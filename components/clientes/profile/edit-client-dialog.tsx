@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
-import { users } from "@/lib/account"
+import { getMembers } from "@/lib/account"
 import { maskPhone } from "@/lib/masks"
 import type { Client } from "@/types"
 
@@ -35,7 +35,7 @@ function EditClientForm({ client, onClose, onSave }: { client: Client; onClose: 
           </Field>
           <Field label="Responsável" htmlFor="edit-owner" className="sm:col-span-2">
             <NativeSelect id="edit-owner" value={form.ownerId} onChange={(e) => setForm((f) => ({ ...f, ownerId: e.target.value }))}>
-              {users.map((u) => (
+              {getMembers().map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>

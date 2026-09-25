@@ -235,8 +235,7 @@ export function mapSearchResponse(response: DataJudSearchResponse, requestedCnj:
     ? {
         code: typeof source.orgaoJulgador.codigo === "number" ? source.orgaoJulgador.codigo : undefined,
         name: text(source.orgaoJulgador.nome),
-        municipalityCode:
-          typeof source.orgaoJulgador.codigoMunicipioIBGE === "number" ? source.orgaoJulgador.codigoMunicipioIBGE : undefined,
+        municipalityCode: typeof source.orgaoJulgador.codigoMunicipioIBGE === "number" ? source.orgaoJulgador.codigoMunicipioIBGE : undefined,
       }
     : undefined
 

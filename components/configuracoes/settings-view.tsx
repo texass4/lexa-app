@@ -3,29 +3,29 @@
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
-import { Bell, Building, Check, KeyRound, Lock, Monitor, Moon, Plug, ShieldCheck, Sun, UserPlus, UserRound, UsersRound } from "lucide-react"
+import { Bell, Building, Plug, ShieldCheck, UserRound, UsersRound, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
-import { Field, TextInput } from "@/components/ui/field"
-import { StatusBadge, Tag } from "@/components/ui/status-badge"
-import { UserAvatar } from "@/components/ui/user-avatar"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { ToggleSwitch } from "@/components/ui/toggle-switch"
-import { TableShell, Td, Th } from "@/components/ui/data-table"
-import { useTheme } from "@/lib/theme"
-import { organization, users, CURRENT_USER_ID, getUser } from "@/lib/account"
-import { PRACTICE_AREAS } from "@/lib/config"
+import { ProfileSection } from "./profile-section"
+import { OfficeSection } from "./office-section"
+import { MembersManager } from "./members-manager"
+import { PermissionsSection } from "./permissions-section"
+import { useSession } from "@/lib/auth/session"
+import type { Permission } from "@/lib/auth/permissions"
 
 const SECTIONS = [
   { id: "perfil", label: "Perfil", icon: UserRound, description: "Seus dados e preferências" },
   { id: "escritorio", label: "Escritório", icon: Building, description: "Dados do escritório e plano" },
-  { id: "usuarios", label: "Usuários", icon: UsersRound, description: "Equipe com acesso à LEXA" },
-  { id: "permissoes", label: "Permissões", icon: ShieldCheck, description: "O que cada perfil pode fazer" },
+  { id: "usuarios", label: "Usuários", icon: UsersRound, description: "Equipe com acesso à LEXA", permission: "users.manage" },
+  { id: "permissoes", label: "Permissões", icon: ShieldCheck, description: "O que cada perfil pode fazer", permission: "users.manage" },
   { id: "notificacoes", label: "Notificações", icon: Bell, description: "Alertas e canais" },
   { id: "integracoes", label: "Integrações", icon: Plug, description: "Conecte suas ferramentas" },
-] as const
+] as const satisfies readonly { id: string; label: string; icon: LucideIcon; description: string; permission?: Permission }[]
 
 type SectionId = (typeof SECTIONS)[number]["id"]
 
@@ -34,283 +34,6 @@ function SaveBar({ label = "Salvar alterações" }: { label?: string }) {
     <div className="flex justify-end border-t border-border px-5 py-3.5">
       <Button onClick={() => toast.success("Alterações salvas.")}>{label}</Button>
     </div>
-  )
-}
-
-function ProfileSection() {
-  const user = getUser(CURRENT_USER_ID)
-  const { theme, setTheme } = useTheme()
-  return (
-    <div className="space-y-5">
-      <Panel>
-        <PanelHeader title="Perfil" description="Como você aparece para a equipe e para os clientes." />
-        <div className="px-5 pb-5">
-          <div className="mb-6 flex items-center gap-4">
-            <UserAvatar name={user.name} size="xl" tone="dark" />
-            <div>
-              <p className="text-[15px] font-semibold">{user.name}</p>
-              <p className="text-[13px] text-muted-foreground">
-                {user.role} · {user.oab}
-              </p>
-              <Button variant="secondary" size="xs" className="mt-2" onClick={() => toast.success("Foto atualizada.")}>
-                Alterar foto
-              </Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Nome completo" htmlFor="p-name">
-              <TextInput id="p-name" defaultValue={user.name} />
-            </Field>
-            <Field label="Inscrição na OAB" htmlFor="p-oab">
-              <TextInput id="p-oab" defaultValue={user.oab} />
-            </Field>
-            <Field label="E-mail" htmlFor="p-email">
-              <TextInput id="p-email" type="email" defaultValue={user.email} />
-            </Field>
-            <Field label="Telefone" htmlFor="p-phone">
-              <TextInput id="p-phone" defaultValue={user.phone} />
-            </Field>
-          </div>
-        </div>
-        <SaveBar />
-      </Panel>
-
-      <Panel>
-        <PanelHeader title="Aparência" description="Escolha o tema da interface." />
-        <div className="grid grid-cols-1 gap-3 px-5 pb-5 sm:grid-cols-2">
-          {(
-            [
-              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F8F8F6]", bar: "bg-white", line: "bg-[#E7E5E4]" },
-              { id: "dark", label: "Escuro", icon: Moon, preview: "bg-[#0E0E0D]", bar: "bg-[#161615]", line: "bg-[#292826]" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTheme(t.id)}
-              aria-pressed={theme === t.id}
-              className={cn(
-                "group rounded-[12px] border p-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
-                theme === t.id ? "border-foreground" : "border-border hover:border-border-strong",
-              )}
-            >
-              <div className={cn("flex h-20 gap-1.5 overflow-hidden rounded-[8px] p-2", t.preview)}>
-                <div className={cn("w-1/4 rounded-[4px]", t.bar)} />
-                <div className="flex flex-1 flex-col gap-1.5">
-                  <div className={cn("h-3 w-1/2 rounded-[3px]", t.bar)} />
-                  <div className={cn("flex-1 rounded-[4px]", t.bar)}>
-                    <div className={cn("m-1.5 h-1 w-2/3 rounded", t.line)} />
-                    <div className="m-1.5 h-1 w-1/4 rounded bg-[#A88655]" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between px-1 pt-2">
-                <span className="flex items-center gap-2 text-[13px] font-medium">
-                  <t.icon className="size-4 text-muted-foreground" /> {t.label}
-                </span>
-                {theme === t.id && <Check className="size-4" />}
-              </div>
-            </button>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel>
-        <PanelHeader title="Segurança" />
-        <div className="divide-y divide-border px-5 pb-2">
-          <div className="flex items-center gap-3 py-3.5">
-            <KeyRound className="size-4 text-subtle" />
-            <div className="flex-1">
-              <p className="text-[13.5px] font-medium">Senha</p>
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => toast.success("Enviamos um link para redefinir sua senha.")}>
-              Alterar
-            </Button>
-          </div>
-          <div className="flex items-center gap-3 py-3.5">
-            <Lock className="size-4 text-subtle" />
-            <div className="flex-1">
-              <p className="text-[13.5px] font-medium">Verificação em duas etapas</p>
-              <p className="text-[12px] text-muted-foreground">Não configurada</p>
-            </div>
-            <StatusBadge tone="neutral">Desativada</StatusBadge>
-          </div>
-          <div className="flex items-center gap-3 py-3.5">
-            <Monitor className="size-4 text-subtle" />
-            <div className="flex-1">
-              <p className="text-[13.5px] font-medium">Sessões ativas</p>
-              <p className="text-[12px] text-muted-foreground">Este navegador · agora</p>
-            </div>
-          </div>
-        </div>
-      </Panel>
-    </div>
-  )
-}
-
-function OfficeSection() {
-  return (
-    <div className="space-y-5">
-      <Panel className="overflow-hidden">
-        <div className="flex flex-col gap-4 bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklab,var(--gold)_12%,transparent),transparent_60%)] p-5 sm:flex-row sm:items-center">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gold-dark">Plano {organization.plan}</p>
-            <p className="mt-1 text-[15px] font-semibold">
-              {users.length} {users.length === 1 ? "usuário" : "usuários"}
-            </p>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              toast("Nossa equipe comercial entrará em contato.", {
-                description: "Plano Escritório: usuários ilimitados e monitoramento processual.",
-              })
-            }
-          >
-            Conhecer plano Escritório
-          </Button>
-        </div>
-      </Panel>
-      <Panel>
-        <PanelHeader title="Dados do escritório" description="Utilizados em contratos, procurações e comunicações." />
-        <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2">
-          <Field label="Nome fantasia" htmlFor="o-name">
-            <TextInput id="o-name" defaultValue={organization.name} />
-          </Field>
-          <Field label="CNPJ" htmlFor="o-cnpj">
-            <TextInput id="o-cnpj" defaultValue={organization.cnpj} />
-          </Field>
-          <Field label="Razão social" htmlFor="o-legal" className="sm:col-span-2">
-            <TextInput id="o-legal" defaultValue={organization.legalName} />
-          </Field>
-          <Field label="Endereço" htmlFor="o-address" className="sm:col-span-2">
-            <TextInput id="o-address" defaultValue={organization.address} />
-          </Field>
-          <Field label="Telefone" htmlFor="o-phone">
-            <TextInput id="o-phone" defaultValue={organization.phone} />
-          </Field>
-          <Field label="E-mail" htmlFor="o-email">
-            <TextInput id="o-email" defaultValue={organization.email} />
-          </Field>
-          <div className="sm:col-span-2">
-            <p className="mb-2 text-[12.5px] font-medium">Áreas de atuação</p>
-            <div className="flex flex-wrap gap-1.5">
-              {PRACTICE_AREAS.map((a) => (
-                <Tag key={a}>{a}</Tag>
-              ))}
-            </div>
-          </div>
-        </div>
-        <SaveBar />
-      </Panel>
-    </div>
-  )
-}
-
-function UsersSection() {
-  return (
-    <Panel>
-      <PanelHeader
-        title="Usuários"
-        description={`${users.length} ${users.length === 1 ? "pessoa" : "pessoas"} com acesso`}
-        action={
-          <Button size="sm" onClick={() => toast.success("Convite enviado.", { description: "O novo usuário receberá o acesso por e-mail." })}>
-            <UserPlus /> Convidar
-          </Button>
-        }
-      />
-      <TableShell className="rounded-none border-x-0 border-b-0 shadow-none">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] border-separate border-spacing-0">
-            <thead>
-              <tr>
-                <Th>Nome</Th>
-                <Th>Cargo</Th>
-                <Th>Permissão</Th>
-                <Th>Status</Th>
-              </tr>
-            </thead>
-            <tbody className="[&_tr:last-child_td]:border-0">
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <Td>
-                    <div className="flex items-center gap-3">
-                      <UserAvatar name={u.name} tone={u.id === CURRENT_USER_ID ? "dark" : undefined} />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">
-                          {u.name} {u.id === CURRENT_USER_ID && <span className="text-[11.5px] font-normal text-subtle">(você)</span>}
-                        </p>
-                        <p className="truncate text-[12px] text-muted-foreground">{u.email}</p>
-                      </div>
-                    </div>
-                  </Td>
-                  <Td className="text-muted-foreground">{u.role}</Td>
-                  <Td>
-                    <StatusBadge tone={u.permission === "Administrador" ? "gold" : "neutral"} dot={false}>
-                      {u.permission}
-                    </StatusBadge>
-                  </Td>
-                  <Td>
-                    <StatusBadge tone="success">Ativo</StatusBadge>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </TableShell>
-    </Panel>
-  )
-}
-
-const MODULES = ["Clientes", "Processos", "Tarefas e agenda", "Documentos", "Financeiro", "Configurações"]
-const ROLES = ["Administrador", "Advogado", "Colaborador"] as const
-const INITIAL_PERMS: Record<(typeof ROLES)[number], boolean[]> = {
-  Administrador: [true, true, true, true, true, true],
-  Advogado: [true, true, true, true, false, false],
-  Colaborador: [true, true, true, true, false, false],
-}
-
-function PermissionsSection() {
-  const [perms, setPerms] = React.useState(INITIAL_PERMS)
-  return (
-    <Panel>
-      <PanelHeader title="Permissões" description="Defina o acesso de cada perfil aos módulos da LEXA." />
-      <div className="overflow-x-auto border-t border-border">
-        <table className="w-full min-w-[520px] border-separate border-spacing-0">
-          <thead>
-            <tr>
-              <Th>Módulo</Th>
-              {ROLES.map((r) => (
-                <Th key={r} className="text-center">
-                  {r}
-                </Th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="[&_tr:last-child_td]:border-0">
-            {MODULES.map((m, i) => (
-              <tr key={m}>
-                <Td className="font-medium">{m}</Td>
-                {ROLES.map((r) => (
-                  <Td key={r} className="text-center">
-                    <span className="inline-flex">
-                      <ToggleSwitch
-                        label={`${m} — ${r}`}
-                        checked={perms[r][i]}
-                        disabled={r === "Administrador"}
-                        onChange={(v) => setPerms((p) => ({ ...p, [r]: p[r].map((x, j) => (j === i ? v : x)) }))}
-                      />
-                    </span>
-                  </Td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <SaveBar label="Salvar permissões" />
-    </Panel>
   )
 }
 
@@ -443,8 +166,10 @@ export function SettingsView() {
   const params = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+  const { user, can, refresh } = useSession()
+  const sections = SECTIONS.filter((s) => !("permission" in s) || can(s.permission))
   const raw = params.get("secao") as SectionId | null
-  const section: SectionId = raw && SECTIONS.some((s) => s.id === raw) ? raw : "perfil"
+  const section: SectionId = raw && sections.some((s) => s.id === raw) ? raw : "perfil"
   const go = (id: SectionId) => router.replace(`${pathname}?secao=${id}`, { scroll: false })
 
   return (
@@ -453,7 +178,7 @@ export function SettingsView() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
         <nav aria-label="Seções de configurações" className="-mx-4 overflow-x-auto px-4 no-scrollbar lg:mx-0 lg:overflow-visible lg:px-0">
           <ul className="flex gap-1 lg:sticky lg:top-24 lg:flex-col">
-            {SECTIONS.map((s) => {
+            {sections.map((s) => {
               const active = s.id === section
               return (
                 <li key={s.id} className="shrink-0">
@@ -492,7 +217,7 @@ export function SettingsView() {
           >
             {section === "perfil" && <ProfileSection />}
             {section === "escritorio" && <OfficeSection />}
-            {section === "usuarios" && <UsersSection />}
+            {section === "usuarios" && <MembersManager apiBase="/api/team/users" currentUserId={user.id} onChanged={refresh} />}
             {section === "permissoes" && <PermissionsSection />}
             {section === "notificacoes" && <NotificationsSection />}
             {section === "integracoes" && <IntegrationsSection />}

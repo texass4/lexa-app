@@ -23,16 +23,7 @@ import type { DataOrigin, MovementComplement, MovementDocument, MovementJudicial
 /* --------------------------------- modelo --------------------------------- */
 
 export type MovementCategory =
-  | "documento"
-  | "prazo"
-  | "comunicacao"
-  | "tramitacao"
-  | "audiencia"
-  | "julgamento"
-  | "baixa"
-  | "peticao"
-  | "ato"
-  | "outros"
+  "documento" | "prazo" | "comunicacao" | "tramitacao" | "audiencia" | "julgamento" | "baixa" | "peticao" | "ato" | "outros"
 
 export const MOVEMENT_CATEGORY_LABEL: Record<MovementCategory, string> = {
   documento: "Documento",

@@ -7,6 +7,7 @@ import { Logo } from "./logo"
 import { SidebarNav } from "./sidebar-nav"
 import { UserMenu } from "./user-menu"
 import { useUI } from "@/lib/store/ui-store"
+import { getOrganization } from "@/lib/account"
 
 export function Sidebar() {
   const { sidebarCollapsed: collapsed, toggleSidebar } = useUI()
@@ -27,7 +28,7 @@ export function Sidebar() {
           className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
         >
           <Logo collapsed className={cn(!collapsed && "lg:hidden")} />
-          {!collapsed && <Logo className="max-lg:hidden" />}
+          {!collapsed && <Logo subtitle={getOrganization().name} className="max-lg:hidden" />}
         </Link>
       </div>
 

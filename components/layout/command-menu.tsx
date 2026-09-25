@@ -8,8 +8,9 @@ import { ArrowDown, ArrowUp, CalendarPlus, CornerDownLeft, ListChecks, Scale, Se
 import { Kbd } from "@/components/ui/kbd"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { NAV_SECTIONS } from "./nav-config"
-import { useUI } from "@/lib/store/ui-store"
+import { visibleSections } from "./nav-config"
+import { DIALOG_PERMISSION, useUI } from "@/lib/store/ui-store"
+import { useSession } from "@/lib/auth/session"
 import { useDemoData } from "@/lib/store/demo-store"
 import { normalize } from "@/lib/format"
 import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/config"
@@ -55,6 +56,7 @@ export function CommandMenu() {
 function CommandContent() {
   const { setCommandOpen, openDialog } = useUI()
   const data = useDemoData()
+  const { can } = useSession()
   const router = useRouter()
   const [query, setQuery] = React.useState("")
 
@@ -109,14 +111,16 @@ function CommandContent() {
                 icon: CalendarPlus,
                 kind: "appointment" as const,
               },
-            ].map((a) => (
-              <Command.Item key={a.kind} value={`acao ${a.label}`} onSelect={() => openDialog(a.kind)} className={itemCls}>
-                <span className="flex size-7 items-center justify-center rounded-[8px] border border-border bg-surface text-muted-foreground">
-                  <a.icon className="size-3.5" />
-                </span>
-                {a.label}
-              </Command.Item>
-            ))}
+            ]
+              .filter((a) => can(DIALOG_PERMISSION[a.kind]))
+              .map((a) => (
+                <Command.Item key={a.kind} value={`acao ${a.label}`} onSelect={() => openDialog(a.kind)} className={itemCls}>
+                  <span className="flex size-7 items-center justify-center rounded-[8px] border border-border bg-surface text-muted-foreground">
+                    <a.icon className="size-3.5" />
+                  </span>
+                  {a.label}
+                </Command.Item>
+              ))}
           </Command.Group>
         )}
 
@@ -194,12 +198,14 @@ function CommandContent() {
         )}
 
         <Command.Group heading="Ir para" className={groupCls}>
-          {NAV_SECTIONS.flatMap((s) => s.items).map((item) => (
-            <Command.Item key={item.href} value={`ir para ${item.label}`} onSelect={() => go(item.href)} className={itemCls}>
-              <item.icon className="size-4 text-subtle" />
-              {item.label}
-            </Command.Item>
-          ))}
+          {visibleSections(can)
+            .flatMap((s) => s.items)
+            .map((item) => (
+              <Command.Item key={item.href} value={`ir para ${item.label}`} onSelect={() => go(item.href)} className={itemCls}>
+                <item.icon className="size-4 text-subtle" />
+                {item.label}
+              </Command.Item>
+            ))}
         </Command.Group>
       </Command.List>
 

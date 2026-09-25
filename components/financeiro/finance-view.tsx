@@ -74,7 +74,10 @@ export function FinanceView() {
         title="Financeiro"
         description="Honorários previstos, recebidos e em aberto do escritório."
         actions={
-          <Button variant="secondary" onClick={() => toast.success("Relatório exportado.", { description: `financeiro-${series[series.length - 1].key}.xlsx` })}>
+          <Button
+            variant="secondary"
+            onClick={() => toast.success("Relatório exportado.", { description: `financeiro-${series[series.length - 1].key}.xlsx` })}
+          >
             <Download /> Exportar relatório
           </Button>
         }

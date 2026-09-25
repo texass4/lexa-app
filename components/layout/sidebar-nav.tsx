@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { cn } from "cn"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { NAV_SECTIONS, isActive } from "./nav-config"
+import { isActive, visibleSections } from "./nav-config"
+import { useSession } from "@/lib/auth/session"
 import { useDemoData } from "@/lib/store/demo-store"
 
 /**
@@ -17,6 +18,7 @@ import { useDemoData } from "@/lib/store/demo-store"
 export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | "auto" | "collapsed"; onNavigate?: () => void; layoutId: string }) {
   const pathname = usePathname()
   const data = useDemoData()
+  const { can } = useSession()
   const badges = {
     tasks: data.tasks.filter((t) => t.status === "pendente").length,
   }
@@ -27,7 +29,7 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
 
   return (
     <nav aria-label="Navegação principal" className="flex flex-col gap-5">
-      {NAV_SECTIONS.map((section) => (
+      {visibleSections(can).map((section) => (
         <div key={section.label}>
           <p className={cn("mb-1.5 px-2.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-subtle", labelCls)}>{section.label}</p>
           {mode !== "expanded" && <div className={cn("mx-auto mb-2 h-px w-6 bg-border", mode === "auto" ? "lg:hidden" : "")} aria-hidden />}

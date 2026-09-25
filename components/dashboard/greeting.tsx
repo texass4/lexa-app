@@ -3,13 +3,13 @@
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { getNow, fmtTime, greeting, parse } from "@/lib/dates"
-import { getUser, CURRENT_USER_ID } from "@/lib/account"
+import { getUser, currentUserId } from "@/lib/account"
 import { useDemoData } from "@/lib/store/demo-store"
 import { todaysAppointments } from "@/lib/selectors"
 
 export function Greeting() {
   const data = useDemoData()
-  const user = getUser(CURRENT_USER_ID)
+  const user = getUser(currentUserId())
   const next = todaysAppointments(data).find((a) => parse(a.start) > getNow())
   const minutes = next ? Math.round((parse(next.start).getTime() - getNow().getTime()) / 60000) : 0
 

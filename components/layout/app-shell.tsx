@@ -6,10 +6,19 @@ import { Topbar } from "./topbar"
 import { MobileBottomNav, MobileDrawer } from "./mobile-nav"
 import { CommandMenu } from "./command-menu"
 import { GlobalDialogs } from "./global-dialogs"
+import { usePathname } from "next/navigation"
+import { ShieldOff } from "lucide-react"
+import { Panel } from "@/components/ui/panel"
+import { EmptyState } from "@/components/ui/empty-state"
+import { routePermission } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
+import { useSession } from "@/lib/auth/session"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed } = useUI()
+  const { can } = useSession()
+  const permission = routePermission(usePathname())
+  const allowed = !permission || can(permission)
   return (
     <div className="min-h-dvh">
       <a
@@ -27,7 +36,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <Topbar />
         <main id="conteudo" className="mx-auto w-full max-w-[1440px] flex-1 px-4 pt-6 pb-28 sm:px-6 md:pb-14 lg:px-8 lg:pt-8">
-          {children}
+          {allowed ? (
+            children
+          ) : (
+            <Panel className="mt-4">
+              <EmptyState
+                icon={<ShieldOff />}
+                title="Sem acesso a este módulo."
+                description="Seu usuário não tem permissão para ver esta área. Fale com o sócio responsável pelo escritório."
+              />
+            </Panel>
+          )}
         </main>
       </div>
       <MobileBottomNav />

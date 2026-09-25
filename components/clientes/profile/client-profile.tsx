@@ -4,12 +4,14 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
+import { toast } from "sonner"
 import { CalendarClock, FilePlus, Plus, Scale, UserX } from "lucide-react"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { UnderlineTabs } from "@/components/ui/underline-tabs"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { ProcessListItem } from "@/components/shared/process-list-item"
 import { DocumentList } from "@/components/shared/document-list"
 import { ActivityTimeline } from "@/components/shared/activity-timeline"
@@ -19,6 +21,7 @@ import { FinanceTab } from "./finance-tab"
 import { EditClientDialog } from "./edit-client-dialog"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
+import { Can, useSession } from "@/lib/auth/session"
 
 const TABS = ["visao-geral", "processos", "documentos", "financeiro", "timeline"] as const
 type Tab = (typeof TABS)[number]
@@ -47,16 +50,19 @@ function ProfileSkeleton() {
 
 export function ClientProfile({ id }: { id: string }) {
   const data = useDemoData()
-  const { updateClient } = useDemoActions()
+  const { updateClient, deleteClient } = useDemoActions()
   const { openDialog } = useUI()
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
   const ready = data.hydrated
   const [editing, setEditing] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
 
+  const { can } = useSession()
+  const showFinance = can("finance.view")
   const tabParam = params.get("tab") as Tab | null
-  const tab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : "visao-geral"
+  const tab: Tab = tabParam && TABS.includes(tabParam) && (tabParam !== "financeiro" || showFinance) ? tabParam : "visao-geral"
   const setTab = (t: Tab) => router.replace(t === "visao-geral" ? pathname : `${pathname}?tab=${t}`, { scroll: false })
 
   const client = data.clients.find((c) => c.id === id)
@@ -93,7 +99,7 @@ export function ClientProfile({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      <ClientHeader client={client} onEdit={() => setEditing(true)} />
+      <ClientHeader client={client} onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} />
 
       <UnderlineTabs
         ariaLabel="Seções do cliente"
@@ -104,7 +110,7 @@ export function ClientProfile({ id }: { id: string }) {
           { value: "visao-geral", label: "Visão geral" },
           { value: "processos", label: "Processos", count: processes.length },
           { value: "documentos", label: "Documentos", count: documents.length },
-          { value: "financeiro", label: "Financeiro" },
+          ...(showFinance ? [{ value: "financeiro" as const, label: "Financeiro" }] : []),
           { value: "timeline", label: "Timeline" },
         ]}
       />
@@ -134,9 +140,11 @@ export function ClientProfile({ id }: { id: string }) {
                   title="Nenhum processo encontrado."
                   description="Este cliente ainda não possui processos cadastrados no escritório."
                   action={
-                    <Button size="sm" onClick={() => openDialog("process", { clientId: client.id })}>
-                      <Plus /> Novo processo
-                    </Button>
+                    <Can permission="processes.edit">
+                      <Button size="sm" onClick={() => openDialog("process", { clientId: client.id })}>
+                        <Plus /> Novo processo
+                      </Button>
+                    </Can>
                   }
                 />
               </Panel>
@@ -148,9 +156,11 @@ export function ClientProfile({ id }: { id: string }) {
                 title="Documentos"
                 description={`${documents.length} arquivos · ${client.name}`}
                 action={
-                  <Button size="sm" onClick={() => openDialog("document", { clientId: client.id })}>
-                    <FilePlus /> Adicionar documento
-                  </Button>
+                  <Can permission="documents.edit">
+                    <Button size="sm" onClick={() => openDialog("document", { clientId: client.id })}>
+                      <FilePlus /> Adicionar documento
+                    </Button>
+                  </Can>
                 }
               />
               {documents.length ? (
@@ -183,6 +193,17 @@ export function ClientProfile({ id }: { id: string }) {
       </AnimatePresence>
 
       <EditClientDialog client={client} open={editing} onOpenChange={setEditing} onSave={(patch) => updateClient(client.id, patch)} />
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Excluir ${client.name}?`}
+        description="Esta ação não pode ser desfeita. Processos, documentos e tarefas vinculados a este cliente deixam de mostrar o nome dele."
+        onConfirm={() => {
+          deleteClient(client.id)
+          toast.success("Cliente excluído.", { description: client.name })
+          router.push("/clientes")
+        }}
+      />
     </div>
   )
 }

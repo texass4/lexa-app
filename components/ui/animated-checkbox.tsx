@@ -8,11 +8,13 @@ export function AnimatedCheckbox({
   onChange,
   label,
   className,
+  disabled,
 }: {
   checked: boolean
   onChange: () => void
   label: string
   className?: string
+  disabled?: boolean
 }) {
   return (
     <motion.button
@@ -20,14 +22,16 @@ export function AnimatedCheckbox({
       role="checkbox"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={(e) => {
         e.stopPropagation()
         onChange()
       }}
-      whileTap={{ scale: 0.86 }}
+      whileTap={disabled ? undefined : { scale: 0.86 }}
       className={cn(
         "relative flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-gold/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         checked ? "border-foreground bg-foreground text-background" : "border-border-strong bg-surface hover:border-foreground/40",
+        disabled && "cursor-default opacity-60 hover:border-border-strong",
         className,
       )}
     >

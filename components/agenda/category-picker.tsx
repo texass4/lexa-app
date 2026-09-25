@@ -101,7 +101,14 @@ function CreateCategory({ onCreated }: { onCreated: (category: AppointmentCatego
             create()
           }}
         >
-          <TextInput autoFocus placeholder="Ex.: Audiência" maxLength={MAX_NAME} aria-label="Nome da categoria" value={name} onChange={(e) => setName(e.target.value)} />
+          <TextInput
+            autoFocus
+            placeholder="Ex.: Audiência"
+            maxLength={MAX_NAME}
+            aria-label="Nome da categoria"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
           <ColorSwatches value={color} onChange={setColor} />
           <Button type="submit" size="sm" className="w-full" disabled={!name.trim()}>
             Criar categoria

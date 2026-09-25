@@ -2,15 +2,28 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { CalendarDays, CircleDollarSign, ListChecks, Scale } from "lucide-react"
+import { CalendarDays, CircleDollarSign, ListChecks, Scale, type LucideIcon } from "lucide-react"
 import { cn } from "cn"
 import { useDemoData } from "@/lib/store/demo-store"
 import { isOverdue, openReceivables, taskBucket, todaysAppointments } from "@/lib/selectors"
 import { getNow, fmtTime, parse } from "@/lib/dates"
 import { formatCurrency, formatNumber } from "@/lib/format"
+import { useSession } from "@/lib/auth/session"
+import type { Permission } from "@/lib/auth/permissions"
+
+interface KpiCard {
+  permission: Permission
+  href: string
+  label: string
+  short?: string
+  icon: LucideIcon
+  value: string
+  foot: React.ReactNode
+}
 
 export function KpiCards() {
   const data = useDemoData()
+  const { can } = useSession()
   const activeProcesses = data.processes.filter((p) => p.status !== "concluido")
   const synced = data.processes.filter((p) => p.source?.provider === "datajud").length
   const todays = todaysAppointments(data)
@@ -21,8 +34,9 @@ export function KpiCards() {
   const open = openReceivables(data)
   const late = data.invoices.filter((i) => i.status === "atrasado").reduce((a, i) => a + i.amount, 0)
 
-  const cards = [
+  const all: KpiCard[] = [
     {
+      permission: "processes.view",
       href: "/processos",
       label: "Processos ativos",
       short: "Processos",
@@ -31,6 +45,7 @@ export function KpiCards() {
       foot: data.processes.length ? <>{synced} acompanhados pelo DataJud</> : <>Consulte pelo número CNJ</>,
     },
     {
+      permission: "agenda.view",
       href: "/agenda",
       label: "Compromissos hoje",
       short: "Hoje",
@@ -39,6 +54,7 @@ export function KpiCards() {
       foot: nextToday ? <>Próximo às {fmtTime(nextToday.start)}</> : <>Nenhum compromisso restante</>,
     },
     {
+      permission: "tasks.view",
       href: "/tarefas",
       label: "Tarefas pendentes",
       icon: ListChecks,
@@ -52,6 +68,7 @@ export function KpiCards() {
       ),
     },
     {
+      permission: "finance.view",
       href: "/financeiro",
       label: "Honorários em aberto",
       short: "Em aberto",
@@ -60,6 +77,7 @@ export function KpiCards() {
       foot: late > 0 ? <>{formatCurrency(late)} em atraso</> : <>Nenhum valor em atraso</>,
     },
   ]
+  const cards = all.filter((card) => can(card.permission))
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

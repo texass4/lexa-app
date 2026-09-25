@@ -38,7 +38,12 @@ export function RevenueAreaChart({ data, height = 180 }: { data: MonthRevenue[];
   const mounted = useMounted()
   if (!mounted) return <Skeleton style={{ height }} className="w-full rounded-[10px]" />
   return (
-    <div style={{ height }} className="w-full" role="img" aria-label={`Gráfico de receita recebida e prevista de ${data[0]?.label} a ${data[data.length - 1]?.label}`}>
+    <div
+      style={{ height }}
+      className="w-full"
+      role="img"
+      aria-label={`Gráfico de receita recebida e prevista de ${data[0]?.label} a ${data[data.length - 1]?.label}`}
+    >
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 480, height }}>
         <AreaChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
           <defs>
@@ -71,7 +76,12 @@ export function RevenueBarChart({ data, height = 280 }: { data: MonthRevenue[]; 
   const mounted = useMounted()
   if (!mounted) return <Skeleton style={{ height }} className="w-full rounded-[10px]" />
   return (
-    <div style={{ height }} className="w-full" role="img" aria-label={`Receita mensal prevista e recebida de ${data[0]?.label} a ${data[data.length - 1]?.label}`}>
+    <div
+      style={{ height }}
+      className="w-full"
+      role="img"
+      aria-label={`Receita mensal prevista e recebida de ${data[0]?.label} a ${data[data.length - 1]?.label}`}
+    >
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 720, height }}>
         <BarChart data={data} barGap={4} barCategoryGap="28%" margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 4" />

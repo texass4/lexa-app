@@ -17,14 +17,14 @@ export function LogoMark({ className }: { className?: string }) {
   )
 }
 
-export function Logo({ collapsed, className }: { collapsed?: boolean; className?: string }) {
+export function Logo({ collapsed, subtitle, className }: { collapsed?: boolean; subtitle?: string; className?: string }) {
   return (
     <span className={cn("flex items-center gap-2.5", className)}>
       <LogoMark />
       {!collapsed && (
-        <span className="flex flex-col leading-none">
+        <span className="flex min-w-0 flex-col leading-none">
           <span className="text-[14px] font-semibold tracking-[0.22em] text-foreground">LEXA</span>
-          <span className="mt-1 text-[10.5px] tracking-[0.02em] text-muted-foreground">Almeida &amp; Associados</span>
+          {subtitle && <span className="mt-1 truncate text-[10.5px] tracking-[0.02em] text-muted-foreground">{subtitle}</span>}
         </span>
       )}
     </span>

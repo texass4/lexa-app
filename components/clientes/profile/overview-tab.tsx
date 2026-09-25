@@ -16,6 +16,7 @@ import { useCategoryLookup } from "@/components/agenda/use-category"
 import { getNow, fmtActivityTime, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtLongDate, fmtRelative, fmtTime, parse } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
 import type { Activity, Client } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 function InfoRow({ icon, label, value, copy }: { icon: React.ReactNode; label: string; value: string; copy?: boolean }) {
   return (
@@ -52,11 +53,7 @@ export function OverviewTab({ client, activities, onSeeTimeline }: { client: Cli
   const finance = clientFinance(data, client.id)
   const processIds = new Set(processes.map((p) => p.id))
   const tasks = data.tasks
-    .filter(
-      (t) =>
-        (t.related?.type === "client" && t.related.id === client.id) ||
-        (t.related?.type === "process" && processIds.has(t.related.id)),
-    )
+    .filter((t) => (t.related?.type === "client" && t.related.id === client.id) || (t.related?.type === "process" && processIds.has(t.related.id)))
     .sort((a, b) => (a.status === b.status ? a.dueAt.localeCompare(b.dueAt) : a.status === "pendente" ? -1 : 1))
     .slice(0, 5)
   const upcoming = data.appointments
@@ -146,14 +143,16 @@ export function OverviewTab({ client, activities, onSeeTimeline }: { client: Cli
             <PanelHeader
               title="Próximos compromissos"
               action={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Novo compromisso"
-                  onClick={() => openDialog("appointment", { clientId: client.id })}
-                >
-                  <Plus />
-                </Button>
+                <Can permission="agenda.edit">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Novo compromisso"
+                    onClick={() => openDialog("appointment", { clientId: client.id })}
+                  >
+                    <Plus />
+                  </Button>
+                </Can>
               }
             />
             {upcoming.length ? (
@@ -192,9 +191,11 @@ export function OverviewTab({ client, activities, onSeeTimeline }: { client: Cli
             <PanelHeader
               title="Tarefas"
               action={
-                <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task", { clientId: client.id })}>
-                  <Plus />
-                </Button>
+                <Can permission="tasks.edit">
+                  <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task", { clientId: client.id })}>
+                    <Plus />
+                  </Button>
+                </Can>
               }
             />
             {tasks.length ? (

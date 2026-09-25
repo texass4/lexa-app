@@ -15,8 +15,9 @@ import { useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { categoryStyle } from "@/lib/config"
 import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, startOfDay, startOfWeek, weekdayName } from "@/lib/dates"
-import { CURRENT_USER_ID } from "@/lib/account"
+import { currentUserId } from "@/lib/account"
 import type { Appointment } from "@/types"
+import { useSession } from "@/lib/auth/session"
 
 type View = "dia" | "semana" | "mes"
 
@@ -28,6 +29,8 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 export function AgendaView() {
   const data = useDemoData()
   const { openDialog } = useUI()
+  const { can } = useSession()
+  const editable = can("agenda.edit")
   const ready = data.hydrated
   const [view, setView] = React.useState<View>("semana")
   const [anchor, setAnchor] = React.useState(() => startOfDay(getNow()))
@@ -38,7 +41,7 @@ export function AgendaView() {
 
   const categoryIds = React.useMemo(() => new Set(data.appointmentCategories.map((c) => c.id)), [data.appointmentCategories])
   const legendKey = (a: Appointment) => (a.categoryId && categoryIds.has(a.categoryId) ? a.categoryId : NONE)
-  const events = data.appointments.filter((a) => !hidden.has(legendKey(a)) && (!onlyMine || a.ownerId === CURRENT_USER_ID))
+  const events = data.appointments.filter((a) => !hidden.has(legendKey(a)) && (!onlyMine || a.ownerId === currentUserId()))
 
   const weekStart = startOfWeek(anchor)
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -102,9 +105,11 @@ export function AgendaView() {
           <h1 className="font-serif text-[30px] leading-[1.1] tracking-[-0.01em] sm:text-[34px]">Agenda</h1>
           <p className="mt-2 text-[14px] text-muted-foreground">Compromissos e prazos do escritório.</p>
         </div>
-        <Button onClick={() => create()}>
-          <Plus /> Novo compromisso
-        </Button>
+        {editable && (
+          <Button onClick={() => create()}>
+            <Plus /> Novo compromisso
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -211,14 +216,22 @@ export function AgendaView() {
             {view === "semana" && (
               <>
                 <div className="hidden md:block">
-                  <TimeGrid days={weekDays} events={events} onSelect={setSelected} onCreate={create} processCode={processCode} />
+                  <TimeGrid
+                    days={weekDays}
+                    events={events}
+                    onSelect={setSelected}
+                    onCreate={editable ? create : undefined}
+                    processCode={processCode}
+                  />
                 </div>
                 <div className="md:hidden">
                   <AgendaList days={weekDays} events={events} onSelect={setSelected} />
                 </div>
               </>
             )}
-            {view === "dia" && <TimeGrid days={[anchor]} events={events} onSelect={setSelected} onCreate={create} processCode={processCode} />}
+            {view === "dia" && (
+              <TimeGrid days={[anchor]} events={events} onSelect={setSelected} onCreate={editable ? create : undefined} processCode={processCode} />
+            )}
             {view === "mes" && (
               <MonthGrid
                 anchor={anchor}

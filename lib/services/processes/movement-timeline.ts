@@ -47,7 +47,28 @@ export const MIN_CLUSTER_SIZE = 3
 /* --------------------------------- plural --------------------------------- */
 
 /** Palavras que encerram o núcleo do nome: "Expedição de documento" → "Expedições de documento". */
-const CONNECTORS = new Set(["de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "a", "à", "ao", "aos", "para", "por", "com", "e", "ou", "sobre"])
+const CONNECTORS = new Set([
+  "de",
+  "do",
+  "da",
+  "dos",
+  "das",
+  "em",
+  "no",
+  "na",
+  "nos",
+  "nas",
+  "a",
+  "à",
+  "ao",
+  "aos",
+  "para",
+  "por",
+  "com",
+  "e",
+  "ou",
+  "sobre",
+])
 
 function pluralWord(word: string): string | null {
   if (/[\d/()]/.test(word) || word.length < 2) return null

@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { PRACTICE_AREAS } from "@/lib/config"
-import { users, CURRENT_USER_ID } from "@/lib/account"
-import { useDemoActions } from "@/lib/store/demo-store"
+import { getMembers, currentUserId } from "@/lib/account"
+import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { isEmail, maskDocument, maskPhone } from "@/lib/masks"
 import type { PracticeArea } from "@/types"
 
@@ -24,7 +24,7 @@ const empty = () => ({
   phone: "",
   address: "",
   area: "Previdenciário" as PracticeArea,
-  ownerId: CURRENT_USER_ID,
+  ownerId: currentUserId(),
 })
 
 type FormState = ReturnType<typeof empty>
@@ -32,6 +32,7 @@ type FormState = ReturnType<typeof empty>
 function NewClientForm({ onClose }: { onClose: () => void }) {
   const [form, setForm] = React.useState(empty)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
+  const { clients } = useDemoData()
   const { addClient } = useDemoActions()
   const router = useRouter()
 
@@ -42,8 +43,10 @@ function NewClientForm({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     const next: Record<string, string> = {}
     if (form.name.trim().length < 3) next.name = pj ? "Informe a razão social." : "Informe o nome completo."
-    const digits = form.document.replace(/\D/g, "").length
-    if (digits !== (pj ? 14 : 11)) next.document = pj ? "CNPJ deve ter 14 dígitos." : "CPF deve ter 11 dígitos."
+    const docDigits = form.document.replace(/\D/g, "")
+    if (docDigits.length !== (pj ? 14 : 11)) next.document = pj ? "CNPJ deve ter 14 dígitos." : "CPF deve ter 11 dígitos."
+    else if (clients.some((c) => c.document.replace(/\D/g, "") === docDigits))
+      next.document = `Já existe um cliente cadastrado com este ${pj ? "CNPJ" : "CPF"}.`
     if (form.email && !isEmail(form.email)) next.email = "E-mail inválido."
     setErrors(next)
     if (Object.keys(next).length) return
@@ -121,7 +124,7 @@ function NewClientForm({ onClose }: { onClose: () => void }) {
           </Field>
           <Field label="Responsável" htmlFor="client-owner">
             <NativeSelect id="client-owner" value={form.ownerId} onChange={(e) => set("ownerId", e.target.value)}>
-              {users.map((u) => (
+              {getMembers().map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>

@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const serif = DM_Serif_Display({ variable: "--font-dm-serif", subsets: ["latin"], weight: "400" })
 
 export const metadata: Metadata = {
-  title: { default: "LEXA — Almeida & Associados", template: "%s · LEXA" },
+  title: { default: "LEXA", template: "%s · LEXA" },
   description: "Gestão jurídica para escritórios de advocacia: clientes, processos, prazos e agenda em um só lugar.",
 }
 

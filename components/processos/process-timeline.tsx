@@ -2,19 +2,7 @@
 
 import * as React from "react"
 import { motion } from "framer-motion"
-import {
-  Activity,
-  ArrowRight,
-  Bell,
-  Calendar,
-  ChevronDown,
-  Circle,
-  CircleCheck,
-  Clock,
-  FilePen,
-  FileText,
-  Gavel,
-} from "lucide-react"
+import { Activity, ArrowRight, Bell, Calendar, ChevronDown, Circle, CircleCheck, Clock, FilePen, FileText, Gavel } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -99,7 +87,10 @@ export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
           setFilter(value)
           setLimit(PAGE_SIZE)
         }}
-        options={FILTERS.filter((f) => f.value === "todas" || counts[f.value] > 0 || f.value === filter).map((f) => ({ ...f, count: counts[f.value] }))}
+        options={FILTERS.filter((f) => f.value === "todas" || counts[f.value] > 0 || f.value === filter).map((f) => ({
+          ...f,
+          count: counts[f.value],
+        }))}
         className="mb-6"
       />
 
@@ -224,7 +215,12 @@ function SingleEntry({ movement, emphasis, onOpen }: { movement: LexaMovement; e
   return (
     <li className="relative pb-5 last:pb-0">
       <EntryIcon category={movement.category} emphasis={emphasis} />
-      <button type="button" className={rowButton} onClick={() => onOpen(movement)} aria-label={`Detalhes: ${movement.title}, ${fmtTime(movement.at)}`}>
+      <button
+        type="button"
+        className={rowButton}
+        onClick={() => onOpen(movement)}
+        aria-label={`Detalhes: ${movement.title}, ${fmtTime(movement.at)}`}
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1 pt-0.5">
             <EntryText title={movement.title} description={movement.description} unit={movement.judicialUnit?.name} />

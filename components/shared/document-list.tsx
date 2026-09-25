@@ -1,40 +1,70 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
-import { Download, Ellipsis, Eye, Link2 } from "lucide-react"
+import { Download, Ellipsis, Eye, Link2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FileIcon } from "./file-icon"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useUI } from "@/lib/store/ui-store"
+import { downloadDocument } from "@/lib/documents"
 import { fmtNumericDate } from "@/lib/dates"
 import { formatFileSize } from "@/lib/format"
 import { getUser } from "@/lib/account"
 import type { LegalDocument } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 export function DocumentActions({ doc }: { doc: LegalDocument }) {
+  const { openDialog } = useUI()
+  const { deleteDocument } = useDemoActions()
+  const [deleting, setDeleting] = React.useState(false)
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={`Ações para ${doc.name}`}
-        className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
-      >
-        <Ellipsis className="size-4" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44 rounded-[10px] p-1">
-        <DropdownMenuGroup>
-          <DropdownMenuItem className="h-8 px-2" onClick={() => toast("Pré-visualização aberta.", { description: doc.name })}>
-            <Eye /> Visualizar
-          </DropdownMenuItem>
-          <DropdownMenuItem className="h-8 px-2" onClick={() => toast.success("Download iniciado.", { description: doc.name })}>
-            <Download /> Baixar
-          </DropdownMenuItem>
-          <DropdownMenuItem className="h-8 px-2" onClick={() => toast.success("Link copiado.", { description: "Válido por 7 dias para o cliente." })}>
-            <Link2 /> Copiar link seguro
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Ações para ${doc.name}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+        >
+          <Ellipsis className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44 rounded-[10px] p-1" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuGroup>
+            <DropdownMenuItem className="h-8 px-2" onClick={() => openDialog("document-preview", { documentId: doc.id })}>
+              <Eye /> Visualizar
+            </DropdownMenuItem>
+            <DropdownMenuItem className="h-8 px-2" onClick={() => downloadDocument(doc)}>
+              <Download /> Baixar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="h-8 px-2"
+              onClick={() => toast.success("Link copiado.", { description: "Válido por 7 dias para o cliente." })}
+            >
+              <Link2 /> Copiar link seguro
+            </DropdownMenuItem>
+            <Can permission="documents.edit">
+              <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setDeleting(true)}>
+                <Trash2 /> Excluir
+              </DropdownMenuItem>
+            </Can>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Excluir "${doc.name}"?`}
+        description="Esta ação não pode ser desfeita."
+        onConfirm={() => {
+          deleteDocument(doc.id)
+          toast.success("Documento excluído.", { description: doc.name })
+        }}
+      />
+    </>
   )
 }
 

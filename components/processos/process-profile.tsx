@@ -1,16 +1,20 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   ArrowUpRight,
   CalendarPlus,
   Copy,
+  Ellipsis,
   FilePlus,
   Hourglass,
   ListChecks,
   Plus,
   Scale,
+  Trash2,
   UserRound,
   Activity as ActivityGlyph,
 } from "lucide-react"
@@ -23,18 +27,21 @@ import { StatusBadge, Tag } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { FadeIn } from "@/components/ui/motion"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DocumentList } from "@/components/shared/document-list"
 import { TaskRow } from "@/components/tasks/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { PROCESS_STATUS } from "@/lib/config"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import { getNow, diffInDays, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtNumericDate, fmtTime, parse } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
-import { getUser } from "@/lib/account"
+import { getUser, userTitle } from "@/lib/account"
 import { interpretMovements } from "@/lib/services/processes/movement-interpreter"
+import { Can } from "@/lib/auth/session"
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -47,10 +54,13 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 
 export function ProcessProfile({ id }: { id: string }) {
   const data = useDemoData()
+  const { deleteProcess } = useDemoActions()
   const { openDialog } = useUI()
+  const router = useRouter()
   const lookup = useCategoryLookup()
   const ready = data.hydrated
   const process = data.processes.find((p) => p.id === id)
+  const [deleting, setDeleting] = React.useState(false)
 
   if (!process && data.hydrated) {
     return (
@@ -144,15 +154,35 @@ export function ProcessProfile({ id }: { id: string }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => openDialog("appointment", { processId: process.id, clientId: process.clientId })}>
-              <CalendarPlus /> Compromisso
-            </Button>
-            <Button variant="secondary" onClick={() => openDialog("document", { processId: process.id, clientId: process.clientId })}>
-              <FilePlus /> Documento
-            </Button>
-            <Button onClick={() => openDialog("task", { processId: process.id })}>
-              <ListChecks /> Nova tarefa
-            </Button>
+            <Can permission="agenda.edit">
+              <Button variant="secondary" onClick={() => openDialog("appointment", { processId: process.id, clientId: process.clientId })}>
+                <CalendarPlus /> Compromisso
+              </Button>
+            </Can>
+            <Can permission="documents.edit">
+              <Button variant="secondary" onClick={() => openDialog("document", { processId: process.id, clientId: process.clientId })}>
+                <FilePlus /> Documento
+              </Button>
+            </Can>
+            <Can permission="tasks.edit">
+              <Button onClick={() => openDialog("task", { processId: process.id })}>
+                <ListChecks /> Nova tarefa
+              </Button>
+            </Can>
+            <Can permission="processes.edit">
+              <DropdownMenu>
+                <DropdownMenuTrigger aria-label="Mais ações" className={cn(buttonVariants({ variant: "secondary", size: "icon" }))}>
+                  <Ellipsis />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 rounded-[10px] p-1">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setDeleting(true)}>
+                      <Trash2 /> Excluir processo
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </Can>
           </div>
         </div>
       </FadeIn>
@@ -192,7 +222,7 @@ export function ProcessProfile({ id }: { id: string }) {
             <UserAvatar name={owner.name} size="md" />
             <div className="min-w-0">
               <p className="truncate text-[14px] font-semibold">{owner.name}</p>
-              <p className="truncate text-[11.5px] text-muted-foreground">{owner.oab ?? owner.role}</p>
+              <p className="truncate text-[11.5px] text-muted-foreground">{owner.oab ?? userTitle(owner)}</p>
             </div>
           </div>
         </div>
@@ -231,9 +261,11 @@ export function ProcessProfile({ id }: { id: string }) {
               title="Tarefas do processo"
               description={`${tasks.filter((t) => t.status === "pendente").length} pendentes`}
               action={
-                <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task", { processId: process.id })}>
-                  <Plus />
-                </Button>
+                <Can permission="tasks.edit">
+                  <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task", { processId: process.id })}>
+                    <Plus />
+                  </Button>
+                </Can>
               }
             />
             {tasks.length ? (
@@ -294,14 +326,16 @@ export function ProcessProfile({ id }: { id: string }) {
               title="Documentos"
               description={`${documents.length} arquivos`}
               action={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Adicionar documento"
-                  onClick={() => openDialog("document", { processId: process.id, clientId: process.clientId })}
-                >
-                  <Plus />
-                </Button>
+                <Can permission="documents.edit">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Adicionar documento"
+                    onClick={() => openDialog("document", { processId: process.id, clientId: process.clientId })}
+                  >
+                    <Plus />
+                  </Button>
+                </Can>
               }
             />
             {documents.length ? (
@@ -314,6 +348,18 @@ export function ProcessProfile({ id }: { id: string }) {
           </Panel>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Excluir o processo ${process.number}?`}
+        description="Esta ação não pode ser desfeita, incluindo o histórico de movimentações."
+        onConfirm={() => {
+          deleteProcess(process.id)
+          toast.success("Processo excluído.", { description: process.number })
+          router.push("/processos")
+        }}
+      />
     </div>
   )
 }

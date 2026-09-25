@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { hasValidCheckDigits, maskCNJ, onlyDigits } from "@/lib/cnj"
 import { PRACTICE_AREAS, PROCESS_STATUS } from "@/lib/config"
-import { users, CURRENT_USER_ID } from "@/lib/account"
+import { getMembers, currentUserId } from "@/lib/account"
 import { searchProcessByCNJ } from "@/lib/services/processes/client"
 import type { ProcessSheet } from "@/lib/services/processes/sheet"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
@@ -60,7 +60,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
     court: "",
     district: "Comarca da Capital — Florianópolis",
     opposingParty: "",
-    ownerId: CURRENT_USER_ID,
+    ownerId: currentUserId(),
     status: "em_andamento" as ProcessStatus,
     claimValue: 0,
   })
@@ -138,7 +138,9 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
       setErrors({})
       setLookup({ state: "filled", sheet: found, processId: existing.id, existed: true })
       toast.success("Esse processo já estava em Processos.", {
-        description: added ? `${existing.code} atualizado com ${added} nova(s) movimentação(ões).` : `${existing.code} já estava em dia com o DataJud.`,
+        description: added
+          ? `${existing.code} atualizado com ${added} nova(s) movimentação(ões).`
+          : `${existing.code} já estava em dia com o DataJud.`,
         action: open(existing.id),
       })
       return
@@ -259,9 +261,11 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
                 <div className="flex items-start gap-2.5 rounded-[10px] border border-success/25 bg-success-soft/50 px-3 py-2.5">
                   <CircleCheck className="mt-px size-4 shrink-0 text-success" />
                   <p className="min-w-0 text-[12.5px] leading-snug text-muted-foreground">
-                    <span className="font-medium text-foreground">{linked.existed ? "Já estava em Processos — atualizado." : "Salvo em Processos."}</span>{" "}
-                    {[linked.sheet.tribunal, linked.sheet.degree, `${linked.sheet.movements.length} movimentações`].filter(Boolean).join(" · ")}. Ajuste
-                    cliente e responsável e clique em salvar.
+                    <span className="font-medium text-foreground">
+                      {linked.existed ? "Já estava em Processos — atualizado." : "Salvo em Processos."}
+                    </span>{" "}
+                    {[linked.sheet.tribunal, linked.sheet.degree, `${linked.sheet.movements.length} movimentações`].filter(Boolean).join(" · ")}.
+                    Ajuste cliente e responsável e clique em salvar.
                   </p>
                 </div>
               )}
@@ -277,7 +281,9 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
                   <CircleAlert className="mt-px size-4 shrink-0 text-danger" />
                   <div className="min-w-0">
                     <p className="text-[12.5px] font-medium text-foreground">{lookup.title}</p>
-                    <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{lookup.message} Você pode preencher os campos manualmente.</p>
+                    <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+                      {lookup.message} Você pode preencher os campos manualmente.
+                    </p>
                     {lookup.detail && <p className="mt-1 font-mono text-[11.5px] leading-snug break-words text-subtle">{lookup.detail}</p>}
                   </div>
                 </div>
@@ -321,7 +327,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
           </Field>
           <Field label="Responsável" htmlFor="proc-owner">
             <NativeSelect id="proc-owner" value={form.ownerId} onChange={(e) => set("ownerId", e.target.value)}>
-              {users.map((u) => (
+              {getMembers().map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>

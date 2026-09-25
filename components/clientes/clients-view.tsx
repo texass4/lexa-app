@@ -3,7 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowDown, ArrowUp, ChevronRight, Plus, UsersRound } from "lucide-react"
+import { toast } from "sonner"
+import { ArrowDown, ArrowUp, ChevronRight, Ellipsis, Eye, Plus, Trash2, UsersRound } from "lucide-react"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -15,13 +16,16 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { TableShell, Td, Th } from "@/components/ui/data-table"
 import { FadeIn } from "@/components/ui/motion"
-import { useDemoData } from "@/lib/store/demo-store"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { CLIENT_STATUS } from "@/lib/config"
 import { fmtRelative } from "@/lib/dates"
 import { matches } from "@/lib/format"
 import { getUser } from "@/lib/account"
 import type { Client, ClientStatus } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 type Filter = "todos" | ClientStatus
 const FILTERS: { value: Filter; label: string }[] = [
@@ -36,12 +40,14 @@ type SortKey = "name" | "activity"
 
 export function ClientsView() {
   const data = useDemoData()
+  const { deleteClient } = useDemoActions()
   const { openDialog } = useUI()
   const router = useRouter()
   const ready = data.hydrated
   const [filter, setFilter] = React.useState<Filter>("todos")
   const [query, setQuery] = React.useState("")
   const [sort, setSort] = React.useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "activity", dir: "desc" })
+  const [toDelete, setToDelete] = React.useState<Client | null>(null)
 
   const processCount = React.useMemo(() => {
     const map = new Map<string, number>()
@@ -76,9 +82,11 @@ export function ClientsView() {
         title="Clientes"
         description="Tenha todas as informações do cliente em um único lugar."
         actions={
-          <Button onClick={() => openDialog("client")}>
-            <Plus /> Novo cliente
-          </Button>
+          <Can permission="clients.edit">
+            <Button onClick={() => openDialog("client")}>
+              <Plus /> Novo cliente
+            </Button>
+          </Can>
         }
       />
 
@@ -102,9 +110,11 @@ export function ClientsView() {
             title="Nenhum cliente encontrado."
             description={query ? `Não há clientes que correspondam a “${query}”.` : "Não há clientes com este status no momento."}
             action={
-              <Button size="sm" onClick={() => openDialog("client")}>
-                <Plus /> Novo cliente
-              </Button>
+              <Can permission="clients.edit">
+                <Button size="sm" onClick={() => openDialog("client")}>
+                  <Plus /> Novo cliente
+                </Button>
+              </Can>
             }
           />
         </TableShell>
@@ -143,7 +153,13 @@ export function ClientsView() {
                 </thead>
                 <tbody className="[&_tr:last-child_td]:border-0">
                   {rows.map((c) => (
-                    <ClientRow key={c.id} client={c} processes={processCount.get(c.id) ?? 0} onOpen={() => router.push(`/clientes/${c.id}`)} />
+                    <ClientRow
+                      key={c.id}
+                      client={c}
+                      processes={processCount.get(c.id) ?? 0}
+                      onOpen={() => router.push(`/clientes/${c.id}`)}
+                      onDelete={() => setToDelete(c)}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -189,11 +205,23 @@ export function ClientsView() {
           </ul>
         </FadeIn>
       )}
+
+      <ConfirmDialog
+        open={!!toDelete}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title={`Excluir ${toDelete?.name}?`}
+        description="Esta ação não pode ser desfeita. Processos, documentos e tarefas vinculados a este cliente deixam de mostrar o nome dele."
+        onConfirm={() => {
+          if (!toDelete) return
+          deleteClient(toDelete.id)
+          toast.success("Cliente excluído.", { description: toDelete.name })
+        }}
+      />
     </div>
   )
 }
 
-function ClientRow({ client: c, processes, onOpen }: { client: Client; processes: number; onOpen: () => void }) {
+function ClientRow({ client: c, processes, onOpen, onDelete }: { client: Client; processes: number; onOpen: () => void; onDelete: () => void }) {
   const owner = getUser(c.ownerId)
   const status = CLIENT_STATUS[c.status]
   return (
@@ -235,7 +263,30 @@ function ClientRow({ client: c, processes, onOpen }: { client: Client; processes
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
       </Td>
       <Td>
-        <ChevronRight className="size-4 text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+        <div className="flex items-center justify-end gap-1">
+          <ChevronRight className="size-4 text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`Ações para ${c.name}`}
+              onClick={(e) => e.stopPropagation()}
+              className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+            >
+              <Ellipsis className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44 rounded-[10px] p-1" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="h-8 px-2" onClick={onOpen}>
+                  <Eye /> Abrir perfil
+                </DropdownMenuItem>
+                <Can permission="clients.edit">
+                  <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={onDelete}>
+                    <Trash2 /> Excluir cliente
+                  </DropdownMenuItem>
+                </Can>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </Td>
     </tr>
   )

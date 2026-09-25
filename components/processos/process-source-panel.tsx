@@ -12,6 +12,7 @@ import { fmtDayLabel, fmtNumericDate, fmtTime } from "@/lib/dates"
 import { syncProcessById } from "@/lib/services/processes/client"
 import { useDemoActions } from "@/lib/store/demo-store"
 import type { DataOrigin, Process, ProcessParty } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 const PROVIDER_LABEL: Record<DataOrigin, string> = {
   manual: "Cadastro manual",
@@ -140,10 +141,12 @@ export function ProcessSyncPanel({ process }: { process: Process }) {
         title="Andamento"
         description="Acompanhamento automático das movimentações."
         action={
-          <Button variant="secondary" size="sm" onClick={sync} disabled={syncing}>
-            <RefreshCw className={cn(syncing && "animate-spin")} />
-            {syncing ? "Sincronizando…" : "Atualizar"}
-          </Button>
+          <Can permission="processes.edit">
+            <Button variant="secondary" size="sm" onClick={sync} disabled={syncing}>
+              <RefreshCw className={cn(syncing && "animate-spin")} />
+              {syncing ? "Sincronizando…" : "Atualizar"}
+            </Button>
+          </Can>
         }
       />
       <div className="space-y-3 px-5 pb-5">
@@ -170,8 +173,8 @@ export function ProcessSyncPanel({ process }: { process: Process }) {
         </dl>
 
         <p className="flex items-start gap-2 text-[11.5px] leading-relaxed text-subtle">
-          <ShieldCheck className="mt-px size-3.5 shrink-0" />
-          A consulta acontece no servidor do LEXA e respeita os limites da fonte. Movimentações já conhecidas não são importadas de novo.
+          <ShieldCheck className="mt-px size-3.5 shrink-0" />A consulta acontece no servidor do LEXA e respeita os limites da fonte. Movimentações já
+          conhecidas não são importadas de novo.
         </p>
       </div>
     </Panel>

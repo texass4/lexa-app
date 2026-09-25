@@ -1,17 +1,19 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, FilePlus, ListChecks, Pencil, Phone } from "lucide-react"
+import { ArrowLeft, Ellipsis, FilePlus, ListChecks, Pencil, Phone, Trash2 } from "lucide-react"
 import { cn } from "cn"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { StatusBadge, Tag } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SourceIcon } from "@/components/clientes/source-icon"
 import { CLIENT_STATUS } from "@/lib/config"
 import { fmtLongDate } from "@/lib/dates"
 import { getUser } from "@/lib/account"
 import { useUI } from "@/lib/store/ui-store"
 import type { Client } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 const STATUS_LONG: Record<Client["status"], string> = {
   ativo: "Cliente ativo",
@@ -20,7 +22,7 @@ const STATUS_LONG: Record<Client["status"], string> = {
   inadimplente: "Inadimplente",
 }
 
-export function ClientHeader({ client, onEdit }: { client: Client; onEdit: () => void }) {
+export function ClientHeader({ client, onEdit, onDelete }: { client: Client; onEdit: () => void; onDelete: () => void }) {
   const { openDialog } = useUI()
   const owner = getUser(client.ownerId)
   const status = CLIENT_STATUS[client.status]
@@ -63,9 +65,11 @@ export function ClientHeader({ client, onEdit }: { client: Client; onEdit: () =>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={onEdit}>
-              <Pencil /> Editar
-            </Button>
+            <Can permission="clients.edit">
+              <Button variant="secondary" onClick={onEdit}>
+                <Pencil /> Editar
+              </Button>
+            </Can>
             <a
               href={`tel:${client.phone.replace(/\D/g, "")}`}
               aria-label={`Ligar para ${client.name}`}
@@ -73,12 +77,30 @@ export function ClientHeader({ client, onEdit }: { client: Client; onEdit: () =>
             >
               <Phone />
             </a>
-            <Button variant="secondary" onClick={() => openDialog("task", { clientId: client.id })}>
-              <ListChecks /> Nova tarefa
-            </Button>
-            <Button onClick={() => openDialog("document", { clientId: client.id })}>
-              <FilePlus /> Novo documento
-            </Button>
+            <Can permission="tasks.edit">
+              <Button variant="secondary" onClick={() => openDialog("task", { clientId: client.id })}>
+                <ListChecks /> Nova tarefa
+              </Button>
+            </Can>
+            <Can permission="documents.edit">
+              <Button onClick={() => openDialog("document", { clientId: client.id })}>
+                <FilePlus /> Novo documento
+              </Button>
+            </Can>
+            <Can permission="clients.edit">
+              <DropdownMenu>
+                <DropdownMenuTrigger aria-label="Mais ações" className={cn(buttonVariants({ variant: "secondary", size: "icon" }))}>
+                  <Ellipsis />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 rounded-[10px] p-1">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={onDelete}>
+                      <Trash2 /> Excluir cliente
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </Can>
           </div>
         </div>
       </div>

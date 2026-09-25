@@ -1,10 +1,13 @@
 import { CalendarDays, FolderOpen, LayoutGrid, ListChecks, Scale, Settings, UsersRound, Wallet, type LucideIcon } from "lucide-react"
+import type { Permission } from "@/lib/auth/permissions"
 
 export interface NavItem {
   href: string
   label: string
   icon: LucideIcon
   badgeKey?: "tasks"
+  /** Sem ela, o item some do menu e a rota mostra "sem acesso". */
+  permission?: Permission
 }
 
 export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -15,17 +18,17 @@ export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Escritório",
     items: [
-      { href: "/clientes", label: "Clientes", icon: UsersRound },
-      { href: "/processos", label: "Processos", icon: Scale },
-      { href: "/tarefas", label: "Tarefas", icon: ListChecks, badgeKey: "tasks" },
-      { href: "/agenda", label: "Agenda", icon: CalendarDays },
+      { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
+      { href: "/processos", label: "Processos", icon: Scale, permission: "processes.view" },
+      { href: "/tarefas", label: "Tarefas", icon: ListChecks, badgeKey: "tasks", permission: "tasks.view" },
+      { href: "/agenda", label: "Agenda", icon: CalendarDays, permission: "agenda.view" },
     ],
   },
   {
     label: "Gestão",
     items: [
-      { href: "/documentos", label: "Documentos", icon: FolderOpen },
-      { href: "/financeiro", label: "Financeiro", icon: Wallet },
+      { href: "/documentos", label: "Documentos", icon: FolderOpen, permission: "documents.view" },
+      { href: "/financeiro", label: "Financeiro", icon: Wallet, permission: "finance.view" },
     ],
   },
   {
@@ -47,4 +50,18 @@ export const ROUTE_META: Record<string, { title: string; section: string }> = {
 
 export function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+const ALL_ITEMS = NAV_SECTIONS.flatMap((section) => section.items)
+
+/** Permissão exigida pela rota (ou undefined se todos acessam). */
+export function routePermission(pathname: string) {
+  return ALL_ITEMS.find((item) => isActive(pathname, item.href))?.permission
+}
+
+/** Seções do menu só com o que a pessoa pode ver. */
+export function visibleSections(can: (p: Permission) => boolean) {
+  return NAV_SECTIONS.map((section) => ({ ...section, items: section.items.filter((i) => !i.permission || can(i.permission)) })).filter(
+    (section) => section.items.length > 0,
+  )
 }

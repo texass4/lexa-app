@@ -11,6 +11,7 @@
  */
 
 import { NextResponse } from "next/server"
+import { authorize } from "@/lib/auth/server"
 import { mapSearchResponse } from "@/lib/integrations/legal/datajud/mapper"
 import { userMessageFor } from "@/lib/integrations/legal/datajud/errors"
 import { buildProcessSheet } from "@/lib/services/processes/sheet"
@@ -24,6 +25,8 @@ export const dynamic = "force-dynamic"
 const MAX_INPUT = 32
 
 export async function POST(request: Request) {
+  const denied = await authorize("processes.edit")
+  if (denied) return denied
   let cnj: unknown
   try {
     const body = await request.json()
@@ -63,7 +66,9 @@ export async function POST(request: Request) {
           }
 
           const external = line.found ? mapSearchResponse(line.response, line.cnj) : null
-          console.info(`[datajud.py] resultado ${external ? "encontrado" : "nao_encontrado"} movimentos=${external?.movements.length ?? 0} cache=${line.cached}`)
+          console.info(
+            `[datajud.py] resultado ${external ? "encontrado" : "nao_encontrado"} movimentos=${external?.movements.length ?? 0} cache=${line.cached}`,
+          )
           send({
             type: "result",
             found: !!external,

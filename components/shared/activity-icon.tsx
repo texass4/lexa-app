@@ -1,15 +1,4 @@
-import {
-  Bell,
-  CalendarCheck,
-  CircleDollarSign,
-  FileText,
-  Gavel,
-  ListChecks,
-  RefreshCw,
-  Scale,
-  Signature,
-  UsersRound,
-} from "lucide-react"
+import { Bell, CalendarCheck, CircleDollarSign, FileText, Gavel, ListChecks, RefreshCw, Scale, Signature, UsersRound } from "lucide-react"
 import { cn } from "cn"
 import type { ActivityType } from "@/types"
 

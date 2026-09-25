@@ -3,7 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronRight, Plus, Scale } from "lucide-react"
+import { toast } from "sonner"
+import { ChevronRight, Ellipsis, Eye, Plus, Scale, Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { FilterTabs } from "@/components/ui/filter-tabs"
@@ -14,14 +15,17 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { TableShell, Td, Th } from "@/components/ui/data-table"
 import { FadeIn } from "@/components/ui/motion"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeadlineLabel } from "./deadline-label"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { PROCESS_STATUS } from "@/lib/config"
 import { getNow, diffInDays, parse } from "@/lib/dates"
 import { matches } from "@/lib/format"
 import { getUser } from "@/lib/account"
 import type { Process, ProcessStatus } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 type Filter = "todos" | "prazos" | ProcessStatus
 
@@ -37,12 +41,14 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 export function ProcessesView() {
   const data = useDemoData()
+  const { deleteProcess } = useDemoActions()
   const { openDialog } = useUI()
   const router = useRouter()
   // Os dados vêm do armazenamento do navegador depois da hidratação.
   const ready = data.hydrated
   const [filter, setFilter] = React.useState<Filter>("todos")
   const [query, setQuery] = React.useState("")
+  const [toDelete, setToDelete] = React.useState<Process | null>(null)
 
   const clientName = React.useCallback((id: string) => data.clients.find((c) => c.id === id)?.name ?? "", [data.clients])
 
@@ -72,9 +78,11 @@ export function ProcessesView() {
         title="Processos"
         description="Acompanhe prazos, audiências e movimentações de cada processo do escritório."
         actions={
-          <Button onClick={() => openDialog("process")}>
-            <Plus /> Novo processo
-          </Button>
+          <Can permission="processes.edit">
+            <Button onClick={() => openDialog("process")}>
+              <Plus /> Novo processo
+            </Button>
+          </Can>
         }
       />
 
@@ -105,9 +113,11 @@ export function ProcessesView() {
                 : "Consulte um processo pelo número CNJ em “Novo processo”: ele fica salvo aqui automaticamente."
             }
             action={
-              <Button size="sm" onClick={() => openDialog("process")}>
-                <Plus /> Novo processo
-              </Button>
+              <Can permission="processes.edit">
+                <Button size="sm" onClick={() => openDialog("process")}>
+                  <Plus /> Novo processo
+                </Button>
+              </Can>
             }
           />
         </TableShell>
@@ -173,7 +183,30 @@ export function ProcessesView() {
                           <DeadlineLabel date={p.status === "concluido" ? undefined : p.nextDeadline?.date} />
                         </Td>
                         <Td>
-                          <ChevronRight className="size-4 text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+                          <div className="flex items-center justify-end gap-1">
+                            <ChevronRight className="size-4 text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                aria-label={`Ações para o processo ${p.number}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+                              >
+                                <Ellipsis className="size-4" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44 rounded-[10px] p-1" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuGroup>
+                                  <DropdownMenuItem className="h-8 px-2" onClick={() => router.push(`/processos/${p.id}`)}>
+                                    <Eye /> Abrir processo
+                                  </DropdownMenuItem>
+                                  <Can permission="processes.edit">
+                                    <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setToDelete(p)}>
+                                      <Trash2 /> Excluir processo
+                                    </DropdownMenuItem>
+                                  </Can>
+                                </DropdownMenuGroup>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </Td>
                       </tr>
                     )
@@ -224,6 +257,18 @@ export function ProcessesView() {
           </ul>
         </FadeIn>
       )}
+
+      <ConfirmDialog
+        open={!!toDelete}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title={`Excluir o processo ${toDelete?.number}?`}
+        description="Esta ação não pode ser desfeita, incluindo o histórico de movimentações."
+        onConfirm={() => {
+          if (!toDelete) return
+          deleteProcess(toDelete.id)
+          toast.success("Processo excluído.", { description: toDelete.number })
+        }}
+      />
     </div>
   )
 }

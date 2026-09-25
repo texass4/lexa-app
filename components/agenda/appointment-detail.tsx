@@ -2,17 +2,19 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, CalendarDays, Clock3, MapPin, StickyNote, UserRound } from "lucide-react"
+import { ArrowUpRight, CalendarDays, Clock3, MapPin, StickyNote, Trash2, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { Modal } from "@/components/ui/modal"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useCategoryLookup } from "./use-category"
 import { fmtFullDate, fmtTime, parse } from "@/lib/dates"
 import { getUser } from "@/lib/account"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import type { Appointment } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 function Row({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -25,8 +27,10 @@ function Row({ icon, children }: { icon: React.ReactNode; children: React.ReactN
 
 export function AppointmentDetail({ appointment, onClose }: { appointment?: Appointment; onClose: () => void }) {
   const data = useDemoData()
+  const { deleteAppointment } = useDemoActions()
   const lookup = useCategoryLookup()
   const [shown, setShown] = React.useState(appointment)
+  const [deleting, setDeleting] = React.useState(false)
   if (appointment && appointment !== shown) setShown(appointment)
   const a = appointment ?? shown
   if (!a) return null
@@ -46,6 +50,17 @@ export function AppointmentDetail({ appointment, onClose }: { appointment?: Appo
       icon={<span className="size-2.5 rounded-full" style={style.dot} />}
       footer={
         <>
+          <Can permission="agenda.edit">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Excluir compromisso"
+              className="text-danger hover:bg-danger-soft"
+              onClick={() => setDeleting(true)}
+            >
+              <Trash2 />
+            </Button>
+          </Can>
           <Button
             variant="secondary"
             onClick={() => {
@@ -70,7 +85,10 @@ export function AppointmentDetail({ appointment, onClose }: { appointment?: Appo
       <div className="-mt-1">
         <div className="mb-3 flex flex-wrap gap-1.5">
           {category && (
-            <span className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium" style={{ ...style.soft, ...style.text }}>
+            <span
+              className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium"
+              style={{ ...style.soft, ...style.text }}
+            >
               <span className="size-1.5 rounded-full" style={style.dot} />
               {category.name}
             </span>
@@ -100,6 +118,17 @@ export function AppointmentDetail({ appointment, onClose }: { appointment?: Appo
           </Row>
         )}
       </div>
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Excluir "${a.title}"?`}
+        description="Esta ação não pode ser desfeita."
+        onConfirm={() => {
+          deleteAppointment(a.id)
+          toast.success("Compromisso excluído.", { description: a.title })
+          onClose()
+        }}
+      />
     </Modal>
   )
 }

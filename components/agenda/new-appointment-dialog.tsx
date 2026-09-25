@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
-import { users, CURRENT_USER_ID } from "@/lib/account"
+import { getMembers, currentUserId } from "@/lib/account"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { getNow, toLocalISO } from "@/lib/dates"
 import { CategoryPicker } from "./category-picker"
@@ -42,7 +42,7 @@ function AppointmentForm({ defaults, onClose }: { defaults?: Defaults; onClose: 
     endTime: addMinutes("14:00", DEFAULT_DURATION),
     clientId: defaults?.clientId ?? (defaults?.processId ? (data.processes.find((p) => p.id === defaults.processId)?.clientId ?? "") : ""),
     processId: defaults?.processId ?? "",
-    ownerId: CURRENT_USER_ID,
+    ownerId: currentUserId(),
     notes: "",
   }))
   const [error, setError] = React.useState("")
@@ -152,7 +152,7 @@ function AppointmentForm({ defaults, onClose }: { defaults?: Defaults; onClose: 
           </Field>
           <Field label="Responsável" htmlFor="appt-owner" className="sm:col-span-2">
             <NativeSelect id="appt-owner" value={form.ownerId} onChange={(e) => set("ownerId", e.target.value)}>
-              {users.map((u) => (
+              {getMembers().map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>

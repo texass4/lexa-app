@@ -23,18 +23,36 @@ const SIZES = {
   xl: "size-16 text-lg",
 }
 
-export function UserAvatar({ name, size = "md", className, tone }: { name: string; size?: keyof typeof SIZES; className?: string; tone?: "dark" }) {
+export function UserAvatar({
+  name,
+  src,
+  size = "md",
+  className,
+  tone,
+}: {
+  name: string
+  /** Foto de perfil; sem ela, as iniciais. */
+  src?: string
+  size?: keyof typeof SIZES
+  className?: string
+  tone?: "dark"
+}) {
   return (
     <span
       aria-hidden
       className={cn(
-        "inline-flex shrink-0 select-none items-center justify-center rounded-full font-semibold tracking-wide",
+        "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold tracking-wide",
         SIZES[size],
         tone === "dark" ? "bg-primary text-primary-foreground" : PALETTE[hash(name) % PALETTE.length],
         className,
       )}
     >
-      {initials(name)}
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="size-full object-cover" />
+      ) : (
+        initials(name)
+      )}
     </span>
   )
 }

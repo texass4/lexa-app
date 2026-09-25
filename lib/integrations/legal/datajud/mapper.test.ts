@@ -63,7 +63,10 @@ describe("mapeamento de movimentações", () => {
     const process = mapSearchResponse(realMovementsResponse, REAL_CNJ)
     const documento = process?.movements.find((m) => m.code === 581)
     assert.equal(documento?.description, "Certidão")
-    assert.equal(process?.movements.some((m) => m.description?.includes("tipo_de_documento")), false)
+    assert.equal(
+      process?.movements.some((m) => m.description?.includes("tipo_de_documento")),
+      false,
+    )
   })
 
   it("preserva complementos campo a campo, órgão julgador e o objeto original", () => {

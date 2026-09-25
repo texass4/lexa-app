@@ -7,7 +7,7 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { ChoiceChips } from "@/components/ui/choice-chips"
-import { users, CURRENT_USER_ID } from "@/lib/account"
+import { getMembers, currentUserId } from "@/lib/account"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { getNow, toLocalISO } from "@/lib/dates"
 import type { Priority, RelatedEntity, Task } from "@/types"
@@ -16,7 +16,7 @@ const PRIORITIES = ["Alta", "Média", "Baixa"] as const
 const toPriority: Record<(typeof PRIORITIES)[number], Priority> = { Alta: "alta", Média: "media", Baixa: "baixa" }
 const fromPriority: Record<Priority, (typeof PRIORITIES)[number]> = { alta: "Alta", media: "Média", baixa: "Baixa" }
 
-type Defaults = { clientId?: string; processId?: string }
+type Defaults = { clientId?: string; processId?: string; columnId?: string }
 
 function encodeRelated(r?: RelatedEntity) {
   return r ? `${r.type}:${r.id}` : ""
@@ -39,7 +39,7 @@ function initialState(task?: Task, defaults?: Defaults) {
     date: task?.dueAt.slice(0, 10) ?? toLocalISO(getNow()).slice(0, 10),
     time: task?.dueAt.slice(11, 16) ?? "18:00",
     priority: task ? fromPriority[task.priority] : ("Média" as (typeof PRIORITIES)[number]),
-    assigneeId: task?.assigneeId ?? CURRENT_USER_ID,
+    assigneeId: task?.assigneeId ?? currentUserId(),
     related: encodeRelated(task?.related ?? related),
   }
 }
@@ -72,8 +72,11 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
       updateTask(task.id, payload)
       toast.success("Alterações salvas.")
     } else {
-      addTask(payload)
-      toast.success("Tarefa criada.", { description: `${payload.title} — atribuída a ${users.find((u) => u.id === payload.assigneeId)?.firstName}.` })
+      const columnId = defaults?.columnId ?? data.taskColumns.find((c) => !c.isDone)?.id
+      addTask({ ...payload, columnId })
+      toast.success("Tarefa criada.", {
+        description: `${payload.title} — atribuída a ${getMembers().find((u) => u.id === payload.assigneeId)?.firstName}.`,
+      })
     }
     onClose()
   }
@@ -127,7 +130,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
           </div>
           <Field label="Responsável" htmlFor="task-assignee">
             <NativeSelect id="task-assignee" value={form.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
-              {users.map((u) => (
+              {getMembers().map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>

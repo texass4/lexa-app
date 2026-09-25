@@ -70,7 +70,11 @@ async function post(url: string, body: unknown): Promise<LookupResponse> {
   if (data.found === false || !data.sheet) {
     return data.error?.message
       ? { ok: false, code: data.error.code ?? "NOT_FOUND", message: data.error.message }
-      : { ok: false, code: "NOT_FOUND", message: "Não foi possível localizar esse processo na fonte consultada. Verifique o número CNJ e tente novamente." }
+      : {
+          ok: false,
+          code: "NOT_FOUND",
+          message: "Não foi possível localizar esse processo na fonte consultada. Verifique o número CNJ e tente novamente.",
+        }
   }
 
   return {
@@ -89,11 +93,7 @@ async function post(url: string, body: unknown): Promise<LookupResponse> {
  * — tentativa, HTTP 429, resposta parcial, timeout — chega em `onEvent`
  * enquanto a consulta ainda está rodando.
  */
-export async function searchProcessByCNJ(
-  cnj: string,
-  onEvent?: (event: LookupEvent) => void,
-  signal?: AbortSignal,
-): Promise<LookupResponse> {
+export async function searchProcessByCNJ(cnj: string, onEvent?: (event: LookupEvent) => void, signal?: AbortSignal): Promise<LookupResponse> {
   let response: Response
   try {
     response = await fetch("/api/processes/search", {

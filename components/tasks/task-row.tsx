@@ -13,6 +13,7 @@ import { PRIORITY_CONFIG } from "@/lib/config"
 import { fmtDayLabel, fmtTime } from "@/lib/dates"
 import { getUser } from "@/lib/account"
 import type { Task } from "@/types"
+import { useSession } from "@/lib/auth/session"
 
 export function useToggleTask() {
   const { toggleTask } = useDemoActions()
@@ -40,6 +41,7 @@ export function DueLabel({ task, className }: { task: Task; className?: string }
 export function TaskRow({ task, showAssignee = false }: { task: Task; showAssignee?: boolean }) {
   const data = useDemoData()
   const toggle = useToggleTask()
+  const editable = useSession().can("tasks.edit")
   const related = describeRelated(data, task.related)
   const done = task.status === "concluida"
   const priority = PRIORITY_CONFIG[task.priority]
@@ -53,6 +55,7 @@ export function TaskRow({ task, showAssignee = false }: { task: Task; showAssign
       <AnimatedCheckbox
         checked={done}
         onChange={() => toggle(task)}
+        disabled={!editable}
         label={done ? `Reabrir: ${task.title}` : `Concluir: ${task.title}`}
         className="mt-0.5"
       />

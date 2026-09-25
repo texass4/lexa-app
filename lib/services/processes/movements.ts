@@ -83,8 +83,7 @@ export function collectHashes(cnj: string, movements: StoredMovement[]): Set<str
   return new Set(
     movements.map(
       (movement) =>
-        movement.hash ??
-        movementHash({ cnj, code: movement.code, name: movement.title, occurredAt: movement.at, description: movement.description }),
+        movement.hash ?? movementHash({ cnj, code: movement.code, name: movement.title, occurredAt: movement.at, description: movement.description }),
     ),
   )
 }

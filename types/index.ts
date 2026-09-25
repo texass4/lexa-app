@@ -24,10 +24,13 @@ export interface Organization {
   phone: string
   email: string
   plan: "Essencial" | "Profissional" | "Escritório"
+  /** `pending` até o Super Admin aprovar; `inactive` bloqueia todos os usuários. */
+  status: "pending" | "active" | "inactive"
   createdAt: string
+  approvedAt?: string
 }
 
-export type UserRole = "Sócio" | "Advogada associada" | "Advogado" | "Assistente jurídica"
+export type UserRole = "super_admin" | "owner" | "lawyer" | "staff"
 
 export interface User extends TenantEntity {
   name: string
@@ -35,8 +38,13 @@ export interface User extends TenantEntity {
   role: UserRole
   email: string
   phone: string
+  /** Cargo livre (ex.: "Advogada associada"); sem ele, mostra-se o rótulo do papel. */
+  jobTitle?: string
   oab?: string
-  permission: "Administrador" | "Advogado" | "Colaborador"
+  avatarUrl?: string
+  active: boolean
+  /** null = permissões padrão do papel. */
+  permissions?: string[] | null
 }
 
 /* -------------------------------- Clientes -------------------------------- */
@@ -198,6 +206,17 @@ export interface Task extends TenantEntity {
   status: "pendente" | "concluida"
   completedAt?: string
   related?: RelatedEntity
+  /** Coluna do quadro Kanban. Ausente = primeira coluna não concluída. */
+  columnId?: ID
+}
+
+/** Coluna do quadro de tarefas, criada pelo próprio escritório (estilo Notion/Trello). */
+export interface TaskColumn extends TenantEntity {
+  name: string
+  color: string
+  order: number
+  /** Tarefas nesta coluna contam como concluídas. */
+  isDone?: boolean
 }
 
 /* --------------------------------- Agenda --------------------------------- */
@@ -231,12 +250,14 @@ export type DocumentKind = "Contrato" | "Procuração" | "Documento pessoal" | "
 export interface LegalDocument extends TenantEntity {
   name: string
   kind: DocumentKind
-  extension: "pdf" | "docx" | "jpg" | "png"
+  extension: "pdf" | "docx" | "doc" | "txt" | "jpg" | "png"
   sizeBytes: number
   clientId?: ID
   processId?: ID
   uploadedById: ID
   uploadedAt: string
+  /** Caminho do arquivo no bucket `documents` (`<organizationId>/<id>`); ausente = sem conteúdo salvo. */
+  storagePath?: string
 }
 
 /* ------------------------------- Financeiro ------------------------------- */

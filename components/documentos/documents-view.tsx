@@ -21,6 +21,7 @@ import { fmtNumericDate } from "@/lib/dates"
 import { formatFileSize, matches } from "@/lib/format"
 import { getUser } from "@/lib/account"
 import type { DocumentKind } from "@/types"
+import { Can } from "@/lib/auth/session"
 
 type Filter = "todos" | "Contrato" | "Procuração" | "Petição" | "Documento pessoal" | "Laudo" | "outros"
 
@@ -63,9 +64,11 @@ export function DocumentsView() {
         title="Documentos"
         description={`${data.documents.length} arquivos · ${formatFileSize(totalSize)} armazenados com criptografia.`}
         actions={
-          <Button onClick={() => openDialog("document")}>
-            <FilePlus /> Novo documento
-          </Button>
+          <Can permission="documents.edit">
+            <Button onClick={() => openDialog("document")}>
+              <FilePlus /> Novo documento
+            </Button>
+          </Can>
         }
       />
 
@@ -103,9 +106,11 @@ export function DocumentsView() {
             title="Nenhum documento encontrado."
             description="Adicione contratos, procurações e peças para centralizar os arquivos do escritório."
             action={
-              <Button size="sm" onClick={() => openDialog("document")}>
-                <FilePlus /> Novo documento
-              </Button>
+              <Can permission="documents.edit">
+                <Button size="sm" onClick={() => openDialog("document")}>
+                  <FilePlus /> Novo documento
+                </Button>
+              </Can>
             }
           />
         </TableShell>

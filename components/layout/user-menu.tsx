@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation"
 import { ChevronsUpDown, Keyboard, LogOut, Moon, Settings, Sun, UserRound } from "lucide-react"
-import { toast } from "sonner"
 import { cn } from "cn"
 import {
   DropdownMenu,
@@ -16,11 +15,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { useTheme } from "@/lib/theme"
-import { getUser, CURRENT_USER_ID, organization } from "@/lib/account"
+import { userTitle } from "@/lib/account"
+import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
 
 export function UserMenu({ variant, compact }: { variant: "sidebar" | "header"; compact?: boolean }) {
-  const user = getUser(CURRENT_USER_ID)
+  const { user, organization, signOut } = useSession()
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   const { setCommandOpen } = useUI()
@@ -35,10 +35,10 @@ export function UserMenu({ variant, compact }: { variant: "sidebar" | "header"; 
             compact && "justify-center",
           )}
         >
-          <UserAvatar name={user.name} size="md" tone="dark" />
+          <UserAvatar name={user.name} src={user.avatarUrl} size="md" tone="dark" />
           <span className={cn("min-w-0 flex-1", compact && "sr-only")}>
             <span className="block truncate text-[13px] font-medium text-foreground">{user.name}</span>
-            <span className="block truncate text-[11.5px] text-muted-foreground">{user.role}</span>
+            <span className="block truncate text-[11.5px] text-muted-foreground">{userTitle(user)}</span>
           </span>
           {!compact && <ChevronsUpDown className="size-3.5 text-subtle" />}
         </DropdownMenuTrigger>
@@ -47,7 +47,7 @@ export function UserMenu({ variant, compact }: { variant: "sidebar" | "header"; 
           aria-label="Menu do usuário"
           className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-gold/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <UserAvatar name={user.name} size="md" tone="dark" />
+          <UserAvatar name={user.name} src={user.avatarUrl} size="md" tone="dark" />
         </DropdownMenuTrigger>
       )}
       <DropdownMenuContent
@@ -84,10 +84,7 @@ export function UserMenu({ variant, compact }: { variant: "sidebar" | "header"; 
           <DropdownMenuLabel className="px-2 py-1 text-[11px] font-normal">
             {organization.name} · Plano {organization.plan}
           </DropdownMenuLabel>
-          <DropdownMenuItem
-            className="h-8 px-2"
-            onClick={() => toast("Você está em um ambiente de demonstração.", { description: "A saída está desativada nesta versão." })}
-          >
+          <DropdownMenuItem className="h-8 px-2" onClick={signOut}>
             <LogOut /> Sair
           </DropdownMenuItem>
         </DropdownMenuGroup>

@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button"
 import { TaskRow } from "@/components/tasks/task-row"
 import { useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
-import { CURRENT_USER_ID } from "@/lib/account"
+import { currentUserId } from "@/lib/account"
 import { diffInDays, getNow, parse } from "@/lib/dates"
+import { Can } from "@/lib/auth/session"
 
 export function MyTasks() {
   const { tasks } = useDemoData()
@@ -18,12 +19,12 @@ export function MyTasks() {
   // Mantém a ordem estável ao concluir para que o item não "salte" da mão do usuário.
   const [ids] = React.useState(() =>
     tasks
-      .filter((t) => t.assigneeId === CURRENT_USER_ID && t.status === "pendente" && diffInDays(parse(t.dueAt), getNow()) <= 0)
+      .filter((t) => t.assigneeId === currentUserId() && t.status === "pendente" && diffInDays(parse(t.dueAt), getNow()) <= 0)
       .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
       .map((t) => t.id),
   )
   const newOnes = tasks
-    .filter((t) => t.assigneeId === CURRENT_USER_ID && !ids.includes(t.id) && t.status === "pendente" && diffInDays(parse(t.dueAt), getNow()) <= 0)
+    .filter((t) => t.assigneeId === currentUserId() && !ids.includes(t.id) && t.status === "pendente" && diffInDays(parse(t.dueAt), getNow()) <= 0)
     .map((t) => t.id)
   const list = [...newOnes, ...ids].map((id) => tasks.find((t) => t.id === id)!).filter(Boolean)
   const remaining = list.filter((t) => t.status === "pendente").length
@@ -35,9 +36,11 @@ export function MyTasks() {
         description={remaining ? `${remaining} para hoje` : "Tudo concluído por hoje"}
         action={
           <>
-            <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task")}>
-              <Plus />
-            </Button>
+            <Can permission="tasks.edit">
+              <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task")}>
+                <Plus />
+              </Button>
+            </Can>
             <Link
               href="/tarefas"
               className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"

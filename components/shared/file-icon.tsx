@@ -3,6 +3,8 @@ import { cn } from "cn"
 const STYLES: Record<string, string> = {
   pdf: "bg-danger-soft text-danger",
   docx: "bg-info-soft text-info",
+  doc: "bg-info-soft text-info",
+  txt: "bg-surface-muted text-muted-foreground",
   jpg: "bg-success-soft text-success",
   png: "bg-success-soft text-success",
 }

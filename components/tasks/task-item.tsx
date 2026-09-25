@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { CircleCheck, Ellipsis, Eye, Pencil, RotateCcw } from "lucide-react"
+import { CircleCheck, Ellipsis, Eye, Pencil, RotateCcw, Trash2 } from "lucide-react"
 import { cn } from "cn"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AnimatedCheckbox } from "@/components/ui/animated-checkbox"
@@ -12,6 +12,7 @@ import { DueLabel } from "./task-row"
 import { PRIORITY_CONFIG } from "@/lib/config"
 import { getUser } from "@/lib/account"
 import type { Task } from "@/types"
+import { useSession } from "@/lib/auth/session"
 
 export function TaskItem({
   task,
@@ -19,13 +20,16 @@ export function TaskItem({
   onToggle,
   onEdit,
   onOpen,
+  onDelete,
 }: {
   task: Task
   related?: { label: string; kind: string; href: string }
   onToggle: () => void
   onEdit: () => void
   onOpen: () => void
+  onDelete: () => void
 }) {
+  const editable = useSession().can("tasks.edit")
   const done = task.status === "concluida"
   const priority = PRIORITY_CONFIG[task.priority]
   const assignee = getUser(task.assigneeId)
@@ -51,6 +55,7 @@ export function TaskItem({
         <AnimatedCheckbox
           checked={done}
           onChange={onToggle}
+          disabled={!editable}
           label={done ? `Reabrir: ${task.title}` : `Concluir: ${task.title}`}
           className="mt-0.5 sm:mt-0"
         />
@@ -114,16 +119,25 @@ export function TaskItem({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44 rounded-[10px] p-1" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuGroup>
-              <DropdownMenuItem className="h-8 px-2" onClick={onToggle}>
-                {done ? <RotateCcw /> : <CircleCheck />}
-                {done ? "Reabrir" : "Marcar concluída"}
-              </DropdownMenuItem>
-              <DropdownMenuItem className="h-8 px-2" onClick={onEdit}>
-                <Pencil /> Editar
-              </DropdownMenuItem>
+              {editable && (
+                <DropdownMenuItem className="h-8 px-2" onClick={onToggle}>
+                  {done ? <RotateCcw /> : <CircleCheck />}
+                  {done ? "Reabrir" : "Marcar concluída"}
+                </DropdownMenuItem>
+              )}
+              {editable && (
+                <DropdownMenuItem className="h-8 px-2" onClick={onEdit}>
+                  <Pencil /> Editar
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem className="h-8 px-2" onClick={onOpen}>
                 <Eye /> Abrir detalhes
               </DropdownMenuItem>
+              {editable && (
+                <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={onDelete}>
+                  <Trash2 /> Excluir
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

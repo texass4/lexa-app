@@ -3,13 +3,15 @@
 Guia para alterar o sistema sem adivinhar onde cada coisa mora. Alias `@/` aponta para a raiz de `lexa-app/`.
 
 ```
+proxy.ts  (sessão Supabase em cookie; sem login → /login)
+    ↓
+SessionProvider (lib/auth/session.tsx) → lib/account.ts   (pessoa, escritório, membros)
+    ↓
 UI (página/componente)
-    ↓  lê / age
+    ↓  lê / age              ↓ permissões: useSession().can() · <Can>
 useDemoData() · useDemoActions() · useUI()
     ↓
-demo-store (+ storage.ts → localStorage, por organização)   ui-store
-    ↓  começa vazio — sem dados de demonstração
-lib/account.ts   (escritório e pessoa logada, até existir login)
+demo-store (+ storage.ts → Supabase; a RLS isola por escritório)   ui-store
     ↓  tipado por
 types/index.ts
 
@@ -33,7 +35,11 @@ lexa-app/
 ├── app/                      rotas (páginas finas: metadata + view)
 │   ├── (app)/                shell autenticado: dashboard, clientes, processos,
 │   │                         tarefas, agenda, documentos, financeiro, configuracoes
-│   └── api/processes/        search (consulta) e [id]/sync (atualizar)
+│   ├── (auth)/               login, cadastro, recuperar-senha, redefinir-senha
+│   ├── (admin)/admin         painel do Super Admin (papel checado no servidor)
+│   ├── auth/confirm          troca o token dos links (recuperação/convite) por sessão
+│   └── api/                  processes/* (DataJud), auth/* (cadastro, recuperação),
+│                             team/users (gestão do escritório), me/email, admin/*
 ├── components/
 │   ├── layout/               sidebar, topbar, busca Ctrl K, notificações, modais globais
 │   ├── ui/                   design system
@@ -44,13 +50,18 @@ lexa-app/
 │   ├── cnj.ts                máscara, normalização e dígito verificador
 │   ├── integrations/legal/   modelo neutro (types.ts) + DataJud (mapper, mensagens de erro)
 │   ├── services/processes/   ficha, importação, deduplicação, interpretação de movimentos
-│   ├── store/                demo-store, ui-store, storage (persistência)
-│   ├── account.ts            escritório e usuário atual (até existir login)
+│   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros
+│   ├── supabase/             clientes: navegador, servidor (cookie) e admin (service role)
+│   ├── store/                demo-store, ui-store, storage (persistência no Supabase)
+│   ├── account.ts            pessoa e escritório logados (preenchido pela sessão)
 │   ├── config.ts             labels, cores de status e paleta das categorias
 │   ├── selectors.ts          consultas derivadas (inclui o financeiro, calculado das faturas)
 │   ├── dates.ts              `getNow()` + formatadores
 │   └── format.ts             moeda, busca, normalização de texto, IDs
 ├── python/datajud.py         cliente do DataJud (usado pelas rotas; roda sozinho no terminal)
+├── supabase/migrations/      SQL do banco: tabelas, RLS, Storage (rodar no SQL Editor)
+├── proxy.ts                  sessão e bloqueio de rotas (o "middleware" do Next 16)
+├── instrumentation.ts        cria o Super Admin no start do servidor
 ├── types/index.ts            contratos de todas as entidades
 └── tests/                    loader que roda os testes .ts com `node --test`
 ```
@@ -67,6 +78,9 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 | `/clientes`, `/clientes/[id]` | `components/clientes/…` |
 | `/processos`, `/processos/[id]` | `components/processos/processes-view.tsx`, `process-profile.tsx` |
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
+| `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
+| `/login` · `/cadastro` · `/recuperar-senha` · `/redefinir-senha` | `components/auth/*-form.tsx` |
+| `/admin` | `components/admin/admin-view.tsx` (Super Admin) |
 
 Menu lateral e título do header: `components/layout/nav-config.ts`. Barra inferior do mobile: `mobile-nav.tsx`.
 
@@ -100,18 +114,18 @@ Variáveis de ambiente: veja `.env.example` (`DATAJUD_API_KEY`, e opcionalmente 
 ## 4. Store, persistência e dados
 
 ```ts
-const data = useDemoData()          // clients, processes, tasks, appointments, appointmentCategories…, hydrated
+const data = useDemoData()          // clients, processes, tasks, taskColumns, appointments…, hydrated
 const { addTask, importProcess } = useDemoActions()
 ```
 
-Ações: `addClient`/`updateClient`, `addProcess`/`updateProcess`/`importProcess`/`applyProcessSync`, `addTask`/`updateTask`/`toggleTask`, `addAppointment`, `addAppointmentCategory`/`updateAppointmentCategory`/`deleteAppointmentCategory`, `addDocument`, `markNotificationRead`/`markAllNotificationsRead`.
-
-- **Não há dados de demonstração.** O store começa vazio; tudo o que o escritório cadastra é gravado por `lib/store/storage.ts` no `localStorage`, sob a chave da organização (`lexa:data:v1:<ORG_ID>`). A gravação é agrupada (300 ms) e forçada ao sair da página. Sem espaço, os processos são salvos sem o `raw` das movimentações e um aviso aparece. Trocar por banco = mudar só esse arquivo.
-- `hydrated` fica `true` quando os dados salvos terminam de carregar (uma vez por sessão). As telas mostram esqueleto só até lá — navegar entre abas não recarrega nada.
+- **Os dados moram no Supabase.** Cada coleção é uma tabela (`organization_id`, `id`, `data jsonb`). `lib/store/storage.ts` carrega o que a RLS deixa a pessoa ver e grava só o que mudou (`diffState`, comparando por identidade — o store é imutável). A gravação é agrupada (300 ms) e em fila; se o banco recusar (sem permissão, falha), aparece um aviso e a tela recarrega o que está salvo.
+- `hydrated` fica `true` quando os dados do escritório terminam de carregar. As telas mostram esqueleto só até lá.
+- Arquivos de documentos ficam no Storage (`documents/<organization_id>/…`); a pré-visualização usa URL assinada de 5 min (`lib/documents.ts`).
 - Horário: sempre `getNow()` (`lib/dates.ts`), nunca `new Date()` espalhado pela UI.
-- `lib/account.ts` tem o escritório e a pessoa logada (`CURRENT_USER_ID`) — placeholder até existir login.
+- Pessoa e escritório logados: `currentUserId()`, `currentOrgId()`, `getUser(id)`, `getMembers()` (`lib/account.ts`), preenchidos pelo `SessionProvider`. Dentro de componentes, prefira `useSession()`.
 
-Novo campo num cadastro: tipo em `types/index.ts` → seed → formulário → ação no store → exibição.
+Novo campo num cadastro: tipo em `types/index.ts` → formulário → ação no store → exibição (o jsonb não precisa de migração).
+Nova coleção: tipo → `PersistedState` + `TABLES` em `storage.ts` → tabela e políticas na migração.
 Nova ação de negócio: método em `DemoActions` + implementação, registrando uma `Activity` quando fizer sentido.
 
 ### Categorias de compromisso
@@ -133,17 +147,27 @@ Design system — reutilize, não invente: `page-header`, `panel`, `button`, `st
 
 ---
 
-## 6. O que ainda é simulado
+## 6. Contas, escritórios e permissões
 
-Login, banco de dados, upload de arquivos, integrações (WhatsApp, e-mail, agenda, assinatura, boletos) e cobrança. A consulta ao DataJud e o salvamento dos processos são reais.
+**Isolamento** — garantido no banco, não na tela. Toda tabela de dados tem RLS: só linhas com `organization_id = current_org_id()`, e `current_org_id()` só devolve o escritório se o perfil **e** o escritório estiverem ativos. Cada módulo exige sua permissão (`has_perm('clients.view')` para ler, `.edit` para gravar). Papel, permissões, status e e-mail só mudam pelas rotas do servidor (service role), depois de `requireMember`/`requireSuperAdmin` (`lib/auth/server.ts`).
 
----
+**Papéis** — Super Admin (sem escritório; vem do `.env.local`), Sócio/Proprietário (tudo), Advogado, Colaborador/Estagiário. Padrões em `lib/auth/permissions.ts` **e** em `role_defaults` na migração — o teste `permissions.test.ts` falha se divergirem. O Sócio pode personalizar as permissões de cada pessoa (Configurações › Usuários › Permissões).
 
-## 7. Como rodar
+**Na interface** — `useSession().can("x.edit")` ou `<Can permission="x.edit">` para esconder ações; `nav-config.ts` diz a permissão de cada rota (menu, busca e "sem acesso" no `AppShell`); `DIALOG_PERMISSION` (`ui-store.tsx`) diz a de cada diálogo global.
+
+**Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único; enquanto não há provedor de e-mail, o link sai no terminal (`lib/auth/mailer.ts`).
+
+## 7. O que ainda é simulado
+
+Envio de e-mail (links saem no terminal), integrações (WhatsApp, agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta ao DataJud e o salvamento dos processos são reais.
+
+## 8. Como rodar
+
+Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
 
 ```bash
 npm run dev      # http://localhost:3000 (requer Python 3 com `requests` para consultar processos)
-npm test         # CNJ, mapper, interpretador, timeline, deduplicação, armazenamento, financeiro
+npm test         # CNJ, mapper, interpretador, timeline, deduplicação, sincronização, permissões, financeiro
 npm run lint
 npx tsc --noEmit
 ```

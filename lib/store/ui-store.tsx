@@ -2,13 +2,28 @@
 
 import * as React from "react"
 import { createLocalStore } from "@/lib/hooks"
+import type { Permission } from "@/lib/auth/permissions"
 
-export type DialogKind = "client" | "task" | "appointment" | "document" | "process"
+export type DialogKind = "client" | "task" | "appointment" | "document" | "process" | "document-preview"
+
+/** Permissão necessária para abrir cada diálogo global. */
+export const DIALOG_PERMISSION: Record<DialogKind, Permission> = {
+  client: "clients.edit",
+  task: "tasks.edit",
+  appointment: "agenda.edit",
+  document: "documents.edit",
+  process: "processes.edit",
+  "document-preview": "documents.view",
+}
 
 export interface DialogDefaults {
   clientId?: string
   processId?: string
   date?: string
+  /** Coluna do quadro em que a tarefa deve nascer. */
+  columnId?: string
+  /** Documento a pré-visualizar (`dialog "document-preview"`). */
+  documentId?: string
 }
 
 interface UIState {

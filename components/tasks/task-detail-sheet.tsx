@@ -2,17 +2,19 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, CalendarClock, CircleCheck, Flag, Pencil, RotateCcw, UserRound } from "lucide-react"
+import { ArrowUpRight, CalendarClock, CircleCheck, Flag, Pencil, RotateCcw, Trash2, UserRound } from "lucide-react"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Eyebrow } from "@/components/ui/panel"
 import { PRIORITY_CONFIG } from "@/lib/config"
 import { fmtActivityTime, fmtDayLabel, fmtDueIn, fmtTime } from "@/lib/dates"
 import { getUser } from "@/lib/account"
 import { isOverdue } from "@/lib/selectors"
 import type { Task } from "@/types"
+import { useSession } from "@/lib/auth/session"
 
 export function TaskDetailSheet({
   task,
@@ -21,6 +23,7 @@ export function TaskDetailSheet({
   onOpenChange,
   onToggle,
   onEdit,
+  onDelete,
 }: {
   task?: Task
   related?: { label: string; kind: string; href: string }
@@ -28,8 +31,11 @@ export function TaskDetailSheet({
   onOpenChange: (o: boolean) => void
   onToggle: (t: Task) => void
   onEdit: (t: Task) => void
+  onDelete: (t: Task) => void
 }) {
   const [shown, setShown] = React.useState(task)
+  const [deleting, setDeleting] = React.useState(false)
+  const editable = useSession().can("tasks.edit")
   if (task && task !== shown) setShown(task)
   const t = task ?? shown
   if (!t) return null
@@ -68,15 +74,26 @@ export function TaskDetailSheet({
         </div>
       }
       footer={
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => onEdit(t)}>
-            <Pencil /> Editar
-          </Button>
-          <Button className="ml-auto" variant={done ? "secondary" : "default"} onClick={() => onToggle(t)}>
-            {done ? <RotateCcw /> : <CircleCheck />}
-            {done ? "Reabrir tarefa" : "Marcar como concluída"}
-          </Button>
-        </div>
+        editable && (
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Excluir tarefa"
+              className="text-danger hover:bg-danger-soft"
+              onClick={() => setDeleting(true)}
+            >
+              <Trash2 />
+            </Button>
+            <Button variant="secondary" onClick={() => onEdit(t)}>
+              <Pencil /> Editar
+            </Button>
+            <Button className="ml-auto" variant={done ? "secondary" : "default"} onClick={() => onToggle(t)}>
+              {done ? <RotateCcw /> : <CircleCheck />}
+              {done ? "Reabrir tarefa" : "Marcar como concluída"}
+            </Button>
+          </div>
+        )
       }
     >
       <div className="space-y-6 px-5 py-5">
@@ -125,6 +142,13 @@ export function TaskDetailSheet({
         </section>
         <p className="text-[11.5px] text-subtle">Criada em {fmtActivityTime(t.createdAt)}</p>
       </div>
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Excluir "${t.title}"?`}
+        description="Esta ação não pode ser desfeita."
+        onConfirm={() => onDelete(t)}
+      />
     </SideSheet>
   )
 }

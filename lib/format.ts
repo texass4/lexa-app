@@ -52,8 +52,7 @@ export function matches(query: string, ...fields: (string | undefined)[]) {
   return fields.some((f) => f && normalize(f).includes(q))
 }
 
-let seq = 0
+/** Identificador único mesmo com várias pessoas do escritório criando ao mesmo tempo. */
 export function uid(prefix: string) {
-  seq += 1
-  return `${prefix}_${Date.now().toString(36)}${seq}`
+  return `${prefix}_${crypto.randomUUID()}`
 }

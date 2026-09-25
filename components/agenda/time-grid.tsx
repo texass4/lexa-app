@@ -22,7 +22,8 @@ export function TimeGrid({
   days: Date[]
   events: Appointment[]
   onSelect: (a: Appointment) => void
-  onCreate: (date: string) => void
+  /** Ausente = sem permissão para criar: os horários não são clicáveis. */
+  onCreate?: (date: string) => void
   processCode: (id?: string) => string | undefined
 }) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
@@ -97,15 +98,16 @@ export function TimeGrid({
                     key={h}
                     type="button"
                     aria-label={`Novo compromisso em ${d.getDate()}/${d.getMonth() + 1} às ${h}:00`}
+                    disabled={!onCreate}
                     onClick={() => {
                       const x = new Date(d)
                       x.setHours(h, 0, 0, 0)
-                      onCreate(toLocalISO(x))
+                      onCreate?.(toLocalISO(x))
                     }}
-                    className="group absolute inset-x-0 border-t border-border/70 outline-none first:border-t-0 hover:bg-gold-soft/40 focus-visible:bg-gold-soft/50"
+                    className="group absolute inset-x-0 border-t border-border/70 outline-none first:border-t-0 hover:bg-gold-soft/40 focus-visible:bg-gold-soft/50 disabled:cursor-default disabled:hover:bg-transparent"
                     style={{ top: i * HOUR_PX, height: HOUR_PX }}
                   >
-                    <span className="absolute top-1 left-2 text-[11px] font-medium text-gold-dark opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <span className="absolute top-1 left-2 text-[11px] font-medium text-gold-dark opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-disabled:hidden">
                       + {String(h).padStart(2, "0")}:00
                     </span>
                   </button>
@@ -143,7 +145,14 @@ export function TimeGrid({
                         past && "opacity-60",
                         compact ? "py-0.5" : "py-1.5",
                       )}
-                      style={{ ...style.soft, ...style.bar, top: top + 1, height, left: `calc(${(lane / lanes) * 100}% + 3px)`, width: `calc(${100 / lanes}% - 6px)` }}
+                      style={{
+                        ...style.soft,
+                        ...style.bar,
+                        top: top + 1,
+                        height,
+                        left: `calc(${(lane / lanes) * 100}% + 3px)`,
+                        width: `calc(${100 / lanes}% - 6px)`,
+                      }}
                     >
                       <p className="truncate text-[11.5px] font-semibold leading-tight" style={style.text}>
                         {compact ? `${fmtTime(a.start)} ${a.personName ?? label}` : label}

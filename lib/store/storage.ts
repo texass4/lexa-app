@@ -1,30 +1,23 @@
 /**
- * Persistência dos dados do escritório no navegador (localStorage).
+ * Persistência dos dados do escritório no Supabase.
  *
- * É o degrau entre o store em memória e um banco de verdade: tudo o que o
- * escritório cadastra sobrevive ao reload, separado por organização. Quando a
- * persistência for para o servidor, só este arquivo muda.
+ * Cada coleção do store é uma tabela (`organization_id`, `id`, `data jsonb`). A RLS
+ * do banco garante que só se lê e grava no escritório de quem está logado, e só nos
+ * módulos em que a pessoa tem permissão — este arquivo não precisa (nem deve) filtrar
+ * por escritório na leitura.
  *
- * Cada operação é protegida: storage bloqueado, cheio ou com conteúdo
- * inválido nunca derruba a aplicação.
+ * O store é imutável: um registro que mudou é um objeto novo. Por isso a sincronização
+ * compara por identidade e grava só o que mudou (`diffState`).
  */
 
-import type {
-  Activity,
-  Appointment,
-  AppointmentCategory,
-  Client,
-  Invoice,
-  LegalDocument,
-  Notification,
-  Process,
-  Task,
-} from "@/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Notification, Process, Task, TaskColumn } from "@/types"
 
 export interface PersistedState {
   clients: Client[]
   processes: Process[]
   tasks: Task[]
+  taskColumns: TaskColumn[]
   appointments: Appointment[]
   appointmentCategories: AppointmentCategory[]
   documents: LegalDocument[]
@@ -33,97 +26,148 @@ export interface PersistedState {
   notifications: Notification[]
 }
 
-const KEYS: (keyof PersistedState)[] = [
-  "clients",
-  "processes",
-  "tasks",
-  "appointments",
-  "appointmentCategories",
-  "documents",
-  "invoices",
-  "activities",
-  "notifications",
-]
+export type Collection = keyof PersistedState
 
-export const storageKey = (orgId: string) => `lexa:data:v1:${orgId}`
-
-/** Chave antiga, de quando só os processos eram salvos. Lida uma vez, na migração. */
-export const LEGACY_PROCESS_KEY = "lexa:processes:v1"
-
-export interface StorageLike {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
+export const TABLES: Record<Collection, string> = {
+  clients: "clients",
+  processes: "processes",
+  tasks: "tasks",
+  taskColumns: "task_columns",
+  appointments: "appointments",
+  appointmentCategories: "appointment_categories",
+  documents: "documents",
+  invoices: "invoices",
+  activities: "activities",
+  notifications: "notifications",
 }
 
-const browserStorage = (): StorageLike | null => {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage
-  } catch {
-    return null
+export const COLLECTION_LABELS: Record<Collection, string> = {
+  clients: "clientes",
+  processes: "processos",
+  tasks: "tarefas",
+  taskColumns: "colunas do quadro",
+  appointments: "compromissos",
+  appointmentCategories: "categorias da agenda",
+  documents: "documentos",
+  invoices: "faturas",
+  activities: "atividades",
+  notifications: "notificações",
+}
+
+/** Coleções em que o item novo entra no topo da lista (ações usam `[novo, ...lista]`). */
+const NEWEST_FIRST = new Set<Collection>(["clients", "processes", "tasks", "documents", "invoices", "activities", "notifications"])
+
+/** Só recebem inserções — não há política de UPDATE no banco. */
+const APPEND_ONLY = new Set<Collection>(["activities"])
+
+const COLLECTIONS = Object.keys(TABLES) as Collection[]
+const PAGE = 1000
+
+type Entity = { id: string }
+
+export interface CollectionDiff<T extends Entity = Entity> {
+  upserts: T[]
+  deletes: T[]
+}
+
+export type StateDiff = Partial<Record<Collection, CollectionDiff>>
+
+export function diffCollection<T extends Entity>(prev: readonly T[], next: readonly T[]): CollectionDiff<T> {
+  const before = new Map(prev.map((item) => [item.id, item]))
+  const after = new Set(next.map((item) => item.id))
+  return {
+    upserts: next.filter((item) => before.get(item.id) !== item),
+    deletes: prev.filter((item) => !after.has(item.id)),
   }
 }
 
-const hasId = (value: unknown): value is { id: string } => !!value && typeof (value as { id?: unknown }).id === "string"
+/** O que mudou entre dois estados — só as coleções com alteração. */
+export function diffState(prev: PersistedState, next: PersistedState): StateDiff {
+  const diff: StateDiff = {}
+  for (const key of COLLECTIONS) {
+    if (prev[key] === next[key]) continue
+    const changes = diffCollection<Entity>(prev[key], next[key])
+    if (changes.upserts.length || changes.deletes.length) diff[key] = changes
+  }
+  return diff
+}
 
-const looksLikeProcess = (value: unknown): value is Process =>
-  hasId(value) && typeof (value as Partial<Process>).number === "string" && Array.isArray((value as Partial<Process>).movements)
+const sortKey = (item: Entity) => {
+  const record = item as { createdAt?: string; at?: string }
+  return record.createdAt ?? record.at ?? ""
+}
 
-function readJSON(storage: StorageLike, key: string): Record<string, unknown> | null {
-  try {
-    const raw = storage.getItem(key)
-    if (!raw) return null
-    const data = JSON.parse(raw)
-    return data && typeof data === "object" ? (data as Record<string, unknown>) : null
-  } catch {
-    return null
+/** Ordena como o store mantém em memória (mais novo no topo, ou cronológico). */
+export function orderCollection<T extends Entity>(key: Collection, items: T[]): T[] {
+  const dir = NEWEST_FIRST.has(key) ? -1 : 1
+  return [...items].sort((a, b) => dir * sortKey(a).localeCompare(sortKey(b)))
+}
+
+async function loadCollection(supabase: SupabaseClient, key: Collection) {
+  const items: Entity[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(TABLES[key])
+      .select("data")
+      .order("created_at")
+      .order("id")
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    items.push(...(data as { data: Entity }[]).map((row) => row.data))
+    if (data.length < PAGE) return orderCollection(key, items)
   }
 }
 
-/** Só as listas válidas; registros malformados são descartados. */
-export function loadState(orgId: string, storage: StorageLike | null = browserStorage()): Partial<PersistedState> {
-  if (!storage) return {}
-  const data = readJSON(storage, storageKey(orgId))
-
-  if (!data) {
-    // Migração: antes só os processos eram salvos, numa chave própria.
-    const legacy = readJSON(storage, LEGACY_PROCESS_KEY)
-    const processes = Array.isArray(legacy?.processes) ? legacy.processes.filter(looksLikeProcess) : []
-    return processes.length ? { processes } : {}
-  }
-
-  const state: Partial<PersistedState> = {}
-  for (const key of KEYS) {
-    const list = data[key]
-    if (!Array.isArray(list)) continue
-    // Cada lista tem seu tipo; a checagem estrutural mínima é o `id`.
-    ;(state as Record<string, unknown[]>)[key] = key === "processes" ? list.filter(looksLikeProcess) : list.filter(hasId)
-  }
-  return state
+/** Carrega tudo o que a RLS deixa esta pessoa ver. */
+export async function loadState(supabase: SupabaseClient): Promise<PersistedState> {
+  const lists = await Promise.all(COLLECTIONS.map((key) => loadCollection(supabase, key)))
+  return Object.fromEntries(COLLECTIONS.map((key, i) => [key, lists[i]])) as unknown as PersistedState
 }
 
-export type SaveResult = "saved" | "saved-without-raw" | "failed"
+export interface SyncResult {
+  /** Coleções que o banco recusou por falta de permissão. */
+  denied: Collection[]
+  /** Falhou por outro motivo (rede, servidor). */
+  failed: boolean
+}
 
-/**
- * Grava tudo. Se o navegador recusar por falta de espaço, tenta de novo sem o
- * objeto original das movimentações (`raw`), que é o item mais pesado — os
- * dados normalizados continuam completos.
- */
-export function saveState(orgId: string, state: PersistedState, storage: StorageLike | null = browserStorage()): SaveResult {
-  if (!storage) return "failed"
-  const write = (value: PersistedState) => storage.setItem(storageKey(orgId), JSON.stringify({ version: 1, ...value }))
+const isRlsDenial = (error: { code?: string; message?: string }) => error.code === "42501" || /row-level security/i.test(error.message ?? "")
 
-  try {
-    write(state)
-    return "saved"
-  } catch {}
+/** Grava as mudanças no escritório. Arquivos de documentos excluídos saem do Storage. */
+export async function syncState(supabase: SupabaseClient, organizationId: string, diff: StateDiff): Promise<SyncResult> {
+  const result: SyncResult = { denied: [], failed: false }
 
-  try {
-    write({
-      ...state,
-      processes: state.processes.map((p) => ({ ...p, movements: p.movements.map((movement) => ({ ...movement, raw: undefined })) })),
-    })
-    return "saved-without-raw"
-  } catch {
-    return "failed"
+  for (const key of Object.keys(diff) as Collection[]) {
+    const { upserts, deletes } = diff[key]!
+    const table = TABLES[key]
+
+    if (upserts.length) {
+      const rows = upserts.map((item) => ({ organization_id: organizationId, id: item.id, data: item }))
+      const { error } = await supabase.from(table).upsert(rows, { onConflict: "organization_id,id", ignoreDuplicates: APPEND_ONLY.has(key) })
+      if (error) {
+        if (isRlsDenial(error)) result.denied.push(key)
+        else result.failed = true
+        continue
+      }
+    }
+
+    if (deletes.length) {
+      const ids = deletes.map((item) => item.id)
+      // Exclusão barrada pela RLS não dá erro: só não apaga. Conferimos o que saiu.
+      const { data, error } = await supabase.from(table).delete().eq("organization_id", organizationId).in("id", ids).select("id")
+      if (error) {
+        result.failed = true
+        continue
+      }
+      if ((data?.length ?? 0) < ids.length) result.denied.push(key)
+
+      if (key === "documents") {
+        const removed = new Set((data ?? []).map((row) => row.id as string))
+        const paths = (deletes as LegalDocument[]).filter((d) => removed.has(d.id) && d.storagePath).map((d) => d.storagePath!)
+        if (paths.length) await supabase.storage.from("documents").remove(paths)
+      }
+    }
   }
+
+  return result
 }

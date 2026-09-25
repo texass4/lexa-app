@@ -194,7 +194,13 @@ describe("complementos", () => {
 
 describe("cadastro manual", () => {
   it("produz o mesmo modelo, usando a classificação legada quando o nome não basta", () => {
-    const seed: ProcessMovement = { id: "s", at: "2026-09-20T10:00:00", title: "Benefício implantado", kind: "decision", description: "INSS comunicou a implantação." }
+    const seed: ProcessMovement = {
+      id: "s",
+      at: "2026-09-20T10:00:00",
+      title: "Benefício implantado",
+      kind: "decision",
+      description: "INSS comunicou a implantação.",
+    }
     const m = interpretMovement(seed)
     assert.equal(m.category, "julgamento")
     assert.equal(m.description, "INSS comunicou a implantação.")
