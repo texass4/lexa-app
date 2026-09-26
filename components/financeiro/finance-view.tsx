@@ -18,13 +18,14 @@ import { useDemoData } from "@/lib/store/demo-store"
 import { INVOICE_STATUS } from "@/lib/config"
 import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
-import { financeSummary, monthlyRevenue, openReceivables, revenueByArea } from "@/lib/selectors"
+import { financeSummary, invoiceStatus, monthlyRevenue, openReceivables, revenueByArea } from "@/lib/selectors"
 
 export function FinanceView() {
   const data = useDemoData()
   const ready = data.hydrated
   const open = openReceivables(data)
-  const overdue = data.invoices.filter((i) => i.status === "atrasado")
+  // Parcela a vencer com vencimento passado já está em atraso, mesmo sem mudar o status salvo.
+  const overdue = data.invoices.filter((i) => invoiceStatus(i) === "atrasado").sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   const overdueTotal = overdue.reduce((a, i) => a + i.amount, 0)
   const upcoming = data.invoices.filter((i) => i.status !== "pago").sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   const summary = financeSummary(data.invoices)
@@ -188,19 +189,18 @@ export function FinanceView() {
             <ul className={cn("divide-y divide-border", upcoming.length > 0 && "border-t border-border")}>
               {upcoming.map((inv) => {
                 const client = data.clients.find((c) => c.id === inv.clientId)
-                const status = INVOICE_STATUS[inv.status]
+                const current = invoiceStatus(inv)
+                const status = INVOICE_STATUS[current]
                 const { day, month } = fmtDayMonthParts(inv.dueDate)
                 return (
                   <li key={inv.id} className="flex items-center gap-3.5 px-4 py-3 sm:px-5">
                     <span
                       className={cn(
                         "flex w-11 shrink-0 flex-col items-center rounded-[8px] border py-1",
-                        inv.status === "atrasado" ? "border-danger/25 bg-danger-soft" : "border-border bg-surface",
+                        current === "atrasado" ? "border-danger/25 bg-danger-soft" : "border-border bg-surface",
                       )}
                     >
-                      <span
-                        className={cn("text-[9.5px] font-semibold tracking-[0.1em]", inv.status === "atrasado" ? "text-danger" : "text-gold-dark")}
-                      >
+                      <span className={cn("text-[9.5px] font-semibold tracking-[0.1em]", current === "atrasado" ? "text-danger" : "text-gold-dark")}>
                         {month}
                       </span>
                       <span className="tabular text-[15px] font-semibold leading-tight">{day}</span>
@@ -214,7 +214,7 @@ export function FinanceView() {
                         <span className="truncate">{client?.name}</span>
                       </Link>
                       <p className="truncate text-[12px] text-muted-foreground">
-                        {inv.description} · {inv.method} · {fmtDueIn(inv.dueDate)}
+                        {[inv.description, inv.method, fmtDueIn(inv.dueDate)].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <span className="hidden sm:block">
@@ -222,7 +222,7 @@ export function FinanceView() {
                         {status.label}
                       </StatusBadge>
                     </span>
-                    <span className={cn("tabular w-24 shrink-0 text-right text-[13.5px] font-semibold", inv.status === "atrasado" && "text-danger")}>
+                    <span className={cn("tabular w-24 shrink-0 text-right text-[13.5px] font-semibold", current === "atrasado" && "text-danger")}>
                       {formatCurrency(inv.amount)}
                     </span>
                     <Link

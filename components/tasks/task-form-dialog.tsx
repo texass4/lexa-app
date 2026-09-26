@@ -82,6 +82,8 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
   }
 
   const activeClients = data.clients.filter((c) => c.status !== "inativo")
+  // Aberta pelo perfil do cliente: o vínculo fica restrito ao cliente e aos processos dele.
+  const scopedClient = !task && !defaults?.processId && defaults?.clientId ? data.clients.find((c) => c.id === defaults.clientId) : undefined
 
   return (
     <>
@@ -98,25 +100,38 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
             />
           </Field>
           <Field label="Vincular a" htmlFor="task-related" optional className="sm:col-span-2">
-            <NativeSelect id="task-related" value={form.related} onChange={(e) => set("related", e.target.value)}>
-              <option value="">Sem vínculo</option>
-              <optgroup label="Processos">
+            {scopedClient ? (
+              <NativeSelect id="task-related" value={form.related} onChange={(e) => set("related", e.target.value)}>
+                <option value={`client:${scopedClient.id}`}>{scopedClient.name} (sem processo específico)</option>
                 {data.processes
-                  .filter((p) => p.status !== "concluido")
+                  .filter((p) => p.clientId === scopedClient.id && p.status !== "concluido")
                   .map((p) => (
                     <option key={p.id} value={`process:${p.id}`}>
-                      {p.code} — {data.clients.find((c) => c.id === p.clientId)?.name} · {p.type}
+                      {p.code} — {p.type}
                     </option>
                   ))}
-              </optgroup>
-              <optgroup label="Clientes">
-                {activeClients.map((c) => (
-                  <option key={c.id} value={`client:${c.id}`}>
-                    {c.name}
-                  </option>
-                ))}
-              </optgroup>
-            </NativeSelect>
+              </NativeSelect>
+            ) : (
+              <NativeSelect id="task-related" value={form.related} onChange={(e) => set("related", e.target.value)}>
+                <option value="">Sem vínculo</option>
+                <optgroup label="Processos">
+                  {data.processes
+                    .filter((p) => p.status !== "concluido")
+                    .map((p) => (
+                      <option key={p.id} value={`process:${p.id}`}>
+                        {p.code} — {data.clients.find((c) => c.id === p.clientId)?.name} · {p.type}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Clientes">
+                  {activeClients.map((c) => (
+                    <option key={c.id} value={`client:${c.id}`}>
+                      {c.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </NativeSelect>
+            )}
           </Field>
           <Field label="Prazo" htmlFor="task-date">
             <TextInput id="task-date" type="date" value={form.date} onChange={(e) => set("date", e.target.value)} />

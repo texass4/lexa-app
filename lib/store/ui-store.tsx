@@ -4,7 +4,7 @@ import * as React from "react"
 import { createLocalStore } from "@/lib/hooks"
 import type { Permission } from "@/lib/auth/permissions"
 
-export type DialogKind = "client" | "task" | "appointment" | "document" | "process" | "document-preview"
+export type DialogKind = "client" | "task" | "appointment" | "document" | "process" | "invoice" | "document-preview"
 
 /** Permissão necessária para abrir cada diálogo global. */
 export const DIALOG_PERMISSION: Record<DialogKind, Permission> = {
@@ -13,6 +13,7 @@ export const DIALOG_PERMISSION: Record<DialogKind, Permission> = {
   appointment: "agenda.edit",
   document: "documents.edit",
   process: "processes.edit",
+  invoice: "finance.edit",
   "document-preview": "documents.view",
 }
 

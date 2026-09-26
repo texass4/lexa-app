@@ -54,7 +54,8 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
   const router = useRouter()
   const initial = () => ({
     number: "",
-    clientId: clientId ?? data.clients[0]?.id ?? "",
+    // Sem cliente pré-definido, começa "Sem cliente" — nunca vincula ao primeiro da lista por engano.
+    clientId: clientId ?? "",
     area: "Cível" as PracticeArea,
     type: "",
     court: "",

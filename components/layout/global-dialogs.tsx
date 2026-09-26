@@ -7,6 +7,7 @@ import { TaskFormDialog } from "@/components/tasks/task-form-dialog"
 import { NewAppointmentDialog } from "@/components/agenda/new-appointment-dialog"
 import { NewDocumentDialog } from "@/components/documentos/new-document-dialog"
 import { NewProcessDialog } from "@/components/processos/new-process-dialog"
+import { NewInvoiceDialog } from "@/components/financeiro/new-invoice-dialog"
 import { DocumentPreviewSheet } from "@/components/shared/document-preview-sheet"
 
 export function GlobalDialogs() {
@@ -26,6 +27,7 @@ export function GlobalDialogs() {
       <NewAppointmentDialog open={isOpen("appointment")} onOpenChange={onOpenChange} defaults={defaults} />
       <NewDocumentDialog open={isOpen("document")} onOpenChange={onOpenChange} defaults={defaults} />
       <NewProcessDialog open={isOpen("process")} onOpenChange={onOpenChange} clientId={defaults?.clientId} />
+      <NewInvoiceDialog open={isOpen("invoice")} onOpenChange={onOpenChange} defaults={defaults} />
       <DocumentPreviewSheet documentId={defaults?.documentId} open={isOpen("document-preview")} onOpenChange={onOpenChange} />
     </>
   )

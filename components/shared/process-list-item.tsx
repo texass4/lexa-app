@@ -1,10 +1,10 @@
 import Link from "next/link"
-import { ChevronRight, Hourglass, Landmark } from "lucide-react"
+import { ChevronRight, History, Hourglass, Landmark } from "lucide-react"
 import { cn } from "cn"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { PROCESS_STATUS } from "@/lib/config"
-import { getNow, diffInDays, fmtDayMonth, fmtDueIn, parse } from "@/lib/dates"
+import { getNow, diffInDays, fmtDayMonth, fmtDueIn, fmtNumericDate, parse } from "@/lib/dates"
 import { getUser } from "@/lib/account"
 import type { Process } from "@/types"
 
@@ -13,6 +13,8 @@ export function ProcessListItem({ process: p }: { process: Process }) {
   const owner = getUser(p.ownerId)
   const due = p.nextDeadline ? diffInDays(parse(p.nextDeadline.date), getNow()) : undefined
   const urgent = due !== undefined && due <= 3
+  const lastMovement = p.movements.reduce<Process["movements"][number] | undefined>((last, m) => (!last || m.at > last.at ? m : last), undefined)
+  const court = p.judicialUnit ?? p.court
 
   return (
     <Link
@@ -23,12 +25,20 @@ export function ProcessListItem({ process: p }: { process: Process }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-[13px] font-medium tracking-tight text-foreground">{p.number}</span>
           <span className="text-[11.5px] text-subtle">{p.code}</span>
+          {p.tribunal && <span className="text-[11.5px] font-medium text-muted-foreground">· {p.tribunal}</span>}
         </div>
-        <p className="mt-1 truncate text-[14px] font-semibold text-foreground">{p.type}</p>
+        <p className="mt-1 truncate text-[14px] font-semibold text-foreground">{p.className ?? p.type}</p>
         <p className="mt-1 flex items-center gap-1.5 truncate text-[12.5px] text-muted-foreground">
           <Landmark className="size-3.5 shrink-0 text-subtle" />
-          <span className="truncate">{p.court}</span>
+          <span className="truncate">{court || "Órgão julgador não informado"}</span>
         </p>
+        {lastMovement && (
+          <p className="mt-1 flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
+            <History className="size-3.5 shrink-0 text-subtle" />
+            <span className="tabular shrink-0">{fmtNumericDate(lastMovement.at)}</span>
+            <span className="truncate">· {lastMovement.title}</span>
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 sm:flex-nowrap">
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>

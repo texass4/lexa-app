@@ -134,13 +134,23 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 ---
 
+### Clientes (hub do cliente)
+
+O cliente é a entidade central: processos (`clientId`), tarefas (`related`), documentos, compromissos e faturas apontam para ele — e o que aponta só para um processo dele também é dele. `clientHub()` e `clientFinance()` (`lib/selectors.ts`) reúnem tudo; o perfil (`components/clientes/profile/`) tem abas Visão geral, Processos, Tarefas, Documentos, Compromissos, Financeiro e Timeline, cada uma exigindo a permissão `.view` do módulo.
+
+- Regras do cadastro (CPF/CNPJ com dígito verificador, duplicidade, telefone, endereço, tags, WhatsApp): `lib/clients.ts`. O formulário único de criar/editar é `components/clientes/client-form.tsx`. O banco repete a checagem do documento (`0002_clients_hub.sql`); a violação volta como aviso próprio (`SyncResult.conflicts`).
+- Fatura "a vencer" com vencimento passado conta como atrasada: use `invoiceStatus()`, nunca `invoice.status` direto.
+- Lançamentos financeiros: diálogo global `"invoice"` (`components/financeiro/new-invoice-dialog.tsx`), gravando em `invoices` — o mesmo dado do módulo Financeiro.
+- `updateClient` registra na timeline mudança de status, de responsável e de dados; atividades de tarefa, documento e compromisso vinculados a processo levam o `clientId` do processo.
+- WhatsApp: só o link oficial (wa.me). `WhatsAppConversation` (`types/index.ts`) é o formato que uma integração futura (Z-API) deve preencher no painel do cliente.
+
 ## 5. UI global
 
 `app/layout.tsx` → `Providers` (tema, stores, toasts) → `app/(app)/layout.tsx` → `AppShell` (sidebar, topbar, busca, modais).
 
 ```ts
 const { openDialog } = useUI()
-openDialog("task", { processId })   // "client" | "task" | "appointment" | "document" | "process"
+openDialog("task", { processId })   // "client" | "task" | "appointment" | "document" | "process" | "invoice"
 ```
 
 Design system — reutilize, não invente: `page-header`, `panel`, `button`, `status-badge`, `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens de cor em `app/globals.css`.
@@ -159,11 +169,11 @@ Design system — reutilize, não invente: `page-header`, `panel`, `button`, `st
 
 ## 7. O que ainda é simulado
 
-Envio de e-mail (links saem no terminal), integrações (WhatsApp, agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta ao DataJud e o salvamento dos processos são reais.
+Envio de e-mail (links saem no terminal), integrações (WhatsApp — só o link wa.me —, agenda, assinatura, boletos), envio de cobrança e exportação de relatório na tela Financeiro, e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta ao DataJud e o salvamento dos processos são reais.
 
 ## 8. Como rodar
 
-Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
+Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` e depois `0002_clients_hub.sql` (CPF/CNPJ único e válido por escritório) no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
 
 ```bash
 npm run dev      # http://localhost:3000 (requer Python 3 com `requests` para consultar processos)

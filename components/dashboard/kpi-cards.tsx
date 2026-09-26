@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { CalendarDays, CircleDollarSign, ListChecks, Scale, type LucideIcon } from "lucide-react"
 import { cn } from "cn"
 import { useDemoData } from "@/lib/store/demo-store"
-import { isOverdue, openReceivables, taskBucket, todaysAppointments } from "@/lib/selectors"
+import { invoiceStatus, isOverdue, openReceivables, taskBucket, todaysAppointments } from "@/lib/selectors"
 import { getNow, fmtTime, parse } from "@/lib/dates"
 import { formatCurrency, formatNumber } from "@/lib/format"
 import { useSession } from "@/lib/auth/session"
@@ -32,7 +32,7 @@ export function KpiCards() {
   const overdue = pending.filter((t) => isOverdue(t)).length
   const today = pending.filter((t) => taskBucket(t) === "hoje").length
   const open = openReceivables(data)
-  const late = data.invoices.filter((i) => i.status === "atrasado").reduce((a, i) => a + i.amount, 0)
+  const late = data.invoices.filter((i) => invoiceStatus(i) === "atrasado").reduce((a, i) => a + i.amount, 0)
 
   const all: KpiCard[] = [
     {

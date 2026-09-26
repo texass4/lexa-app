@@ -127,15 +127,19 @@ export async function loadState(supabase: SupabaseClient): Promise<PersistedStat
 export interface SyncResult {
   /** Coleções que o banco recusou por falta de permissão. */
   denied: Collection[]
+  /** Coleções recusadas por regra de unicidade (ex.: CPF/CNPJ já cadastrado no escritório). */
+  conflicts: Collection[]
   /** Falhou por outro motivo (rede, servidor). */
   failed: boolean
 }
 
 const isRlsDenial = (error: { code?: string; message?: string }) => error.code === "42501" || /row-level security/i.test(error.message ?? "")
+/** Índice único ou restrição de validação do banco (`0002_clients_hub.sql`). */
+const isConflict = (error: { code?: string }) => error.code === "23505" || error.code === "23514"
 
 /** Grava as mudanças no escritório. Arquivos de documentos excluídos saem do Storage. */
 export async function syncState(supabase: SupabaseClient, organizationId: string, diff: StateDiff): Promise<SyncResult> {
-  const result: SyncResult = { denied: [], failed: false }
+  const result: SyncResult = { denied: [], conflicts: [], failed: false }
 
   for (const key of Object.keys(diff) as Collection[]) {
     const { upserts, deletes } = diff[key]!
@@ -146,6 +150,7 @@ export async function syncState(supabase: SupabaseClient, organizationId: string
       const { error } = await supabase.from(table).upsert(rows, { onConflict: "organization_id,id", ignoreDuplicates: APPEND_ONLY.has(key) })
       if (error) {
         if (isRlsDenial(error)) result.denied.push(key)
+        else if (isConflict(error)) result.conflicts.push(key)
         else result.failed = true
         continue
       }
