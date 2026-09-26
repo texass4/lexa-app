@@ -22,6 +22,7 @@ import { useToggleTask } from "./task-row"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { createLocalStore } from "@/lib/hooks"
+import { addDays, getNow, monthShort, startOfWeek, weekdayName } from "@/lib/dates"
 import { describeRelated, isOverdue, taskBucket, type TaskBucket } from "@/lib/selectors"
 import { PRIORITY_CONFIG } from "@/lib/config"
 import { matches } from "@/lib/format"
@@ -43,14 +44,23 @@ const FILTER_TEST: Record<Filter, (t: Task) => boolean> = {
   concluidas: (t) => t.status === "concluida",
 }
 
-const BUCKETS: { id: TaskBucket; label: string; hint?: string }[] = [
-  { id: "atrasadas", label: "Atrasadas", hint: "Prazo vencido" },
-  { id: "hoje", label: "Hoje", hint: "Quarta-feira, 23 set" },
-  { id: "amanha", label: "Amanhã", hint: "Quinta-feira, 24 set" },
-  { id: "semana", label: "Esta semana", hint: "Até domingo, 27 set" },
-  { id: "proximas", label: "Próximas" },
-  { id: "concluidas", label: "Concluídas" },
-]
+const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+const dayHint = (d: Date) => `${cap(weekdayName(d.getDay()))}, ${d.getDate()} ${monthShort(d.getMonth())}`
+
+/** Grupos da lista, com a data real de hoje, amanhã e do fim da semana. */
+function buckets(now: Date): { id: TaskBucket; label: string; hint?: string }[] {
+  const sunday = addDays(startOfWeek(now), 6)
+  return [
+    { id: "atrasadas", label: "Atrasadas", hint: "Prazo vencido" },
+    { id: "hoje", label: "Hoje", hint: dayHint(now) },
+    { id: "amanha", label: "Amanhã", hint: dayHint(addDays(now, 1)) },
+    { id: "semana", label: "Esta semana", hint: `Até ${weekdayName(0)}, ${sunday.getDate()} ${monthShort(sunday.getMonth())}` },
+    { id: "proximas", label: "Próximas" },
+    { id: "concluidas", label: "Concluídas" },
+  ]
+}
+
+const isFilter = (value: string | null): value is Filter => !!value && value in FILTER_TEST
 
 export function TasksView() {
   const data = useDemoData()
@@ -61,13 +71,24 @@ export function TasksView() {
   const pathname = usePathname()
   const params = useSearchParams()
   const ready = data.hydrated
-  const view = (React.useSyncExternalStore(viewStore.subscribe, viewStore.get, viewStore.getServer) as ViewMode) || "board"
-  const setView = (v: ViewMode) => viewStore.set(v)
+  const storedView = (React.useSyncExternalStore(viewStore.subscribe, viewStore.get, viewStore.getServer) as ViewMode) || "board"
+  // `?filtro=atrasadas` (links de "o que merece atenção") abre a lista já filtrada.
+  const filterParam = params.get("filtro")
+  const view: ViewMode = isFilter(filterParam) ? "list" : storedView
+  const setView = (v: ViewMode) => {
+    viewStore.set(v)
+    if (filterParam) router.replace(pathname, { scroll: false })
+  }
 
   const openId = params.get("tarefa")
   const openTask = openId ? data.tasks.find((t) => t.id === openId) : undefined
 
-  const [filter, setFilter] = React.useState<Filter>("todas")
+  const [filter, setFilter] = React.useState<Filter>(() => (isFilter(filterParam) ? filterParam : "todas"))
+  const [lastFilterParam, setLastFilterParam] = React.useState(filterParam)
+  if (filterParam !== lastFilterParam) {
+    setLastFilterParam(filterParam)
+    if (isFilter(filterParam)) setFilter(filterParam)
+  }
   const [scope, setScope] = React.useState<Scope>(() => (openTask && openTask.assigneeId !== currentUserId() ? "escritorio" : "minhas"))
   const [query, setQuery] = React.useState("")
   const [editing, setEditingState] = React.useState<{ task?: Task; open: boolean }>({ open: false })
@@ -93,20 +114,23 @@ export function TasksView() {
     number
   >
 
-  const groups = BUCKETS.map((b) => ({
-    ...b,
-    items: visible
-      .filter((t) => taskBucket(t) === b.id)
-      .sort((a, c) =>
-        b.id === "concluidas"
-          ? (c.completedAt ?? "").localeCompare(a.completedAt ?? "")
-          : a.dueAt.localeCompare(c.dueAt) || PRIORITY_CONFIG[a.priority].order - PRIORITY_CONFIG[c.priority].order,
-      ),
-  })).filter((g) => g.items.length > 0)
+  const groups = buckets(getNow())
+    .map((b) => ({
+      ...b,
+      items: visible
+        .filter((t) => taskBucket(t) === b.id)
+        .sort((a, c) =>
+          b.id === "concluidas"
+            ? (c.completedAt ?? "").localeCompare(a.completedAt ?? "")
+            : a.dueAt.localeCompare(c.dueAt) || PRIORITY_CONFIG[a.priority].order - PRIORITY_CONFIG[c.priority].order,
+        ),
+    }))
+    .filter((g) => g.items.length > 0)
 
   const setOpen = (id?: string) => router.replace(id ? `${pathname}?tarefa=${id}` : pathname, { scroll: false })
 
   const pendingMine = data.tasks.filter((t) => t.assigneeId === currentUserId() && t.status === "pendente").length
+  const overdueMine = data.tasks.filter((t) => t.assigneeId === currentUserId() && isOverdue(t)).length
 
   return (
     <div className="space-y-6">
@@ -114,7 +138,9 @@ export function TasksView() {
         title={scope === "minhas" ? "Minhas tarefas" : "Tarefas do escritório"}
         description={
           scope === "minhas"
-            ? `Você tem ${pendingMine} tarefas pendentes. Priorize os prazos que vencem hoje.`
+            ? pendingMine
+              ? `Você tem ${pendingMine} tarefa${pendingMine > 1 ? "s" : ""} pendente${pendingMine > 1 ? "s" : ""}${overdueMine ? ` — ${overdueMine} atrasada${overdueMine > 1 ? "s" : ""}. Comece por elas.` : ". Priorize os prazos que vencem hoje."}`
+              : "Nenhuma tarefa pendente com você. Crie uma ou veja as do escritório."
             : "Acompanhe o que cada pessoa da equipe precisa entregar."
         }
         actions={

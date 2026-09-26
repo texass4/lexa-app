@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, CalendarClock, CircleCheck, Flag, Pencil, RotateCcw, Trash2, UserRound } from "lucide-react"
+import { ArrowUpRight, CalendarClock, CircleCheck, Flag, Pencil, RotateCcw, Sparkles, Trash2, UserRound } from "lucide-react"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -15,6 +15,114 @@ import { getUser } from "@/lib/account"
 import { isOverdue } from "@/lib/selectors"
 import type { Task } from "@/types"
 import { useSession } from "@/lib/auth/session"
+import { useDemoData } from "@/lib/store/demo-store"
+import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/config"
+import { fmtRelative } from "@/lib/dates"
+import { clientContext, processContext, taskPrompts } from "@/components/ai/ai-context"
+import { useLexaAI } from "@/components/ai/lexa-ai-provider"
+
+/**
+ * O que está em volta da tarefa: o processo (prazo, última movimentação) ou o
+ * cliente — e perguntas da LEXA sobre ela, com os dados desse contexto.
+ */
+function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => void }) {
+  const data = useDemoData()
+  const lexa = useLexaAI()
+  const { can } = useSession()
+  const related = task.related
+  const process = related?.type === "process" && can("processes.view") ? data.processes.find((p) => p.id === related.id) : undefined
+  const client =
+    related?.type === "client" && can("clients.view")
+      ? data.clients.find((c) => c.id === related.id)
+      : process && can("clients.view")
+        ? data.clients.find((c) => c.id === process.clientId)
+        : undefined
+
+  if (!process && !client) {
+    return (
+      <p className="rounded-[12px] border border-dashed border-border px-3.5 py-3 text-[12.5px] leading-relaxed text-muted-foreground">
+        Esta tarefa não está ligada a um processo ou cliente. Vincule em “Editar” para ver o contexto aqui e perguntar à LEXA sobre ela.
+      </p>
+    )
+  }
+
+  const aiContext = process ? processContext(process.id, process.code) : clientContext(client!.id, client!.name)
+  const prompts = taskPrompts(task.title, process ? "process" : "client")
+  const lastMovement = process?.movements.length ? process.lastMovementAt : undefined
+
+  return (
+    <section className="space-y-3">
+      <Eyebrow>Contexto</Eyebrow>
+      {process && (
+        <Link
+          href={`/processos/${process.id}`}
+          className="group block rounded-[12px] border border-border bg-surface p-3.5 outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-[13.5px] font-medium">
+              Processo <span className="font-mono">{process.code}</span> · {process.type}
+            </p>
+            <StatusBadge tone={PROCESS_STATUS[process.status].tone} size="sm">
+              {PROCESS_STATUS[process.status].label}
+            </StatusBadge>
+          </div>
+          <dl className="mt-2 space-y-1 text-[12.5px] text-muted-foreground">
+            {process.nextDeadline && process.status !== "concluido" && (
+              <div className="flex gap-1.5">
+                <dt>Próximo prazo:</dt>
+                <dd className="min-w-0 truncate text-foreground">
+                  {fmtDueIn(process.nextDeadline.date)} · {process.nextDeadline.title}
+                </dd>
+              </div>
+            )}
+            {lastMovement && (
+              <div className="flex gap-1.5">
+                <dt>Última movimentação:</dt>
+                <dd className="min-w-0 truncate text-foreground">
+                  {fmtRelative(lastMovement)} · {process.movements[0]?.title}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </Link>
+      )}
+      {client && (
+        <Link
+          href={`/clientes/${client.id}`}
+          className="flex items-center justify-between gap-3 rounded-[12px] border border-border bg-surface px-3.5 py-2.5 text-[13px] outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <UserAvatar name={client.name} size="xs" />
+            <span className="truncate font-medium">{client.name}</span>
+          </span>
+          <StatusBadge tone={CLIENT_STATUS[client.status].tone} size="sm">
+            {CLIENT_STATUS[client.status].label}
+          </StatusBadge>
+        </Link>
+      )}
+      <div className="rounded-[12px] border border-gold/20 bg-gold-soft/35 p-3">
+        <p className="flex items-center gap-1.5 text-[12px] font-medium text-gold-dark">
+          <Sparkles className="size-3.5" /> Pergunte à LEXA sobre esta tarefa
+        </p>
+        <div className="mt-2 flex flex-col gap-1">
+          {prompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              onClick={() => {
+                onBeforeAsk()
+                lexa.ask(prompt, aiContext)
+              }}
+              className="rounded-[8px] px-2 py-1.5 text-left text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface/80 focus-visible:ring-2 focus-visible:ring-gold/40"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 export function TaskDetailSheet({
   task,
@@ -134,9 +242,10 @@ export function TaskDetailSheet({
             </div>
           )}
         </dl>
+        <TaskContext task={t} onBeforeAsk={() => onOpenChange(false)} />
         <section>
           <Eyebrow className="mb-2">Descrição</Eyebrow>
-          <p className="rounded-[12px] bg-surface-muted/60 px-3.5 py-3 text-[13px] leading-relaxed text-foreground/90">
+          <p className="rounded-[12px] bg-surface-muted/60 px-3.5 py-3 text-[13px] leading-relaxed whitespace-pre-line text-foreground/90">
             {t.description ?? "Sem descrição. Use “Editar” para adicionar orientações para a equipe."}
           </p>
         </section>

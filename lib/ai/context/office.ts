@@ -5,6 +5,7 @@
  */
 
 import { PROCESS_STATUS } from "@/lib/config"
+import { STALE_DAYS } from "@/lib/attention"
 import { addDays, parse, startOfDay, startOfWeek } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
 import { financeSummary, isOverdue } from "@/lib/selectors"
@@ -27,8 +28,8 @@ import {
   upcoming,
 } from "./shared"
 
-/** Sem movimentação há mais que isso = processo parado. */
-export const STALE_DAYS = 60
+/** Sem movimentação há mais que isso = processo parado — a mesma regra dos sinais de atenção da interface. */
+export { STALE_DAYS }
 
 export const OFFICE_LIMITS = {
   list: 10,

@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation"
 import { ArrowUpRight, FileText, ListChecks, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FilterTabs } from "@/components/ui/filter-tabs"
+import { SignalList } from "@/components/shared/signal-list"
 import { MovementDetailSheet } from "@/components/processos/movement-detail-sheet"
 import { aiApi } from "@/lib/ai/client"
 import type { ActionSuggestion, AIResult, AISource, NextActions, ProcessSummary } from "@/lib/ai/types"
+import type { AttentionSignal } from "@/lib/attention"
 import { interpretMovement, type LexaMovement } from "@/lib/services/processes/movement-interpreter"
 import { useSession } from "@/lib/auth/session"
 import type { Client, Process } from "@/types"
@@ -24,50 +26,49 @@ import {
   AttentionList,
   NoteList,
   SuggestionList,
-  isAIReady,
 } from "./ai-blocks"
-import { AIChatSheet } from "./ai-chat-sheet"
-import { useAIAction, useAIChat, useAIStatus, useCreateTaskFromSuggestion } from "./use-ai"
+import { PROCESS_PROMPTS, processContext } from "./ai-context"
+import { useAISourceHandler, useLexaAI } from "./lexa-ai-provider"
+import { useAIAction, useCreateTaskFromSuggestion } from "./use-ai"
 
 type View = "summary" | "next"
 
-const QUICK_PROMPTS = [
-  "Me explique esse processo.",
-  "Explique a última movimentação.",
-  "Quais são os pontos de atenção?",
-  "Sugira próximos passos.",
-  "Existe alguma tarefa relacionada?",
-]
+/** Resumo e próximos passos têm botões próprios (análise estruturada); o resto vai para a conversa. */
+const SHORTCUTS = PROCESS_PROMPTS.filter((prompt) => !prompt.startsWith("Resuma") && !prompt.startsWith("Sugira"))
 
 /**
- * LEXA IA no perfil do processo. Montar com `key={process.id}`: cada processo
- * tem suas próprias análises e conversa. Nada é chamado sem clique.
+ * Inteligência do processo: o que os dados já mostram (sinais) e, sob demanda,
+ * a interpretação da LEXA IA. Montar com `key={process.id}`: cada processo tem
+ * suas próprias análises. Nada é chamado sem clique.
  */
-export function ProcessAIPanel({ process, client }: { process: Process; client?: Client }) {
-  const status = useAIStatus()
-  const ready = isAIReady(status)
+export function ProcessAIPanel({ process, client, signals }: { process: Process; client?: Client; signals: AttentionSignal[] }) {
+  const lexa = useLexaAI()
+  const { status, ready } = lexa
   const summary = useAIAction<AIResult<ProcessSummary>>()
   const next = useAIAction<AIResult<NextActions>>()
-  const chat = useAIChat({ type: "process", id: process.id })
   const [view, setView] = React.useState<View>("summary")
-  const [chatOpen, setChatOpen] = React.useState(false)
   const [movement, setMovement] = React.useState<LexaMovement | null>(null)
   const [movementOpen, setMovementOpen] = React.useState(false)
   const createTask = useCreateTaskFromSuggestion({ processId: process.id })
   const { can } = useSession()
-
   const router = useRouter()
+  const context = processContext(process.id, process.code)
 
   /** Movimentação abre o detalhe aqui mesmo; as demais fontes levam ao registro. */
-  const openSource = (source: AISource) => {
-    const found = source.kind === "movement" ? process.movements.find((m) => m.id === source.id) : undefined
-    if (found) {
-      setMovement(interpretMovement(found, process.id))
-      setMovementOpen(true)
-    } else if (source.href) {
-      router.push(source.href)
-    }
-  }
+  const openSource = React.useCallback(
+    (source: AISource) => {
+      const found = source.kind === "movement" ? process.movements.find((m) => m.id === source.id) : undefined
+      if (found) {
+        setMovement(interpretMovement(found, process.id))
+        setMovementOpen(true)
+      } else if (source.href) {
+        router.push(source.href)
+      }
+    },
+    [process.movements, process.id, router],
+  )
+  // Fontes citadas na conversa global também abrem aqui.
+  useAISourceHandler(openSource)
 
   const runSummary = () => {
     setView("summary")
@@ -84,24 +85,47 @@ export function ProcessAIPanel({ process, client }: { process: Process; client?:
   return (
     <>
       <AIPanel
-        description="Análises a partir dos dados deste processo salvos no LEXA."
+        title="O que está acontecendo neste processo?"
+        description={
+          signals.length
+            ? `${signals.length === 1 ? "1 ponto merece" : `${signals.length} pontos merecem`} sua atenção nos dados deste processo.`
+            : "Nenhum prazo próximo, atraso ou paralisação nos dados deste processo."
+        }
         actions={
           <>
             <Button variant="secondary" size="sm" onClick={runSummary} disabled={!ready || summary.loading}>
               <FileText /> Resumir processo
             </Button>
             <Button variant="secondary" size="sm" onClick={runNext} disabled={!ready || next.loading}>
-              <ListChecks /> Verificar próximos passos
+              <ListChecks /> O que fazer agora
             </Button>
-            <Button size="sm" onClick={() => setChatOpen(true)} disabled={!ready}>
-              <MessageSquare /> Perguntar à LEXA
+            <Button variant="ghost" size="sm" onClick={() => lexa.open(context)}>
+              <MessageSquare /> Perguntar
             </Button>
           </>
         }
       >
-        {status && !ready && (
+        {signals.length > 0 && (
+          <div className="px-3 pb-3">
+            <SignalList signals={signals} linked={false} />
+          </div>
+        )}
+        {status && !ready ? (
           <div className="px-5 pb-5">
             <AIUnavailable status={status} />
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5 border-t border-border px-5 py-3">
+            {SHORTCUTS.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => lexa.ask(prompt, context)}
+                className="h-7 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted-foreground outline-none transition-[border-color,color,transform] hover:border-gold/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 active:scale-[0.97]"
+              >
+                {prompt}
+              </button>
+            ))}
           </div>
         )}
 
@@ -123,7 +147,7 @@ export function ProcessAIPanel({ process, client }: { process: Process; client?:
             {active.error && <AIErrorNotice error={active.error} onRetry={view === "summary" ? runSummary : runNext} />}
             {active.loading && (
               <AIThinking
-                label={view === "summary" ? "LEXA IA está analisando o processo…" : "LEXA IA está verificando os próximos passos…"}
+                label={view === "summary" ? `LEXA está analisando o processo ${process.code}…` : "LEXA está verificando o que fazer agora…"}
                 onCancel={active.cancel}
               />
             )}
@@ -139,24 +163,12 @@ export function ProcessAIPanel({ process, client }: { process: Process; client?:
               href={`/clientes/${client.id}`}
               className="inline-flex items-center gap-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:underline"
             >
-              Gerar panorama do cliente {client.name} <ArrowUpRight className="size-3.5" />
+              Como está o cliente {client.name}? <ArrowUpRight className="size-3.5" />
             </Link>
           </div>
         )}
       </AIPanel>
 
-      <AIChatSheet
-        open={chatOpen}
-        onOpenChange={setChatOpen}
-        chat={chat}
-        subtitle={`Processo ${process.number}`}
-        quickPrompts={QUICK_PROMPTS}
-        status={status}
-        onOpenSource={(source) => {
-          setChatOpen(false)
-          openSource(source)
-        }}
-      />
       <MovementDetailSheet movement={movement} open={movementOpen} onOpenChange={setMovementOpen} />
     </>
   )

@@ -5,7 +5,8 @@ export interface NavItem {
   href: string
   label: string
   icon: LucideIcon
-  badgeKey?: "tasks"
+  /** Contador que só aparece quando pede ação (ver `SidebarNav`). */
+  badgeKey?: "tasks" | "processes"
   /** Sem ela, o item some do menu e a rota mostra "sem acesso". */
   permission?: Permission
 }
@@ -20,7 +21,7 @@ export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
       { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
-      { href: "/processos", label: "Processos", icon: Scale, permission: "processes.view" },
+      { href: "/processos", label: "Processos", icon: Scale, badgeKey: "processes", permission: "processes.view" },
       { href: "/tarefas", label: "Tarefas", icon: ListChecks, badgeKey: "tasks", permission: "tasks.view" },
       { href: "/agenda", label: "Agenda", icon: CalendarDays, permission: "agenda.view" },
     ],

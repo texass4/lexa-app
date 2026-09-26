@@ -157,3 +157,13 @@ export function greeting(now: Date = getNow()) {
   if (h < 18) return "Boa tarde"
   return "Boa noite"
 }
+
+/** "agora", "em 45 min", "em 2h", "em 5h18" — quanto falta para um horário. */
+export function fmtStartsIn(iso: string, now: Date = getNow()) {
+  const minutes = Math.round((parse(iso).getTime() - now.getTime()) / 60_000)
+  if (minutes <= 0) return "agora"
+  if (minutes < 60) return `em ${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return `em ${hours}h${rest ? String(rest).padStart(2, "0") : ""}`
+}

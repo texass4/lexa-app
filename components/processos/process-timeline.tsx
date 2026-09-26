@@ -7,7 +7,8 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FilterTabs } from "@/components/ui/filter-tabs"
-import { getNow, fmtDayLabel, fmtDayMonthParts, fmtTime, parse, weekdayShort } from "@/lib/dates"
+import { getNow, diffInDays, fmtDayLabel, fmtDayMonthParts, fmtTime, parse, weekdayShort } from "@/lib/dates"
+import { RECENT_DAYS } from "@/lib/attention"
 import type { LexaMovement, MovementCategory } from "@/lib/services/processes/movement-interpreter"
 import { buildTimeline, type TimelineCluster, type TimelineItem } from "@/lib/services/processes/movement-timeline"
 import { MovementDetailSheet } from "./movement-detail-sheet"
@@ -67,6 +68,8 @@ export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
   const days = React.useMemo(() => buildTimeline(filtered.slice(0, limit)), [filtered, limit])
   const remaining = filtered.length - Math.min(limit, filtered.length)
   const newestId = movements[0]?.id
+  // Destaque "Nova" só quando a mais recente é mesmo recente.
+  const fresh = !!movements[0] && diffInDays(getNow(), parse(movements[0].at)) <= RECENT_DAYS
 
   const open = React.useCallback((movement: LexaMovement) => {
     setSelected(movement)
@@ -104,6 +107,7 @@ export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
               last={gi === days.length - 1}
               delay={gi < 8 ? gi * 0.04 : 0}
               newestId={newestId}
+              fresh={fresh}
               onOpen={open}
             />
           ))}
@@ -133,6 +137,7 @@ function TimelineDayGroup({
   last,
   delay,
   newestId,
+  fresh,
   onOpen,
 }: {
   date: string
@@ -140,6 +145,7 @@ function TimelineDayGroup({
   last: boolean
   delay: number
   newestId?: string
+  fresh: boolean
   onOpen: (movement: LexaMovement) => void
 }) {
   const { day, month } = fmtDayMonthParts(date)
@@ -170,9 +176,9 @@ function TimelineDayGroup({
       <ol className={cn("relative min-w-0 border-l border-border pl-6 sm:pl-7", last ? "pb-2" : "pb-8")}>
         {items.map((item) =>
           item.type === "single" ? (
-            <SingleEntry key={item.key} movement={item.movement} emphasis={item.movement.id === newestId} onOpen={onOpen} />
+            <SingleEntry key={item.key} movement={item.movement} emphasis={item.movement.id === newestId} fresh={fresh} onOpen={onOpen} />
           ) : (
-            <ClusterEntry key={item.key} cluster={item} emphasis={item.movements[0]?.id === newestId} onOpen={onOpen} />
+            <ClusterEntry key={item.key} cluster={item} emphasis={item.movements[0]?.id === newestId} fresh={fresh} onOpen={onOpen} />
           ),
         )}
       </ol>
@@ -198,10 +204,15 @@ function EntryIcon({ category, emphasis }: { category: MovementCategory; emphasi
 }
 
 /** Título, descrição legível e órgão julgador — nessa ordem de importância. */
-function EntryText({ title, description, unit }: { title: string; description?: string; unit?: string }) {
+function EntryText({ title, description, unit, fresh }: { title: string; description?: string; unit?: string; fresh?: boolean }) {
   return (
     <>
-      <p className="text-[13.5px] font-medium leading-snug break-words text-foreground">{title}</p>
+      <p className="text-[13.5px] font-medium leading-snug break-words text-foreground">
+        {title}
+        {fresh && (
+          <span className="ml-2 inline-block rounded-[5px] bg-gold-soft px-1.5 align-[1px] text-[10.5px] font-semibold text-gold-dark">Nova</span>
+        )}
+      </p>
       {description && <p className="mt-1 text-[12.5px] leading-snug break-words text-muted-foreground">{description}</p>}
       {unit && <p className="mt-0.5 text-[12px] leading-snug break-words text-subtle">{unit}</p>}
     </>
@@ -211,7 +222,17 @@ function EntryText({ title, description, unit }: { title: string; description?: 
 const rowButton =
   "-mx-2 -my-1 block w-[calc(100%+1rem)] rounded-[10px] px-2 py-1 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-gold/40"
 
-function SingleEntry({ movement, emphasis, onOpen }: { movement: LexaMovement; emphasis: boolean; onOpen: (m: LexaMovement) => void }) {
+function SingleEntry({
+  movement,
+  emphasis,
+  fresh,
+  onOpen,
+}: {
+  movement: LexaMovement
+  emphasis: boolean
+  fresh: boolean
+  onOpen: (m: LexaMovement) => void
+}) {
   return (
     <li className="relative pb-5 last:pb-0">
       <EntryIcon category={movement.category} emphasis={emphasis} />
@@ -223,7 +244,7 @@ function SingleEntry({ movement, emphasis, onOpen }: { movement: LexaMovement; e
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1 pt-0.5">
-            <EntryText title={movement.title} description={movement.description} unit={movement.judicialUnit?.name} />
+            <EntryText title={movement.title} description={movement.description} unit={movement.judicialUnit?.name} fresh={emphasis && fresh} />
           </div>
           <span className="tabular shrink-0 pt-1 text-[11.5px] text-subtle">{fmtTime(movement.at)}</span>
         </div>
@@ -232,7 +253,17 @@ function SingleEntry({ movement, emphasis, onOpen }: { movement: LexaMovement; e
   )
 }
 
-function ClusterEntry({ cluster, emphasis, onOpen }: { cluster: TimelineCluster; emphasis: boolean; onOpen: (m: LexaMovement) => void }) {
+function ClusterEntry({
+  cluster,
+  emphasis,
+  fresh,
+  onOpen,
+}: {
+  cluster: TimelineCluster
+  emphasis: boolean
+  fresh: boolean
+  onOpen: (m: LexaMovement) => void
+}) {
   const [expanded, setExpanded] = React.useState(false)
   const listId = React.useId()
   const count = cluster.movements.length
@@ -242,7 +273,7 @@ function ClusterEntry({ cluster, emphasis, onOpen }: { cluster: TimelineCluster;
       <EntryIcon category={cluster.category} emphasis={emphasis} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1 pt-0.5">
-          <EntryText title={cluster.label} description={cluster.description} unit={cluster.judicialUnit?.name} />
+          <EntryText title={cluster.label} description={cluster.description} unit={cluster.judicialUnit?.name} fresh={emphasis && fresh} />
         </div>
         <span className="tabular shrink-0 pt-1 text-[11.5px] text-subtle">
           {fmtTime(cluster.from)} – {fmtTime(cluster.to)}

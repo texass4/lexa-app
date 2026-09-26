@@ -2,11 +2,11 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowUpRight, CircleDollarSign, Download, Send, TrendingUp, TriangleAlert, Wallet, Percent } from "lucide-react"
+import { ArrowUpRight, CircleDollarSign, Download, TrendingUp, TriangleAlert, Wallet, Percent } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -16,7 +16,8 @@ import { FadeIn } from "@/components/ui/motion"
 import { RevenueBarChart } from "./revenue-chart"
 import { useDemoData } from "@/lib/store/demo-store"
 import { INVOICE_STATUS } from "@/lib/config"
-import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow } from "@/lib/dates"
+import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
+import { downloadCSV } from "@/lib/csv"
 import { formatCurrency } from "@/lib/format"
 import { financeSummary, monthlyRevenue, openReceivables, revenueByArea } from "@/lib/selectors"
 
@@ -24,8 +25,9 @@ export function FinanceView() {
   const data = useDemoData()
   const ready = data.hydrated
   const open = openReceivables(data)
-  const overdue = data.invoices.filter((i) => i.status === "atrasado")
+  const overdue = data.invoices.filter((i) => i.status === "atrasado").sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   const overdueTotal = overdue.reduce((a, i) => a + i.amount, 0)
+  const oldest = overdue[0]
   const upcoming = data.invoices.filter((i) => i.status !== "pago").sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   const summary = financeSummary(data.invoices)
   const series = monthlyRevenue(data.invoices)
@@ -33,6 +35,32 @@ export function FinanceView() {
   const maxArea = byArea[0]?.amount ?? 0
   const pct = summary.expected > 0 ? Math.round((summary.received / summary.expected) * 100) : undefined
   const growth = summary.growth
+  const clientName = (id: string) => data.clients.find((c) => c.id === id)?.name ?? ""
+
+  /** Exporta as faturas reais do escritório (arquivo gerado no navegador). */
+  const exportInvoices = () => {
+    const rows = [...data.invoices]
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .map((i) => [
+        clientName(i.clientId),
+        i.description,
+        i.amount,
+        fmtNumericDate(i.dueDate),
+        INVOICE_STATUS[i.status].label,
+        i.paidAt ? fmtNumericDate(i.paidAt) : "",
+        i.method ?? "",
+      ])
+    const file = `financeiro-${toLocalISO(getNow()).slice(0, 10)}.csv`
+    downloadCSV(file, [["Cliente", "Descrição", "Valor (R$)", "Vencimento", "Situação", "Pago em", "Forma"], ...rows])
+    toast.success("Relatório exportado.", { description: `${file} · ${rows.length} lançamento${rows.length === 1 ? "" : "s"}` })
+  }
+
+  // "Como está o dinheiro do escritório?" em uma frase, com os números reais.
+  const headline = !data.invoices.length
+    ? "Honorários previstos, recebidos e em aberto aparecem aqui assim que houver lançamentos."
+    : `${formatCurrency(summary.received)} recebidos de ${formatCurrency(summary.expected)} previstos em ${summary.month.split(" ")[0].toLowerCase()}${
+        overdueTotal > 0 ? ` · ${formatCurrency(overdueTotal)} vencidos` : " · nada vencido"
+      }.`
 
   const kpis = [
     { label: "Receita prevista", value: formatCurrency(summary.expected), hint: summary.month, icon: TrendingUp },
@@ -72,13 +100,10 @@ export function FinanceView() {
     <div className="space-y-6">
       <PageHeader
         title="Financeiro"
-        description="Honorários previstos, recebidos e em aberto do escritório."
+        description={ready ? headline : "Honorários previstos, recebidos e em aberto do escritório."}
         actions={
-          <Button
-            variant="secondary"
-            onClick={() => toast.success("Relatório exportado.", { description: `financeiro-${series[series.length - 1].key}.xlsx` })}
-          >
-            <Download /> Exportar relatório
+          <Button variant="secondary" onClick={exportInvoices} disabled={!ready || data.invoices.length === 0}>
+            <Download /> Exportar CSV
           </Button>
         }
       />
@@ -121,70 +146,21 @@ export function FinanceView() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13.5px] font-medium text-foreground">
-                  {overdue.length} parcelas em atraso somam {formatCurrency(overdueTotal)}
+                  {overdue.length === 1 ? "1 parcela em atraso soma" : `${overdue.length} parcelas em atraso somam`} {formatCurrency(overdueTotal)}
                 </p>
                 <p className="text-[12.5px] text-muted-foreground">
-                  {data.clients.find((c) => c.id === overdue[0].clientId)?.name} · vencidas desde {fmtNumericDate(overdue[0].dueDate)}
+                  Mais antiga: {clientName(oldest.clientId)} · vencida desde {fmtNumericDate(oldest.dueDate)}
                 </p>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => toast.success("Lembrete de cobrança enviado.", { description: "Mensagem enviada por e-mail e WhatsApp." })}
-              >
-                <Send /> Enviar cobrança
-              </Button>
+              <Link href={`/clientes/${oldest.clientId}?tab=financeiro`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                Abrir cliente <ArrowUpRight />
+              </Link>
             </FadeIn>
           )}
 
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-            <Panel className="lg:col-span-8">
-              <PanelHeader
-                title="Receita mensal"
-                description={`${series[0].label} a ${series[series.length - 1].label}`}
-                action={
-                  <div className="flex items-center gap-3 text-[11.5px] text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-[3px] bg-foreground" /> Recebida
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-[3px] bg-border-strong" /> Prevista
-                    </span>
-                  </div>
-                }
-              />
-              <div className="px-3 pb-4 sm:px-5">
-                <RevenueBarChart data={series} height={280} />
-              </div>
-            </Panel>
-
-            <Panel className="lg:col-span-4">
-              <PanelHeader title="Receita por área" description={`Recebido em ${getNow().getFullYear()}`} />
-              {byArea.length === 0 && <EmptyState compact title="Nenhum recebimento neste ano." />}
-              <ul className="space-y-3.5 px-5 pb-5">
-                {byArea.map((a, i) => (
-                  <li key={a.area}>
-                    <div className="mb-1.5 flex items-center justify-between text-[12.5px]">
-                      <span className="text-foreground">{a.area}</span>
-                      <span className="tabular font-medium">{a.pct}%</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-muted">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${maxArea ? (a.amount / maxArea) * 100 : 0}%` }}
-                        transition={{ duration: 0.6, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                        className={cn("h-full rounded-full", i === 0 ? "bg-gold" : "bg-foreground/75")}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          </div>
-
           <Panel>
             <PanelHeader title="Próximos recebimentos" description={`${upcoming.length} parcelas · ${formatCurrency(open)}`} />
-            {upcoming.length === 0 && <EmptyState compact title="Nenhuma parcela a receber." />}
+            {upcoming.length === 0 && <EmptyState compact title="Nenhuma parcela a receber." description="Tudo o que foi faturado já está pago." />}
             <ul className={cn("divide-y divide-border", upcoming.length > 0 && "border-t border-border")}>
               {upcoming.map((inv) => {
                 const client = data.clients.find((c) => c.id === inv.clientId)
@@ -214,7 +190,7 @@ export function FinanceView() {
                         <span className="truncate">{client?.name}</span>
                       </Link>
                       <p className="truncate text-[12px] text-muted-foreground">
-                        {inv.description} · {inv.method} · {fmtDueIn(inv.dueDate)}
+                        {[inv.description, inv.method, fmtDueIn(inv.dueDate)].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <span className="hidden sm:block">
@@ -237,6 +213,53 @@ export function FinanceView() {
               })}
             </ul>
           </Panel>
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+            <Panel className="lg:col-span-8">
+              <PanelHeader
+                title="Receita mensal"
+                description={`${series[0].label} a ${series[series.length - 1].label}`}
+                action={
+                  <div className="flex items-center gap-3 text-[11.5px] text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-[3px] bg-foreground" /> Recebida
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-[3px] bg-border-strong" /> Prevista
+                    </span>
+                  </div>
+                }
+              />
+              <div className="px-3 pb-4 sm:px-5">
+                <RevenueBarChart data={series} height={280} />
+              </div>
+            </Panel>
+
+            <Panel className="lg:col-span-4">
+              <PanelHeader title="Receita por área" description={`Recebido em ${getNow().getFullYear()}`} />
+              {byArea.length === 0 && (
+                <EmptyState compact title="Nenhum recebimento neste ano." description="A divisão por área aparece com os primeiros pagamentos." />
+              )}
+              <ul className="space-y-3.5 px-5 pb-5">
+                {byArea.map((a, i) => (
+                  <li key={a.area}>
+                    <div className="mb-1.5 flex items-center justify-between text-[12.5px]">
+                      <span className="text-foreground">{a.area}</span>
+                      <span className="tabular font-medium">{a.pct}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-muted">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${maxArea ? (a.amount / maxArea) * 100 : 0}%` }}
+                        transition={{ duration: 0.6, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                        className={cn("h-full rounded-full", i === 0 ? "bg-gold" : "bg-foreground/75")}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          </div>
         </>
       )}
     </div>

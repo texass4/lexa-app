@@ -23,6 +23,8 @@ import { ClientAIPanel } from "@/components/ai/client-ai-panel"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
+import { clientSignals } from "@/lib/attention"
+import { getNow } from "@/lib/dates"
 
 const TABS = ["visao-geral", "processos", "documentos", "financeiro", "timeline"] as const
 type Tab = (typeof TABS)[number]
@@ -101,7 +103,7 @@ export function ClientProfile({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <ClientHeader client={client} onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} />
-      <ClientAIPanel key={client.id} client={client} />
+      <ClientAIPanel key={client.id} client={client} signals={clientSignals(data, client, getNow(), can)} />
 
       <UnderlineTabs
         ariaLabel="Seções do cliente"
@@ -139,8 +141,8 @@ export function ClientProfile({ id }: { id: string }) {
               <Panel>
                 <EmptyState
                   icon={<Scale />}
-                  title="Nenhum processo encontrado."
-                  description="Este cliente ainda não possui processos cadastrados no escritório."
+                  title="Este cliente ainda não possui processos."
+                  description="Consulte pelo número CNJ: a LEXA passa a acompanhar prazos e movimentações e destaca o que merece atenção."
                   action={
                     <Can permission="processes.edit">
                       <Button size="sm" onClick={() => openDialog("process", { clientId: client.id })}>
@@ -187,7 +189,12 @@ export function ClientProfile({ id }: { id: string }) {
               {activities.length ? (
                 <ActivityTimeline activities={activities} />
               ) : (
-                <EmptyState compact icon={<CalendarClock />} title="Sem movimentações ainda." />
+                <EmptyState
+                  compact
+                  icon={<CalendarClock />}
+                  title="Nada registrado ainda."
+                  description="Cadastros, tarefas, documentos e movimentações deste cliente formam esta linha do tempo."
+                />
               )}
             </Panel>
           )}

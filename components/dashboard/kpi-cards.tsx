@@ -10,6 +10,7 @@ import { getNow, fmtTime, parse } from "@/lib/dates"
 import { formatCurrency, formatNumber } from "@/lib/format"
 import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
+import { isStale, movedRecently, STALE_DAYS } from "@/lib/attention"
 
 interface KpiCard {
   permission: Permission
@@ -25,7 +26,8 @@ export function KpiCards() {
   const data = useDemoData()
   const { can } = useSession()
   const activeProcesses = data.processes.filter((p) => p.status !== "concluido")
-  const synced = data.processes.filter((p) => p.source?.provider === "datajud").length
+  const moved = activeProcesses.filter((p) => movedRecently(p)).length
+  const stale = activeProcesses.filter((p) => isStale(p)).length
   const todays = todaysAppointments(data)
   const nextToday = todays.find((a) => parse(a.start) > getNow())
   const pending = data.tasks.filter((t) => t.status === "pendente")
@@ -42,7 +44,20 @@ export function KpiCards() {
       short: "Processos",
       icon: Scale,
       value: formatNumber(activeProcesses.length, 2),
-      foot: data.processes.length ? <>{synced} acompanhados pelo DataJud</> : <>Consulte pelo número CNJ</>,
+      // O número sozinho não diz nada: o rodapé diz o que mudou ou o que está parado.
+      foot: !data.processes.length ? (
+        <>Consulte pelo número CNJ</>
+      ) : moved ? (
+        <>
+          <span className="font-medium text-foreground">{moved}</span> com movimentação recente
+        </>
+      ) : stale ? (
+        <span className="text-warning">
+          {stale} sem movimentação há +{STALE_DAYS} dias
+        </span>
+      ) : (
+        <>Sem movimentação nos últimos 7 dias</>
+      ),
     },
     {
       permission: "agenda.view",
@@ -74,7 +89,7 @@ export function KpiCards() {
       short: "Em aberto",
       icon: CircleDollarSign,
       value: formatCurrency(open),
-      foot: late > 0 ? <>{formatCurrency(late)} em atraso</> : <>Nenhum valor em atraso</>,
+      foot: late > 0 ? <span className="text-danger">{formatCurrency(late)} em atraso</span> : <>Nenhum valor em atraso</>,
     },
   ]
   const cards = all.filter((card) => can(card.permission))
