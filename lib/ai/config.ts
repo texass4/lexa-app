@@ -17,8 +17,12 @@ export interface AIConfig {
   provider: "gemini"
   apiKey: string
   model: string
+  /** Modelos tentados, em ordem, quando o principal está sobrecarregado ou indisponível. */
+  fallbackModels: string[]
   timeoutMs: number
 }
+
+const MODEL_NAME = /^[A-Za-z0-9._\-/]{3,80}$/
 
 type Env = Record<string, string | undefined>
 
@@ -46,13 +50,17 @@ export function getAIConfig(env: Env = process.env): AIConfig {
   if (!apiKey) throw new AIError("NOT_CONFIGURED")
 
   const model = env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
-  if (!/^[A-Za-z0-9._\-/]{3,80}$/.test(model)) throw new AIError("NOT_CONFIGURED", { message: "GEMINI_MODEL inválido." })
+  if (!MODEL_NAME.test(model)) throw new AIError("NOT_CONFIGURED", { message: "GEMINI_MODEL inválido." })
+
+  const fallbackModels = [...new Set((env.GEMINI_FALLBACK_MODEL ?? "").split(",").map((name) => name.trim()))].filter((name) => name && name !== model)
+  if (fallbackModels.some((name) => !MODEL_NAME.test(name))) throw new AIError("NOT_CONFIGURED", { message: "GEMINI_FALLBACK_MODEL inválido." })
 
   const timeout = Number(env.AI_TIMEOUT_MS)
   return {
     provider: "gemini",
     apiKey,
     model,
+    fallbackModels,
     timeoutMs: Number.isFinite(timeout) && timeout >= 5_000 ? timeout : DEFAULT_AI_TIMEOUT_MS,
   }
 }

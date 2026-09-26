@@ -5,7 +5,7 @@
  * vem de `config.ts` e nunca chega ao navegador.
  */
 
-import { GoogleGenAI, type GenerateContentParameters } from "@google/genai"
+import { GoogleGenAI, ThinkingLevel, type GenerateContentParameters } from "@google/genai"
 import { AIError } from "./errors"
 import type { AIProvider, AIProviderResult, AIRequest, AIUsage } from "./provider"
 import type { JsonSchema } from "./schema"
@@ -27,81 +27,113 @@ export interface GeminiResponseLike {
 interface GeminiOptions {
   apiKey: string
   model: string
+  fallbackModels?: string[]
   timeoutMs: number
   client?: GeminiClientLike
+  /** Espera antes de repetir o mesmo modelo (sem reserva configurado). */
+  retryDelayMs?: number
 }
 
 const DEFAULT_TEMPERATURE = 0.2
 /** Teto (não custo): só os tokens gerados são cobrados. No Gemini, o raciocínio também conta aqui. */
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192
 /**
- * Gemini 2.5 Flash raciocina por padrão com orçamento dinâmico (cobrado como saída).
- * Organizar dados já estruturados pede pouco raciocínio: um teto curto barateia e
- * evita resposta cortada. Outros modelos seguem o padrão do provedor.
+ * Os modelos Flash raciocinam por padrão (cobrado como saída e mais lento).
+ * Organizar dados já estruturados pede pouco raciocínio: 2.5 recebe um orçamento
+ * curto e a família 3 o nível "low". Nomes genéricos (ex.: "-latest") ficam no
+ * padrão do provedor, porque não dá para saber qual parâmetro aceitam.
  */
-const thinkingFor = (model: string) => (/^gemini-2\.5-flash/.test(model) ? { thinkingBudget: 1024 } : undefined)
+function thinkingFor(model: string) {
+  if (/^gemini-2\.5-flash/.test(model)) return { thinkingBudget: 1024 }
+  if (/^gemini-3/.test(model)) return { thinkingLevel: ThinkingLevel.LOW }
+  return undefined
+}
+
+/** Falhas que outro modelo (ou uma nova tentativa) pode resolver. */
+const SWITCHABLE = new Set(["UNAVAILABLE", "PROVIDER_RATE_LIMITED", "MODEL_UNAVAILABLE"])
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini"
   readonly model: string
+  private readonly fallbackModels: string[]
   private readonly client: GeminiClientLike
   private readonly timeoutMs: number
+  private readonly retryDelayMs: number
 
   constructor(options: GeminiOptions) {
     if (typeof window !== "undefined") throw new Error("GeminiProvider só pode rodar no servidor.")
     this.model = options.model
+    this.fallbackModels = options.fallbackModels ?? []
     this.timeoutMs = options.timeoutMs
-    this.client =
-      options.client ??
-      new GoogleGenAI({
-        apiKey: options.apiKey,
-        // Uma nova tentativa só para instabilidade do serviço; limite de uso (429) não é repetido.
-        httpOptions: { retryOptions: { attempts: 2, initialDelay: 1, maxDelay: 3, httpStatusCodes: [500, 502, 503, 504] } },
-      })
+    this.retryDelayMs = options.retryDelayMs ?? 1500
+    // Sem novas tentativas dentro do SDK: quem decide repetir ou trocar de modelo é `call`.
+    this.client = options.client ?? new GoogleGenAI({ apiKey: options.apiKey })
   }
 
   async generateText(request: AIRequest): Promise<AIProviderResult<string>> {
-    const response = await this.call(request)
-    return { value: readText(response), usage: usage(response) }
+    const { response, model } = await this.call(request)
+    return { value: readText(response), usage: usage(response, model) }
   }
 
   async generateJSON(request: AIRequest & { schema: JsonSchema }): Promise<AIProviderResult<unknown>> {
-    const response = await this.call(request, { responseMimeType: "application/json", responseJsonSchema: request.schema })
+    const { response, model } = await this.call(request, { responseMimeType: "application/json", responseJsonSchema: request.schema })
     const text = readText(response)
     try {
-      return { value: JSON.parse(text), usage: usage(response) }
+      return { value: JSON.parse(text), usage: usage(response, model) }
     } catch (cause) {
       throw new AIError("INVALID_RESPONSE", { message: "O modelo não devolveu um JSON válido.", cause })
     }
   }
 
-  private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}): Promise<GeminiResponseLike> {
+  /**
+   * Tenta o modelo principal e, se ele estiver sobrecarregado (503), sem cota (429)
+   * ou indisponível (404), os reservas em ordem. Sem reserva, repete o principal uma
+   * vez. Todas as tentativas dividem o mesmo tempo máximo.
+   */
+  private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}) {
     const timeout = AbortSignal.timeout(this.timeoutMs)
     const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
+    const chain = this.fallbackModels.length ? [this.model, ...this.fallbackModels] : [this.model, this.model]
 
-    try {
-      return await this.client.models.generateContent({
-        model: this.model,
-        contents: request.messages.map((message) => ({
-          role: message.role === "assistant" ? "model" : "user",
-          parts: [{ text: message.content }],
-        })),
-        config: {
-          systemInstruction: request.system,
-          temperature: request.temperature ?? DEFAULT_TEMPERATURE,
-          maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-          thinkingConfig: thinkingFor(this.model),
-          abortSignal: signal,
-          ...extra,
-        },
-      })
-    } catch (error) {
-      if (request.signal?.aborted) throw new AIError("CANCELLED", { cause: error })
-      if (timeout.aborted) throw new AIError("TIMEOUT", { cause: error })
-      throw mapGeminiError(error)
+    for (let i = 0; ; i++) {
+      const model = chain[i]
+      try {
+        return { response: await this.attempt(model, request, extra, signal), model }
+      } catch (error) {
+        if (request.signal?.aborted) throw new AIError("CANCELLED", { cause: error })
+        if (timeout.aborted) throw new AIError("TIMEOUT", { cause: error })
+        const known = mapGeminiError(error)
+        const next = chain[i + 1]
+        if (!next || !SWITCHABLE.has(known.code) || (next === model && known.code === "MODEL_UNAVAILABLE")) throw known
+        if (next === model) await sleep(this.retryDelayMs, signal)
+      }
     }
   }
+
+  private attempt(model: string, request: AIRequest, extra: GenerateContentParameters["config"], signal: AbortSignal) {
+    return this.client.models.generateContent({
+      model,
+      contents: request.messages.map((message) => ({
+        role: message.role === "assistant" ? "model" : "user",
+        parts: [{ text: message.content }],
+      })),
+      config: {
+        systemInstruction: request.system,
+        temperature: request.temperature ?? DEFAULT_TEMPERATURE,
+        maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        thinkingConfig: thinkingFor(model),
+        abortSignal: signal,
+        ...extra,
+      },
+    })
+  }
 }
+
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true })
+  })
 
 function readText(response: GeminiResponseLike): string {
   if (response.promptFeedback?.blockReason) throw new AIError("BLOCKED", { message: `Pedido bloqueado: ${response.promptFeedback.blockReason}` })
@@ -115,9 +147,9 @@ function readText(response: GeminiResponseLike): string {
   return text
 }
 
-function usage(response: GeminiResponseLike): AIUsage | undefined {
+function usage(response: GeminiResponseLike, model: string): AIUsage {
   const meta = response.usageMetadata
-  return meta ? { inputTokens: meta.promptTokenCount, outputTokens: meta.candidatesTokenCount } : undefined
+  return { inputTokens: meta?.promptTokenCount, outputTokens: meta?.candidatesTokenCount, model }
 }
 
 /** Erro do SDK → código do LEXA. A mensagem original fica só em `cause`. */

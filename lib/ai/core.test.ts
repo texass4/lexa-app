@@ -51,7 +51,7 @@ function gemini(reply: GeminiResponseLike | Error) {
       },
     },
   }
-  return { provider: new GeminiProvider({ apiKey: "k", model: "gemini-test", timeoutMs: 5_000, client }), calls }
+  return { provider: new GeminiProvider({ apiKey: "k", model: "gemini-test", timeoutMs: 5_000, client, retryDelayMs: 0 }), calls }
 }
 
 const apiError = (status: number, message = "erro") => Object.assign(new Error(message), { status })
@@ -131,6 +131,59 @@ describe("GeminiProvider", () => {
     assert.equal(await rejects(gemini(apiError(400, "API key not valid")).provider.generateText(request)), "INVALID_API_KEY")
     const missingModel = (await gemini(apiError(404)).provider.generateText(request).catch((e: AIError) => e)) as AIError
     assert.equal(missingModel.providerStatus, 404)
+  })
+
+  it("modelo sobrecarregado (503) ou sem cota (429) → tenta o reserva e informa quem respondeu", async () => {
+    for (const status of [503, 429, 404]) {
+      const models: string[] = []
+      const client: GeminiClientLike = {
+        models: {
+          async generateContent(params) {
+            models.push(params.model)
+            if (params.model === "principal") throw apiError(status)
+            return { text: "ok" }
+          },
+        },
+      }
+      const provider = new GeminiProvider({ apiKey: "k", model: "principal", fallbackModels: ["reserva"], timeoutMs: 5_000, client })
+      const result = await provider.generateText(request)
+      assert.deepEqual(models, ["principal", "reserva"], `status ${status}`)
+      assert.equal(result.usage?.model, "reserva")
+    }
+  })
+
+  it("sem reserva, repete o principal uma vez em 503; erro de pedido (400) não é repetido", async () => {
+    let calls = 0
+    const flaky: GeminiClientLike = {
+      models: {
+        async generateContent() {
+          calls += 1
+          if (calls === 1) throw apiError(503)
+          return { text: "ok" }
+        },
+      },
+    }
+    const ok = await new GeminiProvider({ apiKey: "k", model: "m", timeoutMs: 5_000, client: flaky, retryDelayMs: 0 }).generateText(request)
+    assert.equal(ok.value, "ok")
+    assert.equal(calls, 2)
+
+    const { provider, calls: bad } = gemini(apiError(400, "campo inválido"))
+    assert.equal(await rejects(provider.generateText(request)), "BAD_REQUEST")
+    assert.equal(bad.length, 1)
+  })
+
+  it("todos os modelos sobrecarregados → UNAVAILABLE com o status do provedor", async () => {
+    const { provider, calls } = gemini(apiError(503))
+    const failure = (await provider.generateText(request).catch((e: AIError) => e)) as AIError
+    assert.equal(failure.code, "UNAVAILABLE")
+    assert.equal(failure.providerStatus, 503)
+    assert.equal(calls.length, 2)
+  })
+
+  it("lê GEMINI_FALLBACK_MODEL (lista, sem repetir o principal)", () => {
+    const config = getAIConfig({ GEMINI_API_KEY: "k", GEMINI_MODEL: "flash-a", GEMINI_FALLBACK_MODEL: "flash-b, flash-a, flash-c,flash-b" })
+    assert.deepEqual(config.fallbackModels, ["flash-b", "flash-c"])
+    assert.deepEqual(getAIConfig({ GEMINI_API_KEY: "k" }).fallbackModels, [])
   })
 
   it("cancelamento pelo usuário → CANCELLED", async () => {

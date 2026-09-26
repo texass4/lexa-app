@@ -26,6 +26,8 @@ export interface AIRequest {
 export interface AIUsage {
   inputTokens?: number
   outputTokens?: number
+  /** Modelo que de fato respondeu (pode ser o reserva). */
+  model?: string
 }
 
 export interface AIProviderResult<T> {
@@ -47,14 +49,14 @@ let cached: { key: string; provider: AIProvider } | undefined
 export function createAIProvider(config: AIConfig): AIProvider {
   switch (config.provider) {
     case "gemini":
-      return new GeminiProvider({ apiKey: config.apiKey, model: config.model, timeoutMs: config.timeoutMs })
+      return new GeminiProvider({ apiKey: config.apiKey, model: config.model, fallbackModels: config.fallbackModels, timeoutMs: config.timeoutMs })
   }
 }
 
 /** Um único cliente por configuração, reaproveitado entre requisições. */
 export function getAIProvider(): AIProvider {
   const config = getAIConfig()
-  const key = `${config.provider}:${config.model}:${config.timeoutMs}:${config.apiKey.length}:${config.apiKey.slice(-4)}`
+  const key = `${config.provider}:${config.model}:${config.fallbackModels.join(",")}:${config.timeoutMs}:${config.apiKey.length}:${config.apiKey.slice(-4)}`
   if (cached?.key !== key) cached = { key, provider: createAIProvider(config) }
   return cached.provider
 }

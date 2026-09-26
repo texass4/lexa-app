@@ -21,6 +21,7 @@ Camada de inteligência sobre os dados reais do escritório: resumo e próximos 
    ```bash
    GEMINI_API_KEY=sua-chave
    GEMINI_MODEL=gemini-2.5-flash   # opcional; qualquer modelo Flash disponível na sua conta
+   GEMINI_FALLBACK_MODEL=          # opcional; reserva quando o principal estiver sobrecarregado
    AI_ENABLED=true                 # false desliga a LEXA IA
    ```
 3. **Instale as dependências** (`@google/genai` já está no `package.json`): `npm install`.
