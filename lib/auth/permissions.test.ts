@@ -1,16 +1,22 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { describe, it } from "node:test"
 
 import { ALL_PERMISSIONS, effectivePermissions, hasPermission, ROLE_DEFAULTS, sanitizePermissions, type Role } from "./permissions"
 
-const sql = readFileSync(new URL("../../supabase/migrations/0001_lexa_auth.sql", import.meta.url), "utf8")
+const migrations = new URL("../../supabase/migrations/", import.meta.url)
+/** Todas as migrações, na ordem em que rodam: vale a última definição de `role_defaults`. */
+const sql = readdirSync(migrations)
+  .filter((file) => file.endsWith(".sql"))
+  .sort()
+  .map((file) => readFileSync(new URL(file, migrations), "utf8"))
+  .join("\n")
 
-/** Lê a lista de `role_defaults` de um papel direto da migração. */
+/** Lê a lista de `role_defaults` de um papel direto das migrações (a definição mais recente). */
 function sqlDefaults(role: Role): string[] {
-  const match = sql.match(new RegExp(`when '${role}' then array\\[([^\\]]*)\\]`))
-  assert.ok(match, `role_defaults sem o papel ${role}`)
-  return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()
+  const matches = [...sql.matchAll(new RegExp(`when '${role}' then array\\[([^\\]]*)\\]`, "g"))]
+  assert.ok(matches.length, `role_defaults sem o papel ${role}`)
+  return [...matches.at(-1)![1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()
 }
 
 describe("permissões", () => {

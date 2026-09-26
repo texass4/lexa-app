@@ -302,3 +302,5 @@ export interface Notification {
   read: boolean
   href: string
 }
+
+export * from "./whatsapp"
