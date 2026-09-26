@@ -9,6 +9,8 @@
 --     quando o documento é cadastrado ou alterado (cadastros antigos continuam
 --     editáveis enquanto o documento não muda).
 -- O app mostra um aviso próprio para esses erros (códigos 23505 e 23514).
+-- Sem `case ... end` dentro das funções: o SQL Editor do Supabase confunde esse
+-- `end;` com o fim do bloco e corta a função no meio.
 -- Tudo numa transação: se houver duplicados, nada é aplicado.
 
 begin;
@@ -59,7 +61,8 @@ begin
     for i in 1..12 loop
       s := s + substr(d, i, 1)::int * w1[i];
     end loop;
-    r := case when s % 11 < 2 then 0 else 11 - s % 11 end;
+    r := s % 11;
+    if r < 2 then r := 0; else r := 11 - r; end if;
     if r <> substr(d, 13, 1)::int then
       return false;
     end if;
@@ -67,7 +70,8 @@ begin
     for i in 1..13 loop
       s := s + substr(d, i, 1)::int * w2[i];
     end loop;
-    r := case when s % 11 < 2 then 0 else 11 - s % 11 end;
+    r := s % 11;
+    if r < 2 then r := 0; else r := 11 - r; end if;
     return r = substr(d, 14, 1)::int;
   end if;
 
