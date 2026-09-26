@@ -24,6 +24,10 @@ app/api/processes/search | [id]/sync      servidor
 python/datajud.py                          HTTP com o DataJud: retry, 429, cache SQLite
     ↓
 datajud/mapper.ts → sheet.ts → import.ts   JSON bruto → ficha → processo do LEXA
+
+Central de Atendimento (WhatsApp)
+    tela → /api/whatsapp/* → lib/services/whatsapp → Z-API → WhatsApp
+    WhatsApp → Z-API → /api/whatsapp/webhook → banco → Realtime → tela
 ```
 
 ---
@@ -33,23 +37,28 @@ datajud/mapper.ts → sheet.ts → import.ts   JSON bruto → ficha → processo
 ```
 lexa-app/
 ├── app/                      rotas (páginas finas: metadata + view)
-│   ├── (app)/                shell autenticado: dashboard, clientes, processos,
+│   ├── (app)/                shell autenticado: dashboard, clientes, atendimento, processos,
 │   │                         tarefas, agenda, documentos, financeiro, configuracoes
 │   ├── (auth)/               login, cadastro, recuperar-senha, redefinir-senha
 │   ├── (admin)/admin         painel do Super Admin (papel checado no servidor)
 │   ├── auth/confirm          troca o token dos links (recuperação/convite) por sessão
 │   └── api/                  processes/* (DataJud), auth/* (cadastro, recuperação),
-│                             team/users (gestão do escritório), me/email, admin/*
+│                             team/users (gestão do escritório), me/email, admin/*,
+│                             whatsapp/* (Central de Atendimento + webhook da Z-API)
 ├── components/
 │   ├── layout/               sidebar, topbar, busca Ctrl K, notificações, modais globais
 │   ├── ui/                   design system
 │   ├── shared/               peças usadas em mais de um módulo
 │   ├── processos/            lista, perfil, timeline, formulário com consulta CNJ
+│   ├── atendimento/          Central de Atendimento (WhatsApp): conversas, conversa, contexto, Lexa IA
 │   └── clientes/ tasks/ agenda/ documentos/ financeiro/ dashboard/ configuracoes/
 ├── lib/
 │   ├── cnj.ts                máscara, normalização e dígito verificador
 │   ├── integrations/legal/   modelo neutro (types.ts) + DataJud (mapper, mensagens de erro)
+│   ├── integrations/whatsapp/ contrato neutro do provedor + Z-API (cliente HTTP, webhooks)
 │   ├── services/processes/   ficha, importação, deduplicação, interpretação de movimentos
+│   ├── services/whatsapp/    recebimento, envio, conversas, instância, Lexa IA (servidor)
+│   ├── whatsapp/             telefone, status, mapeadores de linha, cliente do navegador
 │   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros
 │   ├── supabase/             clientes: navegador, servidor (cookie) e admin (service role)
 │   ├── store/                demo-store, ui-store, storage (persistência no Supabase)
@@ -76,6 +85,7 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 |---|---|
 | `/dashboard` | `components/dashboard/dashboard-view.tsx` |
 | `/clientes`, `/clientes/[id]` | `components/clientes/…` |
+| `/atendimento` (`?c=<conversa>`) | `components/atendimento/atendimento-view.tsx` |
 | `/processos`, `/processos/[id]` | `components/processos/processes-view.tsx`, `process-profile.tsx` |
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
@@ -134,6 +144,40 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 ---
 
+## 4b. Central de Atendimento (WhatsApp via Z-API)
+
+**Tela** — `/atendimento`, três áreas: conversas (`conversation-list.tsx`) → conversa (`conversation-view.tsx`: cabeçalho com ações rápidas, busca, `message-list.tsx`, `composer.tsx`) → contexto jurídico (`context-panel.tsx`) com a aba Lexa IA (`ai-panel.tsx`). Abaixo de 1280 px o contexto abre como painel lateral; no celular, lista e conversa se alternam. O `AppShell` dá altura total a essa rota.
+
+**Dados** — tabelas próprias (não o padrão jsonb), em `supabase/migrations/0002_whatsapp.sql`:
+
+| Tabela | O quê |
+|---|---|
+| `whatsapp_instances` | conexão com a Z-API (sem token) e status |
+| `whatsapp_contacts` | telefone do contato; `client_id` quando vinculado a um cliente |
+| `whatsapp_conversations` | uma por contato e instância; status, responsável, não lidas, prévia |
+| `whatsapp_messages` | recebidas, enviadas, notas internas (`note`) e registros (`event`) |
+| `whatsapp_message_attachments` | mídias; arquivo no bucket `whatsapp` (`<org>/…`) |
+| `whatsapp_tags`, `whatsapp_conversation_tags` | tags do escritório |
+| `whatsapp_conversation_assignments` | histórico de responsáveis |
+| `whatsapp_statuses` | status personalizados (futuro), cada um ligado a uma categoria do sistema |
+| `whatsapp_webhook_events` | log bruto dos webhooks (só o servidor vê) |
+
+Isolamento: RLS de leitura (`current_org_id()` + `whatsapp.view`) e **chaves estrangeiras compostas** `(organization_id, id)` — o banco recusa qualquer referência entre escritórios. O navegador só lê; toda escrita passa por `/api/whatsapp/*` (`requireActor` → serviço → service role). A tela recebe mudanças pelo Realtime do Supabase (`inbox-provider.tsx`), que respeita a mesma RLS.
+
+**Envio** — `POST /api/whatsapp/conversations/:id/messages` (`services/whatsapp/outbound.ts`): grava `pending`, chama a Z-API e vira `sent`/`failed`; entregue/lida chegam pelo webhook e só avançam (`whatsapp_apply_status`). Anexos: o navegador sobe em `whatsapp/<org>/outgoing/…` e a Z-API recebe um link assinado de 1 h. **Notas internas** são gravadas e param ali — o banco impede que uma nota tenha id do WhatsApp.
+
+**Recebimento** — a Z-API chama `POST /api/whatsapp/webhook?token=<ZAPI_WEBHOOK_SECRET>` (rota pública no `proxy.ts`). O segredo é comparado em tempo constante e o `instanceId` do corpo define o escritório. `parseZapiWebhook` traduz o evento; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, **vincula sozinho ao cliente de mesmo telefone** (com e sem o nono dígito — `lib/whatsapp/phone.ts`), cria a conversa e grava a mensagem (idempotente). Sem cliente, fica "Contato novo": transformar em cliente é sempre uma ação confirmada na tela. Mídias recebidas são copiadas para o Storage depois da resposta (`after`), porque os links da Z-API expiram.
+
+**Instância** — a do `.env` pertence ao escritório de `ZAPI_ORGANIZATION_ID` (criada sozinha no primeiro uso). Credenciais nunca vão ao banco nem ao navegador; `providerFor()` (`services/whatsapp/instances.ts`) é o ponto a estender para vários números. Quem tem `office.manage` vê na Central o diagnóstico, o QR Code e o botão que cadastra os webhooks na Z-API.
+
+**Permissões** — `whatsapp.view` (ler), `whatsapp.edit` (responder, notas, tags, status, assumir conversa sem responsável), `whatsapp.assign` (distribuir e trocar responsável). Padrões por papel em `role_defaults` (0002) e `lib/auth/permissions.ts`.
+
+**Lexa IA** — `POST /api/whatsapp/ai` (`services/whatsapp/ai.ts`, Claude via `@anthropic-ai/sdk`, saída estruturada com zod). Resume, sugere resposta, identifica tarefas e processos, analisa imagens/PDFs recebidos e escreve resumo interno. **Nunca executa nada**: a resposta sugerida vai para o campo (só sai com "Enviar") e criar tarefa / salvar nota pedem confirmação.
+
+Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZATION_ID`, `ZAPI_WEBHOOK_SECRET`, opcionais `ZAPI_WEBHOOK_BASE_URL` e `ANTHROPIC_API_KEY` (veja `.env.example`).
+
+---
+
 ## 5. UI global
 
 `app/layout.tsx` → `Providers` (tema, stores, toasts) → `app/(app)/layout.tsx` → `AppShell` (sidebar, topbar, busca, modais).
@@ -159,15 +203,15 @@ Design system — reutilize, não invente: `page-header`, `panel`, `button`, `st
 
 ## 7. O que ainda é simulado
 
-Envio de e-mail (links saem no terminal), integrações (WhatsApp, agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta ao DataJud e o salvamento dos processos são reais.
+Envio de e-mail (links saem no terminal), integrações (agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta ao DataJud, o salvamento dos processos e o WhatsApp (Z-API) são reais.
 
 ## 8. Como rodar
 
-Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
+Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` e depois `0002_whatsapp.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
 
 ```bash
 npm run dev      # http://localhost:3000 (requer Python 3 com `requests` para consultar processos)
-npm test         # CNJ, mapper, interpretador, timeline, deduplicação, sincronização, permissões, financeiro
+npm test         # CNJ, mapper, interpretador, timeline, deduplicação, sincronização, permissões, financeiro, WhatsApp
 npm run lint
 npx tsc --noEmit
 ```

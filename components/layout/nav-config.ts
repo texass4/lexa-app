@@ -1,4 +1,4 @@
-import { CalendarDays, FolderOpen, LayoutGrid, ListChecks, Scale, Settings, UsersRound, Wallet, type LucideIcon } from "lucide-react"
+import { CalendarDays, FolderOpen, LayoutGrid, ListChecks, MessagesSquare, Scale, Settings, UsersRound, Wallet, type LucideIcon } from "lucide-react"
 import type { Permission } from "@/lib/auth/permissions"
 
 export interface NavItem {
@@ -19,6 +19,7 @@ export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     label: "Escritório",
     items: [
       { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
+      { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
       { href: "/processos", label: "Processos", icon: Scale, permission: "processes.view" },
       { href: "/tarefas", label: "Tarefas", icon: ListChecks, badgeKey: "tasks", permission: "tasks.view" },
       { href: "/agenda", label: "Agenda", icon: CalendarDays, permission: "agenda.view" },
@@ -40,6 +41,7 @@ export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
 export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/dashboard": { title: "Visão geral", section: "Painel" },
   "/clientes": { title: "Clientes", section: "Escritório" },
+  "/atendimento": { title: "Central de atendimento", section: "WhatsApp" },
   "/processos": { title: "Processos", section: "Escritório" },
   "/tarefas": { title: "Tarefas", section: "Escritório" },
   "/agenda": { title: "Agenda", section: "Escritório" },

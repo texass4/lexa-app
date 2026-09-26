@@ -14,11 +14,16 @@ import { routePermission } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 
+const FULL_HEIGHT = ["/atendimento"]
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed } = useUI()
   const { can } = useSession()
-  const permission = routePermission(usePathname())
+  const pathname = usePathname()
+  const permission = routePermission(pathname)
   const allowed = !permission || can(permission)
+  // Telas de trabalho em altura total (a Central de Atendimento): sem rolagem da página.
+  const fullHeight = allowed && FULL_HEIGHT.some((href) => pathname === href || pathname.startsWith(`${href}/`))
   return (
     <div className="min-h-dvh">
       <a
@@ -35,7 +40,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <Topbar />
-        <main id="conteudo" className="mx-auto w-full max-w-[1440px] flex-1 px-4 pt-6 pb-28 sm:px-6 md:pb-14 lg:px-8 lg:pt-8">
+        <main
+          id="conteudo"
+          className={cn(
+            "mx-auto w-full flex-1",
+            fullHeight
+              ? "flex h-[calc(100dvh-60px)] min-h-0 flex-col px-2 pt-2 pb-[calc(68px+env(safe-area-inset-bottom))] sm:px-3 sm:pt-3 md:pb-3 lg:px-4 lg:pb-4"
+              : "max-w-[1440px] px-4 pt-6 pb-28 sm:px-6 md:pb-14 lg:px-8 lg:pt-8",
+          )}
+        >
           {allowed ? (
             children
           ) : (
