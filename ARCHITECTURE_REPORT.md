@@ -1792,7 +1792,7 @@ Formato de erro: **A** = `{ error: string }` (via `route()`); **B** = `{ error: 
 | `POST /api/whatsapp/tags` · `DELETE /api/whatsapp/tags/:id` | `edit` · `assign` | nome/cor | — | `context-panel.tsx` |
 | `GET/POST /api/whatsapp/ai` | `whatsapp.view` | `conversationId, action` | chamada ao Claude | `ai-panel.tsx` |
 
-Total no `loving-keller`: 18 (main) + 7 (IA) + 13 handlers do WhatsApp = **38 handlers**. Formatos de erro: agora **três** (`{error:string}` das rotas `route()`, `{error:{code,message}}` do DataJud e da LEXA IA).
+Total no `loving-keller`: 18 (main) + 7 (IA) + 13 handlers do WhatsApp = **38 handlers**. Formatos de erro: continuam **dois** — `{error:string}` (rotas com `route()`, inclusive as do WhatsApp) e `{error:{code,message}}` (DataJud e LEXA IA).
 
 ---
 
