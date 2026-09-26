@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { Eyebrow } from "@/components/ui/panel"
 import { fmtNumericDate, fmtTime } from "@/lib/dates"
 import { MOVEMENT_CATEGORY_LABEL, type LexaMovement } from "@/lib/services/processes/movement-interpreter"
+import { MovementAISection } from "@/components/ai/movement-ai-section"
+import { useCreateTaskFromSuggestion } from "@/components/ai/use-ai"
 import type { DataOrigin } from "@/types"
 
 const ORIGIN_LABEL: Record<DataOrigin, string> = {
@@ -41,6 +43,7 @@ export function MovementDetailSheet({
 }) {
   // O pai mantém a última movimentação ao fechar, preservando o conteúdo na animação de saída.
   const m = movement
+  const createTask = useCreateTaskFromSuggestion({ processId: m?.processId })
   if (!m) return null
 
   const unit = m.judicialUnit
@@ -110,6 +113,22 @@ export function MovementDetailSheet({
           >
             Ver documento{m.document.type ? ` (${m.document.type})` : ""} <ArrowUpRight className="size-3.5 text-subtle" />
           </a>
+        )}
+
+        {m.processId && (
+          <MovementAISection
+            key={m.id}
+            processId={m.processId}
+            movementId={m.id}
+            onCreateTask={
+              createTask &&
+              ((suggestion) => {
+                // Fecha o painel antes de abrir o formulário de tarefa (um diálogo por vez).
+                onOpenChange(false)
+                createTask(suggestion)
+              })
+            }
+          />
         )}
 
         {raw && (

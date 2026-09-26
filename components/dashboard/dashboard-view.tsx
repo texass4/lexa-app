@@ -10,6 +10,7 @@ import { FadeIn } from "@/components/ui/motion"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { useDemoData } from "@/lib/store/demo-store"
 import { useSession } from "@/lib/auth/session"
+import { OfficeAIPanel } from "@/components/ai/office-ai-panel"
 
 function DashboardSkeleton() {
   return (
@@ -38,6 +39,9 @@ export function DashboardView() {
         <Greeting />
       </FadeIn>
       <KpiCards />
+      <FadeIn delay={0.08}>
+        <OfficeAIPanel />
+      </FadeIn>
       {/* No mobile as colunas viram "contents" para reordenar: agenda e tarefas primeiro. */}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-5">
         <div className="contents lg:col-span-8 lg:flex lg:min-w-0 lg:flex-col lg:gap-5">

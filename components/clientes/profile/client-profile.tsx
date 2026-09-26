@@ -19,6 +19,7 @@ import { ClientHeader } from "./client-header"
 import { OverviewTab } from "./overview-tab"
 import { FinanceTab } from "./finance-tab"
 import { EditClientDialog } from "./edit-client-dialog"
+import { ClientAIPanel } from "@/components/ai/client-ai-panel"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
@@ -100,6 +101,7 @@ export function ClientProfile({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <ClientHeader client={client} onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} />
+      <ClientAIPanel key={client.id} client={client} />
 
       <UnderlineTabs
         ariaLabel="Seções do cliente"

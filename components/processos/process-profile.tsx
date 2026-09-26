@@ -33,6 +33,7 @@ import { DocumentList } from "@/components/shared/document-list"
 import { TaskRow } from "@/components/tasks/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
+import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { PROCESS_STATUS } from "@/lib/config"
@@ -240,6 +241,9 @@ export function ProcessProfile({ id }: { id: string }) {
           <p className="mt-2 truncate text-[12px] text-muted-foreground">Distribuído em {fmtNumericDate(process.distributedAt)}</p>
         </div>
       </div>
+
+      {/* `key`: cada processo tem suas próprias análises e conversa — nada vaza entre processos. */}
+      <ProcessAIPanel key={process.id} process={process} client={client} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <Panel className="lg:col-span-7">

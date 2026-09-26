@@ -39,17 +39,20 @@ lexa-app/
 │   ├── (admin)/admin         painel do Super Admin (papel checado no servidor)
 │   ├── auth/confirm          troca o token dos links (recuperação/convite) por sessão
 │   └── api/                  processes/* (DataJud), auth/* (cadastro, recuperação),
-│                             team/users (gestão do escritório), me/email, admin/*
+│                             team/users (gestão do escritório), me/email, admin/*,
+│                             ai/* (LEXA IA)
 ├── components/
 │   ├── layout/               sidebar, topbar, busca Ctrl K, notificações, modais globais
 │   ├── ui/                   design system
 │   ├── shared/               peças usadas em mais de um módulo
 │   ├── processos/            lista, perfil, timeline, formulário com consulta CNJ
+│   ├── ai/                   painéis, chat e blocos visuais da LEXA IA
 │   └── clientes/ tasks/ agenda/ documentos/ financeiro/ dashboard/ configuracoes/
 ├── lib/
 │   ├── cnj.ts                máscara, normalização e dígito verificador
 │   ├── integrations/legal/   modelo neutro (types.ts) + DataJud (mapper, mensagens de erro)
 │   ├── services/processes/   ficha, importação, deduplicação, interpretação de movimentos
+│   ├── ai/                   LEXA IA: provedor (Gemini), contexto, prompts, schemas, serviços
 │   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros
 │   ├── supabase/             clientes: navegador, servidor (cookie) e admin (service role)
 │   ├── store/                demo-store, ui-store, storage (persistência no Supabase)
@@ -171,3 +174,37 @@ npm test         # CNJ, mapper, interpretador, timeline, deduplicação, sincron
 npm run lint
 npx tsc --noEmit
 ```
+
+## 9. LEXA IA
+
+Inteligência sobre os dados que já estão no LEXA. O usuário pede, o servidor monta o contexto, o modelo interpreta, a tela mostra — e o usuário decide.
+
+```
+Botão / chat (components/ai/*)            nunca chama a IA sem clique; nada de SDK no navegador
+    ↓ fetch                                lib/ai/client.ts
+app/api/ai/*  →  lib/ai/http.ts            IA ligada? → requireMember(permissão) → corpo validado (input.ts)
+    ↓
+lib/ai/context/repository.ts               somente leitura: sessão do usuário (RLS) + filtro organization_id + permissão do módulo
+    ↓
+lib/ai/context/{process,client,office}.ts  escolhe campos e limita volume; refs curtas (M1, T1, P1) → fontes reais
+    ↓ sanitizeAIContext                    remove senha/token/e-mail/CPF/raw/storagePath/organizationId…
+lib/ai/services/*  →  services/run.ts      cache curto + pedido igual em andamento → limite de uso → provedor
+    ↓                                      → schema (schemas/) → grounding.ts (refs inexistentes saem; data/prazo sem origem = aviso) → log seguro
+lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai
+```
+
+**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `chat` e `GET /api/ai/status` (ligada/configurada; não chama o modelo). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
+
+**Trocar de provedor** — implemente `AIProvider` (`generateText` e `generateJSON`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
+
+**Regras do modelo** — prompt único em `lib/ai/prompts/system.ts` (fato × inferência × limitação; sem prazos, jurisprudência ou fatos inventados; dados tratados como dados). Mudou o texto? Suba `PROMPT_VERSION`. Instruções de cada funcionalidade em `prompts/tasks.ts`; formato das respostas em `schemas/`.
+
+**Custo** — modelo Flash (`GEMINI_MODEL`), temperatura baixa, contexto enxuto (até 20 movimentações, listas curtas, métricas agregadas no panorama), histórico do chat limitado a 10 mensagens, cache de 10 min para análises idênticas e limite de uso por pessoa (8/min, 60/h) e por escritório (200/h) em `guard.ts` — em memória, por instância do servidor.
+
+**Tarefas sugeridas** — nunca são gravadas pela IA: "Criar tarefa" abre `openDialog("task", { title, description, priority, processId })`, o mesmo formulário do LEXA.
+
+**Chat** — sem estado no servidor: o navegador manda o escopo (`process`, `client` ou `office`) e o histórico curto; o contexto é remontado do banco a cada pergunta. Os componentes montam com `key` do registro, então trocar de processo começa outra conversa.
+
+**Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
+
+Variáveis: `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.
