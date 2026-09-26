@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { PRIORITY_CONFIG } from "@/lib/config"
 import { fmtNumericDate, fmtRelative, toLocalISO } from "@/lib/dates"
 import type { AIRequestError } from "@/lib/ai/client"
+import { CONFIG_ERROR_CODES } from "@/lib/ai/errors"
 import type { ActionSuggestion, AIResult, AISource, AISources, AIStatus, AttentionPoint, Confidence, Nature, ReferencedNote } from "@/lib/ai/types"
 
 /* ---------------------------------- marca ---------------------------------- */
@@ -88,7 +89,7 @@ export function AIThinking({ label, onCancel, className }: { label: string; onCa
 }
 
 export function AIErrorNotice({ error, onRetry, className }: { error: AIRequestError; onRetry?: () => void; className?: string }) {
-  const config = error.code === "NOT_CONFIGURED" || error.code === "DISABLED"
+  const config = CONFIG_ERROR_CODES.includes(error.code)
   return (
     <div
       role="alert"

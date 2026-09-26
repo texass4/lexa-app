@@ -163,6 +163,8 @@ export interface AIStatus {
 export type AIErrorCode =
   | "DISABLED"
   | "NOT_CONFIGURED"
+  | "INVALID_API_KEY"
+  | "MODEL_UNAVAILABLE"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "NOT_FOUND"

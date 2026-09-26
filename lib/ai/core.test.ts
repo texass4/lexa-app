@@ -114,8 +114,9 @@ describe("GeminiProvider", () => {
   it("erros da API viram códigos do LEXA, sem vazar a mensagem original", async () => {
     const cases: [number, string][] = [
       [429, "PROVIDER_RATE_LIMITED"],
-      [403, "NOT_CONFIGURED"],
-      [404, "NOT_CONFIGURED"],
+      [401, "INVALID_API_KEY"],
+      [403, "INVALID_API_KEY"],
+      [404, "MODEL_UNAVAILABLE"],
       [500, "UNAVAILABLE"],
       [503, "UNAVAILABLE"],
       [504, "TIMEOUT"],
@@ -127,7 +128,9 @@ describe("GeminiProvider", () => {
       assert.equal((failure as AIError).code, expected, `status ${status}`)
       assert.doesNotMatch((failure as AIError).userMessage, /xyz|detalhe interno/)
     }
-    assert.equal(await rejects(gemini(apiError(400, "API key not valid")).provider.generateText(request)), "NOT_CONFIGURED")
+    assert.equal(await rejects(gemini(apiError(400, "API key not valid")).provider.generateText(request)), "INVALID_API_KEY")
+    const missingModel = (await gemini(apiError(404)).provider.generateText(request).catch((e: AIError) => e)) as AIError
+    assert.equal(missingModel.providerStatus, 404)
   })
 
   it("cancelamento pelo usuário → CANCELLED", async () => {

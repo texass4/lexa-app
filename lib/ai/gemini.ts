@@ -126,13 +126,14 @@ export function mapGeminiError(error: unknown): AIError {
   const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : undefined
   const message = error instanceof Error ? error.message : ""
 
-  if (status === 429) return new AIError("PROVIDER_RATE_LIMITED", { cause: error })
-  if (status === 401 || status === 403 || (status === 400 && /api[ _]?key/i.test(message)))
-    return new AIError("NOT_CONFIGURED", { message: "Chave da Gemini inválida ou sem acesso.", cause: error })
-  if (status === 404) return new AIError("NOT_CONFIGURED", { message: "Modelo configurado em GEMINI_MODEL indisponível.", cause: error })
-  if (status === 408 || status === 504) return new AIError("TIMEOUT", { cause: error })
-  if (status !== undefined && status >= 500) return new AIError("UNAVAILABLE", { cause: error })
-  if (status === 400) return new AIError("BAD_REQUEST", { message: "Pedido recusado pelo provedor.", cause: error })
+  const options = { cause: error, providerStatus: status }
+
+  if (status === 429) return new AIError("PROVIDER_RATE_LIMITED", options)
+  if (status === 401 || status === 403 || (status === 400 && /api[ _]?key/i.test(message))) return new AIError("INVALID_API_KEY", options)
+  if (status === 404) return new AIError("MODEL_UNAVAILABLE", options)
+  if (status === 408 || status === 504) return new AIError("TIMEOUT", options)
+  if (status !== undefined && status >= 500) return new AIError("UNAVAILABLE", options)
+  if (status === 400) return new AIError("BAD_REQUEST", { ...options, message: "Pedido recusado pelo provedor." })
   if (error instanceof Error && error.name === "AbortError") return new AIError("TIMEOUT", { cause: error })
   return new AIError("UNAVAILABLE", { cause: error })
 }

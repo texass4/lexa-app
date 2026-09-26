@@ -8,6 +8,8 @@ import type { AIErrorCode } from "./types"
 export const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
   DISABLED: "A LEXA IA está desativada neste ambiente.",
   NOT_CONFIGURED: "A configuração da LEXA IA ainda não foi concluída. Configure GEMINI_API_KEY no ambiente do servidor.",
+  INVALID_API_KEY: "A Gemini recusou a chave configurada em GEMINI_API_KEY. Confira se ela está correta e ativa no Google AI Studio.",
+  MODEL_UNAVAILABLE: "O modelo configurado em GEMINI_MODEL não está disponível para esta chave. Troque por outro modelo Flash disponível na sua conta.",
   UNAUTHORIZED: "Sua sessão expirou. Entre novamente para usar a LEXA IA.",
   FORBIDDEN: "Você não tem permissão para consultar estas informações.",
   NOT_FOUND: "Não encontramos este registro no seu escritório.",
@@ -27,6 +29,8 @@ export const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
 export const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
   DISABLED: 503,
   NOT_CONFIGURED: 503,
+  INVALID_API_KEY: 503,
+  MODEL_UNAVAILABLE: 503,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
@@ -47,12 +51,15 @@ export class AIError extends Error {
   readonly code: AIErrorCode
   /** Segundos até poder tentar de novo (limite de uso). */
   readonly retryAfter?: number
+  /** Status HTTP devolvido pelo provedor, quando houver — vai para o log (não é sensível). */
+  readonly providerStatus?: number
 
-  constructor(code: AIErrorCode, options: { message?: string; retryAfter?: number; cause?: unknown } = {}) {
+  constructor(code: AIErrorCode, options: { message?: string; retryAfter?: number; providerStatus?: number; cause?: unknown } = {}) {
     super(options.message ?? AI_ERROR_MESSAGES[code], { cause: options.cause })
     this.name = "AIError"
     this.code = code
     this.retryAfter = options.retryAfter
+    this.providerStatus = options.providerStatus
   }
 
   get status() {
@@ -66,3 +73,6 @@ export class AIError extends Error {
 }
 
 export const isAIError = (error: unknown): error is AIError => error instanceof AIError
+
+/** Erros que só se resolvem ajustando o ambiente — não adianta "tentar de novo". */
+export const CONFIG_ERROR_CODES: readonly string[] = ["DISABLED", "NOT_CONFIGURED", "INVALID_API_KEY", "MODEL_UNAVAILABLE"]

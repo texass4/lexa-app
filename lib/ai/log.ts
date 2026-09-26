@@ -15,6 +15,8 @@ export interface AILogEvent {
   durationMs: number
   ok: boolean
   code?: string
+  /** Status HTTP do provedor num erro (ex.: 404 = modelo indisponível). */
+  providerStatus?: number
   cached?: boolean
   inputTokens?: number
   outputTokens?: number

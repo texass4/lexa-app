@@ -70,7 +70,7 @@ export async function track<T extends { cached?: boolean }>(
     return result as unknown as T
   } catch (error) {
     const known = isAIError(error) ? error : new AIError("UNEXPECTED", { cause: error })
-    log({ ...base, durationMs: Date.now() - started, ok: false, code: known.code })
+    log({ ...base, durationMs: Date.now() - started, ok: false, code: known.code, providerStatus: known.providerStatus })
     throw known
   }
 }
