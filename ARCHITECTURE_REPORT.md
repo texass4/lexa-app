@@ -1,6 +1,13 @@
 # LEXA — Relatório Técnico de Arquitetura
 
-> **Escopo e método.** Análise estática do código no branch `claude/modest-ptolemy-nkt8sl` (commit `042e353`). Foram lidos ~200 arquivos (≈19.400 linhas, sem contar `package-lock.json`). Nenhum arquivo do projeto foi alterado; o único arquivo criado é este relatório. A suíte de testes foi executada apenas para leitura do resultado (`npm test` → 80 testes, 80 passando). `node_modules/` **não estava instalado** no ambiente, então nada foi inferido a partir do código das bibliotecas — só do `package.json`/`package-lock.json`.
+> **Escopo e método (versão 2).** Análise estática de **três versões do código** que existem no GitHub (ver seção 0):
+> - `main` (commit `042e353`) — a base; ~200 arquivos, ≈19.400 linhas.
+> - `claude/loving-keller-fwyhxd` (commit `2d53083`) — **main + WhatsApp (Z-API) + LEXA IA (Gemini) + IA da Central (Claude)**; +106 arquivos alterados, ≈13.000 linhas novas. **É a versão tratada como "o LEXA atual" nas seções de WhatsApp e IA.**
+> - `claude/busy-ptolemy-oqxh7h` (commit `5e74b23`) — **main + hub de Clientes + Financeiro com lançamentos**; +34 arquivos, ≈3.200 linhas novas.
+>
+> A primeira versão deste relatório analisou só o `main` e por isso dizia que WhatsApp e IA eram "inexistentes" — **isso estava errado para o sistema que você usa**, porque esse código ainda não foi mesclado ao `main`. Seções 1–19 e 22–38 descrevem o `main` e, onde indicado com **[loving-keller]** ou **[busy-ptolemy]**, o que muda nesses branches. As seções 0, 20 e 21 foram reescritas.
+>
+> Nenhum arquivo do projeto foi alterado; os branches foram lidos em cópias temporárias fora do projeto. Testes executados só para leitura: `main` 80/80; `busy-ptolemy` 99/99; `loving-keller` 126/127 (a única falha é `lib/ai/core.test.ts`, porque `@google/genai` não está instalado neste ambiente — não é defeito do código). `node_modules/` não estava instalado, então nada foi inferido do código das bibliotecas.
 >
 > **Convenções de linguagem usadas no relatório**
 > - **"Observei no código…"** → fato verificado, com arquivo/função citados.
@@ -8,12 +15,60 @@
 > - **"Potencial risco…"** → risco técnico identificado.
 > - **"Não foi possível determinar pelo código analisado."** → fora do alcance do código.
 >
-> **Aviso importante antes de ler:** o pedido menciona LEXA IA/Gemini e WhatsApp como módulos. **Nenhum dos dois está implementado no código.** Não há SDK do Gemini, nem chamada a modelos de IA, nem provider/webhook de WhatsApp. As seções 20 e 21 documentam exatamente o que existe (menções de interface e simulações) e onde esses módulos se encaixariam.
+> **Aviso importante antes de ler:** WhatsApp (Z-API) e LEXA IA **existem e são reais** no branch `claude/loving-keller-fwyhxd` (e o WhatsApp também no branch `whatsapp`). **Não estão no `main`.** Veja a seção 0 antes de qualquer outra.
+
+---
+
+## 0. Onde está cada parte do código (branches)
+
+### 0.1 Mapa dos branches no GitHub
+
+```
+main  (042e353 "atualiza Lexa")
+ │
+ ├── whatsapp                      f970ed8  WhatsApp: atendimento (em andamento)            ← autor: você
+ │
+ ├── claude/loving-keller-fwyhxd   2fd3768  Adiciona a LEXA IA (Gemini)
+ │                                 f970ed8  (o mesmo commit do branch whatsapp)
+ │                                 65d755a  LEXA IA: chave recusada × modelo indisponível
+ │                                 f9b53a7  LEXA IA: modelo reserva quando a Gemini está sobrecarregada
+ │                                 2d53083  Junta a Central de Atendimento (WhatsApp) com a LEXA IA
+ │
+ ├── claude/busy-ptolemy-oqxh7h    73594cd  Clientes: hub do cliente, cadastro validado, financeiro real
+ │                                 5e74b23  Migração 0002: CASE → IF para rodar no SQL Editor
+ │
+ └── claude/modest-ptolemy-nkt8sl  (este relatório)
+```
+
+| Branch | O que tem | Contém o `whatsapp`? | Mesclado no `main`? |
+|---|---|---|---|
+| `main` | base | — | — |
+| `whatsapp` | Central de Atendimento (Z-API) | é ele | **Não** |
+| `claude/loving-keller-fwyhxd` | WhatsApp **+** LEXA IA (Gemini) **+** IA da Central (Claude) | **Sim** (inteiro) | **Não** |
+| `claude/busy-ptolemy-oqxh7h` | Hub de Clientes, CPF/CNPJ validado no banco, lançamentos financeiros, exportação CSV | Não | **Não** |
+
+**Não foi possível determinar pelo código analisado** qual versão está rodando no seu computador ou em produção. Se houver alterações só na sua máquina (sem push), elas não aparecem aqui.
+
+### 0.2 O que acontece se juntar `loving-keller` e `busy-ptolemy`
+
+Simulei a junção com `git merge-tree` (sem alterar nada):
+
+| Arquivo | Resultado |
+|---|---|
+| `ARCHITECTURE.md` | **Conflito** de texto |
+| `components/clientes/profile/client-profile.tsx` | **Conflito** (um branch adiciona o painel da IA, o outro reescreve o perfil do cliente) |
+| `components/tasks/task-form-dialog.tsx`, `lib/store/ui-store.tsx`, `types/index.ts` | Junção automática |
+
+Além dos conflitos de texto, há dois problemas que o Git **não** acusa:
+
+1. **Tipo com o mesmo nome.** O `busy-ptolemy` declara um tipo provisório `WhatsAppConversation` em `types/index.ts` ("Ainda não há integração…"). O `loving-keller` adiciona `export * from "./whatsapp"` no mesmo arquivo, e `types/whatsapp.ts` também exporta `WhatsAppConversation` (o tipo real). Em TypeScript, a declaração local tem prioridade sobre o `export *`, então os 8 arquivos da Central que importam `WhatsAppConversation` de `@/types` passariam a receber o tipo provisório. Isso sugere erros de tipo (e `next build` falhando) após a junção — não compilei para confirmar.
+2. **Duas migrações "0002".** `0002_whatsapp.sql` e `0002_clients_hub.sql` têm o mesmo número. Como as migrações são coladas à mão no SQL Editor, o risco é aplicar uma e esquecer a outra. Elas não mexem nas mesmas tabelas; a `0002_whatsapp.sql` redefine `role_defaults()` (a `0002_clients_hub.sql` não).
 
 ---
 
 ## Sumário
 
+0. Onde está cada parte do código (branches)
 1. Resumo executivo
 2. Stack
 3. Arquitetura geral
@@ -69,7 +124,7 @@ O servidor Next.js (API Routes) só existe para três coisas: **(1)** consulta p
 
 ### Stack em uma linha
 
-Next.js 16.3.6 · React 19.2.8 · TypeScript 5.9 · Tailwind CSS 4 · Base UI (`@base-ui/react`) + estilo shadcn · Supabase (`@supabase/ssr` 0.12.7, `@supabase/supabase-js` 2.117.2) · Python 3 + `requests` + SQLite (cache) · Recharts · framer-motion · lucide-react · sonner (toasts) · cmdk (busca Ctrl+K) · testes com `node --test` nativo.
+Next.js 16.3.6 · React 19.2.8 · TypeScript 5.9 · Tailwind CSS 4 · Base UI (`@base-ui/react`) + estilo shadcn · Supabase (`@supabase/ssr` 0.12.7, `@supabase/supabase-js` 2.117.2) · Python 3 + `requests` + SQLite (cache) · Recharts · framer-motion · lucide-react · sonner (toasts) · cmdk (busca Ctrl+K) · testes com `node --test` nativo. **[loving-keller]** + `@google/genai` (Gemini), `@anthropic-ai/sdk` (Claude), `zod`, Supabase Realtime e Z-API (HTTP).
 
 ### Principais módulos (todos com UI em `components/<módulo>/`)
 
@@ -82,11 +137,12 @@ Next.js 16.3.6 · React 19.2.8 · TypeScript 5.9 · Tailwind CSS 4 · Base UI (`
 | Tarefas | **Real** (lista + Kanban com colunas customizáveis) |
 | Agenda | **Real** (criar, excluir, categorias; **sem edição e sem recorrência**) |
 | Documentos | **Real** (upload para Supabase Storage, preview por URL assinada) |
-| Financeiro | **Somente leitura** — tabela `invoices` existe e é lida, mas **não há nenhuma tela nem ação que crie/edite faturas** |
-| Dashboard | **Real**, 100% calculado no navegador a partir do store |
+| Financeiro | `main`: **somente leitura** (nenhuma tela cria faturas). **[busy-ptolemy]**: **real** — lançar cobrança, registrar pagamento, excluir, atraso calculado pela data, exportação CSV |
+| Dashboard | **Real**, calculado no navegador a partir do store. **[loving-keller]** + painel da LEXA IA |
 | Notificações | **Estrutura** — tabela e menu existem, mas **nada no código cria notificações** |
-| WhatsApp | **Inexistente** — apenas textos/botões simulados (toasts) |
-| LEXA IA / Gemini | **Inexistente** |
+| WhatsApp — Central de Atendimento | `main`: só simulações. **[loving-keller] / [whatsapp]: real** — Z-API, webhook, envio e recebimento (texto, imagem, documento, áudio), conversas, contatos, tags, responsáveis, status, notas internas, tempo real (Supabase Realtime) |
+| LEXA IA (Gemini) | `main`: não existe. **[loving-keller]: real** — resumo de processo, análise de movimentação, próximos passos, panorama do cliente, panorama do escritório e chat |
+| IA da Central (Claude) | **[loving-keller]: real** — resumo da conversa, sugestão de resposta, tarefas, processos citados, análise de documentos e nota interna, usando `claude-opus-5` |
 
 ### Banco
 
@@ -99,8 +155,11 @@ Next.js 16.3.6 · React 19.2.8 · TypeScript 5.9 · Tailwind CSS 4 · Base UI (`
 | Supabase (Postgres/Auth/Storage) | `lib/supabase/*`, `lib/store/storage.ts`, rotas `app/api/**` | Real |
 | DataJud (API Pública CNJ) | `python/datajud.py` chamado por `lib/services/processes/python-lookup.ts` | Real |
 | E-mail | `lib/auth/mailer.ts` | **Simulado** — link impresso no terminal |
-| WhatsApp, Google Agenda, assinatura, boletos, Outlook/Gmail | `components/configuracoes/settings-view.tsx` | **Simulado** (toast "Ambiente de demonstração") |
-| Gemini / IA | — | Inexistente |
+| **Z-API (WhatsApp)** | **[loving-keller]** `lib/integrations/whatsapp/zapi/*`, `lib/services/whatsapp/*`, `app/api/whatsapp/**` | **Real** (um número por instalação — ver 20.9) |
+| **Google Gemini** | **[loving-keller]** `lib/ai/gemini.ts` (único arquivo que importa `@google/genai`) | **Real** |
+| **Anthropic Claude** | **[loving-keller]** `lib/services/whatsapp/ai.ts` | **Real** (só na Central de Atendimento) |
+| Supabase Realtime | **[loving-keller]** `components/atendimento/inbox-provider.tsx` | Real (só nas tabelas do WhatsApp) |
+| Google Agenda, assinatura, boletos, Outlook/Gmail | `components/configuracoes/settings-view.tsx` | **Simulado** (toast "Ambiente de demonstração") |
 
 ### Autenticação e autorização
 
@@ -108,6 +167,12 @@ Next.js 16.3.6 · React 19.2.8 · TypeScript 5.9 · Tailwind CSS 4 · Base UI (`
 - `proxy.ts` (o "middleware" do Next 16) valida o usuário a cada requisição com `supabase.auth.getUser()` e redireciona para `/login` quem não está logado.
 - Papéis: `super_admin`, `owner` (Sócio), `lawyer` (Advogado), `staff` (Colaborador/Estagiário). Permissões por módulo (`clients.view`, `clients.edit`, …, `office.manage`, `users.manage`), com personalização por usuário.
 - A autorização **real** está em: RLS (`current_org_id()`, `has_perm()`), políticas do Storage e helpers de rota `requireMember`/`requireSuperAdmin` (`lib/auth/server.ts`). No frontend, `useSession().can()` e `<Can>` apenas escondem elementos.
+
+### LEXA IA e WhatsApp (no `loving-keller`)
+
+- **LEXA IA (Gemini):** rotas `/api/ai/*` → `aiRoute()` (membro ativo + permissão + IA configurada) → repositório de leitura **preso ao escritório e às permissões de quem pergunta** → context builder com lista branca de campos → sanitização (remove e-mail, telefone, CPF/CNPJ, endereço, `raw`…) → Gemini com JSON Schema → validação do schema → verificação das fontes citadas e de datas/prazos inventados → resposta. Rate limit por pessoa e por escritório, cache de 10 min e deduplicação em memória. **Nunca grava nada.**
+- **WhatsApp (Z-API):** diferente do resto do LEXA, é **server-first e relacional**: 10 tabelas próprias com chaves estrangeiras compostas por escritório; o navegador só **lê** (RLS + Realtime) e toda escrita passa por rotas do servidor com a service role. Webhook público autenticado por segredo na URL.
+- **IA da Central (Claude):** envia a transcrição (até 150 mensagens), o telefone do contato, dados do cliente/processos e, na análise de documentos, até 4 imagens/PDFs ao Claude. Não tem rate limit nem cache, e lê clientes/processos **sem checar** `clients.view`/`processes.view` (ver 21.8).
 
 ### DataJud
 
@@ -117,7 +182,9 @@ Fluxo: formulário → `POST /api/processes/search` → `spawn(python3 datajud.p
 
 **Fortes:** isolamento multi-tenant bem desenhado na camada de banco (RLS + funções `security definer` + GRANT por coluna); fronteira de integração processual limpa (`ExternalProcess`/`ProcessSheet`); tratamento cuidadoso de fuso horário e de dados brutos do DataJud; testes para as partes puras mais delicadas (CNJ, mapper, hash, interpretador, timeline, diff de persistência, paridade de permissões TS×SQL).
 
-**Riscos principais:** (1) regras de negócio e validação **apenas no cliente** — qualquer membro com permissão de edição pode gravar JSON arbitrário direto no PostgREST; (2) carregamento **integral** de todas as coleções do escritório a cada sessão (não escala); (3) processos Python sem limite de concorrência/rate limit no servidor (até 5 min cada); (4) dependência de Python + SQLite em disco, possivelmente incompatível com hospedagem serverless; (5) links de recuperação/convite **com token válido** impressos em log; (6) gravação otimista com *rollback* que pode descartar alterações; (7) vários campos/telas que nunca recebem dados (prazos, faturas, notificações, status de cliente).
+**Riscos principais do `main`:** (1) regras de negócio e validação **apenas no cliente** — qualquer membro com permissão de edição pode gravar JSON arbitrário direto no PostgREST; (2) carregamento **integral** de todas as coleções do escritório a cada sessão (não escala); (3) processos Python sem limite de concorrência/rate limit no servidor (até 5 min cada); (4) dependência de Python + SQLite em disco, possivelmente incompatível com hospedagem serverless; (5) links de recuperação/convite **com token válido** impressos em log; (6) gravação otimista com *rollback* que pode descartar alterações; (7) vários campos/telas que nunca recebem dados (prazos, faturas, notificações, status de cliente — os três últimos resolvidos no `busy-ptolemy`).
+
+**Riscos adicionais do `loving-keller`:** (8) o código principal (WhatsApp, IA, clientes/financeiro) está espalhado em branches que **não se juntam sem ajustes** (seção 0.2); (9) o WhatsApp atende **um único escritório por instalação** (credenciais e dono no `.env`); (10) a IA da Central usa um modelo caro sem limite de uso e ignora as permissões de módulo ao ler clientes/processos; (11) o segredo do webhook viaja na URL (query string); (12) rate limit e cache da LEXA IA ficam em memória de cada instância.
 
 ---
 
@@ -159,6 +226,19 @@ Versões são as resolvidas no `package-lock.json`.
 | **Deploy** | Não há configuração explícita (sem `vercel.json`, sem CI). `.gitignore` ignora `.vercel` | — | — | `next.config.ts`, `.gitignore` |
 
 **Dependências declaradas mas com papel mínimo:** `shadcn` é usado só pelo CSS importado em `globals.css`; `lib/utils.ts` é um reexport de `cn` usado por dois arquivos (`components/ui/button.tsx`, `components/layout/command-menu.tsx`).
+
+**[loving-keller] Tecnologias adicionadas**
+
+| Tecnologia | Versão (package.json) | Onde é usada | Problema que resolve | Arquivos principais |
+|---|---|---|---|---|
+| `@google/genai` (Gemini) | ^2.24.0 | LEXA IA | geração de texto e JSON estruturado | `lib/ai/gemini.ts` (único import) |
+| `@anthropic-ai/sdk` (Claude) | ^0.128.0 | IA da Central de Atendimento | resumo/resposta/tarefas/análise de documentos da conversa | `lib/services/whatsapp/ai.ts` |
+| `zod` | ^4.6.5 | só na IA da Central (`zod/v4` + `betaZodOutputFormat`) | schema de saída do Claude | `lib/services/whatsapp/ai.ts` (a LEXA IA usa um schema próprio em `lib/ai/schema.ts`) |
+| Z-API | API HTTP (sem SDK) | WhatsApp | envio/recebimento, QR code, status | `lib/integrations/whatsapp/zapi/client.ts` |
+| Supabase Realtime | via `@supabase/supabase-js` | Central de Atendimento | mensagens e conversas em tempo real | `components/atendimento/inbox-provider.tsx` |
+| `after()` do Next.js | nativo | webhook do WhatsApp | trabalho depois de responder (download de mídia) | `app/api/whatsapp/webhook/route.ts` |
+
+**[busy-ptolemy]** não adiciona dependências; adiciona `lib/clients.ts` (validação de CPF/CNPJ, telefone, endereço, tags, link `wa.me`) e `lib/export.ts` (CSV).
 
 ---
 
@@ -217,9 +297,22 @@ Versões são as resolvidas no `package-lock.json`.
 - **Backend de dados:** o **Supabase é o backend real** do CRUD. Não existe camada "service/repository" no servidor Next para clientes, processos etc.
 - **Backend Next.js:** handlers enxutos em `app/api/**` que usam `lib/auth/server.ts` (autorização) e `lib/auth/members.ts` (gestão de usuários) com a *service role*.
 - **Autenticação:** Supabase Auth; sessão em cookie; `proxy.ts` renova e protege.
-- **IA:** inexistente.
+- **IA:** inexistente no `main`. **[loving-keller]** LEXA IA (Gemini) em rotas `/api/ai/*` com repositório de leitura sujeito à RLS; IA da Central (Claude) em `/api/whatsapp/ai` com service role. Ver seção 21.
 - **Processamento de dados:** normalização do DataJud (`mapper.ts`, `sheet.ts`, `import.ts`), deduplicação (`movements.ts`), interpretação/apresentação de movimentações (`movement-interpreter.ts`, `movement-timeline.ts`), cálculos financeiros (`lib/selectors.ts`). As funções de normalização rodam no **servidor** (rota) e as de interpretação/cálculo rodam no **navegador**.
-- **Background jobs:** **não existem**. Nenhum cron, fila, worker, webhook ou Supabase Edge Function no repositório. O único código que roda "sozinho" é `instrumentation.ts` (uma vez, no start do servidor, para criar o Super Admin).
+- **Background jobs:** **não existem** no `main`. Nenhum cron, fila, worker ou Supabase Edge Function. O único código que roda "sozinho" é `instrumentation.ts`. **[loving-keller]** acrescenta o **webhook** da Z-API (`/api/whatsapp/webhook`, público, autenticado por segredo) e trabalho pós-resposta com `after()` (download de mídias). Continua sem cron/fila.
+
+### 3.3 [loving-keller] Camadas acrescentadas
+
+```
+Navegador
+ ├─ components/ai/*  ──fetch──► /api/ai/*  ──► aiRoute ─► repositório (sessão+RLS) ─► context builder ─► sanitize ─► Gemini
+ └─ components/atendimento/*
+       ├─ leitura: Supabase (RLS, só SELECT) + Realtime (canal whatsapp:<org>)
+       ├─ upload de anexo: Storage whatsapp/<org>/outgoing/…
+       └─ escrita: fetch ─► /api/whatsapp/* ─► lib/services/whatsapp/* (service role) ─► Z-API ─► WhatsApp
+                                             └─► /api/whatsapp/ai ─► Claude
+Z-API ─► POST /api/whatsapp/webhook?token=… ─► inbound.ts (service role) ─► tabelas whatsapp_* ─► Realtime ─► tela
+```
 
 ---
 
@@ -317,6 +410,26 @@ lexa-app/
   - Lista de papéis/permissões duplicada entre `lib/auth/permissions.ts` e `role_defaults` no SQL (intencional, protegida por teste).
   - `STATUS`/`MAX_INPUT`/parse de corpo repetidos nas duas rotas de processo.
 - **Arquivos muito grandes:** ver seção 28 (`demo-store.tsx` 738 linhas, `members-manager.tsx` 535, `datajud.py` 465, `admin-view.tsx` 386, `process-profile.tsx` 365, `new-process-dialog.tsx` 361, `profile-section.tsx` 346).
+
+### 4.3 [loving-keller] Pastas novas
+
+```
+app/(app)/atendimento/        Central de Atendimento
+app/api/ai/                   7 rotas da LEXA IA
+app/api/whatsapp/             11 arquivos de rota (webhook, instância, conversas, mensagens, contatos, tags, IA)
+components/ai/                painéis e chat da LEXA IA
+components/atendimento/       18 componentes da Central (~4.500 linhas)
+lib/ai/                       LEXA IA: config, provider, gemini, contexto, prompts, schemas, guard, serviços
+lib/integrations/whatsapp/    interface de provider + Z-API (client, webhook)
+lib/services/whatsapp/        regras do WhatsApp no servidor (actor, instances, inbound, outbound, conversations, ai)
+lib/whatsapp/                 código compartilhado/browser (client, mappers, config, phone, files)
+types/whatsapp.ts             tipos da Central
+supabase/migrations/0002_whatsapp.sql
+```
+
+**[busy-ptolemy]**: `components/clientes/{client-form,client-actions,tag-input}.tsx`, `components/clientes/profile/hub-tabs.tsx`, `components/financeiro/new-invoice-dialog.tsx`, `lib/clients.ts`, `lib/export.ts`, `supabase/migrations/0002_clients_hub.sql`.
+
+Arquivos grandes novos (loving-keller): `context-panel.tsx` 533, `conversation-view.tsx` 512, `0002_whatsapp.sql` 503, `dialogs.tsx` 451, `ai-blocks.tsx` 387, `composer.tsx` 378, `inbound.ts` 355.
 
 ---
 
@@ -528,6 +641,25 @@ organizations ══1:N (cascade)═══╡ profiles.organization_id   (null =
       └══1:N══ notifications (só href; sem vínculos por id)
 ```
 
+### 7.7 [loving-keller] Tabelas do WhatsApp
+
+10 tabelas **relacionais** (não `jsonb`), descritas em 20.4: `whatsapp_instances`, `whatsapp_contacts`, `whatsapp_statuses`, `whatsapp_conversations`, `whatsapp_messages`, `whatsapp_message_attachments`, `whatsapp_tags`, `whatsapp_conversation_tags`, `whatsapp_conversation_assignments`, `whatsapp_webhook_events`. Também: `profiles_org_id_key unique (organization_id, id)` (para FKs compostas), redefinição de `role_defaults()` com as permissões do WhatsApp, 3 funções só para service role, bucket `whatsapp` e publicação no Realtime.
+
+```
+organizations
+  └── whatsapp_instances (1 por número)
+        └── whatsapp_conversations ──► whatsapp_contacts ══FK══► clients (organization_id, id)   [primeira FK real para uma tabela jsonb]
+              │   assigned_user_id ══FK══► profiles (organization_id, id)
+              ├── whatsapp_messages ──► whatsapp_message_attachments ──► storage whatsapp/<org>/…
+              ├── whatsapp_conversation_tags ──► whatsapp_tags
+              └── whatsapp_conversation_assignments
+whatsapp_webhook_events (log bruto; organization_id pode ser nulo)
+```
+
+### 7.8 [busy-ptolemy] Clientes: CPF/CNPJ no banco
+
+`0002_clients_hub.sql`: função `is_valid_br_document()` (dígitos verificadores de CPF e CNPJ), trigger `clients_validate_document` (recusa documento inválido quando é criado/alterado, com código 23514) e índice único `clients_document_unique (organization_id, dígitos do documento)` (código 23505). A migração aborta listando duplicados já existentes. `storage.ts` passa a reconhecer esses erros como `conflicts`. **Primeira regra de negócio de domínio garantida pelo banco** para as tabelas `jsonb`.
+
 ---
 
 ## 8. Autenticação
@@ -634,6 +766,10 @@ Convite (Sócio ou Super Admin) → inviteMember() (lib/auth/members.ts)
 - **`notifications_update`** permite a qualquer membro reescrever o `data` inteiro de qualquer notificação do escritório (não só marcar `read`). Baixo impacto hoje, pois nada cria notificações.
 - **Rotas do DataJud** exigem `processes.edit`, mas **não** verificam se o `id` do processo pertence ao escritório — o `id` só é usado para log. Isso sugere que a rota é propositalmente "sem estado" (o comentário diz que o `id` é "para o dia em que a persistência sair do browser").
 
+### 9.4 [loving-keller] Permissões novas
+
+Módulo `whatsapp` (`whatsapp.view`, `whatsapp.edit`) e permissão administrativa `whatsapp.assign` (distribuir conversas). Padrões: sócio tudo; advogado `view/edit/assign`; colaborador `view/edit`. Definidas em `lib/auth/permissions.ts` **e** na nova `role_defaults()` de `0002_whatsapp.sql` (o teste de paridade passa a ler a migração mais recente). Checagens no servidor: `requireActor(permissão)` em cada rota; regras finas dentro dos serviços (status e tags exigem `edit`; trocar responsável exige `assign`, exceto assumir conversa sem dono; QR code e cadastro do webhook exigem `office.manage`). A LEXA IA exige `processes.view`/`clients.view` por rota e filtra cada módulo por `*.view` no repositório; **a IA da Central exige só `whatsapp.view`** (ver 21.8).
+
 ---
 
 ## 10. Multi-tenant
@@ -665,6 +801,18 @@ Observei que o tenant é `organizations.id`, e o vínculo usuário→tenant é `
 **Conclusão:** não encontrei caminho de acesso *cross-tenant* no código analisado. Os pontos fracos são **intra-tenant** (seção 9.3) e de **integridade** (qualquer membro com `.edit` pode gravar JSON arbitrário no próprio escritório, pulando todas as validações da UI — seção 25).
 
 **Não foi possível determinar pelo código analisado:** se o projeto Supabase de produção tem os *default privileges* padrão (GRANT de `select/insert/update/delete` para `authenticated` nas tabelas novas do schema `public`). A migração **não concede** explicitamente esses privilégios nas tabelas de dados — ela só revoga de `anon`. Isso sugere dependência do comportamento padrão do Supabase.
+
+### 10.4 [loving-keller] WhatsApp e IA
+
+| Entidade | Como o escritório A é separado do B |
+|---|---|
+| Tabelas `whatsapp_*` | RLS de leitura + **nenhuma escrita pelo navegador** + FKs compostas `(organization_id, id)` (é impossível, no banco, ligar uma conversa a um contato/cliente/membro de outro escritório) + filtros `organization_id` em todas as consultas das rotas |
+| Webhook | o escritório vem da **instância** cadastrada (`instanceByExternalId`), nunca do corpo; instância desconhecida é ignorada |
+| Arquivos do WhatsApp | bucket `whatsapp`, pasta = `current_org_id()`; check no banco para `storage_path` |
+| LEXA IA | repositório com a sessão do usuário (RLS) **e** filtro explícito; chave do cache inclui o escritório |
+| IA da Central | service role, mas sempre filtrando `organization_id` do usuário (`loadConversation`) |
+
+**Limitação:** o WhatsApp só atende **o escritório definido em `ZAPI_ORGANIZATION_ID`** (20.9). Não é multi-tenant do ponto de vista de produto, embora o banco já esteja preparado para várias instâncias.
 
 ---
 
@@ -783,6 +931,22 @@ Local: filtro, busca, ordenação, cliente a excluir (`useState`). Aba: URL. Dad
 
 - `status` nasce `"novo"` e **nenhum código altera** (não há ação nem tela) — portanto os filtros "Ativos", "Inativos", "Inadimplente" só teriam itens se o banco fosse alterado por fora.
 - `lastActivityAt` só é definido na criação — a ordenação "Última atividade" equivale a "data de criação".
+
+### 11.11 [busy-ptolemy] O que muda em Clientes
+
+- **Cadastro completo** (`client-form.tsx`, validado por `lib/clients.ts` → `validateClientForm`): CPF/CNPJ **com dígito verificador**, telefone, WhatsApp separado, e-mail, endereço em partes (CEP, rua, número…), data de nascimento/fundação, profissão, origem, tags, observações, contato principal, **status editável**.
+- **Duplicidade** conferida no formulário (`findDuplicateClient`) **e no banco** (índice único, 7.8).
+- **Edição** usa o mesmo formulário; `updateClient` registra na timeline o que mudou (status, responsável, dados).
+- **Hub do cliente** (`hub-tabs.tsx`, `overview-tab.tsx`): abas com processos, tarefas, documentos, agenda, financeiro; painel de WhatsApp com link `wa.me` (sem integração).
+- **Lista** (`clients-view.tsx`, 431 linhas alteradas): mais filtros e ações (`client-actions.tsx`).
+- `lastActivityByClient` e `delinquentClientIds` (em `lib/selectors.ts`) calculam "última atividade" e "inadimplente" a partir dos dados, em vez de depender dos campos gravados.
+- Testes: `lib/clients.test.ts` (175 linhas).
+
+Com isso, as observações 11.4, 11.7, 11.8 e 11.10 deixam de valer **nesse branch**.
+
+### 11.12 [loving-keller] O que muda em Clientes
+
+Painel da LEXA IA no perfil (`ClientAIPanel`: panorama do cliente + chat) e vínculo automático contato do WhatsApp ↔ cliente pelo telefone.
 
 ---
 
@@ -1216,6 +1380,16 @@ Isso sugere que o módulo financeiro está **pronto para exibir** dados, mas hoj
 
 Todos os cálculos acontecem **no navegador**, sobre todas as faturas carregadas.
 
+### 18.3 [busy-ptolemy] Financeiro com lançamentos
+
+- Ações novas em `demo-store.tsx`: `addInvoice`, `markInvoicePaid`, `deleteInvoice` (com registro em atividades).
+- `components/financeiro/new-invoice-dialog.tsx` (diálogo global `"invoice"`, exige `finance.edit`).
+- **Atraso calculado:** `invoiceStatus()` em `lib/selectors.ts` considera atrasada a fatura pendente com vencimento passado — o status "atrasado" deixa de depender de um campo gravado.
+- **Exportação real** em CSV (`lib/export.ts` → `toCsv`, `downloadFile`), substituindo o toast simulado.
+- Testes ampliados em `lib/selectors.test.ts` e `lib/export.test.ts`.
+
+As observações 18.1 ("não existe criar fatura", "status não calculado", "exportar simulado") deixam de valer **nesse branch**. Continua não havendo despesas/categorias financeiras.
+
 ---
 
 ## 19. Dashboard
@@ -1250,33 +1424,303 @@ UI (card)  →  KpiCards (components/dashboard/kpi-cards.tsx)
 
 ## 20. WhatsApp
 
-**Conclusão: não há implementação de WhatsApp.** Não existe provider (Z-API, Meta Cloud API ou outro), webhook, endpoint, tabela de conversas/mensagens/contatos, chatbot, fila ou variável de ambiente relacionada.
+> **Onde está:** branches `whatsapp` (commit `f970ed8`, "em andamento") e `claude/loving-keller-fwyhxd` (que contém o mesmo commit + a IA da Central). **Não está no `main`.** No `main` só existem as simulações listadas em 20.11.
 
-O que existe (tudo interface ou simulação):
+### 20.1 Visão geral
 
-| Onde | O que é |
+A Central de Atendimento (`/atendimento`) é uma caixa de entrada de WhatsApp 1:1 integrada ao LEXA, com a **Z-API** como provedor. Arquiteturalmente ela é **o oposto do resto do LEXA**:
+
+| | Resto do LEXA (`main`) | Central de Atendimento |
+|---|---|---|
+| Onde fica a regra de negócio | navegador (`demo-store.tsx`) | **servidor** (`lib/services/whatsapp/*`) |
+| Como o navegador grava | direto no Supabase (RLS) | **só via rotas `/api/whatsapp/*`** (o navegador não tem INSERT/UPDATE/DELETE nessas tabelas) |
+| Modelo de dados | tabelas `jsonb` sem FK | **10 tabelas relacionais** com FKs compostas `(organization_id, id)`, `check`, índices únicos |
+| Atualização da tela | carga única por sessão | **Supabase Realtime** (tempo real) |
+| Idempotência | não há | `unique (conversation_id, provider_message_id)`, upserts com `ignoreDuplicates` |
+
+### 20.2 Arquivos
+
+| Camada | Arquivos |
 |---|---|
-| `types/index.ts` → `ClientSource` | valor `"WhatsApp"` como origem do cliente (não há tela que preencha `source`) |
-| `components/clientes/source-icon.tsx` | ícone `MessageCircle` para a origem "WhatsApp" |
-| `components/configuracoes/settings-view.tsx` → `INTEGRATIONS` | card "WhatsApp Business" com botão **Conectar** que só muda estado local e mostra toast "Ambiente de demonstração — nenhuma conta real foi vinculada." |
-| `settings-view.tsx` → `NotificationsSection` | canal "WhatsApp" em toggles de notificação (estado local, botão "Salvar" só mostra toast) |
-| `components/agenda/appointment-detail.tsx` | botão "Enviar lembrete" → toast "receberá a confirmação por WhatsApp" |
-| `components/financeiro/finance-view.tsx` | "Enviar cobrança" → toast "Mensagem enviada por e-mail e WhatsApp" |
-| `ARCHITECTURE.md` §7 | lista WhatsApp em "O que ainda é simulado" |
+| Página | `app/(app)/atendimento/page.tsx` → `components/atendimento/atendimento-view.tsx` |
+| UI (18 arquivos, ~4.500 linhas) | `inbox-provider.tsx` (estado + Realtime), `conversation-list.tsx`, `conversation-view.tsx`, `message-list.tsx`, `composer.tsx` (texto, anexos, áudio, emoji, rascunhos), `attachment.tsx`, `context-panel.tsx` (painel do cliente/processos/tags), `connection.tsx` (QR code, status, webhook), `dialogs.tsx`, `ai-panel.tsx` (IA da Central), `use-messages.ts`, `drafts.ts`, `emoji-picker.tsx`, `parts.tsx` |
+| Cliente do navegador | `lib/whatsapp/client.ts` (leitura direta no Supabase + `fetch` para as rotas + upload de anexos), `mappers.ts`, `config.ts` (status do sistema, limites), `phone.ts` (normalização de telefone BR), `files.ts` |
+| Rotas | `app/api/whatsapp/webhook`, `instance`, `instance/qr`, `conversations`, `conversations/[id]`, `conversations/[id]/messages`, `messages/[id]/retry`, `contacts/[id]`, `tags`, `tags/[id]`, `ai` |
+| Serviços (servidor) | `lib/services/whatsapp/actor.ts` (quem age + `loadConversation`), `instances.ts`, `inbound.ts` (webhook → banco), `outbound.ts` (envio), `conversations.ts` (status, responsável, tags, contatos), `ai.ts` (Claude) |
+| Integração Z-API | `lib/integrations/whatsapp/types.ts` (interface `WhatsAppProvider`), `zapi/client.ts` (HTTP), `zapi/webhook.ts` (tradução dos eventos) |
+| Tipos | `types/whatsapp.ts` (reexportado por `types/index.ts`) |
+| Banco | `supabase/migrations/0002_whatsapp.sql` (503 linhas) |
+| Testes | `lib/integrations/whatsapp/zapi/webhook.test.ts`, `lib/whatsapp/phone.test.ts` |
 
-Os fluxos "Mensagem recebida → webhook → banco → UI" e "Usuário responde → provider → WhatsApp" **não existem no código**. Onde se encaixariam (inferência, seguindo os padrões atuais): webhook em `app/api/<...>/route.ts` fora do `proxy` protegido (precisaria ser rota pública com validação de assinatura), escrita com `getSupabaseAdmin()` em novas tabelas por escritório (mesmo padrão `organization_id + RLS`), e envio via rota de servidor com a credencial do provider.
+### 20.3 Provider e configuração
+
+- **Provider:** Z-API (`https://api.z-api.io/instances/{id}/token/{token}/{rota}` + header `Client-Token`). Meta Cloud API **não** é usada.
+- **Abstração:** `WhatsAppProvider` (`lib/integrations/whatsapp/types.ts`) com `sendText`, `sendImage`, `sendDocument`, `sendAudio`, `markRead`, `status`, `qrCode`, `configureWebhooks`. Só `createZapiClient` implementa.
+- **Variáveis:** `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZATION_ID`, `ZAPI_WEBHOOK_SECRET`, `ZAPI_WEBHOOK_BASE_URL` (opcional), `ZAPI_BASE_URL` (opcional). Todas só no servidor.
+- **Credenciais nunca vão para o banco:** `providerFor(instance)` só devolve cliente se `instance.external_id` for igual ao `ZAPI_INSTANCE_ID` do `.env`.
+- **Timeout** de 25 s por chamada à Z-API; mensagens de erro traduzidas (`userMessage`).
+
+### 20.4 Banco (tabelas da migração `0002_whatsapp.sql`)
+
+| Tabela | Papel | Destaques |
+|---|---|---|
+| `whatsapp_instances` | número conectado (instância Z-API) | `unique (provider, external_id)`; `status` connected/disconnected |
+| `whatsapp_contacts` | telefone do outro lado | `phone` só dígitos (8–15); `unique (organization_id, phone)`; **FK real para `clients`** `(organization_id, client_id)` com `on delete set null` |
+| `whatsapp_statuses` | status personalizados por escritório | ligados a 4 categorias do sistema |
+| `whatsapp_conversations` | uma por contato por instância | `unique (instance_id, contact_id)`; `assigned_user_id` com FK para membro do mesmo escritório; `unread_count`, prévia da última mensagem |
+| `whatsapp_messages` | mensagens, notas internas e registros | `direction` inbound/outbound/internal; `type` com 11 valores; `status` pending→sent→delivered→read/played ou failed; `unique (conversation_id, provider_message_id)`; `raw jsonb`; checks garantindo que nota interna nunca tem id do provedor |
+| `whatsapp_message_attachments` | anexos | `storage_path` obrigatoriamente na pasta do escritório (check); `download_status` pending/stored/failed |
+| `whatsapp_tags`, `whatsapp_conversation_tags` | etiquetas | nome único por escritório (sem caixa) |
+| `whatsapp_conversation_assignments` | histórico de responsáveis | quem passou para quem |
+| `whatsapp_webhook_events` | log bruto de todo webhook | `payload jsonb` completo; **nenhuma política** — só o servidor lê |
+
+Funções só para a service role: `whatsapp_match_client` (acha o cliente pelo telefone), `whatsapp_touch_conversation` (prévia, não lidas, transições automáticas de status), `whatsapp_apply_status` (status só avança). Bucket privado `whatsapp` (64 MB), pasta `<org>/…`; o navegador só pode subir em `<org>/outgoing/…`.
+
+**RLS:** o navegador só tem `SELECT`, com `organization_id = current_org_id() and has_perm('whatsapp.view')`. **Realtime** publicado para instâncias, contatos, conversas, mensagens, anexos e tags (respeita a RLS).
+
+### 20.5 Mensagem recebida (fluxo real)
+
+```
+Cliente manda mensagem no WhatsApp
+  ↓
+Z-API → POST /api/whatsapp/webhook?token=<ZAPI_WEBHOOK_SECRET>          (rota pública no proxy.ts)
+  ↓ app/api/whatsapp/webhook/route.ts
+  • 503 se o segredo não estiver configurado; 401 se o token não bate (comparação timingSafeEqual)
+  • corpo ≤ 1 MB; JSON válido
+  ↓ parseZapiWebhook(payload)            lib/integrations/whatsapp/zapi/webhook.ts
+  • ReceivedCallback / MessageStatusCallback / DeliveryCallback / Connected / Disconnected
+  • grupos, canais, stories e reações → "ignored"
+  ↓ handleWebhookEvent(event, raw)       lib/services/whatsapp/inbound.ts   (service role)
+  • grava o payload bruto em whatsapp_webhook_events
+  • instanceByExternalId(instanceId do corpo) → define o ESCRITÓRIO (nada no corpo escolhe escritório)
+  • instância desconhecida → ignora
+  ↓ processMessage
+  • upsertContact(org, phone)  → primeira vez: procura cliente com o mesmo telefone (whatsapp_match_client) e vincula; nunca cria cliente
+  • conversationFor(instance, contact)  (upsert idempotente)
+  • edição → atualiza body; já registrada → ignora
+  • fromMe (enviada pelo LEXA ou pelo celular): "adota" a mensagem pending do LEXA dos últimos 2 min em vez de duplicar
+  • insert whatsapp_messages (upsert por conversation_id + provider_message_id) com raw
+  • mídia → insert whatsapp_message_attachments (pending) + follow-up
+  • whatsapp_touch_conversation → prévia, unread_count+1, status automático (resolvida reabre como "Novo"; aguardando cliente volta a "Em atendimento")
+  ↓ resposta 200 { value: true } à Z-API
+  ↓ after(): storeMediaLater → baixa a mídia (só https, ≤ 64 MB, timeout 90 s) → bucket whatsapp → download_status "stored"
+  ↓
+Supabase Realtime → inbox-provider.tsx (canal whatsapp:<org>) → lista e conversa atualizam na tela
+```
+
+Erro no processamento → 500 (a Z-API reenvia; o processamento é idempotente) e o erro fica em `whatsapp_webhook_events.error`.
+
+### 20.6 Usuário responde (fluxo real)
+
+```
+composer.tsx (texto | anexo | áudio gravado | nota interna)
+  ↓ anexo: uploadOutgoing() → Storage whatsapp/<org>/outgoing/<uuid>/<arquivo>   (direto do navegador; política exige whatsapp.edit)
+  ↓ whatsappApi.send() → POST /api/whatsapp/conversations/:id/messages  { id (uuid da tela), type, text, replyToId, attachment }
+  ↓ requireActor("whatsapp.edit")  → requireMember (membro ativo, escritório ativo)
+  ↓ sendMessage()  lib/services/whatsapp/outbound.ts
+  • valida: tipo, texto ≤ 4096, id UUID (idempotência: 409 se repetido), anexo na pasta outgoing do escritório, ≤ 64 MB, MIME de imagem/áudio
+  • loadConversation(actor, id) → 404 se não for do escritório
+  • insert whatsapp_messages status "pending" (nota interna: "sent", direction "internal" e PARA AQUI)
+  • touchConversation
+  ↓ dispatch()
+  • anexo → URL assinada de 1 h do Storage → Z-API baixa por ela
+  • providerFor(instance).sendText/Image/Document/Audio  → Z-API → WhatsApp do cliente
+  • sucesso: grava provider_message_id; whatsapp_apply_status("sent")
+  • falha: status "failed" + motivo legível; botão "Tentar de novo" → POST /api/whatsapp/messages/:id/retry
+  ↓ depois, webhooks de status: delivered → read/played
+  ↓ Realtime atualiza os "checks" na tela
+```
+
+### 20.7 Conversas, contatos, estados e responsáveis
+
+- **Status:** 4 do sistema (`new`, `in_progress`, `waiting_client`, `resolved`) + personalizados por escritório (tabela existe; **não encontrei tela para criá-los** no branch).
+- **Transições automáticas** em `whatsapp_touch_conversation` (SQL).
+- **Responsável:** assumir conversa sem dono exige `whatsapp.edit`; passar/tirar exige `whatsapp.assign` (novo em `ADMIN_PERMISSIONS`). Histórico em `whatsapp_conversation_assignments` + evento na linha do tempo.
+- **Tags:** criar exige `whatsapp.edit`; excluir exige `whatsapp.assign`.
+- **Vínculo com cliente:** automático pelo telefone na primeira mensagem, ou manual (`PATCH /api/whatsapp/contacts/:id`). FK real para `clients`.
+- **Iniciar conversa:** `POST /api/whatsapp/conversations` (por telefone, opcionalmente ligado a um cliente).
+- **Marcar como lida:** zera o contador e manda confirmação de leitura à Z-API (melhor esforço).
+- **Notas internas e registros** (`direction: internal`) ficam na mesma linha do tempo e nunca vão ao WhatsApp (garantido por `check` no banco).
+
+### 20.8 Tratamento de erros
+
+`ZapiError` com mensagem amigável + detalhe técnico no log; mensagem com falha fica visível e reenviável; webhook com erro devolve 500 para a Z-API tentar de novo; mídia que não baixa vira `download_status: failed` e a tela usa o link da Z-API (`remoteUrl`) como alternativa; `route()` padroniza os demais erros.
+
+### 20.9 Limitações e riscos observados
+
+| Nível | Observação | Onde |
+|---|---|---|
+| **ALTO** | **Um único número (e um único escritório) por instalação.** As credenciais e o dono da instância vêm do `.env` (`ZAPI_INSTANCE_ID`, `ZAPI_ORGANIZATION_ID`). Os demais escritórios do SaaS ficam sem WhatsApp. O próprio código diz que é "o único ponto a estender (ex.: um cofre de segredos por instância)". | `lib/services/whatsapp/instances.ts` |
+| MÉDIO | O segredo do webhook viaja na **query string** (`?token=`), que costuma aparecer em logs de proxy/CDN e no painel da Z-API. A Z-API não assina os eventos. | `webhook/route.ts`, `instance/route.ts` |
+| MÉDIO | `whatsapp_webhook_events` guarda **o payload bruto de todo evento** (texto das mensagens, telefones) sem rotina de limpeza; `whatsapp_messages.raw` também. Retenção de dados pessoais (LGPD). | migração, `inbound.ts` |
+| MÉDIO | O download de mídia segue redirecionamentos (`redirect: "follow"`) de uma URL que vem do corpo do webhook; a checagem de `https` é só na URL inicial. Protegido pelo segredo do webhook. | `inbound.ts` → `storeMediaLater` |
+| BAIXO | Filtro `.or()` do PostgREST montado com ids vindos do webhook (`provider_message_id.eq.${…}`), restrito ao escritório. | `inbound.ts` (evento `delivery`) |
+| BAIXO | A tela exibe `remoteUrl` (link da Z-API) quando a cópia local falhou — o navegador acessa um domínio de terceiro. | `lib/whatsapp/client.ts` → `attachmentUrl` |
+| BAIXO | O tipo do arquivo enviado vem do navegador (`file.type`); só imagem e áudio são conferidos no servidor. | `uploadOutgoing`, `outbound.ts` |
+| Info | Status personalizados existem no banco, mas não há tela para criá-los. | `whatsapp_statuses` |
+
+### 20.10 Pontos fortes (com evidência)
+
+Isolamento por escritório em **três camadas** (RLS de leitura, FKs compostas `(organization_id, id)` que impedem vincular registros de escritórios diferentes, e filtros explícitos por `organization_id` nas rotas); o escritório de um webhook é decidido pelo servidor (instância), nunca pelo corpo; idempotência de webhooks e de envios; transições de status no banco; credenciais fora do banco; testes do parser de webhook e da normalização de telefone.
+
+### 20.11 O que existe no `main` (simulações)
+
+`ClientSource "WhatsApp"`, ícone de origem, card "WhatsApp Business" com "Conectar" simulado em `settings-view.tsx`, "Enviar lembrete" em `appointment-detail.tsx` e "Enviar cobrança" em `finance-view.tsx` — todos só mostram toast. **[busy-ptolemy]** adiciona um painel de WhatsApp no perfil do cliente com um tipo provisório `WhatsAppConversation` e link `wa.me` (`lib/clients.ts` → `whatsappLink`), sem integração.
 
 ---
 
-## 21. LEXA IA / Gemini
+## 21. LEXA IA / Gemini (e a IA da Central, com Claude)
 
-**Conclusão: não há implementação de IA.** Busquei por `gemini`, `genai`, `google.generativeai`, `openai`, `anthropic` e similares em todo o código (TS, TSX, Python, SQL, JSON, MD): **nenhuma ocorrência**. Não há SDK no `package.json`, nem variável de ambiente, nem endpoint, nem prompts, schemas de saída, *context builders* ou componente de chat. O único elemento visual próximo é o ícone `WandSparkles` do botão **"Preencher"** do formulário de processo — que chama o DataJud, não IA.
+> **Onde está:** `claude/loving-keller-fwyhxd`. **Não está no `main`.** O LEXA tem **duas IAs diferentes**, com arquiteturas diferentes:
+>
+> | | **LEXA IA** | **IA da Central de Atendimento** |
+> |---|---|---|
+> | Provedor | **Google Gemini** (`@google/genai`) | **Anthropic Claude** (`@anthropic-ai/sdk`) |
+> | Modelo | `GEMINI_MODEL` (padrão `gemini-2.5-flash`) + reservas `GEMINI_FALLBACK_MODEL` | `claude-opus-5` (fixo no código), com fallback do lado do servidor da Anthropic |
+> | Chave | `GEMINI_API_KEY` | `ANTHROPIC_API_KEY` (ou `ANTHROPIC_AUTH_TOKEN`) |
+> | Onde aparece | Dashboard, perfil do processo, detalhe de movimentação, perfil do cliente, chat | Painel "IA" dentro de uma conversa do WhatsApp |
+> | Código | `lib/ai/**` (≈30 arquivos), `components/ai/*`, `app/api/ai/*` | `lib/services/whatsapp/ai.ts`, `components/atendimento/ai-panel.tsx`, `app/api/whatsapp/ai` |
 
-Portanto os riscos pedidos (dados excessivos, vazamento entre tenants, exposição de API key, prompt injection, respostas não estruturadas, chamadas duplicadas, custo) **não se aplicam ao código atual**. Pontos de atenção para quando for implementado (inferência a partir da arquitetura existente):
+### 21.1 LEXA IA — arquivos
 
-- **Onde o contexto estaria disponível:** hoje todo o dado do escritório está **no navegador** (`useDemoData()`). Montar o contexto no cliente e enviá-lo a uma rota seria o caminho mais curto — e o mais arriscado (o cliente poderia enviar qualquer coisa; excesso de dados). Uma rota de servidor com `requireMember()` + leitura via `createSupabaseServer()` (sujeita à RLS) manteria o isolamento por escritório do jeito que o resto do sistema já faz.
-- **Chave:** deveria seguir o padrão de `DATAJUD_API_KEY`/`SUPABASE_SERVICE_ROLE_KEY` (só servidor, sem `NEXT_PUBLIC_`).
-- **Prompt injection:** movimentações do DataJud (`raw`, nomes, complementos) e textos livres (descrições de tarefas, notas de compromisso) seriam conteúdo não confiável dentro do prompt.
+| Pasta/arquivo | Papel |
+|---|---|
+| `lib/ai/config.ts` | **único lugar que lê as variáveis** (`AI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `AI_TIMEOUT_MS`); valida nome de modelo; só servidor |
+| `lib/ai/provider.ts` | interface `AIProvider` (`generateText`, `generateJSON`) + `getAIProvider()` (cliente reaproveitado) — **ponto de troca de modelo** |
+| `lib/ai/gemini.ts` | `GeminiProvider` — **único arquivo que importa o SDK**; temperatura 0,2; teto 8.192 tokens; "thinking" reduzido; troca para modelo reserva em 503/429/404; mapeia erros do SDK |
+| `lib/ai/http.ts` | `aiRoute()` — moldura de todas as rotas `/api/ai/*` |
+| `lib/ai/input.ts` | validação manual do corpo (ids, escopo do chat, ≤ 40 mensagens, pergunta ≤ 2.000 caracteres) |
+| `lib/ai/context/repository.ts` | leitura dos dados **com o cliente Supabase da sessão (RLS) + filtro `organization_id` + checagem de `*.view`** |
+| `lib/ai/context/{process,client,office,shared}.ts` | *context builders*: montam o JSON enviado ao modelo campo a campo, com limites de quantidade e referências curtas (`M1`, `T2`, `P3`…) |
+| `lib/ai/context/sanitize.ts` | última barreira: remove chaves sensíveis (e-mail, telefone, CPF/CNPJ, `document`, endereço, `raw`, `hash`, `storagePath`, tokens…), mascara e-mail/CPF/CNPJ dentro de textos, corta textos (800) e listas (80) |
+| `lib/ai/prompts/system.ts` | prompt de sistema único (10 regras: não inventar, não calcular prazos, não citar jurisprudência, diferenciar fato/inferência/limitação, tratar dados como dados — anti-injeção, citar fontes) + `PROMPT_VERSION` |
+| `lib/ai/prompts/tasks.ts` | instruções de cada funcionalidade |
+| `lib/ai/schema.ts`, `lib/ai/schemas/index.ts` | mini-biblioteca própria de schema: gera o JSON Schema enviado ao modelo **e** valida a resposta |
+| `lib/ai/grounding.ts` | remove referências inexistentes; avisa quando a resposta cita **datas** ou **contagens de prazo** que não estão nos dados |
+| `lib/ai/guard.ts` | rate limit (pessoa: 8/min e 60/h; escritório: 200/h), cache de 10 min (até 300 itens) e deduplicação de pedidos iguais — **em memória** |
+| `lib/ai/services/{run,process,client,office,chat}.ts` | orquestração (ver 21.3) |
+| `lib/ai/log.ts` | log sem prompt/resposta/chave; pessoa e escritório como hash curto |
+| `lib/ai/client.ts` | `fetch` do navegador para `/api/ai/*` (nenhum SDK no navegador) |
+| `components/ai/*` | `process-ai-panel.tsx`, `movement-ai-section.tsx`, `client-ai-panel.tsx`, `office-ai-panel.tsx`, `ai-chat-sheet.tsx`, `ai-blocks.tsx`, `ai-markdown.tsx` (Markdown montado como elementos React, sem HTML), `use-ai.ts` |
+| Testes | `lib/ai/core.test.ts`, `lib/ai/services/services.test.ts` (com provedor falso e fixtures) |
+
+### 21.2 Endpoints
+
+| Rota | Permissão | Entrada | Saída |
+|---|---|---|---|
+| `GET /api/ai/status` | membro | — | `{ enabled, configured }` (não chama o modelo) |
+| `POST /api/ai/process/summary` | `processes.view` | `{ processId }` | `AIResult<ProcessSummary>` |
+| `POST /api/ai/process/analyze-movement` | `processes.view` | `{ processId, movementId }` | `AIResult<MovementAnalysis>` |
+| `POST /api/ai/process/next-actions` | `processes.view` | `{ processId }` | `AIResult<NextActions>` |
+| `POST /api/ai/client/summary` | `clients.view` | `{ clientId }` | `AIResult<ClientSummary>` |
+| `POST /api/ai/office/overview` | membro (cada seção só com os módulos que a pessoa vê) | — | `OfficeOverviewResult` (inclui métricas calculadas pelo LEXA) |
+| `POST /api/ai/chat` | depende do escopo (conferida ao carregar dados) | `{ scope: office|process|client, messages }` | `AIResult<ChatReply>` |
+
+Envelope `AIResult`: `data`, `sources` (registros reais citados), `warnings` (datas/prazos suspeitos), `basis` ("Baseado em N movimentações…"), `generatedAt`, `cached`. Erros sempre `{ error: { code, message, retryAfter? } }` com 18 códigos (`lib/ai/errors.ts`). `maxDuration = 60`.
+
+### 21.3 Fluxo completo (implementação real)
+
+```
+Usuário clica "Resumir" (process-ai-panel.tsx)          ← a IA só roda por clique; nada é automático
+  ↓ use-ai.ts → aiApi.processSummary(id, signal)          lib/ai/client.ts
+  ↓ POST /api/ai/process/summary
+  ↓ proxy.ts (sessão)
+  ↓ aiRoute("processes.view")                             lib/ai/http.ts
+    1. requireMember(permissão)  → autenticação + membro ativo + escritório ativo + permissão
+    2. getAIConfig()             → DISABLED / NOT_CONFIGURED antes de qualquer consulta
+    3. body JSON                 → readId (regex de id)
+    4. repo = createSupabaseRepository(createSupabaseServer(), organizationId, can)
+         └─ tenant: cliente da SESSÃO (RLS) + .eq("organization_id") + checagem de *.view por módulo
+  ↓ summarizeProcess(deps, id)                            lib/ai/services/process.ts
+    • loadProcessData → processo, cliente, tarefas, compromissos, documentos, membros
+    • sem movimentações, tarefas e compromissos → INSUFFICIENT_DATA (não gasta chamada)
+  ↓ runStructured()                                       lib/ai/services/run.ts
+    • buildProcessContext → JSON com lista branca de campos + referências M1…/T1…
+    • sanitizeAIContext   → remove/mascara dados pessoais, corta tamanhos
+    • chave de cache = operação + escritório + modelo + PROMPT_VERSION + hash(contexto+pedido)
+    • cache hit → devolve (cached: true); pedido igual em andamento → espera o mesmo
+    • consumeQuota → rate limit pessoa/escritório (429 RATE_LIMITED com Retry-After)
+  ↓ GeminiProvider.generateJSON()                         lib/ai/gemini.ts
+    • systemInstruction = prompt base + tarefa; mensagem = <dados>JSON</dados> + pedido
+    • responseMimeType JSON + responseJsonSchema
+    • timeout total 45 s; 503/429/404 → modelo reserva (ou repete uma vez)
+  ↓ schema.parse(resposta) → INVALID_RESPONSE se não bater
+  ↓ finalize: remove referências inexistentes
+  ↓ citedSources + groundingWarnings (datas/prazos que não estão nos dados)
+  ↓ logAIEvent (sem conteúdo)
+  ↓ JSON → painel mostra resumo, pontos de atenção (fato/inferência/verificação), fontes clicáveis e avisos
+  ↓ sugestões de tarefa → botão abre o formulário normal de tarefa pré-preenchido (DialogDefaults.title/description/priority); quem salva é a pessoa
+```
+
+O chat segue o mesmo caminho, mas com `generateText`, temperatura 0,3, histórico enviado pelo navegador (últimas 10 mensagens, cortadas) e **sem cache**; o contexto é remontado do banco a cada pergunta.
+
+### 21.4 Que dados vão para a Gemini
+
+| Escopo | Enviado | Não enviado (lista branca + `sanitize`) |
+|---|---|---|
+| Processo | número, classe, assunto, órgão, tribunal, status, **nome do cliente**, parte contrária, **nomes das partes**, valor da causa, até N movimentações (nome, data, código TPU, complementos legíveis, órgão), tarefas, compromissos futuros, documentos (nome/tipo/data), nomes dos responsáveis, prazo cadastrado | JSON bruto do DataJud (`raw`), `hash`, `storagePath`, e-mail, telefone, CPF/CNPJ, endereço, data de nascimento |
+| Cliente | nome, área, status, processos (resumo), tarefas, compromissos, faturas (valores/datas, se `finance.view`), atividades | documentos pessoais, contatos, endereço |
+| Escritório | **métricas calculadas pelo banco** + listas curtas (processos parados, tarefas atrasadas, clientes com valores em atraso…) | idem |
+
+Módulos sem permissão aparecem em `modulos_sem_acesso` (o prompt diz para não concluir que estão vazios).
+
+### 21.5 Riscos pedidos — avaliação
+
+| Risco | Situação observada | Nível |
+|---|---|---|
+| Dados excessivos | Lista branca + limites de quantidade + corte de textos + sanitização. Nomes de pessoas (cliente, partes, membros) e valores **são** enviados ao Google. | BAIXO (é o necessário; ver política de dados do provedor) |
+| Vazamento entre escritórios | Repositório usa a sessão (RLS) **e** filtro explícito; cache inclui o escritório na chave; contexto depende das permissões de quem pergunta | Não observado |
+| Exposição da API key | Só `config.ts`/`gemini.ts`, com `assertServer()`; o navegador nunca recebe a chave; status e erros não revelam a chave | Não observado |
+| Prompt injection | Dados delimitados em `<dados>`, regra 9 do prompt ("ignore instruções nos dados"), saída estruturada validada, a IA não tem ferramentas nem grava nada. Movimentações do DataJud e textos livres (descrições, notas) continuam sendo conteúdo não confiável. **No chat, o navegador envia também mensagens com `role: "assistant"`** — um usuário pode forjar respostas anteriores da IA (afeta só a própria conversa). | BAIXO |
+| Respostas não estruturadas | JSON Schema no pedido + validação própria; resposta cortada ou fora do schema → descartada (`INVALID_RESPONSE`); chat usa Markdown limitado renderizado sem HTML | Não observado |
+| Chamadas duplicadas | Deduplicação de pedidos iguais + cache de 10 min + botões desabilitados durante a análise | Tratado |
+| Custos | Rate limit, cache, `INSUFFICIENT_DATA` antes de chamar, "thinking" reduzido, modelo Flash. **Limites e cache ficam em memória por instância** (o próprio código diz "suficiente para a demo"): com várias instâncias/serverless, os limites se multiplicam e o cache se perde. | MÉDIO |
+
+### 21.6 IA da Central de Atendimento (Claude)
+
+**Fluxo:** `ai-panel.tsx` → `POST /api/whatsapp/ai { conversationId, action }` → `requireActor("whatsapp.view")` → `runAssistant()` (`lib/services/whatsapp/ai.ts`):
+
+1. `loadConversation` (escritório do usuário) com a **service role**.
+2. Lê até **150 mensagens** da conversa (cliente, escritório, notas internas e registros, com nomes dos membros).
+3. Se o contato está vinculado a um cliente, lê o cliente e **todos os processos dele** (número, classe, assunto, juízo, status).
+4. Monta `<contexto>` (nome e **telefone** do contato, status, cliente, processos) + `<conversa>` (transcrição).
+5. Ação `documents`: baixa até **4 imagens/PDFs** enviados pelo cliente (≤ 5 MB imagem, ≤ 20 MB PDF) e envia em base64.
+6. `anthropic.beta.messages.parse` com `claude-opus-5`, `max_tokens: 16000`, *adaptive thinking*, saída validada por **Zod** (`betaZodOutputFormat`), fallback do servidor da Anthropic.
+7. Devolve a sugestão; **nada é enviado nem criado sem clique**.
+
+Ações: `summary`, `reply` (resposta pronta para enviar), `tasks` (com `dueInDays` sugerido), `processes` (liga menções da conversa aos processos do cliente), `documents` (análise de RG, comprovantes etc.), `internal_summary`.
+
+### 21.7 Diferenças importantes entre as duas IAs
+
+| Aspecto | LEXA IA (Gemini) | IA da Central (Claude) |
+|---|---|---|
+| Cliente do banco | sessão do usuário (RLS) | **service role** (ignora RLS) |
+| Checa `clients.view`/`processes.view` | Sim | **Não** — só `whatsapp.view` |
+| Sanitização de dados pessoais | Sim (`sanitize.ts`) | **Não** — telefone, conversa inteira e documentos (RG, comprovantes) vão ao provedor |
+| Rate limit / cache | Sim (em memória) | **Não** |
+| Timeout | 45 s | nenhum explícito (`maxDuration = 300` na rota) |
+| Modelo | Flash (barato) | Opus (o mais caro), até 16.000 tokens de saída |
+| Log | sem conteúdo | `console.error(status, message)` do erro |
+| Validação da saída | schema próprio | Zod |
+| Testes | sim | não encontrei |
+
+### 21.8 Riscos da IA da Central
+
+| Nível | Observação |
+|---|---|
+| **MÉDIO** | **Permissão de módulo ignorada:** quem tem `whatsapp.view` mas não `clients.view`/`processes.view` recebe, na resposta da IA, informações de cliente e processos que a tela não mostraria (o contexto é lido com a service role). |
+| **MÉDIO** | **Custo sem teto:** cada clique chama o modelo mais caro com até 150 mensagens (+ PDFs/imagens), sem rate limit, sem cache e sem deduplicação. |
+| **MÉDIO** | **Dados pessoais sensíveis** (documentos de identidade, comprovantes, telefone) enviados à Anthropic sem mascaramento. Isso sugere a necessidade de base legal/contrato de tratamento (LGPD) — questão jurídica, não de código. |
+| BAIXO | Mensagens do cliente podem conter instruções; o prompt diz para tratá-las como dados e a saída é estruturada, sem ferramentas. |
+
+### 21.9 Onde trocar o modelo
+
+- **LEXA IA:** trocar `GEMINI_MODEL` (sem código) ou criar outra classe que implemente `AIProvider` e escolhê-la em `createAIProvider()` (`lib/ai/provider.ts`). O comentário do arquivo diz exatamente isso, e `AIConfig.provider` é o *switch*.
+- **IA da Central:** não há abstração; o modelo está fixo em `const MODEL = "claude-opus-5"` em `lib/services/whatsapp/ai.ts`. Isso sugere que unificar as duas IAs sob `AIProvider` reduziria duplicação de configuração, erros e controles de custo.
+
+### 21.10 Pontos fortes da LEXA IA (com evidência)
+
+Fronteira única com o SDK (`gemini.ts`); configuração centralizada e validada; isolamento em duas travas + permissões por módulo; lista branca + sanitização; prompt anti-alucinação com regras jurídicas explícitas (não calcular prazo, não citar jurisprudência); saída estruturada validada; verificação pós-resposta (referências, datas, prazos); nenhuma escrita automática; log sem conteúdo; códigos de erro com mensagens prontas; testes com provedor falso.
 
 ---
 
@@ -1326,6 +1770,29 @@ Formato de erro: **A** = `{ error: string }` (via `route()`); **B** = `{ error: 
 **Validação de entrada:** manual (tipos TS são só *cast* — `readJson<T>()` não valida). Onde há regra, ela é explícita no handler (`isEmail`, `passwordProblem`, `MEMBER_ROLES.includes`, `STATUSES/PLANS.includes`, `ID_PATTERN`, `MAX_INPUT`).
 
 **Inconsistências de API:** dois formatos de erro (A e B); rotas de processo não usam `route()`; `team/users` responde com `{ member }`/`{ members }`, admin com `{ organization }`/`{ organizations }`.
+
+### 22.3 [loving-keller] Rotas novas
+
+| Método e caminho | Auth | Entrada | Efeitos | Usado por |
+|---|---|---|---|---|
+| `GET /api/ai/status` | membro | — | nenhum | `lib/ai/client.ts` |
+| `POST /api/ai/process/summary` · `analyze-movement` · `next-actions` | `processes.view` | ids | chamada à Gemini | `process-ai-panel.tsx`, `movement-ai-section.tsx` |
+| `POST /api/ai/client/summary` | `clients.view` | `clientId` | Gemini | `client-ai-panel.tsx` |
+| `POST /api/ai/office/overview` | membro | — | Gemini | `office-ai-panel.tsx` |
+| `POST /api/ai/chat` | conforme escopo | `scope`, `messages` | Gemini | `ai-chat-sheet.tsx` |
+| `POST /api/whatsapp/webhook?token=` | **pública** + segredo | evento Z-API | grava contatos/conversas/mensagens/anexos; baixa mídia | Z-API |
+| `GET /api/whatsapp/instance` | `whatsapp.view` | — | consulta status na Z-API; URL do webhook só para `office.manage` | `connection.tsx` |
+| `POST /api/whatsapp/instance {action:"webhooks"}` | `office.manage` | — | cadastra o webhook na Z-API | `connection.tsx` |
+| `GET /api/whatsapp/instance/qr` | `office.manage` | — | QR code da Z-API | `connection.tsx` |
+| `POST /api/whatsapp/conversations` | `whatsapp.edit` | `phone, name?, clientId?` | cria contato/conversa | `dialogs.tsx` |
+| `PATCH /api/whatsapp/conversations/:id` | `whatsapp.view` + regra por campo | status, responsável, lida, tags | eventos na timeline; confirmação de leitura na Z-API | `conversation-view.tsx` etc. |
+| `POST /api/whatsapp/conversations/:id/messages` | `whatsapp.edit` | texto/anexo/nota | grava + envia pela Z-API | `composer.tsx` |
+| `POST /api/whatsapp/messages/:id/retry` | `whatsapp.edit` | — | reenvia | `message-list.tsx` |
+| `PATCH /api/whatsapp/contacts/:id` | `whatsapp.edit` | `clientId`/`name` | vincula a cliente | `context-panel.tsx` |
+| `POST /api/whatsapp/tags` · `DELETE /api/whatsapp/tags/:id` | `edit` · `assign` | nome/cor | — | `context-panel.tsx` |
+| `GET/POST /api/whatsapp/ai` | `whatsapp.view` | `conversationId, action` | chamada ao Claude | `ai-panel.tsx` |
+
+Total no `loving-keller`: 18 (main) + 7 (IA) + 13 handlers do WhatsApp = **38 handlers**. Formatos de erro: agora **três** (`{error:string}` das rotas `route()`, `{error:{code,message}}` do DataJud e da LEXA IA).
 
 ---
 
@@ -1400,13 +1867,13 @@ Ver seção 16.3.
 Ver seção 17.2 (`storage.upload` direto do navegador **antes** de `addDocument`).
 
 ### 24.10 Lançamento financeiro
-**Não existe no código.** Não há ação, formulário nem rota para criar ou alterar `invoices`. O único fluxo financeiro é de leitura: `FinanceView` → `useDemoData().invoices` → `lib/selectors.ts` → cards/gráfico.
+`main`: **não existe** (só leitura). **[busy-ptolemy]**: `FinanceView`/perfil do cliente → `openDialog("invoice")` → `NewInvoiceDialog` → `addInvoice()` (store) → `persist` → `upsert public.invoices` (RLS `finance.edit`) → cards recalculados por `lib/selectors.ts`.
 
 ### 24.11 LEXA IA
-**Não existe no código** (seção 21).
+**[loving-keller]** Ver 21.3 (`process-ai-panel.tsx` → `aiApi` → `/api/ai/process/summary` → `aiRoute` → `summarizeProcess` → `runStructured` → `GeminiProvider` → schema → painel).
 
 ### 24.12 WhatsApp
-**Não existe no código** (seção 20).
+**[loving-keller]/[whatsapp]** Recebimento: 20.5. Envio: 20.6.
 
 ### 24.13 Convidar membro (fluxo extra, relevante)
 `/configuracoes?secao=usuarios` → `MembersManager` (`apiBase="/api/team/users"`) → `call(POST)` → `requireMember("users.manage")` → `inviteMember()` (`lib/auth/members.ts`: `auth.admin.createUser` + `profiles.insert` + link de recuperação) → `sendAuthLink()` imprime no log → `201 { member }` → lista atualizada.
@@ -1489,6 +1956,18 @@ Ver seção 17.2 (`storage.upload` direto do navegador **antes** de `addDocument
 | **Proxy** | Usa `getUser()` (valida no Supabase) em vez de `getSession()`; falha fechada sem env. `matcher` exclui estáticos por extensão. | (ponto forte) |
 | **Open redirect** | `safeNext()` só aceita caminho iniciado por `/` e rejeita `//` e `/\`. | (ponto forte) |
 
+### 26.1 [loving-keller] Itens novos
+
+| Tema | Observação | Risco |
+|---|---|---|
+| Webhook público | segredo comparado em tempo constante; limite de 1 MB; escritório decidido pela instância. Segredo na query string. | MÉDIO (segredo em URL) |
+| SSRF no download de mídia | URL vem do corpo do webhook; exige `https` na URL inicial, mas segue redirecionamentos | MÉDIO/BAIXO (depende do segredo) |
+| Retenção de dados | payload bruto de todo webhook + `raw` de cada mensagem, sem limpeza | MÉDIO (LGPD) |
+| IA da Central | ignora `clients.view`/`processes.view`; envia documentos e telefone ao provedor; sem rate limit | MÉDIO |
+| LEXA IA | chave só no servidor; RLS + filtro; sanitização; saída validada; sem HTML | (ponto forte) |
+| Escrita do WhatsApp | só servidor, com checagem de permissão e escritório em cada rota | (ponto forte) |
+| Storage `whatsapp` | leitura só do escritório; upload só em `outgoing/` com `whatsapp.edit` | (ponto forte) |
+
 ---
 
 ## 27. Performance
@@ -1509,6 +1988,16 @@ Ver seção 17.2 (`storage.upload` direto do navegador **antes** de `addDocument
 | Bundle | Recharts só em `financeiro/revenue-chart.tsx` e dashboard; framer-motion em muitos componentes; quase tudo `"use client"` | Todo o app é JS no cliente | Bundle inicial maior | Análise de bundle (não feita — `node_modules` ausente) |
 | Imagens | Avatar via `<img>` de URL pública; preview via `<img>` | Sem `next/image` (há `eslint-disable`) | Baixo | — |
 | Uploads | Direto do navegador ao Storage (não passa pelo Next) | — | (ponto forte: não ocupa o servidor) | — |
+
+### 27.1 [loving-keller] Itens novos
+
+| Problema | Onde | Impacto provável | Direção futura |
+|---|---|---|---|
+| Rate limit e cache da IA em memória | `lib/ai/guard.ts` | em várias instâncias/serverless os limites se multiplicam e o cache some | armazenamento compartilhado (ex.: Redis/tabela) |
+| IA da Central sem cache/limite, modelo Opus, até 150 mensagens + arquivos | `lib/services/whatsapp/ai.ts` | custo e latência altos por clique | limites, modelo menor, cache |
+| Download de mídia (até 64 MB) na mesma função do webhook (`after`) | `inbound.ts` | função serverless ocupada por até 90 s | fila |
+| Realtime com filtro por escritório em 6 tabelas | `inbox-provider.tsx` | adequado; conversas limitadas (`CONVERSATION_LIMIT`) e mensagens paginadas (`MESSAGE_PAGE`) | — (ponto forte) |
+| LEXA IA carrega só campos necessários (ex.: `listProcessOverviews` usa `data->campo` sem o histórico) | `lib/ai/context/repository.ts` | consultas enxutas | — (ponto forte) |
 
 ---
 
@@ -1624,6 +2113,17 @@ Coleções:   types/index.ts ⇄ storage.ts (PersistedState, TABLES) ⇄ migraç
 | BAIXO | Sem logging estruturado/monitoramento; tudo em `console.*` | servidor |
 | (bom) | `route()` padroniza erros e esconde detalhes; mensagens de erro do DataJud centralizadas e amigáveis; `ErrorState` com "Tentar de novo" no boundary do app | `lib/auth/server.ts`, `errors.ts`, `app/(app)/error.tsx` |
 
+### 30.2 [loving-keller]/[busy-ptolemy] Dívida técnica acrescentada
+
+- **Código em branches separados, sem mesclar** e com conflitos entre si (seção 0.2) — hoje é o maior risco de manutenção.
+- **Duas migrações com o número `0002`**.
+- **Dois estilos de arquitetura no mesmo app:** CRUD no navegador (`jsonb` + store) × servidor + tabelas relacionais (WhatsApp).
+- **Duas IAs com dois SDKs**, dois esquemas de validação (schema próprio × Zod), dois tratamentos de erro e controles de custo diferentes.
+- `zod` entra no projeto só para a IA da Central.
+- WhatsApp preso a um escritório via `.env`.
+- Status personalizados do WhatsApp sem tela.
+- `.env.example` com seção "Lexa IA (Claude)" comentada (`# ANTHROPIC_API_KEY=`), fácil de passar despercebida.
+
 ---
 
 ## 31. Testes
@@ -1659,6 +2159,15 @@ Coleções:   types/index.ts ⇄ storage.ts (PersistedState, TABLES) ⇄ migraç
 - **Nenhum E2E** (login → cadastro → consulta CNJ).
 - `sheet.ts`/`import.ts` são cobertos só indiretamente.
 
+### 31.4 Testes nos branches
+
+| Branch | Resultado | Novos arquivos de teste |
+|---|---|---|
+| `busy-ptolemy` | **99/99** | `lib/clients.test.ts`, `lib/export.test.ts`, `selectors.test.ts` ampliado |
+| `loving-keller` | **126/127** (falha só por `@google/genai` não instalado neste ambiente) | `lib/ai/core.test.ts`, `lib/ai/services/services.test.ts` (provedor falso + fixtures), `lib/integrations/whatsapp/zapi/webhook.test.ts`, `lib/whatsapp/phone.test.ts` |
+
+Sem testes: rotas do WhatsApp, `inbound.ts`/`outbound.ts` (banco), IA da Central, componentes da Central e da IA, políticas RLS novas.
+
 ---
 
 ## 32. Deploy
@@ -1689,6 +2198,20 @@ Coleções:   types/index.ts ⇄ storage.ts (PersistedState, TABLES) ⇄ migraç
 | `NEXT_PUBLIC_SITE_URL` | `siteUrl()` | Opcional (recomendado) | Sim |
 | `DATAJUD_API_KEY` | `python/datajud.py` | Para consulta | Não |
 | `PYTHON_BIN`, `DATAJUD_PYTHON_TIMEOUT_MS` | `python-lookup.ts` | Opcionais | Não |
+
+### 32.2.1 [loving-keller] Variáveis novas
+
+| Variável | Obrigatória para | Observação |
+|---|---|---|
+| `GEMINI_API_KEY` | LEXA IA | sem ela, a IA aparece "não configurada" (não há resposta simulada) |
+| `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `AI_ENABLED`, `AI_TIMEOUT_MS` | opcionais | validadas em `lib/ai/config.ts` |
+| `ANTHROPIC_API_KEY` (ou `ANTHROPIC_AUTH_TOKEN`) | IA da Central | comentada no `.env.example` |
+| `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN` | WhatsApp | só servidor |
+| `ZAPI_ORGANIZATION_ID` | WhatsApp | **define o único escritório** dono do número |
+| `ZAPI_WEBHOOK_SECRET` | webhook | sem ele o webhook responde 503 |
+| `ZAPI_WEBHOOK_BASE_URL` | webhook | a Z-API exige HTTPS |
+
+Além disso: rodar `0002_whatsapp.sql` (e/ou `0002_clients_hub.sql`) no SQL Editor; habilitar a publicação `supabase_realtime` (a migração só adiciona as tabelas se ela existir); cadastrar o webhook (botão em `connection.tsx` ou painel da Z-API). As rotas da IA declaram `maxDuration` 60 s e a IA da Central 300 s — relevante em hospedagem serverless.
 
 ### 32.3 Caminho "git push → runtime"
 
@@ -1765,7 +2288,13 @@ Dashboard Clientes Processos Tarefas  Agenda Documentos Financeiro Configur.  (A
             │ + SQLite cache   │                      └───────────────────────────┘
             └──────────────────┘
 
-   Não existem: Gemini/IA · WhatsApp (só simulação na UI) · e-mail real (log) · jobs/cron · webhooks
+   No main não existem: IA · WhatsApp (só simulação) · e-mail real (log) · jobs/cron · webhooks
+
+   [loving-keller] acrescenta:
+     Navegador ──► /api/ai/* ──► Gemini (Google)
+     Navegador ──► /api/whatsapp/* ──► Z-API ──► WhatsApp            Navegador ◄── Supabase Realtime (whatsapp_*)
+     Z-API ──► /api/whatsapp/webhook ──► tabelas whatsapp_* + Storage whatsapp
+     Navegador ──► /api/whatsapp/ai ──► Claude (Anthropic)
 ```
 
 ---
@@ -1779,10 +2308,12 @@ Um app Next.js que se comporta como uma SPA: o navegador baixa **todos** os dado
 Três arquivos: `lib/store/demo-store.tsx` (o que acontece quando o usuário age), `lib/store/storage.ts` (como isso vira linhas no banco) e `supabase/migrations/0001_lexa_auth.sql` (quem pode ver/gravar o quê). Em volta deles, `types/index.ts` define a forma dos dados e `lib/auth/session.tsx` + `lib/account.ts` dizem "quem sou eu e de que escritório".
 
 **"Quais são os principais domínios?"**
-Escritório/pessoas (auth), Clientes, Processos (com movimentações), Tarefas (com colunas), Agenda (com categorias), Documentos, Financeiro (faturas, só leitura), Atividades (histórico) e Notificações (estrutura).
+Escritório/pessoas (auth), Clientes, Processos (com movimentações), Tarefas (com colunas), Agenda (com categorias), Documentos, Financeiro (faturas), Atividades (histórico) e Notificações (estrutura). **[loving-keller]** + Atendimento (WhatsApp) e LEXA IA — que é uma camada de **leitura** sobre os outros domínios, não um domínio com dados próprios.
 
 **"Como eles se relacionam?"**
 Tudo pertence a um **escritório**. O **cliente** é o centro das ligações: processos, compromissos, documentos e faturas apontam para ele por `clientId`; tarefas apontam para cliente **ou** processo (`related`). Essas ligações são IDs dentro do JSON — o banco não as conhece, a UI resolve com `find`.
+
+**"E o WhatsApp e a IA?"** São as partes "server-first": o navegador só pede, o servidor decide e grava (WhatsApp) ou lê e pergunta ao modelo (IA). Se você entende as rotas `/api/processes/*`, entende o padrão delas.
 
 **"Qual é o caminho normal dos dados?"**
 
@@ -1827,9 +2358,10 @@ A exceção é a consulta processual: `tela → /api/processes/* → Python → 
 | **Documentos** | `components/documentos/documents-view.tsx`, `new-document-dialog.tsx`; `components/shared/document-list.tsx`, `document-preview-sheet.tsx`, `file-icon.tsx`; `lib/documents.ts`; ações `addDocument/deleteDocument`; remoção de arquivo em `lib/store/storage.ts`; bucket/políticas na migração |
 | **Financeiro** | `components/financeiro/finance-view.tsx`, `revenue-chart.tsx`; `components/clientes/profile/finance-tab.tsx`; cálculos em `lib/selectors.ts`; `INVOICE_STATUS` em `lib/config.ts`; tipo `Invoice` (**não há ações de escrita — seria preciso criá-las em `demo-store.tsx`**) |
 | **Dashboard** | `components/dashboard/*` (`dashboard-view.tsx`, `kpi-cards.tsx`, `greeting.tsx`, `my-tasks.tsx`, `today-agenda.tsx`, `recent-activity.tsx`, `revenue-panel.tsx`); seletores em `lib/selectors.ts` |
-| **Gemini / IA** | Não existe. Por analogia: nova rota em `app/api/…` com `requireMember()`; chave só no servidor; componente em `components/…`; registro no `nav-config.ts` se for tela |
+| **Gemini / LEXA IA** [loving-keller] | Modelo/chave: `.env` + `lib/ai/config.ts`; trocar de provedor: `lib/ai/provider.ts` + nova classe como `lib/ai/gemini.ts`; prompts: `lib/ai/prompts/system.ts` (subir `PROMPT_VERSION`) e `tasks.ts`; formato das respostas: `lib/ai/schemas/index.ts` + `lib/ai/types.ts`; que dados vão ao modelo: `lib/ai/context/*.ts` e `sanitize.ts`; limites/custo: `lib/ai/guard.ts`; nova funcionalidade: serviço em `lib/ai/services/` + rota em `app/api/ai/` com `aiRoute()` + `lib/ai/client.ts` + componente em `components/ai/` |
+| **IA da Central (Claude)** [loving-keller] | `lib/services/whatsapp/ai.ts` (modelo, ações, schemas Zod, prompt), `app/api/whatsapp/ai/route.ts`, `components/atendimento/ai-panel.tsx` |
 | **DataJud** | `python/datajud.py` (HTTP, retry, cache, tribunais); `lib/services/processes/python-lookup.ts` (processo filho/timeout); `app/api/processes/search/route.ts`, `[id]/sync/route.ts`; `lib/integrations/legal/datajud/mapper.ts`, `errors.ts`; `lib/services/processes/lookup-events.ts` (log) e `sheet.ts` |
-| **WhatsApp** | Não existe. Pontos simulados: `components/configuracoes/settings-view.tsx`, `components/agenda/appointment-detail.tsx`, `components/financeiro/finance-view.tsx` |
+| **WhatsApp** [loving-keller]/[whatsapp] | Tela: `components/atendimento/*`; envio: `lib/services/whatsapp/outbound.ts`; recebimento: `app/api/whatsapp/webhook/route.ts` + `lib/services/whatsapp/inbound.ts` + `lib/integrations/whatsapp/zapi/webhook.ts`; HTTP da Z-API: `zapi/client.ts`; status/responsável/tags: `conversations.ts`; número/escritório: `instances.ts` + `.env`; tempo real: `inbox-provider.tsx`; banco: `0002_whatsapp.sql`; tipos: `types/whatsapp.ts`; outro provedor: implementar `WhatsAppProvider` (`lib/integrations/whatsapp/types.ts`) e trocar `providerFor()` |
 | **Autenticação** | `proxy.ts`; `components/auth/*`; `app/(auth)/*`; `app/auth/confirm/route.ts`; `app/api/auth/*`; `lib/auth/session.tsx`, `server.ts`, `validation.ts`, `navigate.ts`, `mailer.ts` (envio de e-mail), `bootstrap.ts`; `lib/supabase/*` |
 | **Banco** | `supabase/migrations/0001_lexa_auth.sql` (+ nova migração); `lib/store/storage.ts` (`PersistedState`, `TABLES`, `NEWEST_FIRST`, `APPEND_ONLY`); `types/index.ts`; `initialState` em `demo-store.tsx`; `lib/auth/profile.ts` (mapeamento de linhas relacionais) |
 | **Permissões** | `lib/auth/permissions.ts` **e** `role_defaults` no SQL (o teste `permissions.test.ts` exige paridade); `components/layout/nav-config.ts` (rota); `DIALOG_PERMISSION` em `lib/store/ui-store.tsx`; `<Can>`/`can()` nas telas; políticas RLS; `components/configuracoes/permissions-section.tsx`, `members-manager.tsx`; `lib/auth/members.ts` |
@@ -1901,7 +2433,13 @@ A exceção é a consulta processual: `tela → /api/processes/* → Python → 
 | **Super Admin** | Administrador do LEXA (sem escritório) que aprova/gerencia escritórios |
 | **Sócio / Advogado / Colaborador** | `owner` / `lawyer` / `staff` |
 | **`can()` / `<Can>`** | Checagem de permissão **visual** no cliente |
-| **Schema** | Aqui: schema SQL da migração. Não há schemas de validação (Zod/Yup) |
+| **Schema** | Schema SQL da migração; **[loving-keller]** também o schema de resposta da IA (`lib/ai/schema.ts`, próprio) e schemas Zod da IA da Central |
+| **Webhook** | [loving-keller] Chamada HTTP que a Z-API faz ao LEXA quando algo acontece no WhatsApp (`/api/whatsapp/webhook`) |
+| **Instância (Z-API)** | Um número de WhatsApp conectado à Z-API (`whatsapp_instances`) |
+| **Realtime** | Recurso do Supabase que envia ao navegador as mudanças das tabelas em tempo real |
+| **Context builder** | [loving-keller] Função que monta, campo a campo, o JSON de dados enviado ao modelo (`lib/ai/context/*`) |
+| **Grounding** | Verificação da resposta da IA contra os dados enviados (referências, datas, prazos) — `lib/ai/grounding.ts` |
+| **Service role / Actor** | [loving-keller] `Actor` = quem está agindo na Central (`requireActor`), com `can()` |
 | **ORM** | Não usado; acesso via query builder do supabase-js |
 
 ---
@@ -1914,9 +2452,12 @@ O LEXA tem uma arquitetura **"cliente gordo + banco com RLS"**: o navegador conc
 2. **Integridade:** regras de negócio e validação só existem no navegador; o banco aceita qualquer JSON de quem tem permissão de edição.
 3. **Colaboração:** sem realtime e com last-write-wins por entidade inteira.
 4. **Operação:** DataJud depende de Python + SQLite no mesmo host do Next, sem limite de concorrência; e-mail ainda não existe (links com token em log).
-5. **Completude:** Financeiro e Notificações são só leitura/estrutura; prazos de processo nunca são preenchidos; WhatsApp e IA ainda não existem.
+5. **Completude (no `main`):** Financeiro e Notificações são só leitura/estrutura; prazos de processo nunca são preenchidos.
+6. **Integração dos branches:** WhatsApp, LEXA IA e o hub de Clientes/Financeiro **existem e funcionam, mas em branches separados que não se juntam sem ajustes** (seção 0.2). Enquanto isso não for resolvido, o `main` não representa o produto.
 
-As partes mais maduras — e que servem de modelo para expandir — são o **pipeline processual** (`lib/integrations/legal` → `lib/services/processes`), com fronteira de provider, preservação do dado bruto, cuidado com fuso horário e testes, e o **modelo de autorização** (RLS + `has_perm` + GRANT por coluna + helpers de rota + teste de paridade TS×SQL). Para expandir o sistema (novas entidades, IA, WhatsApp, lançamentos financeiros), o caminho de menor atrito é seguir esses dois padrões: tipo em `types/index.ts` → tabela com `organization_id` + RLS na migração → coleção em `storage.ts` → ação no store (ou rota de servidor, quando envolver segredo, validação obrigatória ou integração externa).
+No `loving-keller`, a **Central de Atendimento** e a **LEXA IA** seguem um padrão mais robusto que o resto do app (servidor como dono da regra, tabelas relacionais com FKs por escritório, saída de IA validada e verificada) e servem de referência para evoluir os módulos antigos. Os pontos de atenção ali são o WhatsApp limitado a um escritório, os controles de custo em memória e a IA da Central sem as mesmas proteções da LEXA IA.
+
+As partes mais maduras do `main` — e que servem de modelo para expandir — são o **pipeline processual** (`lib/integrations/legal` → `lib/services/processes`), com fronteira de provider, preservação do dado bruto, cuidado com fuso horário e testes, e o **modelo de autorização** (RLS + `has_perm` + GRANT por coluna + helpers de rota + teste de paridade TS×SQL). Para expandir o sistema (novas entidades, IA, WhatsApp, lançamentos financeiros), o caminho de menor atrito é seguir esses dois padrões: tipo em `types/index.ts` → tabela com `organization_id` + RLS na migração → coleção em `storage.ts` → ação no store (ou rota de servidor, quando envolver segredo, validação obrigatória ou integração externa).
 
 ---
 
