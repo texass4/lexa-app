@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import type { User as AuthUser } from "@supabase/supabase-js"
 import { createSupabaseServer } from "@/lib/supabase/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
+import { loadSettings } from "@/lib/admin/platform"
 import { hasPermission, type Permission } from "./permissions"
 import type { ProfileRow } from "./profile"
 
@@ -20,7 +21,7 @@ interface Caller {
 }
 
 /** Quem está chamando, validado pelo token do cookie (não pelo corpo da requisição). */
-async function getCaller(): Promise<Caller> {
+export async function getCaller(): Promise<Caller> {
   const supabase = await createSupabaseServer()
   const {
     data: { user },
@@ -43,6 +44,10 @@ export async function requireMember(permission?: Permission) {
     .maybeSingle<{ status: string }>()
   if (!profile.active || org?.status !== "active") throw new HttpError(403, "Acesso desativado.")
   if (permission && !hasPermission(profile, permission)) throw new HttpError(403, "Você não tem permissão para esta ação.")
+  // Manutenção: as rotas do servidor usam a service role (ignoram a RLS), então o
+  // bloqueio precisa estar aqui também — não só em `current_org_id()`.
+  const { maintenance } = await loadSettings()
+  if (maintenance.enabled) throw new HttpError(503, maintenance.message)
   return { ...caller, organizationId: profile.organization_id }
 }
 

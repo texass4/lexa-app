@@ -80,7 +80,7 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
 | `/login` · `/cadastro` · `/recuperar-senha` · `/redefinir-senha` | `components/auth/*-form.tsx` |
-| `/admin` | `components/admin/admin-view.tsx` (Super Admin) |
+| `/admin` … | Lexa Admin (Super Admin) — veja a seção 7 |
 
 Menu lateral e título do header: `components/layout/nav-config.ts`. Barra inferior do mobile: `mobile-nav.tsx`.
 
@@ -157,13 +157,40 @@ Design system — reutilize, não invente: `page-header`, `panel`, `button`, `st
 
 **Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único; enquanto não há provedor de e-mail, o link sai no terminal (`lib/auth/mailer.ts`).
 
-## 7. O que ainda é simulado
+## 7. Lexa Admin (`/admin`)
 
-Envio de e-mail (links saem no terminal), integrações (WhatsApp, agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta ao DataJud e o salvamento dos processos são reais.
+Centro de controle do Super Admin, com shell próprio (barra lateral escura, busca `Ctrl K`, pendências, perfil, botão para o CRM).
 
-## 8. Como rodar
+| URL | Tela | API |
+|---|---|---|
+| `/admin` | `components/admin/dashboard/dashboard-view.tsx` | `GET /api/admin/overview?from&to` |
+| `/admin/escritorios`, `/[id]` | `components/admin/organizations/*` | `/api/admin/organizations[/id[/users…]]` |
+| `/admin/usuarios` | `components/admin/users/users-view.tsx` | `GET /api/admin/users`, `PATCH /api/admin/users/[id]` (mover) |
+| `/admin/planos` | `components/admin/plans/plans-view.tsx` | `/api/admin/plans[/id]` |
+| `/admin/uso` | `components/admin/usage/usage-view.tsx` | `GET /api/admin/organizations` |
+| `/admin/financeiro` | `components/admin/finance/finance-view.tsx` | `GET /api/admin/finance` |
+| `/admin/atividade` | `components/admin/audit/audit-view.tsx` | `GET /api/admin/audit` |
+| `/admin/configuracoes` | `components/admin/settings/settings-view.tsx` | `GET/PUT /api/admin/settings` |
 
-Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
+Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e contadores do menu), `/api/auth/events` (login/logout na auditoria).
+
+**Segurança** — `app/(admin)/layout.tsx` confere o papel no servidor antes de renderizar; e toda rota `/api/admin/*` começa com `requireAdmin()` (`lib/admin/guard.ts`: sessão validada no Supabase + `super_admin` ativo + mesma origem nas alterações). As páginas não têm dados no HTML: tudo vem da API, então navegar sem recarregar não pula a checagem. Service role só no servidor.
+
+**Dados** — `lib/admin/data.ts` (leituras), `lib/admin/catalog.ts` (tipos e regras puras: limites, alertas, períodos, formatação — testado), `lib/admin/settings.ts` (configurações e padrões), `lib/admin/audit.ts` (`recordAudit`, nunca derruba a ação), `lib/admin/usage.ts` (`recordUsage` para WhatsApp/IA). O Super Admin vê contagens, tamanhos, datas e quem acessou — nunca o conteúdo jurídico (as funções SQL agregam; a atividade do CRM sai só com tipo, autor e hora).
+
+**Banco** (`0002_lexa_admin.sql`) — `plans` (catálogo; `organizations.plan` é FK pelo nome, renomear propaga), `subscriptions` (estado de cobrança; nasce em teste por trigger), `payments` (vazia até o gateway), `audit_logs` (só inserção), `usage_events`, `platform_settings`; status `suspended`; `current_org_id()` passa a respeitar o modo manutenção (bloqueio real, na RLS). Tabelas administrativas: RLS ligada e nenhuma política — o navegador não lê nem grava.
+
+**Regras aplicadas de verdade** — manutenção (RLS + `requireMember`), cadastro público aberto/fechado e com/sem aprovação (`/api/auth/signup`), plano padrão, dias de teste (trigger), consulta DataJud ligada/desligada (`/api/processes/*`), limite de usuários do plano nos convites (opcional, em Configurações), retenção da auditoria.
+
+**Cobrança** — sem gateway, receita é estimada pelo preço dos planos × assinaturas ativas (marcado como "estimado"). Para integrar: guardar `gateway_*_id` nos planos/assinaturas, criar a rota de webhook que grava em `payments` e atualiza `subscriptions.status` (`past_due`, `canceled`…) — o Financeiro já lê daí.
+
+## 8. O que ainda é simulado
+
+Envio de e-mail (links saem no terminal), integrações (WhatsApp, IA, agenda, assinatura digital, boletos) e cobrança automática (a estrutura está pronta — seção 7). Autenticação, banco, isolamento, arquivos de documentos, a consulta ao DataJud, o salvamento dos processos e todo o painel Admin são reais.
+
+## 9. Como rodar
+
+Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` e depois `0002_lexa_admin.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
 
 ```bash
 npm run dev      # http://localhost:3000 (requer Python 3 com `requests` para consultar processos)

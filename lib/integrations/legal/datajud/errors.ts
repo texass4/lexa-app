@@ -29,6 +29,13 @@ const USER_MESSAGES: Record<LegalIntegrationErrorCode, string> = {
   UNEXPECTED: "Não conseguimos consultar o processo agora. Tente novamente em alguns instantes.",
 }
 
+/** Resposta das rotas quando o Super Admin desliga a consulta ao DataJud (Configurações › Recursos). */
+export const DATAJUD_DISABLED = () =>
+  Response.json(
+    { error: { code: "PROVIDER_NOT_CONFIGURED", message: "A consulta automática ao DataJud está desativada pela administração do LEXA." } },
+    { status: 503 },
+  )
+
 /** Mensagem pronta para a UI a partir do código de erro. */
 export function userMessageFor(code: string): string {
   return USER_MESSAGES[code as LegalIntegrationErrorCode] ?? USER_MESSAGES.UNEXPECTED

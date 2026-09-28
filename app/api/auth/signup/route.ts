@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { HttpError, readJson, route } from "@/lib/auth/server"
 import { isEmail, normalizeEmail, passwordProblem } from "@/lib/auth/validation"
+import { loadSettings } from "@/lib/admin/platform"
+import { resolveDefaultPlan } from "@/lib/admin/plans"
+import { recordAudit } from "@/lib/admin/audit"
 
 interface Body {
   name?: string
@@ -29,11 +32,23 @@ export const POST = route(async (request) => {
   if (weak) throw new HttpError(400, weak)
   if (officeName.length < 2) throw new HttpError(400, "Informe o nome do escritório.")
 
+  const settings = await loadSettings()
+  if (!settings.general.publicSignup) throw new HttpError(403, "O cadastro de novos escritórios está fechado no momento. Fale com a equipe do LEXA.")
+  const plan = await resolveDefaultPlan(settings.general.defaultPlan)
+  const status = settings.general.requireApproval ? "pending" : "active"
+
   const admin = getSupabaseAdmin()
 
   const { data: org, error: orgError } = await admin
     .from("organizations")
-    .insert({ name: officeName, cnpj: body.cnpj?.trim() || null, email, status: "pending" })
+    .insert({
+      name: officeName,
+      cnpj: body.cnpj?.trim() || null,
+      email,
+      plan,
+      status,
+      approved_at: status === "active" ? new Date().toISOString() : null,
+    })
     .select("id")
     .single()
   if (orgError || !org) throw orgError ?? new Error("Falha ao criar escritório.")
@@ -66,5 +81,14 @@ export const POST = route(async (request) => {
     throw profileError
   }
 
-  return NextResponse.json({ ok: true }, { status: 201 })
+  await recordAudit(request, {
+    action: "organization.signup",
+    actor: { id: created.user.id, name, email, role: "owner" },
+    organizationId: org.id,
+    target: { type: "organization", id: org.id, label: officeName },
+    summary: `${officeName} se cadastrou (${status === "pending" ? "aguardando aprovação" : "ativado automaticamente"}) no plano ${plan}`,
+    metadata: { plan, status },
+  })
+
+  return NextResponse.json({ ok: true, pending: status === "pending" }, { status: 201 })
 })

@@ -32,6 +32,13 @@
   --color-violet: var(--violet);
   --color-violet-soft: var(--violet-soft);
 
+  --color-admin-rail: var(--admin-rail);
+  --color-admin-rail-foreground: var(--admin-rail-foreground);
+  --color-admin-rail-muted: var(--admin-rail-muted);
+  --color-admin-rail-subtle: var(--admin-rail-subtle);
+  --color-admin-rail-accent: var(--admin-rail-accent);
+  --color-admin-rail-border: var(--admin-rail-border);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -130,9 +137,25 @@
   --sidebar-accent-foreground: #171717;
   --sidebar-border: #e7e5e4;
   --sidebar-ring: #a88655;
+
+  /* Lexa Admin: barra lateral escura (tinta) com o dourado da marca — distingue o
+     centro de controle do CRM sem sair da identidade. */
+  --admin-rail: #151513;
+  --admin-rail-foreground: #eceae5;
+  --admin-rail-muted: #8e8b84;
+  --admin-rail-subtle: #7a776f;
+  --admin-rail-accent: #22211e;
+  --admin-rail-border: #2a2926;
 }
 
 .dark {
+  --admin-rail: #0a0a09;
+  --admin-rail-foreground: #eceae5;
+  --admin-rail-muted: #8e8b84;
+  --admin-rail-subtle: #716e68;
+  --admin-rail-accent: #1a1a18;
+  --admin-rail-border: #201f1d;
+
   --background: #0e0e0d;
   --foreground: #ecebe8;
   --surface: #161615;

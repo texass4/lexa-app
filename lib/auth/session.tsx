@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Clock3, LogOut, ShieldOff } from "lucide-react"
+import { ArrowLeft, Clock3, LogOut, RefreshCw, ShieldCheck, ShieldOff, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AuthCard } from "@/components/auth/auth-card"
 import { LogoMark } from "@/components/layout/logo"
@@ -11,6 +11,7 @@ import { hasPermission, type Permission } from "./permissions"
 import { toOrganization, toUser, type OrganizationRow, type ProfileRow } from "./profile"
 import type { Organization, User } from "@/types"
 import { hardNavigate } from "@/lib/auth/navigate"
+import { signOutAndLeave } from "@/lib/auth/sign-out"
 
 interface Session {
   user: User
@@ -26,14 +27,13 @@ type Status =
   | { kind: "loading" }
   | { kind: "ready"; user: User; organization: Organization; members: User[] }
   | { kind: "pending"; organization?: Organization }
-  | { kind: "blocked"; reason: "user" | "organization" | "no-organization" }
+  | { kind: "blocked"; reason: "user" | "organization" | "suspended" | "no-organization" }
+  | { kind: "maintenance"; message: string }
+  | { kind: "super-admin" }
 
 const SessionContext = React.createContext<Session | null>(null)
 
-async function signOut() {
-  await getSupabase().auth.signOut()
-  hardNavigate("/login")
-}
+const signOut = () => signOutAndLeave()
 
 async function loadSession(): Promise<Status> {
   const supabase = getSupabase()
@@ -48,6 +48,9 @@ async function loadSession(): Promise<Status> {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle<ProfileRow>()
   if (!profile) return { kind: "blocked", reason: "no-organization" }
   if (profile.role === "super_admin") {
+    // Vindo do botão "CRM" do Admin, explica por que não há CRM para o Super Admin;
+    // em qualquer outra entrada (login, link antigo), segue direto para o Admin.
+    if (new URLSearchParams(window.location.search).get("de") === "admin") return { kind: "super-admin" }
     hardNavigate("/admin")
     return { kind: "loading" }
   }
@@ -57,7 +60,13 @@ async function loadSession(): Promise<Status> {
   if (!orgRow) return { kind: "blocked", reason: "no-organization" }
   const organization = toOrganization(orgRow)
   if (organization.status === "pending") return { kind: "pending", organization }
-  if (organization.status === "inactive") return { kind: "blocked", reason: "organization" }
+  if (organization.status === "suspended") return { kind: "blocked", reason: "suspended" }
+  if (organization.status !== "active") return { kind: "blocked", reason: "organization" }
+
+  // Manutenção da plataforma: a RLS já bloqueia os dados; aqui só explicamos.
+  const { data: maintenance } = await supabase.rpc("platform_maintenance")
+  const platform = maintenance as { enabled?: boolean; message?: string | null } | null
+  if (platform?.enabled) return { kind: "maintenance", message: platform.message || "Estamos em manutenção. Voltamos em instantes." }
 
   const { data: memberRows } = await supabase.from("profiles").select("*").eq("organization_id", organization.id).order("name")
   const members = ((memberRows ?? []) as ProfileRow[]).map(toUser)
@@ -130,10 +139,50 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     )
   }
 
+  if (status.kind === "super-admin") {
+    return (
+      <AuthCard
+        title="O CRM é de cada escritório"
+        description="Você está conectado como Super Admin. Essa conta não pertence a nenhum escritório e, por isso, não abre dados jurídicos de clientes — é o que garante o isolamento entre escritórios."
+      >
+        <div className="flex items-center gap-3 rounded-[12px] bg-gold-soft/70 px-3.5 py-3 text-[13px] text-gold-dark">
+          <ShieldCheck className="size-4 shrink-0" /> Para ver o CRM como um cliente, entre com uma conta de escritório.
+        </div>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <Button variant="secondary" onClick={signOut}>
+            <LogOut /> Trocar de conta
+          </Button>
+          <Button onClick={() => hardNavigate("/admin")}>
+            <ArrowLeft /> Voltar ao Admin
+          </Button>
+        </div>
+      </AuthCard>
+    )
+  }
+
+  if (status.kind === "maintenance") {
+    return (
+      <AuthCard title="Manutenção programada" description={status.message}>
+        <div className="flex items-center gap-3 rounded-[12px] bg-surface-muted/60 px-3.5 py-3 text-[13px] text-muted-foreground">
+          <Wrench className="size-4 shrink-0" /> Seus dados estão seguros. Tente de novo em alguns minutos.
+        </div>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <Button variant="secondary" onClick={signOut}>
+            <LogOut /> Sair
+          </Button>
+          <Button onClick={() => window.location.reload()}>
+            <RefreshCw /> Tentar de novo
+          </Button>
+        </div>
+      </AuthCard>
+    )
+  }
+
   if (status.kind === "blocked") {
     const description = {
       user: "Seu acesso a este escritório foi desativado. Fale com o sócio responsável.",
       organization: "O acesso deste escritório ao LEXA está desativado. Fale com a equipe do LEXA.",
+      suspended: "O acesso deste escritório ao LEXA está suspenso. Fale com a equipe do LEXA para regularizar.",
       "no-organization": "Sua conta não está vinculada a nenhum escritório.",
     }[status.reason]
     return (

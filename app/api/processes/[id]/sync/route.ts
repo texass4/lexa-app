@@ -12,6 +12,8 @@
 
 import { NextResponse } from "next/server"
 import { authorize } from "@/lib/auth/server"
+import { loadSettings } from "@/lib/admin/platform"
+import { DATAJUD_DISABLED } from "@/lib/integrations/legal/datajud/errors"
 import { mapSearchResponse } from "@/lib/integrations/legal/datajud/mapper"
 import { userMessageFor } from "@/lib/integrations/legal/datajud/errors"
 import { buildProcessSheet } from "@/lib/services/processes/sheet"
@@ -35,6 +37,7 @@ const STATUS: Record<string, number> = {
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const denied = await authorize("processes.edit")
   if (denied) return denied
+  if (!(await loadSettings()).features.datajud) return DATAJUD_DISABLED()
   const { id } = await context.params
 
   if (!ID_PATTERN.test(id)) {

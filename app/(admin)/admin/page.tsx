@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
-import { AdminView } from "@/components/admin/admin-view"
+import { AdminDashboardView } from "@/components/admin/dashboard/dashboard-view"
 
-export const metadata: Metadata = { title: "Super Admin" }
+export const metadata: Metadata = { title: "Dashboard · Lexa Admin" }
 
 export default function AdminPage() {
-  return <AdminView />
+  return <AdminDashboardView />
 }

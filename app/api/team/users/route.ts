@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { readJson, requireMember, route } from "@/lib/auth/server"
-import { inviteMember, listMembers, type InviteInput } from "@/lib/auth/members"
+import { assertUserCapacity, inviteMember, listMembers, type InviteInput } from "@/lib/auth/members"
+import { recordAudit } from "@/lib/admin/audit"
 
 /** Usuários do escritório de quem chama, com último acesso. */
 export const GET = route(async () => {
@@ -10,7 +11,15 @@ export const GET = route(async () => {
 
 /** Convida alguém para o escritório de quem chama. */
 export const POST = route(async (request) => {
-  const { organizationId } = await requireMember("users.manage")
+  const { organizationId, profile } = await requireMember("users.manage")
+  await assertUserCapacity(organizationId)
   const member = await inviteMember(request, organizationId, await readJson<InviteInput>(request))
+  await recordAudit(request, {
+    action: "user.invited",
+    actor: profile,
+    organizationId,
+    target: { type: "user", id: member.id, label: member.name },
+    summary: `${member.name} (${member.email}) convidado(a) como ${member.role}`,
+  })
   return NextResponse.json({ member }, { status: 201 })
 })
