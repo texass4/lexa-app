@@ -31,6 +31,11 @@ export interface OrganizationRow {
   status: Organization["status"]
   created_at: string
   approved_at: string | null
+  /* Colunas do painel Admin (0002) — só o servidor lê e grava. */
+  status_reason?: string | null
+  admin_notes?: string | null
+  custom_limits?: Record<string, number | null> | null
+  updated_at?: string
 }
 
 /** Membro com dados de acesso — só para quem gerencia usuários. */

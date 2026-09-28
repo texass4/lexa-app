@@ -21,7 +21,7 @@ export interface LookupSuccess {
 
 export interface LookupFailure {
   ok: false
-  reason: LookupFailureReason | "forbidden" | "offline" | "aborted"
+  reason: LookupFailureReason | "forbidden" | "disabled" | "offline" | "aborted"
   /** Texto pronto para a interface. */
   message: string
 }

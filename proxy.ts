@@ -8,6 +8,8 @@ import { createServerClient } from "@supabase/ssr"
 const PUBLIC = ["/login", "/cadastro", "/recuperar-senha", "/auth/confirm", "/api/auth/", "/api/whatsapp/webhook"]
 /** Telas de entrada: quem já está logado é mandado para o app. */
 const GUEST_ONLY = ["/login", "/cadastro", "/recuperar-senha"]
+/** Área do Super Admin. */
+const ADMIN = ["/admin", "/api/admin/"]
 
 const matchesAny = (pathname: string, list: string[]) => list.some((p) => pathname === p || pathname.startsWith(p.endsWith("/") ? p : `${p}/`))
 
@@ -58,6 +60,19 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && matchesAny(pathname, GUEST_ONLY)) return redirect("/")
+
+  // Admin: segunda barreira (as páginas e cada rota /api/admin/* conferem de novo no
+  // servidor). Quem não é Super Admin ativo nem chega a carregar o painel.
+  if (user && matchesAny(pathname, ADMIN)) {
+    const { data: profile } = await supabase.from("profiles").select("role, active").eq("id", user.id).maybeSingle<{ role: string; active: boolean }>()
+    if (profile?.role !== "super_admin" || !profile.active) {
+      if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Apenas o Super Admin." }, { status: 403 })
+      return redirect("/")
+    }
+    // Dados administrativos: nunca em cache de navegador/CDN nem em buscadores.
+    response.headers.set("Cache-Control", "no-store, max-age=0")
+    response.headers.set("X-Robots-Tag", "noindex, nofollow")
+  }
 
   return response
 }

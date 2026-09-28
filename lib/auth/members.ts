@@ -5,6 +5,8 @@ import { sendAuthLink } from "./mailer"
 import { MEMBER_ROLES, sanitizePermissions, type MemberRole } from "./permissions"
 import { toUser, type MemberAccess, type ProfileRow } from "./profile"
 import { isEmail, normalizeEmail } from "./validation"
+import { loadSettings } from "@/lib/admin/platform"
+import { sanitizeLimits } from "@/lib/admin/catalog"
 
 /**
  * Gestão de usuários de um escritório, com a service role. Usado pelas rotas do
@@ -154,6 +156,54 @@ export async function updateMember(organizationId: string, userId: string, patch
 
   if (!Object.keys(update).length) return toUser(target)
   const { data, error } = await getSupabaseAdmin().from("profiles").update(update).eq("id", userId).select("*").single<ProfileRow>()
+  if (error) throw error
+  return toUser(data)
+}
+
+/**
+ * Limite de usuários do plano (ou o personalizado do escritório). Só vale quando o
+ * Super Admin liga "Aplicar limite de usuários" nas configurações; o próprio Super
+ * Admin pode passar do limite de propósito.
+ */
+export async function assertUserCapacity(organizationId: string) {
+  const settings = await loadSettings()
+  if (!settings.general.enforceUserLimits) return
+  const admin = getSupabaseAdmin()
+  const [{ data: org }, { count }] = await Promise.all([
+    admin.from("organizations").select("plan, custom_limits").eq("id", organizationId).maybeSingle<{ plan: string; custom_limits: Record<string, unknown> | null }>(),
+    admin.from("profiles").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
+  ])
+  if (!org) return
+  const { data: plan } = await admin.from("plans").select("max_users").eq("name", org.plan).maybeSingle<{ max_users: number | null }>()
+  const custom = org.custom_limits ? sanitizeLimits(org.custom_limits) : {}
+  const limit = "users" in custom ? (custom.users ?? null) : (plan?.max_users ?? null)
+  if (limit !== null && (count ?? 0) >= limit) {
+    throw new HttpError(403, `O plano ${org.plan} permite até ${limit} usuário(s). Fale com a equipe do LEXA para ampliar.`)
+  }
+}
+
+/**
+ * Move a pessoa para outro escritório (só o Super Admin). As permissões voltam ao
+ * padrão do papel — elas eram do escritório antigo. Registros criados por ela ficam
+ * no escritório de origem.
+ */
+export async function moveMember(fromOrganizationId: string, toOrganizationId: string, userId: string, role?: string) {
+  const target = await targetIn(fromOrganizationId, userId)
+  if (fromOrganizationId === toOrganizationId) return toUser(target)
+  const nextRole = (role ?? target.role) as MemberRole
+  if (!MEMBER_ROLES.includes(nextRole)) throw new HttpError(400, "Papel inválido.")
+  const admin = getSupabaseAdmin()
+  const { data: dest } = await admin.from("organizations").select("id").eq("id", toOrganizationId).maybeSingle()
+  if (!dest) throw new HttpError(404, "Escritório de destino não encontrado.")
+  if (target.role === "owner" && target.active && (await activeOwners(fromOrganizationId)) <= 1) {
+    throw new HttpError(400, "Esta pessoa é o único Sócio/Proprietário ativo do escritório de origem. Promova outra pessoa antes de movê-la.")
+  }
+  const { data, error } = await admin
+    .from("profiles")
+    .update({ organization_id: toOrganizationId, role: nextRole, permissions: null })
+    .eq("id", userId)
+    .select("*")
+    .single<ProfileRow>()
   if (error) throw error
   return toUser(data)
 }

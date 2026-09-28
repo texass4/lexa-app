@@ -20,11 +20,14 @@ export interface LookupSuccessBody {
 
 export interface LookupFailureBody {
   ok: false
-  reason: LookupFailureReason | "forbidden"
+  /** `disabled`: a administração do LEXA desligou a consulta automática. */
+  reason: LookupFailureReason | "forbidden" | "disabled"
   message: string
 }
 
 export type LookupBody = LookupSuccessBody | LookupFailureBody
+
+export const LOOKUP_DISABLED_MESSAGE = "A consulta automática de processos está desativada no momento."
 
 /** Maior entrada aceita: um CNJ formatado tem 25 caracteres. */
 export const MAX_CNJ_INPUT = 32

@@ -23,9 +23,13 @@ export interface Organization {
   address: string
   phone: string
   email: string
-  plan: "Essencial" | "Profissional" | "Escritório"
-  /** `pending` até o Super Admin aprovar; `inactive` bloqueia todos os usuários. */
-  status: "pending" | "active" | "inactive"
+  /** Nome de um plano do catálogo (`public.plans`), ex.: "Essencial". */
+  plan: string
+  /**
+   * `pending` até o Super Admin aprovar; `suspended` (ex.: inadimplência) e `inactive`
+   * bloqueiam todos os usuários — a RLS só libera escritórios `active`.
+   */
+  status: "pending" | "active" | "suspended" | "inactive"
   createdAt: string
   approvedAt?: string
 }

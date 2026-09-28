@@ -46,6 +46,7 @@ const ERROR_TITLE: Partial<Record<LookupFailure["reason"], string>> = {
   unsupported: "Consulta automática indisponível",
   offline: "Sem conexão",
   forbidden: "Sem permissão para consultar",
+  disabled: "Consulta automática desativada",
 }
 
 /** Já salvo e atualizado há pouco: não precisa consultar de novo. */

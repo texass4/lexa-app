@@ -1,45 +1,45 @@
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { HttpError, readJson, requireSuperAdmin, route } from "@/lib/auth/server"
+import { HttpError, readJson, route } from "@/lib/auth/server"
 import { inviteMember } from "@/lib/auth/members"
-import { toOrganization, type OrganizationRow, type ProfileRow } from "@/lib/auth/profile"
+import { toOrganization, type OrganizationRow } from "@/lib/auth/profile"
+import { requireAdmin } from "@/lib/admin/guard"
+import { recordAudit } from "@/lib/admin/audit"
+import { loadOrganizations, loadPlans } from "@/lib/admin/data"
+import { assertAssignablePlan, resolveDefaultPlan } from "@/lib/admin/plans"
+import { loadSettings } from "@/lib/admin/platform"
 
-const PLANS = ["Essencial", "Profissional", "Escritório"]
-
-/** Todos os escritórios, com número de usuários e o(s) sócio(s). */
-export const GET = route(async () => {
-  await requireSuperAdmin()
-  const admin = getSupabaseAdmin()
-  const [{ data: orgs, error }, { data: profiles }] = await Promise.all([
-    admin.from("organizations").select("*").order("created_at", { ascending: false }),
-    admin.from("profiles").select("id, organization_id, role, name, email, active").not("organization_id", "is", null),
-  ])
-  if (error) throw error
-  const people = (profiles ?? []) as Pick<ProfileRow, "id" | "organization_id" | "role" | "name" | "email" | "active">[]
-  const organizations = (orgs as OrganizationRow[]).map((row) => {
-    const members = people.filter((p) => p.organization_id === row.id)
-    return {
-      ...toOrganization(row),
-      memberCount: members.length,
-      activeCount: members.filter((m) => m.active).length,
-      owners: members.filter((m) => m.role === "owner").map((m) => ({ name: m.name, email: m.email })),
-    }
-  })
-  return NextResponse.json({ organizations })
+/** Todos os escritórios, com equipe, uso, limites, alertas e assinatura; e o catálogo de planos. */
+export const GET = route(async (request) => {
+  await requireAdmin(request)
+  const [organizations, plans] = await Promise.all([loadOrganizations(), loadPlans()])
+  return NextResponse.json({ organizations, plans })
 })
+
+interface Body {
+  name?: string
+  cnpj?: string
+  email?: string
+  plan?: string
+  ownerName?: string
+  ownerEmail?: string
+  /** true = assinante direto; false = começa em teste (padrão). */
+  skipTrial?: boolean
+}
 
 /** Cria um escritório já ativo e convida o Sócio/Proprietário. */
 export const POST = route(async (request) => {
-  await requireSuperAdmin()
-  const body = await readJson<{ name?: string; cnpj?: string; plan?: string; ownerName?: string; ownerEmail?: string }>(request)
+  const { profile } = await requireAdmin(request)
+  const body = await readJson<Body>(request)
   const name = body.name?.trim() ?? ""
   if (name.length < 2) throw new HttpError(400, "Informe o nome do escritório.")
-  const plan = PLANS.includes(body.plan ?? "") ? body.plan : "Essencial"
+  const plan = body.plan ? await assertAssignablePlan(body.plan) : await resolveDefaultPlan((await loadSettings()).general.defaultPlan)
 
   const admin = getSupabaseAdmin()
+  const now = new Date().toISOString()
   const { data: org, error } = await admin
     .from("organizations")
-    .insert({ name, cnpj: body.cnpj?.trim() || null, plan, status: "active", approved_at: new Date().toISOString() })
+    .insert({ name, cnpj: body.cnpj?.trim() || null, email: body.email?.trim() || null, plan, status: "active", approved_at: now })
     .select("*")
     .single<OrganizationRow>()
   if (error) throw error
@@ -50,5 +50,19 @@ export const POST = route(async (request) => {
     await admin.from("organizations").delete().eq("id", org.id)
     throw inviteError
   }
+
+  // A assinatura nasce em teste (trigger do banco); "sem teste" já vira assinante.
+  if (body.skipTrial) {
+    await admin.from("subscriptions").update({ status: "active", trial_ends_at: null, current_period_start: now }).eq("organization_id", org.id)
+  }
+
+  await recordAudit(request, {
+    action: "organization.created",
+    actor: profile,
+    organizationId: org.id,
+    target: { type: "organization", id: org.id, label: org.name },
+    summary: `Escritório ${org.name} criado no plano ${plan}; convite enviado para ${body.ownerEmail}`,
+    metadata: { plan, skipTrial: !!body.skipTrial },
+  })
   return NextResponse.json({ organization: toOrganization(org) }, { status: 201 })
 })

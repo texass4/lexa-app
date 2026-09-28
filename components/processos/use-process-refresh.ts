@@ -50,9 +50,11 @@ export function useProcessRefresh(process: Process | undefined) {
       const result = await refreshProcess(id, cnj, { force: manual })
 
       if (!result.ok) {
+        // Consulta desligada pela administração: a atualização automática só não acontece.
+        if (result.reason === "disabled" && !manual) return setState(IDLE)
         setState({
           status: "error",
-          message: result.reason === "offline" ? result.message : "Tente novamente em alguns instantes.",
+          message: result.reason === "offline" || result.reason === "disabled" ? result.message : "Tente novamente em alguns instantes.",
         })
         return
       }

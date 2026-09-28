@@ -27,6 +27,10 @@ export function LoginForm() {
       setError("E-mail ou senha incorretos.")
       return
     }
+    // Auditoria de acesso (IP e navegador saem do servidor). Falhar aqui não impede a entrada.
+    await fetch("/api/auth/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "login" }) }).catch(
+      () => undefined,
+    )
     hardNavigate(safeNext(params.get("next")))
   }
 

@@ -11,7 +11,8 @@ import { after, NextResponse } from "next/server"
 import { authorizeMember } from "@/lib/auth/server"
 import { LOOKUP_MESSAGES, LookupError, publicLookupError } from "@/lib/integrations/legal/errors"
 import { createSupabaseServer } from "@/lib/supabase/server"
-import { MAX_CNJ_INPUT, type LookupBody } from "./lookup-contract"
+import { loadSettings } from "@/lib/admin/platform"
+import { LOOKUP_DISABLED_MESSAGE, MAX_CNJ_INPUT, type LookupBody } from "./lookup-contract"
 import { supabaseLookupStore } from "./lookup-cache"
 import { processLookup } from "./process-lookup"
 import type { LookupRequest } from "./lookup-service"
@@ -26,6 +27,8 @@ type Policy = Pick<LookupRequest, "maxAgeMs" | "staleWhileRevalidate">
 export async function handleLookup(request: Request, policy: (body: Record<string, unknown>) => Policy, label: string) {
   const auth = await authorizeMember("processes.edit")
   if ("response" in auth) return auth.response
+  // O Super Admin pode desligar a consulta (Admin › Configurações › Recursos).
+  if (!(await loadSettings()).features.datajud) return json({ ok: false, reason: "disabled", message: LOOKUP_DISABLED_MESSAGE }, 503)
 
   let body: Record<string, unknown> = {}
   try {
