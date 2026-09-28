@@ -32,7 +32,6 @@ import { BarList, BarsChart, TrendChart } from "../ui/charts"
 import { toChart } from "../ui/badges"
 import { AttentionList } from "../ui/attention-list"
 import { AuditList } from "../ui/audit-list"
-import { useAdminShell } from "../shell/admin-context"
 
 type UsageMetric = "processes" | "clients" | "tasks" | "documents" | "appointments"
 const USAGE_METRICS: { value: UsageMetric; label: string; unit: string }[] = [
@@ -81,7 +80,6 @@ function DashboardSkeleton() {
 }
 
 export function AdminDashboardView() {
-  const { admin } = useAdminShell()
   const { period, update, query } = usePeriod("30d")
   const { data, error, loading, reload } = useAdminData<OverviewData>(`/api/admin/overview?${query}`)
   const [metric, setMetric] = React.useState<UsageMetric>("processes")
@@ -94,7 +92,7 @@ export function AdminDashboardView() {
     <div className="space-y-8">
       <AdminHeader
         eyebrow="Lexa Admin"
-        title={`Olá, ${admin.name.split(/\s+/)[0]}`}
+        title="Visão geral"
         description="A operação da plataforma em um só lugar — o que cresceu, o que está no limite e o que pede sua ação."
         actions={
           <div className="flex items-center gap-2">
@@ -227,7 +225,7 @@ export function AdminDashboardView() {
             </Panel>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-3">
+          <section className="grid items-start gap-4 lg:grid-cols-3">
             <Panel>
               <PanelHeader
                 title="Distribuição dos planos"

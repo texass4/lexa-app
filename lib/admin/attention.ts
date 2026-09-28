@@ -42,8 +42,8 @@ export function attentionItems(orgs: AdminOrganization[], plans: AdminPlan[], no
       count: atLimit.length,
       title: `${atLimit.length} ${atLimit.length === 1 ? "escritório próximo" : "escritórios próximos"} do limite`,
       detail: critical
-        ? `${critical} já no limite ou acima. Ex.: ${atLimit[0].name} — ${LIMIT_META[top.key].label.toLowerCase()} em ${Math.round(top.ratio * 100)}%`
-        : `Ex.: ${atLimit[0].name} — ${LIMIT_META[top.key].label.toLowerCase()} em ${Math.round(top.ratio * 100)}%`,
+        ? `${critical} já no limite ou acima. Ex.: ${atLimit[0].name} — ${LIMIT_META[top.key].label} em ${Math.round(top.ratio * 100)}%`
+        : `Ex.: ${atLimit[0].name} — ${LIMIT_META[top.key].label} em ${Math.round(top.ratio * 100)}%`,
       href: "/admin/uso?alerta=1",
     })
   }

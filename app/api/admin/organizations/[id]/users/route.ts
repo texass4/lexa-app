@@ -3,6 +3,7 @@ import { readJson, route } from "@/lib/auth/server"
 import { inviteMember, listMembers, type InviteInput } from "@/lib/auth/members"
 import { requireAdmin } from "@/lib/admin/guard"
 import { recordAudit } from "@/lib/admin/audit"
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 
 type Context = { params: Promise<{ id: string }> }
 
@@ -21,7 +22,7 @@ export const POST = route<Context>(async (request, { params }) => {
     actor: profile,
     organizationId: id,
     target: { type: "user", id: member.id, label: member.name },
-    summary: `${member.name} (${member.email}) convidado(a) pelo Super Admin como ${member.role}`,
+    summary: `${member.name} (${member.email}) convidado(a) pelo Super Admin como ${ROLE_LABELS[member.role]}`,
   })
   return NextResponse.json({ member }, { status: 201 })
 })

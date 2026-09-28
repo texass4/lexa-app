@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { readJson, requireMember, route } from "@/lib/auth/server"
 import { assertUserCapacity, inviteMember, listMembers, type InviteInput } from "@/lib/auth/members"
 import { recordAudit } from "@/lib/admin/audit"
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 
 /** Usuários do escritório de quem chama, com último acesso. */
 export const GET = route(async () => {
@@ -19,7 +20,7 @@ export const POST = route(async (request) => {
     actor: profile,
     organizationId,
     target: { type: "user", id: member.id, label: member.name },
-    summary: `${member.name} (${member.email}) convidado(a) como ${member.role}`,
+    summary: `${member.name} (${member.email}) convidado(a) como ${ROLE_LABELS[member.role]}`,
   })
   return NextResponse.json({ member }, { status: 201 })
 })

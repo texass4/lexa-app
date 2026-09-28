@@ -53,7 +53,7 @@ export function StatCard({
       </div>
       {(hint || (href && action)) && (
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-dashed border-border pt-2.5">
-          {hint ? <p className={cn("min-w-0 truncate text-[12px] text-muted-foreground", hintTone && HINT_TONE[hintTone])}>{hint}</p> : <span />}
+          {hint ? <p className={cn("min-w-0 line-clamp-2 text-[12px] leading-snug text-muted-foreground", hintTone && HINT_TONE[hintTone])}>{hint}</p> : <span />}
           {href && action && (
             <span className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-muted-foreground transition-colors group-hover:text-foreground">
               {action}

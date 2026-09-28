@@ -311,6 +311,42 @@ export function UsersView() {
   }
   const d = dialog ?? shown
 
+  const menu = (u: AdminUser) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label={`Ações para ${u.name}`} className={rowMenuTrigger}>
+        <Ellipsis className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 rounded-[10px] p-1">
+        <DropdownMenuGroup>
+          <DropdownMenuItem className="h-8 px-2" onClick={() => setDialog({ kind: "edit", user: u })}>
+            <Pencil /> Editar / alterar cargo
+          </DropdownMenuItem>
+          <DropdownMenuItem className="h-8 px-2" onClick={() => router.push(`/admin/escritorios/${u.organizationId}?aba=usuarios`)}>
+            <ShieldCheck /> Permissões
+          </DropdownMenuItem>
+          <DropdownMenuItem className="h-8 px-2" onClick={() => reset(u)} disabled={!u.active}>
+            <KeyRound /> {u.invitePending ? "Reenviar convite" : "Resetar acesso"}
+          </DropdownMenuItem>
+          <DropdownMenuItem className="h-8 px-2" onClick={() => setDialog({ kind: "move", user: u })}>
+            <ArrowRightLeft /> Alterar escritório
+          </DropdownMenuItem>
+          <DropdownMenuItem className="h-8 px-2" onClick={() => router.push(`/admin/atividade?actor=${u.id}`)}>
+            <ScrollText /> Visualizar atividade
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem className="h-8 px-2" onClick={() => toggle(u)}>
+            <Power /> {u.active ? "Desativar" : "Ativar"}
+          </DropdownMenuItem>
+          <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => remove(u)}>
+            <Trash2 /> Remover
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   return (
     <div className="space-y-6">
       <AdminHeader
@@ -389,7 +425,7 @@ export function UsersView() {
           />
         </TableShell>
       ) : (
-        <TableShell className={cn("transition-opacity", loading && "opacity-60")}>
+        <TableShell className={cn("transition-opacity max-md:hidden", loading && "opacity-60")}>
           <div className="overflow-x-auto thin-scrollbar">
             <table className="w-full min-w-[960px] border-separate border-spacing-0">
               <thead>
@@ -433,41 +469,7 @@ export function UsersView() {
                       </Td>
                       <Td className="whitespace-nowrap text-muted-foreground">{u.lastSignInAt ? fmtRelative(u.lastSignInAt) : "Nunca entrou"}</Td>
                       <Td className="tabular whitespace-nowrap text-muted-foreground">{fmtNumericDate(u.createdAt)}</Td>
-                      <Td>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger aria-label={`Ações para ${u.name}`} className={rowMenuTrigger}>
-                            <Ellipsis className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56 rounded-[10px] p-1">
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem className="h-8 px-2" onClick={() => setDialog({ kind: "edit", user: u })}>
-                                <Pencil /> Editar / alterar cargo
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="h-8 px-2" onClick={() => router.push(`/admin/escritorios/${u.organizationId}?aba=usuarios`)}>
-                                <ShieldCheck /> Permissões
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="h-8 px-2" onClick={() => reset(u)} disabled={!u.active}>
-                                <KeyRound /> {u.invitePending ? "Reenviar convite" : "Resetar acesso"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="h-8 px-2" onClick={() => setDialog({ kind: "move", user: u })}>
-                                <ArrowRightLeft /> Alterar escritório
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="h-8 px-2" onClick={() => router.push(`/admin/atividade?actor=${u.id}`)}>
-                                <ScrollText /> Visualizar atividade
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem className="h-8 px-2" onClick={() => toggle(u)}>
-                                <Power /> {u.active ? "Desativar" : "Ativar"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => remove(u)}>
-                                <Trash2 /> Remover
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </Td>
+                      <Td>{menu(u)}</Td>
                     </tr>
                   )
                 })}
@@ -478,6 +480,41 @@ export function UsersView() {
             {rows.length} de {users.length} usuários
           </div>
         </TableShell>
+      )}
+
+      {/* Cartões: celular */}
+      {data && rows.length > 0 && (
+        <ul className={cn("space-y-2.5 transition-opacity md:hidden", loading && "opacity-60")}>
+          {rows.map((u) => {
+            const s = statusOf(u)
+            return (
+              <li key={u.id} className={cn("rounded-[14px] border border-border bg-card p-4 shadow-card", !u.active && "opacity-60")}>
+                <div className="flex items-start gap-3">
+                  <UserAvatar name={u.name} src={u.avatarUrl} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{u.name}</p>
+                    <p className="truncate text-[12px] text-muted-foreground">{u.email}</p>
+                  </div>
+                  {menu(u)}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <StatusBadge tone={s.tone} size="sm">
+                    {s.label}
+                  </StatusBadge>
+                  <StatusBadge tone={u.role === "owner" ? "gold" : "neutral"} dot={false} size="sm">
+                    {ROLE_LABELS[u.role]}
+                  </StatusBadge>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 text-[12px] text-muted-foreground">
+                  <Link href={`/admin/escritorios/${u.organizationId}`} className="truncate font-medium text-foreground hover:underline">
+                    {u.organizationName}
+                  </Link>
+                  <span className="shrink-0">{u.lastSignInAt ? fmtRelative(u.lastSignInAt) : "Nunca entrou"}</span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       )}
 
       <Modal open={dialog?.kind === "create"} onOpenChange={(o) => !o && close(false)} title="Criar usuário" description="A pessoa recebe um link para criar a própria senha." icon={<UserPlus />} bare>

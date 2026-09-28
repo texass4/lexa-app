@@ -41,7 +41,7 @@ function Row({ title, description, children }: { title: string; description?: Re
     <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="text-[13.5px] font-medium">{title}</p>
-        {description && <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted-foreground">{description}</p>}
+        {description && <div className="mt-0.5 text-[12.5px] leading-relaxed text-muted-foreground">{description}</div>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>

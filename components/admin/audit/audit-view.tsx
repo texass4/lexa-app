@@ -214,7 +214,27 @@ export function AuditView() {
         </TableShell>
       ) : (
         <TableShell className={cn("transition-opacity", loading && "opacity-60")}>
-          <div className="overflow-x-auto thin-scrollbar">
+          {/* Celular: lista compacta; toque abre os detalhes. */}
+          <ul className="divide-y divide-border md:hidden">
+            {entries.map((e) => {
+              const Icon = AUDIT_ICON[AUDIT_ACTIONS[e.action]?.group ?? "settings"]
+              return (
+                <li key={e.id}>
+                  <button type="button" onClick={() => setOpen(e)} className="flex w-full items-start gap-3 px-4 py-3 text-left outline-none active:bg-surface-muted/60">
+                    <Icon className={cn("mt-0.5 size-4 shrink-0", e.severity === "critical" ? "text-danger" : e.severity === "warning" ? "text-warning" : "text-subtle")} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-medium">{auditLabel(e.action)}</span>
+                      {e.summary && <span className="mt-0.5 block line-clamp-2 text-[12px] text-muted-foreground">{e.summary}</span>}
+                      <span className="mt-1 block truncate text-[11.5px] text-subtle">
+                        {e.actorName ?? "Sistema"} · {e.organizationName ?? "Plataforma"} · {fmtDateTime(e.at)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="overflow-x-auto thin-scrollbar max-md:hidden">
             <table className="w-full min-w-[980px] border-separate border-spacing-0">
               <thead>
                 <tr>
@@ -254,7 +274,9 @@ export function AuditView() {
                           )}
                         </span>
                       </Td>
-                      <Td className="max-w-[320px] truncate text-muted-foreground">{e.summary ?? "—"}</Td>
+                      <Td className="max-w-[260px] truncate text-muted-foreground" title={e.summary}>
+                        {e.summary ?? "—"}
+                      </Td>
                       <Td className="font-mono text-[12px] text-muted-foreground">{e.ip ?? "—"}</Td>
                     </tr>
                   )

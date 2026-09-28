@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import type { ProfileRow } from "@/lib/auth/profile"
 import type { AuditSeverity } from "./catalog"
+import { ROLE_LABELS, type Role } from "@/lib/auth/permissions"
 
 /** IP de quem fez a requisição, quando o proxy/CDN informa. */
 export function clientIp(request: Request): string | undefined {
@@ -34,7 +35,7 @@ export function auditMemberPatch(
     patch.active !== undefined
       ? ["user.status_changed", "warning", `${member.name} ${patch.active ? "reativado(a)" : "desativado(a)"}`]
       : patch.role !== undefined
-        ? ["user.role_changed", "warning", `Papel de ${member.name} alterado para ${patch.role}`]
+        ? ["user.role_changed", "warning", `Papel de ${member.name} alterado para ${ROLE_LABELS[patch.role as Role] ?? patch.role}`]
         : patch.permissions !== undefined
           ? ["user.permissions_changed", "warning", `Permissões de ${member.name} ${patch.permissions === null ? "restauradas ao padrão" : "personalizadas"}`]
           : ["user.updated", "info", `Dados de ${member.name} alterados`]

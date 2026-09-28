@@ -25,7 +25,7 @@ export const GET = route(async (request) => {
     loadPlans(),
     loadUsers(),
     loadSeries(from, to),
-    loadAudit({ limit: 8 }),
+    loadAudit({ limit: 6 }),
     loadSettings(),
   ])
 

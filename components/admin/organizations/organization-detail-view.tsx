@@ -87,7 +87,7 @@ function Overview({ d, goTab }: { d: Detail; goTab: (t: Tab) => void }) {
             <TriangleAlert className="size-4 shrink-0" />
             <span className="flex-1">
               <strong className="font-semibold">Próximo do limite:</strong>{" "}
-              {o.alerts.map((a) => `${LIMIT_META[a.key].label.toLowerCase()} ${Math.round(a.ratio * 100)}%`).join(" · ")}
+              {o.alerts.map((a) => `${LIMIT_META[a.key].label} ${Math.round(a.ratio * 100)}%`).join(" · ")}
             </span>
             <span className="font-medium">Ver uso →</span>
           </button>
@@ -246,7 +246,7 @@ function Usage({ d, goTab }: { d: Detail; goTab: (t: Tab) => void }) {
 
 function ActivityTab({ d }: { d: Detail }) {
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid items-start gap-5 lg:grid-cols-2">
       <Panel>
         <PanelHeader title="Auditoria" description="Acessos e alterações administrativas deste escritório" />
         <AuditList entries={d.audit} showOrganization={false} empty="Nenhum evento registrado ainda." />

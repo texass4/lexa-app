@@ -340,7 +340,7 @@ export function OrganizationsView() {
           {/* Tabela: tablet e desktop */}
           <TableShell className="max-md:hidden">
             <div className="overflow-x-auto thin-scrollbar">
-              <table className="w-full min-w-[1080px] border-separate border-spacing-0">
+              <table className="w-full min-w-[980px] border-separate border-spacing-0">
                 <thead>
                   <tr>
                     <Th>Escritório</Th>
@@ -350,8 +350,7 @@ export function OrganizationsView() {
                     <Th className="text-right">Usuários</Th>
                     <Th className="text-right">Clientes</Th>
                     <Th className="text-right">Processos</Th>
-                    <Th>Criado em</Th>
-                    <Th>Última atividade</Th>
+                    <Th>Atividade</Th>
                     <Th className="w-10" aria-label="Ações" />
                   </tr>
                 </thead>
@@ -402,8 +401,12 @@ export function OrganizationsView() {
                       </Td>
                       <Td className="tabular text-right">{formatCount(o.usage.clients)}</Td>
                       <Td className="tabular text-right">{formatCount(o.usage.processes)}</Td>
-                      <Td className="tabular whitespace-nowrap text-muted-foreground">{fmtNumericDate(o.createdAt)}</Td>
-                      <Td className="whitespace-nowrap text-muted-foreground">{o.lastActivityAt ? fmtRelative(o.lastActivityAt) : "Nunca"}</Td>
+                      <Td className="whitespace-nowrap">
+                        <p className={o.lastActivityAt ? "text-foreground" : "text-subtle"}>
+                          {o.lastActivityAt ? `Ativo ${fmtRelative(o.lastActivityAt)}` : "Sem atividade"}
+                        </p>
+                        <p className="tabular text-[12px] text-muted-foreground">Criado em {fmtNumericDate(o.createdAt)}</p>
+                      </Td>
                       <Td onClick={(e) => e.stopPropagation()}>
                         <OrgMenu
                           org={o}
