@@ -28,9 +28,9 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
     )
   }
   return (
-    <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
-        <li key={item.kind}>
+        <li key={item.kind} className="min-w-0">
           <Link
             href={item.href}
             className={cn(

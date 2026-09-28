@@ -60,7 +60,7 @@ function MiniStat({ icon, label, value, detail }: { icon: React.ReactNode; label
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-[68px] rounded-[12px]" />
         ))}
@@ -71,7 +71,7 @@ function DashboardSkeleton() {
           <Skeleton key={i} className="h-[62px] rounded-[12px]" />
         ))}
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Skeleton className="h-[290px] rounded-[14px]" />
         <Skeleton className="h-[290px] rounded-[14px]" />
       </div>
@@ -95,7 +95,7 @@ export function AdminDashboardView() {
         title="Visão geral"
         description="A operação da plataforma em um só lugar — o que cresceu, o que está no limite e o que pede sua ação."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 max-w-full items-center gap-2">
             <PeriodFilter period={period} onChange={update} />
             <Button variant="ghost" size="icon-sm" aria-label="Atualizar" onClick={reload} disabled={loading}>
               <RefreshCw className={cn(loading && "animate-spin")} />
@@ -184,7 +184,7 @@ export function AdminDashboardView() {
             </div>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-2">
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel>
               <PanelHeader
                 title="Crescimento de escritórios"
@@ -207,7 +207,7 @@ export function AdminDashboardView() {
             </Panel>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-5">
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
             <Panel className="lg:col-span-3">
               <PanelHeader title="Uso da plataforma" description={`${formatCount(periodTotal(metric))} ${metricMeta.unit} criados no período`} />
               <div className="px-5 pb-1">
@@ -225,7 +225,7 @@ export function AdminDashboardView() {
             </Panel>
           </section>
 
-          <section className="grid items-start gap-4 lg:grid-cols-3">
+          <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
             <Panel>
               <PanelHeader
                 title="Distribuição dos planos"

@@ -76,7 +76,7 @@ function Overview({ d, goTab }: { d: Detail; goTab: (t: Tab) => void }) {
   const sub = o.subscription
   const created = d.series.reduce((acc, p) => acc + p.clients + p.processes + p.tasks + p.documents + p.appointments, 0)
   return (
-    <div className="grid gap-5 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
       <div className="space-y-5 lg:col-span-2">
         {o.alerts.length > 0 && (
           <button
@@ -218,7 +218,7 @@ function Usage({ d, goTab }: { d: Detail; goTab: (t: Tab) => void }) {
             </Button>
           }
         />
-        <div className="grid gap-x-8 gap-y-5 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-3">
           {LIMIT_KEYS.map((k) => (
             <UsageMeter key={k} limitKey={k} used={usageValue(o.usage, k)} limit={o.limits[k]} />
           ))}
@@ -246,7 +246,7 @@ function Usage({ d, goTab }: { d: Detail; goTab: (t: Tab) => void }) {
 
 function ActivityTab({ d }: { d: Detail }) {
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
       <Panel>
         <PanelHeader title="Auditoria" description="Acessos e alterações administrativas deste escritório" />
         <AuditList entries={d.audit} showOrganization={false} empty="Nenhum evento registrado ainda." />
@@ -307,7 +307,7 @@ export function OrganizationDetailView({ id }: { id: string }) {
         <Skeleton className="h-4 w-28" />
         <Skeleton className="h-9 w-72" />
         <Skeleton className="h-10 w-full max-w-lg" />
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <Skeleton className="h-[360px] rounded-[14px] lg:col-span-2" />
           <Skeleton className="h-[360px] rounded-[14px]" />
         </div>

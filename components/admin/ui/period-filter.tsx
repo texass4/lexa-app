@@ -40,8 +40,8 @@ export function usePeriod(initial: PeriodKey = "30d") {
 export function PeriodFilter({ period, onChange, className }: { period: PeriodState; onChange: ReturnType<typeof usePeriod>["update"]; className?: string }) {
   const today = ymd(getNow())
   return (
-    <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-center", className)}>
-      <FilterTabs ariaLabel="Período" layoutId="admin-period" value={period.key} onChange={(key) => onChange({ key })} options={PERIODS} />
+    <div className={cn("flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:items-center", className)}>
+      <FilterTabs ariaLabel="Período" layoutId="admin-period" value={period.key} onChange={(key) => onChange({ key })} options={PERIODS} className="min-w-0 max-w-full" />
       {period.key === "custom" && (
         <div className="flex items-center gap-1.5 rounded-[10px] border border-border bg-surface px-2 py-1 shadow-xs">
           <CalendarRange className="size-3.5 shrink-0 text-subtle" />

@@ -73,7 +73,7 @@ export function FinanceView() {
         title="Financeiro"
         description="Receita recorrente, assinaturas, inadimplência e movimentações de plano."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 max-w-full items-center gap-2">
             <PeriodFilter period={period} onChange={update} />
             <Button variant="ghost" size="icon-sm" aria-label="Atualizar" onClick={reload} disabled={loading}>
               <RefreshCw className={cn(loading && "animate-spin")} />
@@ -127,7 +127,7 @@ export function FinanceView() {
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
             <Panel className="lg:col-span-3">
               <PanelHeader
                 title="Receita mensal"
@@ -158,7 +158,7 @@ export function FinanceView() {
             </Panel>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Panel>
               <PanelHeader title="Upgrades e downgrades" description="Mudanças de plano no período" />
               <div className="grid grid-cols-2 gap-3 px-5 pb-4">

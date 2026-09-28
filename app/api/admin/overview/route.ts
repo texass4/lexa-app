@@ -25,7 +25,7 @@ export const GET = route(async (request) => {
     loadPlans(),
     loadUsers(),
     loadSeries(from, to),
-    loadAudit({ limit: 6 }),
+    loadAudit({ limit: 40 }),
     loadSettings(),
   ])
 
@@ -94,7 +94,8 @@ export const GET = route(async (request) => {
       .sort((a, b) => b.count - a.count),
     attention: attentionItems(orgs, plans, now),
     topUsage,
-    recent: recent.entries,
+    // Entradas/saídas enchem a lista rápido; aqui ficam as ações administrativas (os acessos estão em Atividade/Logs).
+    recent: recent.entries.filter((e) => !e.action.startsWith("auth.")).slice(0, 6),
     maintenance: settings.maintenance.enabled,
   }
   return NextResponse.json(data)

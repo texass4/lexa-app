@@ -24,7 +24,7 @@ export function AdminHeader({
         <h1 className="text-[24px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-[28px]">{title}</h1>
         {description && <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>}
     </div>
   )
 }

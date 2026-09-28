@@ -117,7 +117,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
   const activePlans = data.plans.filter((p) => p.status === "active")
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
       <nav aria-label="Seções" className="hidden lg:block">
         <ul className="sticky top-24 space-y-0.5">
           {SECTIONS.map((sec) => (
@@ -195,7 +195,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
           </Row>
         </Section>
 
-        <div className="grid gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Section id="ia" title="Configurações de IA">
             <div className="space-y-4 p-5">
               <Field label="Provedor" htmlFor="st-ai-provider">

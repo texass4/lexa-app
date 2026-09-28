@@ -207,7 +207,7 @@ function LimitsForm({ org, plan, actions }: { org: AdminOrganization; plan: Admi
                   <p className="text-[13px] font-medium">{LIMIT_META[k].label}</p>
                   <p className="text-[12px] text-muted-foreground">Plano: {formatLimitValue(k, base[k])}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <label className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
                     <ToggleSwitch label={`Personalizar ${LIMIT_META[k].label}`} checked={row.custom} onChange={(v) => setKey(k, { custom: v })} />
                     Personalizar
@@ -296,7 +296,7 @@ export function OrganizationConfig({ org, plan, plans, actions }: { org: AdminOr
   // `key` recria os formulários quando os dados salvos mudam (valores iniciais novos).
   const version = JSON.stringify([org.name, org.plan, org.status, org.subscription, org.customLimits, org.adminNotes, org.cnpj, org.email, org.phone])
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       <div className="space-y-5">
         <DataForm key={`d-${version}`} org={org} actions={actions} />
         <StatusPanel key={`s-${version}`} org={org} actions={actions} />

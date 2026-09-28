@@ -353,7 +353,7 @@ export function PlansView() {
           <ErrorState onRetry={reload} description={error} />
         </Panel>
       ) : !data ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-[420px] rounded-[16px]" />
           ))}
