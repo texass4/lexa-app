@@ -178,7 +178,7 @@ Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e 
 
 **Dados** — `lib/admin/data.ts` (leituras), `lib/admin/catalog.ts` (tipos e regras puras: limites, alertas, períodos, formatação — testado), `lib/admin/settings.ts` (configurações e padrões), `lib/admin/audit.ts` (`recordAudit`, nunca derruba a ação), `lib/admin/usage.ts` (`recordUsage` para WhatsApp/IA). O Super Admin vê contagens, tamanhos, datas e quem acessou — nunca o conteúdo jurídico (as funções SQL agregam; a atividade do CRM sai só com tipo, autor e hora).
 
-**Banco** (`0002_lexa_admin.sql`) — `plans` (catálogo; `organizations.plan` é FK pelo nome, renomear propaga), `subscriptions` (estado de cobrança; nasce em teste por trigger), `payments` (vazia até o gateway), `audit_logs` (só inserção), `usage_events`, `platform_settings`; status `suspended`; `current_org_id()` passa a respeitar o modo manutenção (bloqueio real, na RLS). Tabelas administrativas: RLS ligada e nenhuma política — o navegador não lê nem grava.
+**Banco** (`0003_lexa_admin.sql`) — `plans` (catálogo; `organizations.plan` é FK pelo nome, renomear propaga), `subscriptions` (estado de cobrança; nasce em teste por trigger), `payments` (vazia até o gateway), `audit_logs` (só inserção), `usage_events`, `platform_settings`; status `suspended`; `current_org_id()` passa a respeitar o modo manutenção (bloqueio real, na RLS). Tabelas administrativas: RLS ligada e nenhuma política — o navegador não lê nem grava.
 
 **Regras aplicadas de verdade** — manutenção (RLS + `requireMember`), cadastro público aberto/fechado e com/sem aprovação (`/api/auth/signup`), plano padrão, dias de teste (trigger), consulta DataJud ligada/desligada (`/api/processes/*`), limite de usuários do plano nos convites (opcional, em Configurações), retenção da auditoria.
 
@@ -190,7 +190,7 @@ Envio de e-mail (links saem no terminal), integrações (WhatsApp, IA, agenda, a
 
 ## 9. Como rodar
 
-Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` e depois `0002_lexa_admin.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
+Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` e depois `0003_lexa_admin.sql` (as migrações 0002 de outras frentes, como WhatsApp, são independentes) no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
 
 ```bash
 npm run dev      # http://localhost:3000 (requer Python 3 com `requests` para consultar processos)

@@ -210,7 +210,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
               <Field label="Modelo" htmlFor="st-ai-model" optional hint="Identificador do modelo no provedor.">
                 <TextInput id="st-ai-model" value={s.ai.model} onChange={(e) => set("ai", { model: e.target.value })} />
               </Field>
-              <SecretStatus ok={data.secrets.ai} name="ANTHROPIC_API_KEY / OPENAI_API_KEY" />
+              <SecretStatus ok={data.secrets.ai} name="GEMINI_API_KEY" />
             </div>
           </Section>
           <Section id="whatsapp" title="Configurações WhatsApp">
@@ -227,7 +227,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
               <Field label="Número comercial" htmlFor="st-wa-number" optional>
                 <TextInput id="st-wa-number" placeholder="+55 48 99999-0000" value={s.whatsapp.businessNumber} onChange={(e) => set("whatsapp", { businessNumber: e.target.value })} />
               </Field>
-              <SecretStatus ok={data.secrets.whatsapp} name="WHATSAPP_API_TOKEN" />
+              <SecretStatus ok={data.secrets.whatsapp} name="ZAPI_TOKEN" />
             </div>
           </Section>
         </div>

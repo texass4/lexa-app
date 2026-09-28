@@ -131,7 +131,7 @@ describe("configurações", () => {
     assert.equal(s.general.trialDays, 365)
     assert.equal(s.general.usageWarningPercent, 50)
     assert.equal(s.general.publicSignup, true)
-    assert.equal(s.ai.provider, "anthropic")
+    assert.equal(s.ai.provider, "gemini")
     assert.ok(!("evil" in s))
   })
 
@@ -195,8 +195,8 @@ describe("pendências", () => {
   })
 })
 
-describe("migração 0002", () => {
-  const sql = readFileSync(new URL("../../supabase/migrations/0002_lexa_admin.sql", import.meta.url), "utf8")
+describe("migração 0003 (admin)", () => {
+  const sql = readFileSync(new URL("../../supabase/migrations/0003_lexa_admin.sql", import.meta.url), "utf8")
 
   it("tabelas administrativas têm RLS e nenhum acesso do navegador", () => {
     for (const table of ["subscriptions", "payments", "audit_logs", "usage_events", "platform_settings"]) {

@@ -14,8 +14,8 @@ export const GET = route(async (request) => {
     plans: plans.map((p) => ({ name: p.name, status: p.status })),
     // Só se existem, nunca o valor: segredos ficam nas variáveis de ambiente.
     secrets: {
-      ai: !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY),
-      whatsapp: !!process.env.WHATSAPP_API_TOKEN,
+      ai: !!(process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY),
+      whatsapp: !!(process.env.ZAPI_TOKEN || process.env.WHATSAPP_API_TOKEN),
       datajud: !!process.env.DATAJUD_API_KEY,
       email: false,
     },

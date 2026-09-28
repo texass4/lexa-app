@@ -12,7 +12,7 @@ let cache: { at: number; value: PlatformSettings } | null = null
 export async function loadSettings({ fresh = false } = {}): Promise<PlatformSettings> {
   if (!fresh && cache && Date.now() - cache.at < TTL) return cache.value
   const { data, error } = await getSupabaseAdmin().from("platform_settings").select("data").eq("id", true).maybeSingle<{ data: unknown }>()
-  // Sem a migração 0002 aplicada, segue com os padrões (o sistema continua funcionando).
+  // Sem a migração 0003_lexa_admin aplicada, segue com os padrões (o sistema continua funcionando).
   if (error) console.warn("[platform_settings]", error.message)
   const value = sanitizeSettings(data?.data)
   cache = { at: Date.now(), value }

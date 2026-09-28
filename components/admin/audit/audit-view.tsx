@@ -209,7 +209,7 @@ export function AuditView() {
           <EmptyState
             icon={<ScrollText />}
             title="Nenhum registro encontrado."
-            description="Entradas, saídas e alterações administrativas passam a ser registradas a partir da migração 0002. Ajuste o período ou os filtros."
+            description="Entradas, saídas e alterações administrativas passam a ser registradas a partir da migração 0003_lexa_admin. Ajuste o período ou os filtros."
           />
         </TableShell>
       ) : (

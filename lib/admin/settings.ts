@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
     usageWarningPercent: 80,
   },
   features: { datajud: true, whatsapp: false, ai: false },
-  ai: { provider: "anthropic", model: "" },
+  ai: { provider: "gemini", model: "" },
   whatsapp: { provider: "", businessNumber: "" },
   defaultLimits: { users: 5, processes: 1000, clients: 2000, storage: 10240, whatsapp: 2000, ai: 500 },
   maintenance: { enabled: false, message: "Estamos fazendo uma manutenção programada. Voltamos em instantes." },
@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
 }
 
 export const AI_PROVIDERS = [
+  { value: "gemini", label: "Google Gemini" },
   { value: "anthropic", label: "Anthropic (Claude)" },
   { value: "openai", label: "OpenAI" },
   { value: "other", label: "Outro" },
@@ -61,9 +62,9 @@ export const AI_PROVIDERS = [
 
 export const WHATSAPP_PROVIDERS = [
   { value: "", label: "Nenhum" },
+  { value: "zapi", label: "Z-API" },
   { value: "meta", label: "WhatsApp Cloud API (Meta)" },
   { value: "twilio", label: "Twilio" },
-  { value: "zapi", label: "Z-API" },
   { value: "other", label: "Outro" },
 ]
 
