@@ -33,6 +33,7 @@ import { DocumentList } from "@/components/shared/document-list"
 import { TaskRow } from "@/components/tasks/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
+import { useProcessRefresh } from "./use-process-refresh"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { PROCESS_STATUS } from "@/lib/config"
@@ -61,6 +62,8 @@ export function ProcessProfile({ id }: { id: string }) {
   const ready = data.hydrated
   const process = data.processes.find((p) => p.id === id)
   const [deleting, setDeleting] = React.useState(false)
+  // Mostra o que está salvo na hora e atualiza em segundo plano quando vencido.
+  const refresh = useProcessRefresh(process)
 
   if (!process && data.hydrated) {
     return (
@@ -245,7 +248,16 @@ export function ProcessProfile({ id }: { id: string }) {
         <Panel className="lg:col-span-7">
           <PanelHeader
             title="Movimentações"
-            description={`${process.movements.length} registros · atualizado ${fmtDayLabel(process.lastMovementAt).toLowerCase()}, ${fmtTime(process.lastMovementAt)}`}
+            description={
+              refresh.state.status === "refreshing" ? (
+                <span className="inline-flex items-center gap-1.5" role="status">
+                  <span className="size-1.5 animate-pulse rounded-full bg-gold" aria-hidden />
+                  Atualizando informações…
+                </span>
+              ) : (
+                `${process.movements.length} registros · última em ${fmtDayLabel(process.lastMovementAt).toLowerCase()}, ${fmtTime(process.lastMovementAt)}`
+              )
+            }
           />
           <div className="px-5 pt-2 pb-6 sm:px-6">
             <ProcessTimeline movements={movements} />
@@ -253,7 +265,7 @@ export function ProcessProfile({ id }: { id: string }) {
         </Panel>
 
         <div className="space-y-5 lg:col-span-5">
-          <ProcessSyncPanel process={process} />
+          <ProcessSyncPanel process={process} state={refresh.state} canRefresh={refresh.enabled} onRefresh={refresh.refresh} />
           <ProcessSummaryPanel process={process} />
 
           <Panel>

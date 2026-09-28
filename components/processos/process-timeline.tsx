@@ -74,7 +74,7 @@ export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
   }, [])
 
   if (!movements.length) {
-    return <EmptyState compact title="Nenhuma movimentação registrada." description="As movimentações aparecem aqui quando a fonte informar." />
+    return <EmptyState compact title="Nenhuma movimentação registrada." description="As movimentações aparecem aqui assim que forem publicadas." />
   }
 
   return (

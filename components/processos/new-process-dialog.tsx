@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CircleAlert, CircleCheck, Scale, WandSparkles } from "lucide-react"
+import { Scale, WandSparkles } from "lucide-react"
 import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
@@ -10,11 +10,13 @@ import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/f
 import { hasValidCheckDigits, maskCNJ, onlyDigits } from "@/lib/cnj"
 import { PRACTICE_AREAS, PROCESS_STATUS } from "@/lib/config"
 import { getMembers, currentUserId } from "@/lib/account"
-import { searchProcessByCNJ } from "@/lib/services/processes/client"
-import type { ProcessSheet } from "@/lib/services/processes/sheet"
+import { getNow, parse } from "@/lib/dates"
+import { lookupProcess, type LookupFailure } from "@/lib/services/processes/client"
+import { isAutoTracked } from "@/lib/services/processes/labels"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import type { PracticeArea, ProcessStatus } from "@/types"
-import { LookupLog, makeLogAppender, useElapsed, type LogEntry } from "./lookup-log"
+import type { PracticeArea, Process, ProcessStatus } from "@/types"
+import { LookupFailed, LookupFound, LookupProgress, summaryFromProcess, summaryFromSheet, type LookupSummary } from "./process-lookup-status"
+import { AUTO_REFRESH_AFTER_MS } from "./use-process-refresh"
 
 export function NewProcessDialog({ open, onOpenChange, clientId }: { open: boolean; onOpenChange: (o: boolean) => void; clientId?: string }) {
   return (
@@ -35,18 +37,19 @@ type Lookup =
   | { state: "idle" }
   | { state: "loading"; startedAt: number }
   /** Consulta concluída: o processo já está salvo em Processos (`processId`). */
-  | { state: "filled"; sheet: ProcessSheet; processId: string; existed: boolean }
-  | { state: "error"; title: string; message: string; detail?: string }
+  | { state: "filled"; cnj: string; summary: LookupSummary; processId: string; existed: boolean }
+  | { state: "error"; title: string; message: string; retry: boolean }
 
-function lookupErrorTitle(code: string) {
-  if (code === "NOT_FOUND") return "Processo não encontrado no DataJud"
-  if (code === "INVALID_CNJ") return "Número inválido"
-  if (code === "RATE_LIMIT") return "Consulta limitada pelo DataJud"
-  if (code === "TIMEOUT") return "O DataJud demorou demais"
-  if (code === "UNAVAILABLE") return "DataJud instável"
-  if (code === "UNSUPPORTED_COURT") return "Tribunal ainda não suportado"
-  return "Não foi possível consultar"
+const ERROR_TITLE: Partial<Record<LookupFailure["reason"], string>> = {
+  not_found: "Processo não encontrado",
+  invalid: "Número inválido",
+  unsupported: "Consulta automática indisponível",
+  offline: "Sem conexão",
+  forbidden: "Sem permissão para consultar",
 }
+
+/** Já salvo e atualizado há pouco: não precisa consultar de novo. */
+const isRecent = (process: Process) => !!process.lastSyncedAt && getNow().getTime() - parse(process.lastSyncedAt).getTime() < AUTO_REFRESH_AFTER_MS
 
 function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => void }) {
   const data = useDemoData()
@@ -67,11 +70,9 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
   const [form, setForm] = React.useState(initial)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
   const [lookup, setLookup] = React.useState<Lookup>({ state: "idle" })
-  const [log, setLog] = React.useState<LogEntry[]>([])
   const abortRef = React.useRef<AbortController | null>(null)
-  const elapsed = useElapsed(lookup.state === "loading" ? lookup.startedAt : null, lookup.state === "loading")
 
-  // Fechar o modal no meio da consulta encerra a requisição (e o script).
+  // Fechar o modal no meio da consulta encerra a espera (o servidor ainda guarda o resultado no cache).
   React.useEffect(() => () => abortRef.current?.abort(), [])
 
   const set = <K extends keyof ReturnType<typeof initial>>(k: K, v: ReturnType<typeof initial>[K]) => setForm((f) => ({ ...f, [k]: v }))
@@ -79,7 +80,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
   const digits = onlyDigits(form.number)
   const loading = lookup.state === "loading"
   // O vínculo com o processo salvo só vale para o número consultado.
-  const linked = lookup.state === "filled" && lookup.sheet.cnj === digits ? lookup : null
+  const linked = lookup.state === "filled" && lookup.cnj === digits ? lookup : null
   const findByCnj = (cnj: string) => data.processes.find((p) => (p.cnj ?? onlyDigits(p.number)) === cnj)
 
   const autofill = async () => {
@@ -92,23 +93,49 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
       setErrors((e) => ({ ...e, number: "O dígito verificador não confere. Confira o número do processo." }))
       return
     }
+
+    const open = (id: string) => ({ label: "Abrir", onClick: () => router.push(`/processos/${id}`) })
+    const known = findByCnj(digits)
+    const formFrom = (existing: Process) => ({
+      number: existing.number,
+      clientId: existing.clientId,
+      area: existing.area,
+      type: existing.type,
+      court: existing.court,
+      district: existing.district,
+      opposingParty: existing.opposingParty,
+      ownerId: existing.ownerId,
+      status: existing.status,
+      claimValue: existing.claimValue,
+    })
+
+    // Já está em Processos e foi atualizado há pouco: responde na hora, sem consulta.
+    if (known && isRecent(known) && isAutoTracked(known.source?.provider)) {
+      abortRef.current?.abort()
+      setForm(formFrom(known))
+      setErrors({})
+      setLookup({ state: "filled", cnj: digits, summary: summaryFromProcess(known), processId: known.id, existed: true })
+      toast.success("Esse processo já está em Processos.", { description: `${known.code} · informações em dia.`, action: open(known.id) })
+      return
+    }
+
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
-    const startedAt = Date.now()
     setErrors((e) => ({ ...e, number: "" }))
-    setLog([])
-    setLookup({ state: "loading", startedAt })
+    setLookup({ state: "loading", startedAt: Date.now() })
 
-    const result = await searchProcessByCNJ(
-      form.number,
-      makeLogAppender(startedAt, (entry) => setLog((current) => [...current, entry])),
-      controller.signal,
-    )
+    const result = await lookupProcess(form.number, controller.signal)
     if (controller.signal.aborted) return
 
     if (!result.ok) {
-      setLookup({ state: "error", title: lookupErrorTitle(result.code), message: result.message, detail: result.detail })
+      setLookup({
+        state: "error",
+        title: ERROR_TITLE[result.reason] ?? "Não foi possível consultar o processo",
+        // O título já diz que não deu; a mensagem só orienta o próximo passo.
+        message: result.reason === "unavailable" ? "Tente novamente em alguns instantes." : result.message,
+        retry: result.reason === "unavailable" || result.reason === "offline",
+      })
       return
     }
 
@@ -117,30 +144,18 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
     // usuário não trocou o número enquanto a consulta rodava.
     const fillForm = (values: typeof form) => setForm((current) => (onlyDigits(current.number) === found.cnj ? values : current))
 
-    const open = (id: string) => ({ label: "Abrir", onClick: () => router.push(`/processos/${id}`) })
     const existing = findByCnj(found.cnj)
 
     if (existing) {
-      // Já estava em Processos: atualiza com a fonte e traz os dados do escritório para o formulário.
-      const { added } = applyProcessSync(existing.id, found)
-      fillForm({
-        number: existing.number,
-        clientId: existing.clientId,
-        area: existing.area,
-        type: existing.type,
-        court: existing.court,
-        district: existing.district,
-        opposingParty: existing.opposingParty,
-        ownerId: existing.ownerId,
-        status: existing.status,
-        claimValue: existing.claimValue,
-      })
+      // Já estava em Processos: atualiza e traz os dados do escritório para o formulário.
+      const { added } = applyProcessSync(existing.id, found, result.checkedAt)
+      fillForm(formFrom(existing))
       setErrors({})
-      setLookup({ state: "filled", sheet: found, processId: existing.id, existed: true })
+      setLookup({ state: "filled", cnj: found.cnj, summary: summaryFromSheet(found), processId: existing.id, existed: true })
       toast.success("Esse processo já estava em Processos.", {
         description: added
-          ? `${existing.code} atualizado com ${added} nova(s) movimentação(ões).`
-          : `${existing.code} já estava em dia com o DataJud.`,
+          ? `${existing.code} atualizado com ${added === 1 ? "1 nova movimentação" : `${added} novas movimentações`}.`
+          : `${existing.code} já estava atualizado.`,
         action: open(existing.id),
       })
       return
@@ -170,7 +185,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
     })
     fillForm(filled)
     setErrors({})
-    setLookup({ state: "filled", sheet: found, processId: created.id, existed: false })
+    setLookup({ state: "filled", cnj: found.cnj, summary: summaryFromSheet(found), processId: created.id, existed: false })
     toast.success("Processo salvo em Processos.", {
       description: `${created.code} · ${found.movements.length} movimentações importadas`,
       action: open(created.id),
@@ -195,9 +210,9 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
         clientId: form.clientId,
         area: form.area,
         type: form.type.trim(),
-        court: form.court.trim() || "Não informado pela fonte",
+        court: form.court.trim() || "Não informado",
         district: form.district,
-        opposingParty: form.opposingParty.trim() || "Não informado pela fonte",
+        opposingParty: form.opposingParty.trim() || "Não informado",
         ownerId: form.ownerId,
         status: form.status,
         claimValue: form.claimValue,
@@ -234,6 +249,13 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
                   set("number", maskCNJ(e.target.value))
                   if (lookup.state === "error") setLookup({ state: "idle" })
                 }}
+                onKeyDown={(e) => {
+                  // Enter no número consulta, em vez de enviar o formulário incompleto.
+                  if (e.key === "Enter" && digits.length === 20 && lookup.state !== "filled") {
+                    e.preventDefault()
+                    if (!loading) autofill()
+                  }
+                }}
               />
               <Button
                 type="button"
@@ -241,55 +263,30 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
                 className="shrink-0"
                 onClick={autofill}
                 disabled={loading || digits.length !== 20}
-                title="Buscar o processo no DataJud e preencher os campos"
+                title="Buscar as informações do processo e preencher os campos"
               >
                 {loading ? (
                   <span className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-foreground" aria-hidden />
                 ) : (
                   <WandSparkles />
                 )}
-                {loading ? `${elapsed}s` : "Preencher"}
+                {loading ? "Buscando…" : "Preencher"}
               </Button>
             </div>
           </Field>
 
           {lookup.state !== "idle" && (
             <div className="space-y-2 sm:col-span-2">
-              {lookup.state === "loading" && <p className="text-[12.5px] text-muted-foreground">Consultando o processo no DataJud…</p>}
-
-              {linked && (
-                <div className="flex items-start gap-2.5 rounded-[10px] border border-success/25 bg-success-soft/50 px-3 py-2.5">
-                  <CircleCheck className="mt-px size-4 shrink-0 text-success" />
-                  <p className="min-w-0 text-[12.5px] leading-snug text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      {linked.existed ? "Já estava em Processos — atualizado." : "Salvo em Processos."}
-                    </span>{" "}
-                    {[linked.sheet.tribunal, linked.sheet.degree, `${linked.sheet.movements.length} movimentações`].filter(Boolean).join(" · ")}.
-                    Ajuste cliente e responsável e clique em salvar.
-                  </p>
-                </div>
-              )}
-
+              {lookup.state === "loading" && <LookupProgress startedAt={lookup.startedAt} />}
+              {linked && <LookupFound summary={linked.summary} existed={linked.existed} />}
               {lookup.state === "filled" && !linked && (
                 <p className="text-[12.5px] text-muted-foreground">
                   O número mudou depois da consulta. O processo consultado continua salvo; este será cadastrado como um novo.
                 </p>
               )}
-
               {lookup.state === "error" && (
-                <div className="flex items-start gap-2.5 rounded-[10px] border border-danger/25 bg-danger-soft/50 px-3 py-2.5">
-                  <CircleAlert className="mt-px size-4 shrink-0 text-danger" />
-                  <div className="min-w-0">
-                    <p className="text-[12.5px] font-medium text-foreground">{lookup.title}</p>
-                    <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-                      {lookup.message} Você pode preencher os campos manualmente.
-                    </p>
-                    {lookup.detail && <p className="mt-1 font-mono text-[11.5px] leading-snug break-words text-subtle">{lookup.detail}</p>}
-                  </div>
-                </div>
+                <LookupFailed title={lookup.title} message={lookup.message} onRetry={lookup.retry ? autofill : undefined} />
               )}
-
-              {(loading || lookup.state === "error") && <LookupLog entries={log} />}
             </div>
           )}
 

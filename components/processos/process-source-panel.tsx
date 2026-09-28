@@ -1,23 +1,15 @@
 "use client"
 
-import * as React from "react"
-import { RefreshCw, ShieldCheck, Users } from "lucide-react"
-import { toast } from "sonner"
+import { CircleAlert, RefreshCw, ShieldCheck, Users } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { fmtDayLabel, fmtNumericDate, fmtTime } from "@/lib/dates"
-import { syncProcessById } from "@/lib/services/processes/client"
-import { useDemoActions } from "@/lib/store/demo-store"
-import type { DataOrigin, Process, ProcessParty } from "@/types"
-import { Can } from "@/lib/auth/session"
-
-const PROVIDER_LABEL: Record<DataOrigin, string> = {
-  manual: "Cadastro manual",
-  datajud: "Consulta processual (DataJud)",
-}
+import { degreeLabel, isAutoTracked, ORIGIN_LABEL } from "@/lib/services/processes/labels"
+import type { Process, ProcessParty } from "@/types"
+import type { RefreshState } from "./use-process-refresh"
 
 interface Fact {
   label: string
@@ -47,14 +39,14 @@ export function ProcessSummaryPanel({ process }: { process: Process }) {
     { label: "Órgão julgador", value: process.judicialUnit ?? process.court },
     { label: "Tribunal", value: process.tribunal },
     { label: "Sistema", value: process.system },
-    { label: "Grau", value: process.degree },
+    { label: "Grau", value: degreeLabel(process.degree) },
     { label: "Ajuizado em", value: fmtNumericDate(process.distributedAt) },
-    { label: "Situação na fonte", value: process.source?.sourceStatus },
+    { label: "Situação no tribunal", value: process.source?.sourceStatus },
   ]
 
   return (
     <Panel>
-      <PanelHeader title="Resumo" description="Informações do processo conforme a fonte consultada." />
+      <PanelHeader title="Resumo" description="Informações públicas do processo." />
       <div className="px-5 pb-5">
         <FactGrid facts={facts} />
       </div>
@@ -99,63 +91,64 @@ export function ProcessPartiesPanel({ process }: { process: Process }) {
           compact
           icon={<Users />}
           title="Partes não informadas."
-          // Ausência de partes é normal: a fonte pública traz metadados e movimentações.
-          description="A fonte consultada não disponibiliza as partes deste processo."
+          // Ausência de partes é normal: a consulta pública traz metadados e movimentações.
+          description="Algumas informações não estão disponíveis para este processo."
         />
       )}
     </Panel>
   )
 }
 
-/** Andamento + ação de sincronizar com a fonte. */
-export function ProcessSyncPanel({ process }: { process: Process }) {
-  const { applyProcessSync } = useDemoActions()
-  const [syncing, setSyncing] = React.useState(false)
-
+/** Andamento + atualização automática das informações. */
+export function ProcessSyncPanel({
+  process,
+  state,
+  canRefresh,
+  onRefresh,
+}: {
+  process: Process
+  state: RefreshState
+  canRefresh: boolean
+  onRefresh: () => void
+}) {
   const origin = process.source?.provider ?? "manual"
-  const cnj = process.cnj ?? process.number
-
-  const sync = async () => {
-    setSyncing(true)
-    const result = await syncProcessById(process.id, cnj)
-    setSyncing(false)
-
-    if (!result.ok) {
-      toast.error("Não foi possível sincronizar.", { description: result.message })
-      return
-    }
-
-    const { added } = applyProcessSync(process.id, result.sheet)
-    if (added > 0) {
-      toast.success(added === 1 ? "1 nova movimentação importada." : `${added} novas movimentações importadas.`, {
-        description: `Processo ${process.code} atualizado.`,
-      })
-    } else {
-      toast.success("Processo já está atualizado.", { description: "Nenhuma movimentação nova na fonte." })
-    }
-  }
+  const auto = isAutoTracked(origin)
+  const refreshing = state.status === "refreshing"
 
   return (
     <Panel>
       <PanelHeader
         title="Andamento"
-        description="Acompanhamento automático das movimentações."
+        description={auto ? "Acompanhamento automático das movimentações." : "Processo cadastrado manualmente."}
         action={
-          <Can permission="processes.edit">
-            <Button variant="secondary" size="sm" onClick={sync} disabled={syncing}>
-              <RefreshCw className={cn(syncing && "animate-spin")} />
-              {syncing ? "Sincronizando…" : "Atualizar"}
+          canRefresh && (
+            <Button variant="secondary" size="sm" onClick={onRefresh} disabled={refreshing}>
+              <RefreshCw className={cn(refreshing && "animate-spin")} />
+              {refreshing ? "Atualizando…" : "Atualizar"}
             </Button>
-          </Can>
+          )
         }
       />
       <div className="space-y-3 px-5 pb-5">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={origin === "datajud" ? "gold" : "neutral"} dot={origin === "datajud"}>
-            {PROVIDER_LABEL[origin]}
+          <StatusBadge tone={auto ? "gold" : "neutral"} dot={auto}>
+            {ORIGIN_LABEL[origin]}
           </StatusBadge>
           {process.source?.sourceStatus && <StatusBadge tone="neutral">{process.source.sourceStatus}</StatusBadge>}
         </div>
+
+        {state.status === "error" && (
+          <div role="status" className="flex items-start gap-2.5 rounded-[10px] border border-danger/20 bg-danger-soft/50 px-3 py-2.5">
+            <CircleAlert className="mt-px size-4 shrink-0 text-danger" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[12.5px] font-medium text-foreground">Não foi possível atualizar as informações deste processo.</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{state.message}</p>
+            </div>
+            <Button variant="ghost" size="sm" className="-my-1 shrink-0" onClick={onRefresh}>
+              Tentar novamente
+            </Button>
+          </div>
+        )}
 
         <dl className="divide-y divide-border">
           <div className="flex items-baseline justify-between gap-4 py-2.5">
@@ -164,18 +157,28 @@ export function ProcessSyncPanel({ process }: { process: Process }) {
               {fmtDayLabel(process.lastMovementAt)}, {fmtTime(process.lastMovementAt)}
             </dd>
           </div>
-          <div className="flex items-baseline justify-between gap-4 py-2.5">
-            <dt className="text-[12.5px] text-muted-foreground">Última sincronização</dt>
-            <dd className="text-right text-[13px] font-medium">
-              {process.lastSyncedAt ? `${fmtDayLabel(process.lastSyncedAt)}, ${fmtTime(process.lastSyncedAt)}` : "Nunca sincronizado"}
-            </dd>
-          </div>
+          {auto && (
+            <div className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-[12.5px] text-muted-foreground">Informações atualizadas</dt>
+              <dd className="text-right text-[13px] font-medium">
+                {refreshing ? (
+                  <span className="text-muted-foreground">Atualizando…</span>
+                ) : process.lastSyncedAt ? (
+                  `${fmtDayLabel(process.lastSyncedAt)}, ${fmtTime(process.lastSyncedAt)}`
+                ) : (
+                  "Aguardando atualização"
+                )}
+              </dd>
+            </div>
+          )}
         </dl>
 
-        <p className="flex items-start gap-2 text-[11.5px] leading-relaxed text-subtle">
-          <ShieldCheck className="mt-px size-3.5 shrink-0" />A consulta acontece no servidor do LEXA e respeita os limites da fonte. Movimentações já
-          conhecidas não são importadas de novo.
-        </p>
+        {auto && (
+          <p className="flex items-start gap-2 text-[11.5px] leading-relaxed text-subtle">
+            <ShieldCheck className="mt-px size-3.5 shrink-0" />O LEXA consulta automaticamente as informações do processo. Movimentações já conhecidas
+            não são importadas de novo.
+          </p>
+        )}
       </div>
     </Panel>
   )

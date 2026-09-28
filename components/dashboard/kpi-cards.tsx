@@ -10,6 +10,7 @@ import { getNow, fmtTime, parse } from "@/lib/dates"
 import { formatCurrency, formatNumber } from "@/lib/format"
 import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
+import { isAutoTracked } from "@/lib/services/processes/labels"
 
 interface KpiCard {
   permission: Permission
@@ -25,7 +26,7 @@ export function KpiCards() {
   const data = useDemoData()
   const { can } = useSession()
   const activeProcesses = data.processes.filter((p) => p.status !== "concluido")
-  const synced = data.processes.filter((p) => p.source?.provider === "datajud").length
+  const synced = data.processes.filter((p) => isAutoTracked(p.source?.provider)).length
   const todays = todaysAppointments(data)
   const nextToday = todays.find((a) => parse(a.start) > getNow())
   const pending = data.tasks.filter((t) => t.status === "pendente")
@@ -42,7 +43,7 @@ export function KpiCards() {
       short: "Processos",
       icon: Scale,
       value: formatNumber(activeProcesses.length, 2),
-      foot: data.processes.length ? <>{synced} acompanhados pelo DataJud</> : <>Consulte pelo número CNJ</>,
+      foot: data.processes.length ? <>{synced} com acompanhamento automático</> : <>Consulte pelo número CNJ</>,
     },
     {
       permission: "agenda.view",

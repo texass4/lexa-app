@@ -4,13 +4,14 @@ import * as React from "react"
 import { Clock3, LogOut, ShieldOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AuthCard } from "@/components/auth/auth-card"
-import { LogoMark } from "@/components/layout/logo"
+import { useSplashReady } from "@/components/layout/app-splash"
 import { getSupabase } from "@/lib/supabase/client"
 import { setAccount } from "@/lib/account"
 import { hasPermission, type Permission } from "./permissions"
 import { toOrganization, toUser, type OrganizationRow, type ProfileRow } from "./profile"
 import type { Organization, User } from "@/types"
 import { hardNavigate } from "@/lib/auth/navigate"
+import { preloadOfficeData } from "@/lib/store/demo-store"
 
 interface Session {
   user: User
@@ -53,13 +54,16 @@ async function loadSession(): Promise<Status> {
   }
   if (!profile.active) return { kind: "blocked", reason: "user" }
 
-  const { data: orgRow } = await supabase.from("organizations").select("*").eq("id", profile.organization_id).maybeSingle<OrganizationRow>()
+  // Escritório e equipe dependem só do perfil: buscados em paralelo.
+  const [{ data: orgRow }, { data: memberRows }] = await Promise.all([
+    supabase.from("organizations").select("*").eq("id", profile.organization_id).maybeSingle<OrganizationRow>(),
+    supabase.from("profiles").select("*").eq("organization_id", profile.organization_id).order("name"),
+  ])
   if (!orgRow) return { kind: "blocked", reason: "no-organization" }
   const organization = toOrganization(orgRow)
   if (organization.status === "pending") return { kind: "pending", organization }
   if (organization.status === "inactive") return { kind: "blocked", reason: "organization" }
 
-  const { data: memberRows } = await supabase.from("profiles").select("*").eq("organization_id", organization.id).order("name")
   const members = ((memberRows ?? []) as ProfileRow[]).map(toUser)
   const user = toUser(profile)
   return { kind: "ready", user, organization, members: members.some((m) => m.id === user.id) ? members : [user, ...members] }
@@ -79,7 +83,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setStatus(next)
   }, [])
 
+  // A intro fica até a sessão (e, em seguida, os dados) estarem prontos.
+  useSplashReady("session", status.kind === "ready")
+  useSplashReady("app", status.kind === "pending" || status.kind === "blocked")
+
   React.useEffect(() => {
+    // Os dados do escritório não dependem da sessão carregada (a RLS decide o que
+    // volta): começam a carregar junto, em vez de esperar perfil → escritório → equipe.
+    preloadOfficeData()
     // Carga inicial assíncrona da sessão (sistema externo: Supabase).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh()
@@ -101,13 +112,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [status, refresh])
 
-  if (status.kind === "loading") {
-    return (
-      <div className="flex min-h-dvh items-center justify-center" aria-busy="true" aria-label="Carregando sua conta">
-        <LogoMark className="size-10 animate-pulse" />
-      </div>
-    )
-  }
+  // A intro (`SplashGate`) cobre a tela enquanto a sessão carrega.
+  if (status.kind === "loading") return null
 
   if (status.kind === "pending") {
     return (

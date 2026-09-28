@@ -10,6 +10,7 @@ import { collectHashes, diffMovements } from "@/lib/services/processes/movements
 import { buildProcessDraft, toProcessMovements, type ImportProcessMeta } from "@/lib/services/processes/import"
 import type { ProcessSheet } from "@/lib/services/processes/sheet"
 import { getSupabase } from "@/lib/supabase/client"
+import { useSplashReady } from "@/components/layout/app-splash"
 import { COLLECTION_LABELS, diffState, loadState, syncState, type PersistedState, type SyncResult } from "./storage"
 
 /**
@@ -82,8 +83,11 @@ interface DemoActions {
   updateProcess(id: string, patch: Partial<NewProcessInput>): Process | undefined
   /** Cria um processo a partir de uma ficha vinda de consulta externa. */
   importProcess(sheet: ProcessSheet, meta: ImportProcessMeta): Process
-  /** Aplica uma ficha reconsultada, importando só o que é novo. */
-  applyProcessSync(processId: string, sheet: ProcessSheet): SyncOutcome
+  /**
+   * Aplica uma ficha reconsultada, importando só o que é novo. `checkedAt` (ISO)
+   * é quando a fonte foi conferida — pode vir do cache do escritório.
+   */
+  applyProcessSync(processId: string, sheet: ProcessSheet, checkedAt?: string): SyncOutcome
   deleteProcess(id: string): void
   toggleTask(id: string): Task | undefined
   addTask(input: NewTaskInput): Task
@@ -119,8 +123,28 @@ const nextProcessCode = (processes: Process[]) => {
 }
 const base = () => ({ organizationId: account.currentOrgId(), createdAt: nowISO() })
 
+/**
+ * Primeira carga dos dados, iniciada antes de a sessão terminar de carregar
+ * (`SessionProvider`). O store usa esta promessa em vez de abrir outra.
+ */
+let preloaded: Promise<PersistedState> | null = null
+
+export function preloadOfficeData() {
+  preloaded ??= loadState(getSupabase())
+  // Evita "unhandled rejection" se ninguém chegar a consumir (ex.: sem acesso).
+  preloaded.catch(() => {})
+}
+
+/** A carga antecipada, ou uma nova. Continua disponível até alguém aplicá-la (StrictMode monta duas vezes). */
+function initialLoad() {
+  preloaded ??= loadState(getSupabase())
+  return preloaded
+}
+
 export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<DemoState>(initialState)
+  const [loadFailed, setLoadFailed] = React.useState(false)
+  useSplashReady("app", state.hydrated || loadFailed)
   const stateRef = React.useRef(state)
   React.useEffect(() => {
     stateRef.current = state
@@ -267,11 +291,11 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return process
       },
 
-      applyProcessSync(processId, sheet) {
+      applyProcessSync(processId, sheet, checkedAt) {
         const current = stateRef.current.processes.find((p) => p.id === processId)
         if (!current) return { added: 0 }
 
-        const at = nowISO()
+        const at = checkedAt ? toLocalISO(new Date(checkedAt)) : nowISO()
         const cnj = current.cnj ?? sheet.cnj
         const incoming = toProcessMovements(sheet.movements, sheet.source.provider)
         const { fresh } = diffMovements(collectHashes(cnj, current.movements), incoming)
@@ -283,7 +307,8 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ...current,
           movements,
           lastMovementAt: movements[0]?.at ?? current.lastMovementAt,
-          lastSyncedAt: at,
+          // Nunca volta no tempo (uma ficha do cache pode ser anterior à última atualização).
+          lastSyncedAt: current.lastSyncedAt && current.lastSyncedAt > at ? current.lastSyncedAt : at,
           cnj,
           // A fonte complementa o cadastro, mas nunca apaga o que já foi preenchido.
           tribunal: sheet.tribunal ?? current.tribunal,
@@ -648,9 +673,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   // Carrega o que a RLS deixa esta pessoa ver. Uma única vez por sessão.
   React.useEffect(() => {
     let cancelled = false
-    loadState(getSupabase())
+    initialLoad()
       .then((saved) => {
         if (cancelled) return
+        preloaded = null
         savedRef.current = saved
         // O que foi criado antes de terminar de carregar entra junto (e é gravado a seguir).
         const current = stateRef.current
@@ -663,6 +689,9 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       })
       .catch((error) => {
         console.error(error)
+        if (cancelled) return
+        preloaded = null
+        setLoadFailed(true)
         toast.error("Não foi possível carregar os dados do escritório.", { description: "Verifique a conexão e recarregue a página." })
       })
     return () => {

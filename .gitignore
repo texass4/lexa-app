@@ -34,9 +34,8 @@ yarn-error.log*
 .env*
 !.env.example
 
-# cache da consulta ao DataJud (SQLite) e artefatos do Python
+# cache local antigo da consulta de processos (não é mais usado)
 /.data/
-__pycache__/
 
 # logs locais
 *.log

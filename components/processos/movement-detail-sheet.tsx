@@ -7,12 +7,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { Eyebrow } from "@/components/ui/panel"
 import { fmtNumericDate, fmtTime } from "@/lib/dates"
 import { MOVEMENT_CATEGORY_LABEL, type LexaMovement } from "@/lib/services/processes/movement-interpreter"
-import type { DataOrigin } from "@/types"
-
-const ORIGIN_LABEL: Record<DataOrigin, string> = {
-  datajud: "DataJud (CNJ)",
-  manual: "Cadastro manual",
-}
+import { ORIGIN_LABEL } from "@/lib/services/processes/labels"
 
 function Fact({ icon: Icon, label, children }: { icon: React.ElementType; label: string; children: React.ReactNode }) {
   return (
@@ -27,8 +22,8 @@ function Fact({ icon: Icon, label, children }: { icon: React.ElementType; label:
 }
 
 /**
- * Detalhes de uma movimentação. Mostra primeiro o que interessa ao advogado;
- * o objeto original da fonte fica recolhido em "Dados da fonte".
+ * Detalhes de uma movimentação, no vocabulário do advogado. O registro original
+ * da fonte continua guardado (`raw`), mas não é exibido.
  */
 export function MovementDetailSheet({
   movement,
@@ -44,7 +39,6 @@ export function MovementDetailSheet({
   if (!m) return null
 
   const unit = m.judicialUnit
-  const raw = m.raw === undefined ? null : JSON.stringify(m.raw, null, 2)
 
   return (
     <SideSheet
@@ -81,7 +75,7 @@ export function MovementDetailSheet({
             </Fact>
           )}
           {m.origin && (
-            <Fact icon={TagIcon} label="Fonte">
+            <Fact icon={TagIcon} label="Origem">
               {ORIGIN_LABEL[m.origin]}
             </Fact>
           )}
@@ -110,18 +104,6 @@ export function MovementDetailSheet({
           >
             Ver documento{m.document.type ? ` (${m.document.type})` : ""} <ArrowUpRight className="size-3.5 text-subtle" />
           </a>
-        )}
-
-        {raw && (
-          <details className="group rounded-[12px] border border-border">
-            <summary className="cursor-pointer list-none px-3.5 py-2.5 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 [&::-webkit-details-marker]:hidden">
-              Dados da fonte
-              <span className="ml-1.5 font-normal text-subtle">— registro original, para conferência</span>
-            </summary>
-            <pre className="max-h-72 overflow-auto border-t border-border bg-surface-muted/60 px-3.5 py-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-all text-foreground/80 thin-scrollbar">
-              {raw}
-            </pre>
-          </details>
         )}
       </div>
     </SideSheet>

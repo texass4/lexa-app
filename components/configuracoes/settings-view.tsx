@@ -90,7 +90,12 @@ function NotificationsSection() {
 type IntegrationStatus = "available" | "connected" | "builtin"
 
 const INTEGRATIONS: { name: string; description: string; status: IntegrationStatus; mark: string }[] = [
-  { name: "Monitoramento processual", description: "Movimentações do DataJud (CNJ) direto nos processos.", status: "builtin", mark: "MP" },
+  {
+    name: "Monitoramento processual",
+    description: "Movimentações dos tribunais direto nos processos, atualizadas automaticamente.",
+    status: "builtin",
+    mark: "MP",
+  },
   { name: "WhatsApp Business", description: "Converse com clientes e registre o histórico automaticamente.", status: "available", mark: "WA" },
   { name: "Google Agenda", description: "Sincronize consultas, audiências e prazos.", status: "available", mark: "GA" },
   { name: "Assinatura eletrônica", description: "Envie contratos e procurações para assinatura.", status: "available", mark: "AE" },

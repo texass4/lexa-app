@@ -2,6 +2,10 @@
  * Modelo externo normalizado — a fronteira entre o LEXA e qualquer fonte de
  * dados processuais (DataJud hoje; Codilo, Judit ou Escavador amanhã).
  *
+ * Trocar de fornecedor = escrever outro `ProcessProvider`. O serviço de
+ * consulta (`lib/services/processes/lookup-service.ts`), o cache e a interface
+ * não mudam.
+ *
  * Regra: nada fora de `lib/integrations/legal/<provider>/` conhece o formato
  * bruto do provider. Todo campo é opcional quando a fonte pode não fornecê-lo —
  * o DataJud público, por exemplo, não devolve as partes do processo.
@@ -88,4 +92,17 @@ export interface ExternalProcess {
     /** Índice/endpoint consultado, útil em log e suporte. */
     dataset?: string
   }
+}
+
+/**
+ * Fornecedor de dados processuais. Implementações moram em
+ * `lib/integrations/legal/<provider>/provider.ts` e rodam só no servidor.
+ */
+export interface ProcessProvider {
+  name: ProviderName
+  /**
+   * Consulta por CNJ (20 dígitos já validados). `null` quando a fonte não tem
+   * o processo; falhas lançam `LookupError` (`../errors`).
+   */
+  lookup(digits: string): Promise<ExternalProcess | null>
 }

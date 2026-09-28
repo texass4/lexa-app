@@ -149,7 +149,7 @@ describe("ficha e rascunho de processo interno", () => {
     const sheet = buildProcessSheet(external)
     const draft = buildProcessDraft(sheet, { clientId: "c_maria", ownerId: "u_ana", area: "Cível" }, "2026-09-24T10:00:00")
 
-    assert.equal(draft.court, "Não informado pela fonte")
-    assert.equal(draft.opposingParty, "Não informado pela fonte")
+    assert.equal(draft.court, "Não informado")
+    assert.equal(draft.opposingParty, "Não informado")
   })
 })

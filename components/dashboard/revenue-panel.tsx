@@ -1,12 +1,19 @@
 "use client"
 
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { ArrowRight, ArrowUpRight } from "lucide-react"
 import { Panel, PanelHeader } from "@/components/ui/panel"
-import { RevenueAreaChart } from "@/components/financeiro/revenue-chart"
+import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/format"
 import { useDemoData } from "@/lib/store/demo-store"
 import { financeSummary, monthlyRevenue } from "@/lib/selectors"
+
+// A biblioteca de gráficos é pesada e só serve a quem vê o financeiro: carrega à parte.
+const RevenueAreaChart = dynamic(() => import("@/components/financeiro/revenue-chart").then((m) => m.RevenueAreaChart), {
+  ssr: false,
+  loading: () => <Skeleton style={{ height: 150 }} className="w-full rounded-[10px]" />,
+})
 
 export function RevenuePanel() {
   const { invoices } = useDemoData()

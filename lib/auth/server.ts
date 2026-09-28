@@ -53,17 +53,16 @@ export async function requireSuperAdmin() {
 }
 
 /**
- * Para as rotas de consulta processual (streaming, fora de `route()`): resposta de erro
- * no formato que `lib/services/processes/client.ts` entende, ou null se pode seguir.
+ * Para as rotas de consulta processual: o escritório de quem chama, ou a resposta
+ * de erro no formato que `lib/services/processes/client.ts` entende.
  */
-export async function authorize(permission?: Permission): Promise<Response | null> {
+export async function authorizeMember(permission?: Permission): Promise<{ organizationId: string } | { response: Response }> {
   try {
-    await requireMember(permission)
-    return null
+    const { organizationId } = await requireMember(permission)
+    return { organizationId }
   } catch (error) {
     if (!(error instanceof HttpError)) throw error
-    const code = error.status === 401 ? "UNAUTHORIZED" : "FORBIDDEN"
-    return NextResponse.json({ error: { code, message: error.message } }, { status: error.status })
+    return { response: NextResponse.json({ ok: false, reason: "forbidden", message: error.message }, { status: error.status }) }
   }
 }
 

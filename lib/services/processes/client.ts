@@ -1,164 +1,88 @@
 /**
- * Acesso do browser às rotas de processo.
+ * Acesso do navegador às rotas de processo.
  *
- * Os componentes usam estas funções e recebem ou a ficha, ou uma mensagem
- * pronta para exibir. Nenhuma tela precisa saber que existe DataJud, HTTP 429
- * ou índice de tribunal.
+ * Os componentes recebem a ficha (modelo interno do LEXA) ou um motivo com
+ * mensagem pronta para a tela. Nada aqui conhece a fonte externa, status HTTP
+ * ou detalhes de erro — isso fica no servidor.
  */
 
-import type { ProviderName } from "@/lib/integrations/legal/types"
+import type { LookupFailureReason } from "@/lib/integrations/legal/errors"
+import type { LookupBody } from "./lookup-contract"
 import type { ProcessSheet } from "./sheet"
-import type { LookupEvent, LookupLine } from "./lookup-events"
 
 export interface LookupSuccess {
   ok: true
   sheet: ProcessSheet
-  provider: ProviderName
-  cached: boolean
-  fetchedAt: string
+  /** ISO (UTC) de quando as informações foram conferidas. */
+  checkedAt: string
+  /** O servidor ainda está buscando uma versão mais nova. */
+  refreshing: boolean
 }
 
 export interface LookupFailure {
   ok: false
-  code: string
-  /** Texto pronto para a interface, em português. */
+  reason: LookupFailureReason | "forbidden" | "offline" | "aborted"
+  /** Texto pronto para a interface. */
   message: string
-  /** Detalhe técnico da fonte, quando houver. */
-  detail?: string
 }
 
 export type LookupResponse = LookupSuccess | LookupFailure
 
-const GENERIC: LookupFailure = {
+/** Rede de segurança do lado do navegador; o servidor já limita a consulta a ~60 s. */
+const CLIENT_TIMEOUT_MS = 90_000
+
+const UNAVAILABLE: LookupFailure = {
   ok: false,
-  code: "UNEXPECTED",
-  message: "Não conseguimos consultar o processo agora. Tente novamente em alguns instantes.",
+  reason: "unavailable",
+  message: "Não foi possível consultar o processo no momento. Tente novamente em alguns instantes.",
 }
 
-async function post(url: string, body: unknown): Promise<LookupResponse> {
+async function post(url: string, body: unknown, signal?: AbortSignal): Promise<LookupResponse> {
+  const timeout = AbortSignal.timeout(CLIENT_TIMEOUT_MS)
   let response: Response
   try {
     response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     })
   } catch {
-    return { ok: false, code: "OFFLINE", message: "Sem conexão para consultar o processo. Verifique sua internet." }
+    if (signal?.aborted) return { ok: false, reason: "aborted", message: "Consulta cancelada." }
+    if (timeout.aborted) return UNAVAILABLE
+    return { ok: false, reason: "offline", message: "Sem conexão com a internet. Verifique sua conexão e tente novamente." }
   }
 
-  let payload: unknown
+  let data: LookupBody
   try {
-    payload = await response.json()
+    data = (await response.json()) as LookupBody
   } catch {
-    return GENERIC
+    return UNAVAILABLE
   }
 
-  const data = payload as {
-    sheet?: ProcessSheet | null
-    found?: boolean
-    provider?: ProviderName
-    cached?: boolean
-    fetchedAt?: string
-    error?: { code?: string; message?: string }
-  }
-
-  if (!response.ok) {
-    return data.error?.message ? { ok: false, code: data.error.code ?? "UNEXPECTED", message: data.error.message } : GENERIC
-  }
-
-  if (data.found === false || !data.sheet) {
-    return data.error?.message
-      ? { ok: false, code: data.error.code ?? "NOT_FOUND", message: data.error.message }
-      : {
-          ok: false,
-          code: "NOT_FOUND",
-          message: "Não foi possível localizar esse processo na fonte consultada. Verifique o número CNJ e tente novamente.",
-        }
-  }
-
-  return {
-    ok: true,
-    sheet: data.sheet,
-    provider: data.provider ?? "datajud",
-    cached: !!data.cached,
-    fetchedAt: data.fetchedAt ?? new Date().toISOString(),
-  }
+  if (data?.ok === true && data.sheet) return { ok: true, sheet: data.sheet, checkedAt: data.checkedAt, refreshing: !!data.refreshing }
+  if (data?.ok === false && data.message) return { ok: false, reason: data.reason, message: data.message }
+  return UNAVAILABLE
 }
+
+/** Consulta por CNJ ("Novo processo"). */
+export const lookupProcess = (cnj: string, signal?: AbortSignal) => post("/api/processes/search", { cnj }, signal)
 
 /**
- * Consulta por CNJ com acompanhamento em tempo real.
- *
- * A rota responde NDJSON (ver `lookup-events.ts`): cada evento do script
- * — tentativa, HTTP 429, resposta parcial, timeout — chega em `onEvent`
- * enquanto a consulta ainda está rodando.
+ * Consultas de atualização em andamento, por processo. Abrir o mesmo processo
+ * duas vezes (ou dois componentes pedindo juntos) reaproveita a mesma chamada.
  */
-export async function searchProcessByCNJ(cnj: string, onEvent?: (event: LookupEvent) => void, signal?: AbortSignal): Promise<LookupResponse> {
-  let response: Response
-  try {
-    response = await fetch("/api/processes/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cnj }),
-      signal,
-    })
-  } catch {
-    if (signal?.aborted) return { ok: false, code: "ABORTED", message: "Consulta cancelada." }
-    return { ok: false, code: "OFFLINE", message: "Sem conexão para consultar o processo. Verifique sua internet." }
-  }
+const refreshing = new Map<string, Promise<LookupResponse>>()
 
-  // Erros de validação voltam como JSON comum, antes de o stream começar.
-  if (!response.ok || !response.body) {
-    try {
-      const data = (await response.json()) as { error?: { code?: string; message?: string } }
-      if (data.error?.message) return { ok: false, code: data.error.code ?? "UNEXPECTED", message: data.error.message }
-    } catch {}
-    return GENERIC
-  }
-
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
-  let buffer = ""
-  let outcome: LookupResponse | null = null
-
-  const handle = (raw: string) => {
-    if (!raw.trim()) return
-    let line: LookupLine
-    try {
-      line = JSON.parse(raw) as LookupLine
-    } catch {
-      return
-    }
-    if (line.type === "event") onEvent?.(line)
-    else if (line.type === "error") outcome = { ok: false, code: line.code, message: line.message, detail: line.detail }
-    else if (line.found && line.sheet) {
-      outcome = { ok: true, sheet: line.sheet, provider: line.sheet.source.provider, cached: line.cached, fetchedAt: line.fetchedAt }
-    } else {
-      outcome = {
-        ok: false,
-        code: "NOT_FOUND",
-        message: "Não foi possível localizar esse processo na fonte consultada. Verifique o número CNJ e tente novamente.",
-      }
-    }
-  }
-
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buffer += value
-      let newline: number
-      while ((newline = buffer.indexOf("\n")) >= 0) {
-        handle(buffer.slice(0, newline))
-        buffer = buffer.slice(newline + 1)
-      }
-    }
-    handle(buffer)
-  } catch {
-    if (signal?.aborted) return { ok: false, code: "ABORTED", message: "Consulta cancelada." }
-    return { ok: false, code: "OFFLINE", message: "A conexão com o servidor caiu durante a consulta." }
-  }
-
-  return outcome ?? GENERIC
+/**
+ * Informações atualizadas de um processo salvo.
+ * `force`: o usuário pediu ("Atualizar") — ignora o cache recente do escritório.
+ */
+export function refreshProcess(processId: string, cnj: string, { force = false }: { force?: boolean } = {}): Promise<LookupResponse> {
+  const key = `${processId}:${force ? "force" : "auto"}`
+  const running = refreshing.get(key) ?? refreshing.get(`${processId}:force`)
+  if (running) return running
+  const task = post(`/api/processes/${encodeURIComponent(processId)}/sync`, { cnj, force }).finally(() => refreshing.delete(key))
+  refreshing.set(key, task)
+  return task
 }
-
-export const syncProcessById = (processId: string, cnj: string) => post(`/api/processes/${processId}/sync`, { cnj })
