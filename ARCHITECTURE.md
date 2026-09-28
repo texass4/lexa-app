@@ -26,6 +26,10 @@ lib/services/processes/lookup-service.ts  cache (memória → Supabase), stale-w
 integrations/legal/datajud/provider.ts    ProcessProvider: client.ts (timeout, retry, 429) + mapper.ts
     ↓
 sheet.ts → import.ts                       ficha normalizada → processo do LEXA
+
+Central de Atendimento (WhatsApp)
+    tela → /api/whatsapp/* → lib/services/whatsapp → Z-API → WhatsApp
+    WhatsApp → Z-API → /api/whatsapp/webhook → banco → Realtime → tela
 ```
 
 ---
@@ -35,23 +39,30 @@ sheet.ts → import.ts                       ficha normalizada → processo do L
 ```
 lexa-app/
 ├── app/                      rotas (páginas finas: metadata + view)
-│   ├── (app)/                shell autenticado: dashboard, clientes, processos,
+│   ├── (app)/                shell autenticado: dashboard, clientes, atendimento, processos,
 │   │                         tarefas, agenda, documentos, financeiro, configuracoes
 │   ├── (auth)/               login, cadastro, recuperar-senha, redefinir-senha
 │   ├── (admin)/admin         painel do Super Admin (papel checado no servidor)
 │   ├── auth/confirm          troca o token dos links (recuperação/convite) por sessão
 │   └── api/                  processes/* (consulta), auth/* (cadastro, recuperação),
-│                             team/users (gestão do escritório), me/email, admin/*
+│                             team/users (gestão do escritório), me/email, admin/*,
+│                             ai/* (LEXA IA), whatsapp/* (Central de Atendimento + webhook da Z-API)
 ├── components/
 │   ├── layout/               intro, sidebar, topbar, busca Ctrl K, notificações, modais globais
 │   ├── ui/                   design system
 │   ├── shared/               peças usadas em mais de um módulo
 │   ├── processos/            lista, perfil, timeline, formulário com consulta CNJ
+│   ├── ai/                   painéis, chat e blocos visuais da LEXA IA
+│   ├── atendimento/          Central de Atendimento (WhatsApp): conversas, conversa, contexto, Lexa IA
 │   └── clientes/ tasks/ agenda/ documentos/ financeiro/ dashboard/ configuracoes/
 ├── lib/
 │   ├── cnj.ts                máscara, normalização e dígito verificador
 │   ├── integrations/legal/   modelo neutro + ProcessProvider (types.ts), erros (errors.ts), DataJud (client, mapper, provider)
+│   ├── integrations/whatsapp/ contrato neutro do provedor + Z-API (cliente HTTP, webhooks)
 │   ├── services/processes/   serviço de consulta + cache, ficha, importação, deduplicação, interpretação
+│   ├── ai/                   LEXA IA: provedor (Gemini), contexto, prompts, schemas, serviços
+│   ├── services/whatsapp/    recebimento, envio, conversas, instância, Lexa IA (servidor)
+│   ├── whatsapp/             telefone, status, mapeadores de linha, cliente do navegador
 │   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros
 │   ├── supabase/             clientes: navegador, servidor (cookie) e admin (service role)
 │   ├── store/                demo-store, ui-store, storage (persistência no Supabase)
@@ -77,6 +88,7 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 |---|---|
 | `/dashboard` | `components/dashboard/dashboard-view.tsx` |
 | `/clientes`, `/clientes/[id]` | `components/clientes/…` |
+| `/atendimento` (`?c=<conversa>`) | `components/atendimento/atendimento-view.tsx` |
 | `/processos`, `/processos/[id]` | `components/processos/processes-view.tsx`, `process-profile.tsx` |
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
@@ -149,6 +161,40 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 ---
 
+## 4b. Central de Atendimento (WhatsApp via Z-API)
+
+**Tela** — `/atendimento`, três áreas: conversas (`conversation-list.tsx`) → conversa (`conversation-view.tsx`: cabeçalho com ações rápidas, busca, `message-list.tsx`, `composer.tsx`) → contexto jurídico (`context-panel.tsx`) com a aba Lexa IA (`ai-panel.tsx`). Abaixo de 1280 px o contexto abre como painel lateral; no celular, lista e conversa se alternam. O `AppShell` dá altura total a essa rota.
+
+**Dados** — tabelas próprias (não o padrão jsonb), em `supabase/migrations/0002_whatsapp.sql`:
+
+| Tabela | O quê |
+|---|---|
+| `whatsapp_instances` | conexão com a Z-API (sem token) e status |
+| `whatsapp_contacts` | telefone do contato; `client_id` quando vinculado a um cliente |
+| `whatsapp_conversations` | uma por contato e instância; status, responsável, não lidas, prévia |
+| `whatsapp_messages` | recebidas, enviadas, notas internas (`note`) e registros (`event`) |
+| `whatsapp_message_attachments` | mídias; arquivo no bucket `whatsapp` (`<org>/…`) |
+| `whatsapp_tags`, `whatsapp_conversation_tags` | tags do escritório |
+| `whatsapp_conversation_assignments` | histórico de responsáveis |
+| `whatsapp_statuses` | status personalizados (futuro), cada um ligado a uma categoria do sistema |
+| `whatsapp_webhook_events` | log bruto dos webhooks (só o servidor vê) |
+
+Isolamento: RLS de leitura (`current_org_id()` + `whatsapp.view`) e **chaves estrangeiras compostas** `(organization_id, id)` — o banco recusa qualquer referência entre escritórios. O navegador só lê; toda escrita passa por `/api/whatsapp/*` (`requireActor` → serviço → service role). A tela recebe mudanças pelo Realtime do Supabase (`inbox-provider.tsx`), que respeita a mesma RLS.
+
+**Envio** — `POST /api/whatsapp/conversations/:id/messages` (`services/whatsapp/outbound.ts`): grava `pending`, chama a Z-API e vira `sent`/`failed`; entregue/lida chegam pelo webhook e só avançam (`whatsapp_apply_status`). Anexos: o navegador sobe em `whatsapp/<org>/outgoing/…` e a Z-API recebe um link assinado de 1 h. **Notas internas** são gravadas e param ali — o banco impede que uma nota tenha id do WhatsApp.
+
+**Recebimento** — a Z-API chama `POST /api/whatsapp/webhook?token=<ZAPI_WEBHOOK_SECRET>` (rota pública no `proxy.ts`). O segredo é comparado em tempo constante e o `instanceId` do corpo define o escritório. `parseZapiWebhook` traduz o evento; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, **vincula sozinho ao cliente de mesmo telefone** (com e sem o nono dígito — `lib/whatsapp/phone.ts`), cria a conversa e grava a mensagem (idempotente). Sem cliente, fica "Contato novo": transformar em cliente é sempre uma ação confirmada na tela. Mídias recebidas são copiadas para o Storage depois da resposta (`after`), porque os links da Z-API expiram.
+
+**Instância** — a do `.env` pertence ao escritório de `ZAPI_ORGANIZATION_ID` (criada sozinha no primeiro uso). Credenciais nunca vão ao banco nem ao navegador; `providerFor()` (`services/whatsapp/instances.ts`) é o ponto a estender para vários números. Quem tem `office.manage` vê na Central o diagnóstico, o QR Code e o botão que cadastra os webhooks na Z-API.
+
+**Permissões** — `whatsapp.view` (ler), `whatsapp.edit` (responder, notas, tags, status, assumir conversa sem responsável), `whatsapp.assign` (distribuir e trocar responsável). Padrões por papel em `role_defaults` (0002) e `lib/auth/permissions.ts`.
+
+**Lexa IA** — `POST /api/whatsapp/ai` (`services/whatsapp/ai.ts`, Claude via `@anthropic-ai/sdk`, saída estruturada com zod). Resume, sugere resposta, identifica tarefas e processos, analisa imagens/PDFs recebidos e escreve resumo interno. **Nunca executa nada**: a resposta sugerida vai para o campo (só sai com "Enviar") e criar tarefa / salvar nota pedem confirmação.
+
+Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZATION_ID`, `ZAPI_WEBHOOK_SECRET`, opcionais `ZAPI_WEBHOOK_BASE_URL` e `ANTHROPIC_API_KEY` (veja `.env.example`).
+
+---
+
 ## 5. UI global
 
 `app/layout.tsx` → `Providers` (tema, stores, toasts) → `app/(app)/layout.tsx` → `SplashGate` (intro) → `AppShell` (sidebar, topbar, busca, modais).
@@ -164,6 +210,14 @@ openDialog("task", { processId })   // "client" | "task" | "appointment" | "docu
 
 Design system — reutilize, não invente: `page-header`, `panel`, `button`, `status-badge`, `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens de cor em `app/globals.css`.
 
+### O que merece atenção (sem IA)
+
+`lib/attention.ts` transforma os dados em sinais — prazo vencendo, tarefa atrasada, movimentação recente (as de prazo/julgamento/comunicação/audiência pedem revisão), processo parado há mais de `STALE_DAYS` (60, a mesma regra do panorama da IA), valor em atraso, documento novo. Cada sinal tem nível (`critical` · `warning` · `info` · `done`), frase, link para o registro real e, quando faz sentido, ação ("Criar tarefa" abre o formulário preenchido). Respeita as permissões de quem olha e agrupa sinais repetidos. Usado no Painel (`attention-panel.tsx`), nos perfis de Processo e Cliente, na lista de processos, no sino, na busca Ctrl K e nos badges do menu. Testes: `lib/attention.test.ts`.
+
+"Desde sua última visita" (`changesSince` + `lib/visits.ts`): a última presença fica no `localStorage` do navegador, por pessoa; o painel mostra o que outras pessoas registraram e as tarefas que venceram desde então.
+
+Transições: `app/(app)/template.tsx` (entrada de página em CSS, `.page-enter`) e `MotionConfig reducedMotion="user"` em `Providers` — com "reduzir movimento" no sistema, nada anima.
+
 ---
 
 ## 6. Contas, escritórios e permissões
@@ -178,15 +232,53 @@ Design system — reutilize, não invente: `page-header`, `panel`, `button`, `st
 
 ## 7. O que ainda é simulado
 
-Envio de e-mail (links saem no terminal), integrações (WhatsApp, agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos e o salvamento dos processos são reais.
+Envio de e-mail (links saem no terminal), integrações (agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos e o WhatsApp (Z-API) são reais.
 
 ## 8. Como rodar
 
-Primeira vez: rode `supabase/migrations/0001_lexa_auth.sql` e depois `0002_process_lookup_cache.sql` no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
+Primeira vez: rode as migrações de `supabase/migrations/` em ordem numérica no SQL Editor do Supabase e preencha o `.env.local` a partir do `.env.example` (URL, anon key, service role, e-mail e senha do Super Admin).
 
 ```bash
 npm run dev      # http://localhost:3000
-npm test         # CNJ, consulta (cliente HTTP, cache, SWR, isolamento, erros), mapper, interpretador, timeline, permissões, financeiro
+npm test         # CNJ, consulta (cliente HTTP, cache, SWR, isolamento, erros), mapper, interpretador, timeline, permissões, financeiro, WhatsApp
 npm run lint
 npx tsc --noEmit
 ```
+
+## 9. LEXA IA
+
+Inteligência sobre os dados que já estão no LEXA. O usuário pede, o servidor monta o contexto, o modelo interpreta, a tela mostra — e o usuário decide.
+
+```
+Botão / chat (components/ai/*)            nunca chama a IA sem clique; nada de SDK no navegador
+    ↓ fetch                                lib/ai/client.ts
+app/api/ai/*  →  lib/ai/http.ts            IA ligada? → requireMember(permissão) → corpo validado (input.ts)
+    ↓
+lib/ai/context/repository.ts               somente leitura: sessão do usuário (RLS) + filtro organization_id + permissão do módulo
+    ↓
+lib/ai/context/{process,client,office}.ts  escolhe campos e limita volume; refs curtas (M1, T1, P1) → fontes reais
+    ↓ sanitizeAIContext                    remove senha/token/e-mail/CPF/raw/storagePath/organizationId…
+lib/ai/services/*  →  services/run.ts      cache curto + pedido igual em andamento → limite de uso → provedor
+    ↓                                      → schema (schemas/) → grounding.ts (refs inexistentes saem; data/prazo sem origem = aviso) → log seguro
+lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai
+```
+
+**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `chat` e `GET /api/ai/status` (ligada/configurada; não chama o modelo). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
+
+**Modelo reserva** — `GEMINI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva, repete o principal uma vez. O log (`model`) mostra quem respondeu.
+
+**Trocar de provedor** — implemente `AIProvider` (`generateText` e `generateJSON`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
+
+**Regras do modelo** — prompt único em `lib/ai/prompts/system.ts` (fato × inferência × limitação; sem prazos, jurisprudência ou fatos inventados; dados tratados como dados). Mudou o texto? Suba `PROMPT_VERSION`. Instruções de cada funcionalidade em `prompts/tasks.ts`; formato das respostas em `schemas/`.
+
+**Custo** — modelo Flash (`GEMINI_MODEL`), temperatura baixa, contexto enxuto (até 20 movimentações, listas curtas, métricas agregadas no panorama), histórico do chat limitado a 10 mensagens, cache de 10 min para análises idênticas e limite de uso por pessoa (8/min, 60/h) e por escritório (200/h) em `guard.ts` — em memória, por instância do servidor.
+
+**Tarefas sugeridas** — nunca são gravadas pela IA: "Criar tarefa" abre `openDialog("task", { title, description, priority, processId })`, o mesmo formulário do LEXA.
+
+**Chat** — sem estado no servidor: o navegador manda o escopo (`process`, `client` ou `office`) e o histórico curto; o contexto é remontado do banco a cada pergunta.
+
+**Camada na interface** — há um único painel de conversa, em `LexaAIProvider` (`components/ai/lexa-ai-provider.tsx`, montado no `AppShell`). O contexto vem da rota: `/processos/[id]` → processo, `/clientes/[id]` → cliente, o resto → escritório, com perguntas próprias de cada tela (`components/ai/ai-context.ts`). Abra com `useLexaAI().open()` ou envie uma pergunta com `ask(prompt, contexto?)` — sempre a partir de um clique. A conversa pertence ao contexto (`key` do escopo): trocar de processo começa outra. Uma tela que quer tratar as fontes citadas (ex.: abrir a movimentação ali mesmo) usa `useAISourceHandler`. Gatilhos: botão "LEXA" no topo, Ctrl K ("Perguntar à LEXA: …"), painéis de Painel/Cliente/Processo, detalhe da tarefa e Agenda.
+
+**Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
+
+Variáveis: `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.

@@ -16,7 +16,7 @@ const PRIORITIES = ["Alta", "Média", "Baixa"] as const
 const toPriority: Record<(typeof PRIORITIES)[number], Priority> = { Alta: "alta", Média: "media", Baixa: "baixa" }
 const fromPriority: Record<Priority, (typeof PRIORITIES)[number]> = { alta: "Alta", media: "Média", baixa: "Baixa" }
 
-type Defaults = { clientId?: string; processId?: string; columnId?: string }
+type Defaults = { clientId?: string; processId?: string; columnId?: string; title?: string; description?: string; priority?: Priority }
 
 function encodeRelated(r?: RelatedEntity) {
   return r ? `${r.type}:${r.id}` : ""
@@ -34,11 +34,11 @@ function initialState(task?: Task, defaults?: Defaults) {
       ? { type: "client", id: defaults.clientId }
       : undefined
   return {
-    title: task?.title ?? "",
-    description: task?.description ?? "",
+    title: task?.title ?? defaults?.title ?? "",
+    description: task?.description ?? defaults?.description ?? "",
     date: task?.dueAt.slice(0, 10) ?? toLocalISO(getNow()).slice(0, 10),
     time: task?.dueAt.slice(11, 16) ?? "18:00",
-    priority: task ? fromPriority[task.priority] : ("Média" as (typeof PRIORITIES)[number]),
+    priority: task ? fromPriority[task.priority] : defaults?.priority ? fromPriority[defaults.priority] : ("Média" as (typeof PRIORITIES)[number]),
     assigneeId: task?.assigneeId ?? currentUserId(),
     related: encodeRelated(task?.related ?? related),
   }

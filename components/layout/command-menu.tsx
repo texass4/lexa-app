@@ -4,7 +4,19 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Command } from "cmdk"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { ArrowDown, ArrowUp, CalendarPlus, CornerDownLeft, ListChecks, Scale, Search, UsersRound } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowUp,
+  CalendarClock,
+  CalendarPlus,
+  CornerDownLeft,
+  FileText,
+  ListChecks,
+  Scale,
+  Search,
+  Sparkles,
+  UsersRound,
+} from "lucide-react"
 import { Kbd } from "@/components/ui/kbd"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -14,7 +26,10 @@ import { useSession } from "@/lib/auth/session"
 import { useDemoData } from "@/lib/store/demo-store"
 import { normalize } from "@/lib/format"
 import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/config"
-import { fmtShortDate } from "@/lib/dates"
+import { fmtShortDate, fmtTime, getNow, parse } from "@/lib/dates"
+import { officeSignals } from "@/lib/attention"
+import { SignalDot } from "@/components/shared/signal-list"
+import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 
 const itemCls =
   "group flex cursor-pointer items-center gap-3 rounded-[9px] px-2.5 py-2 text-[13px] text-foreground outline-none data-[selected=true]:bg-accent"
@@ -56,7 +71,8 @@ export function CommandMenu() {
 function CommandContent() {
   const { setCommandOpen, openDialog } = useUI()
   const data = useDemoData()
-  const { can } = useSession()
+  const { can, user } = useSession()
+  const lexa = useLexaAI()
   const router = useRouter()
   const [query, setQuery] = React.useState("")
 
@@ -68,7 +84,16 @@ function CommandContent() {
   const hasQuery = query.trim().length > 0
   const clients = hasQuery ? data.clients : data.clients.slice(0, 3)
   const processes = hasQuery ? data.processes : data.processes.slice(0, 2)
-  const tasks = hasQuery ? data.tasks.filter((t) => t.status === "pendente") : []
+  const tasks = hasQuery && can("tasks.view") ? data.tasks.filter((t) => t.status === "pendente") : []
+  const documents = hasQuery && can("documents.view") ? data.documents : []
+  const appointments = hasQuery && can("agenda.view") ? data.appointments.filter((a) => parse(a.end) >= getNow()) : []
+  // Sem busca: o que merece atenção agora (os mesmos sinais do painel), no máximo três.
+  const attention =
+    !hasQuery && data.hydrated
+      ? officeSignals(data, { userId: user.id, can })
+          .filter((s) => s.level !== "info")
+          .slice(0, 3)
+      : []
 
   return (
     <Command
@@ -89,7 +114,7 @@ function CommandContent() {
           value={query}
           onValueChange={setQuery}
           autoFocus
-          placeholder="Buscar clientes, processos ou tarefas…"
+          placeholder="Buscar no escritório ou perguntar à LEXA…"
           className="h-14 w-full bg-transparent text-[15px] text-foreground outline-none placeholder:text-subtle"
         />
         <Kbd className="hidden sm:inline-flex">Esc</Kbd>
@@ -98,8 +123,46 @@ function CommandContent() {
       <Command.List className="max-h-[min(60vh,440px)] overflow-y-auto overscroll-contain pb-1.5 thin-scrollbar">
         <Command.Empty className="px-6 py-12 text-center">
           <p className="text-[13.5px] font-medium">Nenhum resultado para “{query}”</p>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">Tente buscar pelo nome, número do processo ou área.</p>
+          <p className="mt-1 text-[12.5px] text-muted-foreground">Tente pelo nome, número do processo, tipo de documento ou área.</p>
         </Command.Empty>
+
+        {hasQuery && (
+          <Command.Group heading="LEXA IA" className={groupCls} forceMount>
+            <Command.Item
+              value={`perguntar lexa ${query}`}
+              forceMount
+              onSelect={() => {
+                setCommandOpen(false)
+                lexa.ask(query.trim(), lexa.context)
+              }}
+              className={itemCls}
+            >
+              <span className="flex size-7 items-center justify-center rounded-[8px] border border-gold/25 bg-gold-soft text-gold-dark">
+                <Sparkles className="size-3.5" />
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                Perguntar à LEXA: <span className="font-medium">“{query.trim()}”</span>
+              </span>
+              <span className="hidden text-[11.5px] text-subtle sm:inline">{lexa.context.subtitle}</span>
+            </Command.Item>
+          </Command.Group>
+        )}
+
+        {attention.length > 0 && (
+          <Command.Group heading="Merece atenção" className={groupCls}>
+            {attention.map((signal) => (
+              <Command.Item key={signal.id} value={`atencao ${signal.id} ${signal.title}`} onSelect={() => go(signal.href)} className={itemCls}>
+                <span className="flex size-7 items-center justify-center">
+                  <SignalDot level={signal.level} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{signal.title}</span>
+                  {signal.detail && <span className="block truncate text-[11.5px] text-muted-foreground">{signal.detail}</span>}
+                </span>
+              </Command.Item>
+            ))}
+          </Command.Group>
+        )}
 
         {!hasQuery && (
           <Command.Group heading="Ações rápidas" className={groupCls}>
@@ -121,6 +184,20 @@ function CommandContent() {
                   {a.label}
                 </Command.Item>
               ))}
+            <Command.Item
+              value="acao perguntar a lexa ia"
+              onSelect={() => {
+                setCommandOpen(false)
+                lexa.open()
+              }}
+              className={itemCls}
+            >
+              <span className="flex size-7 items-center justify-center rounded-[8px] border border-gold/25 bg-gold-soft text-gold-dark">
+                <Sparkles className="size-3.5" />
+              </span>
+              Perguntar à LEXA IA
+              <span className="ml-auto hidden text-[11.5px] text-subtle sm:inline">{lexa.context.subtitle}</span>
+            </Command.Item>
           </Command.Group>
         )}
 
@@ -192,6 +269,59 @@ function CommandContent() {
                 </span>
                 <span className="min-w-0 flex-1 truncate">{t.title}</span>
                 <span className="tabular text-[11.5px] text-subtle">{fmtShortDate(t.dueAt)}</span>
+              </Command.Item>
+            ))}
+          </Command.Group>
+        )}
+
+        {documents.length > 0 && (
+          <Command.Group heading="Documentos" className={groupCls}>
+            {documents.map((d) => {
+              const client = data.clients.find((c) => c.id === d.clientId)
+              const process = data.processes.find((p) => p.id === d.processId)
+              return (
+                <Command.Item
+                  key={d.id}
+                  value={`documento ${d.id} ${d.name}`}
+                  keywords={[d.kind, client?.name ?? "", process?.code ?? "", process?.number ?? ""]}
+                  onSelect={() => {
+                    setCommandOpen(false)
+                    openDialog("document-preview", { documentId: d.id })
+                  }}
+                  className={itemCls}
+                >
+                  <span className="flex size-6 items-center justify-center rounded-[7px] bg-surface-muted text-muted-foreground">
+                    <FileText className="size-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{d.name}</span>
+                    <span className="block truncate text-[11.5px] text-muted-foreground">
+                      {[d.kind, client?.name, process && `Processo ${process.code}`].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                </Command.Item>
+              )
+            })}
+          </Command.Group>
+        )}
+
+        {appointments.length > 0 && (
+          <Command.Group heading="Compromissos" className={groupCls}>
+            {appointments.map((a) => (
+              <Command.Item
+                key={a.id}
+                value={`compromisso ${a.id} ${a.title}`}
+                keywords={[a.personName ?? "", a.location ?? "", data.clients.find((c) => c.id === a.clientId)?.name ?? ""]}
+                onSelect={() => go(a.processId ? `/processos/${a.processId}` : a.clientId ? `/clientes/${a.clientId}` : "/agenda")}
+                className={itemCls}
+              >
+                <span className="flex size-6 items-center justify-center rounded-[7px] bg-surface-muted text-muted-foreground">
+                  <CalendarClock className="size-3.5" />
+                </span>
+                <span className="min-w-0 flex-1 truncate">{a.title}</span>
+                <span className="tabular text-[11.5px] text-subtle">
+                  {fmtShortDate(a.start)} · {fmtTime(a.start)}
+                </span>
               </Command.Item>
             ))}
           </Command.Group>

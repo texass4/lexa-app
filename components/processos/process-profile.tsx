@@ -3,21 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  CalendarPlus,
-  Copy,
-  Ellipsis,
-  FilePlus,
-  Hourglass,
-  ListChecks,
-  Plus,
-  Scale,
-  Trash2,
-  UserRound,
-  Activity as ActivityGlyph,
-} from "lucide-react"
+import { ArrowLeft, ArrowUpRight, CalendarPlus, Copy, Ellipsis, FilePlus, Hourglass, ListChecks, Plus, Scale, Trash2, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
@@ -34,6 +20,8 @@ import { TaskRow } from "@/components/tasks/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
 import { useProcessRefresh } from "./use-process-refresh"
+import { LatestMovement } from "./latest-movement"
+import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { PROCESS_STATUS } from "@/lib/config"
@@ -43,6 +31,7 @@ import { formatCurrency } from "@/lib/format"
 import { getUser, userTitle } from "@/lib/account"
 import { interpretMovements } from "@/lib/services/processes/movement-interpreter"
 import { Can } from "@/lib/auth/session"
+import { processSignals } from "@/lib/attention"
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -111,7 +100,6 @@ export function ProcessProfile({ id }: { id: string }) {
     .filter((a) => a.processId === process.id && parse(a.end) > getNow())
     .sort((a, b) => a.start.localeCompare(b.start))
   const deadlineDiff = process.nextDeadline ? diffInDays(parse(process.nextDeadline.date), getNow()) : undefined
-  const lastMovement = process.movements[0]
   // Memoizado por identidade do array dentro do interpretador.
   const movements = interpretMovements(process.movements, process.id)
 
@@ -190,7 +178,11 @@ export function ProcessProfile({ id }: { id: string }) {
         </div>
       </FadeIn>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <FadeIn delay={0.04}>
+        <LatestMovement movement={movements[0]} />
+      </FadeIn>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div
           className={cn(
             "col-span-2 rounded-[14px] border p-4 shadow-card sm:col-span-1",
@@ -230,19 +222,14 @@ export function ProcessProfile({ id }: { id: string }) {
           </div>
         </div>
         <div className="rounded-[14px] border border-border bg-card p-4 shadow-card">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] font-medium text-muted-foreground">Última movimentação</span>
-            <ActivityGlyph className="size-4 text-subtle" />
-          </div>
-          <p className="mt-2.5 text-[22px] font-semibold leading-none tracking-[-0.025em]">{fmtDayLabel(process.lastMovementAt)}</p>
-          <p className="mt-2 truncate text-[12px] text-muted-foreground">{lastMovement?.title}</p>
-        </div>
-        <div className="col-span-2 rounded-[14px] border border-border bg-card p-4 shadow-card sm:col-span-1 lg:col-span-1">
           <span className="text-[12px] font-medium text-muted-foreground">Valor da causa</span>
           <p className="tabular mt-2.5 truncate text-[22px] font-semibold leading-none tracking-[-0.025em]">{formatCurrency(process.claimValue)}</p>
           <p className="mt-2 truncate text-[12px] text-muted-foreground">Distribuído em {fmtNumericDate(process.distributedAt)}</p>
         </div>
       </div>
+
+      {/* `key`: cada processo tem suas próprias análises e conversa — nada vaza entre processos. */}
+      <ProcessAIPanel key={process.id} process={process} client={client} signals={processSignals(data, process)} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <Panel className="lg:col-span-7">
@@ -265,9 +252,6 @@ export function ProcessProfile({ id }: { id: string }) {
         </Panel>
 
         <div className="space-y-5 lg:col-span-5">
-          <ProcessSyncPanel process={process} state={refresh.state} canRefresh={refresh.enabled} onRefresh={refresh.refresh} />
-          <ProcessSummaryPanel process={process} />
-
           <Panel>
             <PanelHeader
               title="Tarefas do processo"
@@ -287,7 +271,26 @@ export function ProcessProfile({ id }: { id: string }) {
                 ))}
               </ul>
             ) : (
-              <EmptyState compact title="Nenhuma tarefa vinculada." description="Crie tarefas para não perder nenhum prazo." />
+              <EmptyState
+                compact
+                title="Nenhuma tarefa vinculada."
+                description={
+                  process.nextDeadline
+                    ? `O próximo prazo é ${fmtDueIn(process.nextDeadline.date)}. Crie uma tarefa para não perdê-lo.`
+                    : "Crie tarefas para organizar os próximos passos deste processo."
+                }
+                action={
+                  <Can permission="tasks.edit">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => openDialog("task", { processId: process.id, title: process.nextDeadline?.title })}
+                    >
+                      <Plus /> Criar tarefa
+                    </Button>
+                  </Can>
+                }
+              />
             )}
           </Panel>
 
@@ -314,6 +317,8 @@ export function ProcessProfile({ id }: { id: string }) {
             </Panel>
           )}
 
+          <ProcessSyncPanel process={process} state={refresh.state} canRefresh={refresh.enabled} onRefresh={refresh.refresh} />
+          <ProcessSummaryPanel process={process} />
           <ProcessPartiesPanel process={process} />
 
           <Panel>
@@ -355,7 +360,11 @@ export function ProcessProfile({ id }: { id: string }) {
                 <DocumentList documents={documents} />
               </div>
             ) : (
-              <EmptyState compact title="Nenhum documento anexado." />
+              <EmptyState
+                compact
+                title="Nenhum documento anexado."
+                description="Petições, decisões e comprovantes deste processo ficam reunidos aqui."
+              />
             )}
           </Panel>
         </div>

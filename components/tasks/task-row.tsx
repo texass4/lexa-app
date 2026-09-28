@@ -10,20 +10,35 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { describeRelated, isOverdue } from "@/lib/selectors"
 import { PRIORITY_CONFIG } from "@/lib/config"
-import { fmtDayLabel, fmtTime } from "@/lib/dates"
-import { getUser } from "@/lib/account"
+import { diffInDays, fmtDayLabel, fmtTime, getNow, parse } from "@/lib/dates"
+import { currentUserId, getUser } from "@/lib/account"
 import type { Task } from "@/types"
 import { useSession } from "@/lib/auth/session"
 
+/** Pendências da pessoa que vencem hoje ou já venceram — o "para hoje" do painel. */
+const dueByToday = (tasks: Task[], userId: string) =>
+  tasks.filter((t) => t.assigneeId === userId && t.status === "pendente" && diffInDays(parse(t.dueAt), getNow()) <= 0)
+
 export function useToggleTask() {
   const { toggleTask } = useDemoActions()
+  const { tasks } = useDemoData()
   return (task: Task) => {
     const updated = toggleTask(task.id)
     if (updated?.status === "concluida") {
-      toast.success("Tarefa concluída.", {
-        description: task.title,
+      // Feedback de ritmo: quanto falta do dia, com os dados de antes da conclusão.
+      const today = dueByToday(tasks, currentUserId())
+      const counted = today.some((t) => t.id === task.id)
+      const left = today.length - (counted ? 1 : 0)
+      toast.success(counted ? "Tarefa concluída · 1 a menos para hoje" : "Tarefa concluída", {
+        description: counted
+          ? left
+            ? `${task.title} — falta${left > 1 ? "m" : ""} ${left} para hoje.`
+            : `${task.title} — nada mais pendente para hoje.`
+          : task.title,
         action: { label: "Desfazer", onClick: () => toggleTask(task.id) },
       })
+    } else if (updated) {
+      toast("Tarefa reaberta.", { description: task.title })
     }
   }
 }

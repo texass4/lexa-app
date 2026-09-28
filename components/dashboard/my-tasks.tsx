@@ -33,7 +33,9 @@ export function MyTasks() {
     <Panel>
       <PanelHeader
         title="Minhas tarefas"
-        description={remaining ? `${remaining} para hoje` : "Tudo concluído por hoje"}
+        description={
+          remaining ? `${remaining} para hoje ou atrasada${remaining > 1 ? "s" : ""}` : list.length ? "Tudo concluído por hoje" : "Sem prazos hoje"
+        }
         action={
           <>
             <Can permission="tasks.edit">
@@ -50,11 +52,15 @@ export function MyTasks() {
           </>
         }
       />
-      <ul className="px-3 pb-3">
-        {list.map((t) => (
-          <TaskRow key={t.id} task={t} />
-        ))}
-      </ul>
+      {list.length ? (
+        <ul className="px-3 pb-3">
+          {list.map((t) => (
+            <TaskRow key={t.id} task={t} />
+          ))}
+        </ul>
+      ) : (
+        <p className="px-5 pb-5 text-[13px] text-muted-foreground">Nenhuma tarefa sua vence hoje. As próximas aparecem aqui no dia do prazo.</p>
+      )}
     </Panel>
   )
 }

@@ -7,6 +7,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { LogoMark } from "./logo"
 import { NewMenu } from "./new-menu"
 import { NotificationsMenu } from "./notifications-menu"
+import { LexaTrigger } from "@/components/ai/lexa-trigger"
 import { UserMenu } from "./user-menu"
 import { ROUTE_META } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
@@ -85,7 +86,7 @@ export function Topbar() {
             className="group hidden h-9 w-[260px] items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[13px] text-subtle shadow-xs outline-none transition-colors hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-gold/45 lg:flex xl:w-[300px]"
           >
             <Search className="size-4" />
-            <span className="flex-1 text-left">Buscar clientes, processos…</span>
+            <span className="flex-1 text-left">Buscar no escritório…</span>
             <span className="flex items-center gap-0.5">
               <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
               <Kbd>K</Kbd>
@@ -99,6 +100,7 @@ export function Topbar() {
           >
             <Search className="size-[18px]" strokeWidth={1.8} />
           </button>
+          <LexaTrigger />
           <NotificationsMenu />
           <div className="mx-1 hidden h-5 w-px bg-border md:block" aria-hidden />
           <div className="hidden md:block">

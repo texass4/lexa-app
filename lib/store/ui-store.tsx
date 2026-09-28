@@ -3,6 +3,7 @@
 import * as React from "react"
 import { createLocalStore } from "@/lib/hooks"
 import type { Permission } from "@/lib/auth/permissions"
+import type { Priority } from "@/types"
 
 export type DialogKind = "client" | "task" | "appointment" | "document" | "process" | "document-preview"
 
@@ -24,6 +25,10 @@ export interface DialogDefaults {
   columnId?: string
   /** Documento a pré-visualizar (`dialog "document-preview"`). */
   documentId?: string
+  /** Rascunho de tarefa (ex.: sugestão da LEXA IA) — só preenche o formulário; quem salva é a pessoa. */
+  title?: string
+  description?: string
+  priority?: Priority
 }
 
 interface UIState {

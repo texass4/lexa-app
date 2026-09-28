@@ -11,6 +11,7 @@ import { TimeGrid } from "./time-grid"
 import { MonthGrid } from "./month-grid"
 import { AgendaList } from "./agenda-list"
 import { AppointmentDetail } from "./appointment-detail"
+import { AgendaToday } from "./agenda-today"
 import { useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { categoryStyle } from "@/lib/config"
@@ -111,6 +112,9 @@ export function AgendaView() {
           </Button>
         )}
       </div>
+
+      {/* Depende do relógio do navegador: só depois de carregar os dados. */}
+      {ready && <AgendaToday />}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">

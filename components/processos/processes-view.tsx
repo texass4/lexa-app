@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { ChevronRight, Ellipsis, Eye, Plus, Scale, Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
@@ -18,6 +18,8 @@ import { FadeIn } from "@/components/ui/motion"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeadlineLabel } from "./deadline-label"
+import { SignalDot } from "@/components/shared/signal-list"
+import { processSignals, type AttentionSignal } from "@/lib/attention"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { PROCESS_STATUS } from "@/lib/config"
@@ -39,6 +41,17 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "concluido", label: "Concluídos" },
 ]
 
+/** Linha discreta com o principal sinal do processo — só quando existe. */
+function SignalHint({ signal }: { signal?: AttentionSignal }) {
+  if (!signal) return null
+  return (
+    <p className="mt-1 flex max-w-[280px] items-center gap-1.5 text-[11.5px] text-muted-foreground">
+      <SignalDot level={signal.level} className="size-1.5 [&>span]:size-1.5" />
+      <span className="truncate">{signal.title}</span>
+    </p>
+  )
+}
+
 export function ProcessesView() {
   const data = useDemoData()
   const { deleteProcess } = useDemoActions()
@@ -46,7 +59,9 @@ export function ProcessesView() {
   const router = useRouter()
   // Os dados vêm do armazenamento do navegador depois da hidratação.
   const ready = data.hydrated
-  const [filter, setFilter] = React.useState<Filter>("todos")
+  // `?filtro=prazos` vem dos sinais de atenção ("3 prazos nesta semana").
+  const filterParam = useSearchParams().get("filtro")
+  const [filter, setFilter] = React.useState<Filter>(() => (filterParam === "prazos" ? "prazos" : "todos"))
   const [query, setQuery] = React.useState("")
   const [toDelete, setToDelete] = React.useState<Process | null>(null)
 
@@ -69,6 +84,17 @@ export function ProcessesView() {
         }),
     [data.processes, filter, query, test, clientName],
   )
+
+  // O sinal mais importante de cada processo (prazo, movimentação, parado) — sem IA, só dados.
+  const topSignal = React.useMemo(() => {
+    const map = new Map<string, AttentionSignal>()
+    if (!ready) return map
+    for (const p of data.processes) {
+      const first = processSignals(data, p)[0]
+      if (first) map.set(p.id, first)
+    }
+    return map
+  }, [data, ready])
 
   const counts = Object.fromEntries(FILTERS.map((f) => [f.value, data.processes.filter((p) => test(f.value, p)).length])) as Record<Filter, number>
 
@@ -106,16 +132,16 @@ export function ProcessesView() {
         <TableShell>
           <EmptyState
             icon={<Scale />}
-            title={data.processes.length ? "Nenhum processo encontrado." : "Nenhum processo ainda."}
+            title={data.processes.length ? "Nenhum processo com esses filtros." : "Seu escritório ainda não possui processos."}
             description={
               data.processes.length
                 ? "Ajuste o filtro ou a busca."
-                : "Consulte um processo pelo número CNJ em “Novo processo”: ele fica salvo aqui automaticamente."
+                : "Consulte pelo número CNJ em “Novo processo”. A LEXA passa a acompanhar as movimentações e destaca o que merece atenção."
             }
             action={
               <Can permission="processes.edit">
                 <Button size="sm" onClick={() => openDialog("process")}>
-                  <Plus /> Novo processo
+                  <Plus /> Adicionar processo
                 </Button>
               </Can>
             }
@@ -159,6 +185,7 @@ export function ProcessesView() {
                           <p className="mt-0.5 max-w-[280px] truncate text-[12px] text-muted-foreground">
                             <span className="text-subtle">{p.code}</span> · {p.type}
                           </p>
+                          <SignalHint signal={topSignal.get(p.id)} />
                         </Td>
                         <Td>
                           {client ? (
@@ -233,6 +260,7 @@ export function ProcessesView() {
                         <p className="truncate font-mono text-[12px] font-medium text-foreground">{p.number}</p>
                         <p className="mt-1 truncate text-[14px] font-semibold">{clientName(p.clientId) || "Sem cliente"}</p>
                         <p className="truncate text-[12.5px] text-muted-foreground">{p.type}</p>
+                        <SignalHint signal={topSignal.get(p.id)} />
                       </div>
                       <StatusBadge tone={status.tone} size="sm">
                         {status.label}

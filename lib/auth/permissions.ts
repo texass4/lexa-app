@@ -1,6 +1,7 @@
 /**
  * Papéis e permissões do LEXA. Os padrões por papel precisam ser iguais a
- * `role_defaults` em `supabase/migrations/0001_lexa_auth.sql` — o banco (RLS) é quem
+ * `role_defaults` na migração mais recente que a redefine (hoje
+ * `supabase/migrations/0002_whatsapp.sql`) — o banco (RLS) é quem
  * garante; aqui é só para a interface esconder o que a pessoa não pode usar.
  */
 
@@ -11,6 +12,7 @@ export const MODULES = [
   { key: "agenda", label: "Agenda" },
   { key: "documents", label: "Documentos" },
   { key: "finance", label: "Financeiro" },
+  { key: "whatsapp", label: "Atendimento (WhatsApp)" },
 ] as const
 
 export type ModuleKey = (typeof MODULES)[number]["key"]
@@ -18,6 +20,7 @@ export type ModuleKey = (typeof MODULES)[number]["key"]
 export const ADMIN_PERMISSIONS = [
   { key: "office.manage", label: "Editar dados do escritório" },
   { key: "users.manage", label: "Gerenciar usuários e permissões" },
+  { key: "whatsapp.assign", label: "Distribuir conversas do WhatsApp" },
 ] as const
 
 export type Permission = `${ModuleKey}.view` | `${ModuleKey}.edit` | (typeof ADMIN_PERMISSIONS)[number]["key"]
@@ -50,12 +53,14 @@ const WORK: Permission[] = [
   "agenda.edit",
   "documents.view",
   "documents.edit",
+  "whatsapp.view",
+  "whatsapp.edit",
 ]
 
 export const ROLE_DEFAULTS: Record<Role, Permission[]> = {
   super_admin: [],
   owner: ALL_PERMISSIONS,
-  lawyer: [...WORK, "finance.view"],
+  lawyer: [...WORK, "finance.view", "whatsapp.assign"],
   staff: WORK,
 }
 

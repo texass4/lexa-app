@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { toast } from "sonner"
 import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
@@ -189,6 +190,17 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
 
   const firstColumnId = columns[0].id
 
+  /** Soltar numa coluna de concluídas é concluir: confirma e permite desfazer. */
+  const move = (taskId: string, columnId: string) => {
+    const task = data.tasks.find((t) => t.id === taskId)
+    const from = task?.columnId ?? firstColumnId
+    if (!task || from === columnId) return
+    const updated = moveTask(taskId, columnId)
+    if (updated?.status === "concluida" && task.status !== "concluida") {
+      toast.success("Tarefa concluída.", { description: task.title, action: { label: "Desfazer", onClick: () => moveTask(taskId, from) } })
+    }
+  }
+
   return (
     <div className="flex items-start gap-4 overflow-x-auto pb-2 thin-scrollbar">
       {columns.map((column) => {
@@ -206,7 +218,7 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
               e.preventDefault()
               setDragOver(null)
               const taskId = e.dataTransfer.getData("text/plain")
-              if (taskId && editable) moveTask(taskId, column.id)
+              if (taskId && editable) move(taskId, column.id)
             }}
             className={cn(
               "flex max-h-[calc(100vh-320px)] min-h-40 w-72 shrink-0 flex-col rounded-[14px] border p-2.5 transition-colors",
@@ -216,7 +228,7 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
             <ColumnHeader column={column} count={items.length} canDelete={columns.length > 1} editable={editable} />
             <div className="flex-1 space-y-2 overflow-y-auto thin-scrollbar pb-1">
               {items.length === 0 ? (
-                <p className="px-1 py-6 text-center text-[12px] text-subtle">Sem tarefas</p>
+                <p className="px-1 py-6 text-center text-[12px] text-subtle">{editable ? "Arraste tarefas para cá" : "Sem tarefas"}</p>
               ) : (
                 items.map((task) => (
                   <TaskCard
@@ -226,7 +238,7 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
                     columns={columns}
                     onOpen={() => onOpen(task.id)}
                     onDelete={() => setToDelete(task)}
-                    onMove={(columnId) => moveTask(task.id, columnId)}
+                    onMove={(columnId) => move(task.id, columnId)}
                   />
                 ))
               )}
@@ -241,7 +253,11 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
         onOpenChange={(o) => !o && setToDelete(null)}
         title={`Excluir "${toDelete?.title}"?`}
         description="Esta ação não pode ser desfeita."
-        onConfirm={() => toDelete && deleteTask(toDelete.id)}
+        onConfirm={() => {
+          if (!toDelete) return
+          deleteTask(toDelete.id)
+          toast.success("Tarefa excluída.", { description: toDelete.title })
+        }}
       />
     </div>
   )

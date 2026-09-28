@@ -17,7 +17,8 @@ import { FileIcon } from "@/components/shared/file-icon"
 import { DocumentActions, DocumentList } from "@/components/shared/document-list"
 import { useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
-import { fmtNumericDate } from "@/lib/dates"
+import { diffInDays, fmtNumericDate, getNow, parse } from "@/lib/dates"
+import { RECENT_DAYS } from "@/lib/attention"
 import { formatFileSize, matches } from "@/lib/format"
 import { getUser } from "@/lib/account"
 import type { DocumentKind } from "@/types"
@@ -57,12 +58,18 @@ export function DocumentsView() {
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))
 
   const totalSize = data.documents.reduce((acc, d) => acc + d.sizeBytes, 0)
+  const isNew = (uploadedAt: string) => diffInDays(getNow(), parse(uploadedAt)) <= RECENT_DAYS
+  const fresh = ready ? data.documents.filter((d) => isNew(d.uploadedAt)).length : 0
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Documentos"
-        description={`${data.documents.length} arquivos · ${formatFileSize(totalSize)} armazenados com criptografia.`}
+        description={
+          data.documents.length
+            ? `${data.documents.length} arquivo${data.documents.length === 1 ? "" : "s"} · ${formatFileSize(totalSize)}${fresh ? ` · ${fresh} novo${fresh === 1 ? "" : "s"} nesta semana` : ""}. Cada documento fica ligado ao cliente e ao processo.`
+            : "Contratos, procurações e peças do escritório, ligados a clientes e processos."
+        }
         actions={
           <Can permission="documents.edit">
             <Button onClick={() => openDialog("document")}>
@@ -103,8 +110,12 @@ export function DocumentsView() {
         <TableShell>
           <EmptyState
             icon={<FolderOpen />}
-            title="Nenhum documento encontrado."
-            description="Adicione contratos, procurações e peças para centralizar os arquivos do escritório."
+            title={data.documents.length ? "Nenhum documento com esses filtros." : "Nenhum documento ainda."}
+            description={
+              data.documents.length
+                ? "Ajuste o tipo, o cliente ou a busca."
+                : "Adicione contratos, procurações e peças: cada arquivo fica ligado ao cliente e ao processo, e aparece no perfil de cada um."
+            }
             action={
               <Can permission="documents.edit">
                 <Button size="sm" onClick={() => openDialog("document")}>
@@ -141,7 +152,12 @@ export function DocumentsView() {
                           <div className="flex items-center gap-3">
                             <FileIcon extension={d.extension} className="h-9 w-7" />
                             <div className="min-w-0">
-                              <p className="max-w-[300px] truncate font-medium">{d.name}</p>
+                              <p className="flex max-w-[300px] items-center gap-2 font-medium">
+                                <span className="truncate">{d.name}</span>
+                                {isNew(d.uploadedAt) && (
+                                  <span className="shrink-0 rounded-[5px] bg-gold-soft px-1.5 text-[10.5px] font-semibold text-gold-dark">Novo</span>
+                                )}
+                              </p>
                               <p className="text-[11.5px] text-subtle">{formatFileSize(d.sizeBytes)}</p>
                             </div>
                           </div>

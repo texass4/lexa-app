@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { CalendarDays, Copy, Hourglass, IdCard, Mail, MapPin, MessageSquare, Phone, Plus, Scale, UserRound, Wallet } from "lucide-react"
+import { cn } from "cn"
+import { CalendarDays, ChevronRight, Copy, Hourglass, IdCard, Mail, MapPin, MessageSquare, Phone, Plus, Scale, UserRound, Wallet } from "lucide-react"
 import { toast } from "sonner"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
@@ -10,10 +11,12 @@ import { MiniStat } from "@/components/shared/mini-stat"
 import { ActivityIcon } from "@/components/shared/activity-icon"
 import { TaskRow } from "@/components/tasks/task-row"
 import { useDemoData } from "@/lib/store/demo-store"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { PROCESS_STATUS } from "@/lib/config"
 import { useUI } from "@/lib/store/ui-store"
 import { clientFinance } from "@/lib/selectors"
 import { useCategoryLookup } from "@/components/agenda/use-category"
-import { getNow, fmtActivityTime, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtLongDate, fmtRelative, fmtTime, parse } from "@/lib/dates"
+import { getNow, diffInDays, fmtActivityTime, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtLongDate, fmtRelative, fmtTime, parse } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
 import type { Activity, Client } from "@/types"
 import { Can } from "@/lib/auth/session"
@@ -96,7 +99,7 @@ export function OverviewTab({ client, activities, onSeeTimeline }: { client: Cli
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <div className="space-y-5 lg:col-span-5">
+        <div className="space-y-5 lg:col-span-5 max-lg:order-last">
           <Panel>
             <PanelHeader title="Informações" description={client.kind === "PJ" ? "Dados cadastrais da empresa" : "Dados cadastrais do cliente"} />
             <div className="divide-y divide-border px-5 pb-2">
@@ -141,6 +144,95 @@ export function OverviewTab({ client, activities, onSeeTimeline }: { client: Cli
         <div className="space-y-5 lg:col-span-7">
           <Panel>
             <PanelHeader
+              title="Processos"
+              description={processes.length ? `${active.length} ativo${active.length === 1 ? "" : "s"} de ${processes.length}` : undefined}
+              action={
+                <Can permission="processes.edit">
+                  <Button variant="ghost" size="icon-sm" aria-label="Novo processo" onClick={() => openDialog("process", { clientId: client.id })}>
+                    <Plus />
+                  </Button>
+                </Can>
+              }
+            />
+            {processes.length ? (
+              <ul className="px-3 pb-3">
+                {[...active, ...processes.filter((p) => p.status === "concluido")].slice(0, 5).map((p) => {
+                  const status = PROCESS_STATUS[p.status]
+                  const due = p.status !== "concluido" && p.nextDeadline ? diffInDays(parse(p.nextDeadline.date), getNow()) : undefined
+                  return (
+                    <li key={p.id}>
+                      <Link
+                        href={`/processos/${p.id}`}
+                        className="group flex items-center gap-3 rounded-[10px] px-2 py-2.5 outline-none transition-colors hover:bg-accent/60 focus-visible:bg-accent"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-[13.5px] font-medium text-foreground">{p.type}</span>
+                            <StatusBadge tone={status.tone} size="sm">
+                              {status.label}
+                            </StatusBadge>
+                          </span>
+                          <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+                            <span className="font-mono">{p.code}</span>
+                            {p.lastMovementAt && <> · movimentação {fmtRelative(p.lastMovementAt)}</>}
+                          </span>
+                        </span>
+                        {due !== undefined && (
+                          <span className={cn("shrink-0 text-right text-[12px]", due <= 3 ? "font-medium text-danger" : "text-muted-foreground")}>
+                            Prazo {fmtDueIn(p.nextDeadline!.date)}
+                          </span>
+                        )}
+                        <ChevronRight className="size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <EmptyState
+                compact
+                title="Nenhum processo deste cliente."
+                description="Consulte pelo número CNJ: a LEXA passa a acompanhar prazos e movimentações."
+              />
+            )}
+          </Panel>
+
+          <Panel>
+            <PanelHeader
+              title="Atividade recente"
+              action={
+                <button
+                  type="button"
+                  onClick={onSeeTimeline}
+                  className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+                >
+                  Ver timeline
+                </button>
+              }
+            />
+            {activities.length === 0 && (
+              <p className="px-5 pb-5 text-[13px] text-muted-foreground">
+                Cadastros, tarefas, documentos e movimentações deste cliente aparecem aqui.
+              </p>
+            )}
+            <ul className="px-5 pb-4">
+              {activities.slice(0, 4).map((a) => (
+                <li key={a.id} className="flex items-start gap-3 py-2">
+                  <ActivityIcon type={a.type} />
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <p className="text-[13px] leading-snug">
+                      {a.actor && <span className="font-semibold">{a.actor} </span>}
+                      {a.message}
+                    </p>
+                    {a.detail && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{a.detail}</p>}
+                  </div>
+                  <span className="tabular shrink-0 pt-0.5 text-[11.5px] text-subtle">{fmtActivityTime(a.at)}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+          <Panel>
+            <PanelHeader
               title="Próximos compromissos"
               action={
                 <Can permission="agenda.edit">
@@ -183,7 +275,11 @@ export function OverviewTab({ client, activities, onSeeTimeline }: { client: Cli
                 })}
               </ul>
             ) : (
-              <EmptyState compact title="Nenhum compromisso agendado." description="Agende uma consulta ou reunião com o cliente." />
+              <EmptyState
+                compact
+                title="Nenhum compromisso agendado."
+                description="Consultas, reuniões e audiências com este cliente aparecem aqui."
+              />
             )}
           </Panel>
 
@@ -207,36 +303,6 @@ export function OverviewTab({ client, activities, onSeeTimeline }: { client: Cli
             ) : (
               <EmptyState compact title="Nenhuma tarefa vinculada." description="Crie tarefas para organizar o atendimento deste cliente." />
             )}
-          </Panel>
-
-          <Panel>
-            <PanelHeader
-              title="Atividade recente"
-              action={
-                <button
-                  type="button"
-                  onClick={onSeeTimeline}
-                  className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
-                >
-                  Ver timeline
-                </button>
-              }
-            />
-            <ul className="px-5 pb-4">
-              {activities.slice(0, 4).map((a) => (
-                <li key={a.id} className="flex items-start gap-3 py-2">
-                  <ActivityIcon type={a.type} />
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <p className="text-[13px] leading-snug">
-                      {a.actor && <span className="font-semibold">{a.actor} </span>}
-                      {a.message}
-                    </p>
-                    {a.detail && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{a.detail}</p>}
-                  </div>
-                  <span className="tabular shrink-0 pt-0.5 text-[11.5px] text-subtle">{fmtActivityTime(a.at)}</span>
-                </li>
-              ))}
-            </ul>
           </Panel>
         </div>
       </div>

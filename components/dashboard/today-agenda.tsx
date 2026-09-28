@@ -35,7 +35,7 @@ export function TodayAgenda() {
     <Panel className="flex flex-col">
       <PanelHeader
         title="Agenda de hoje"
-        description={`${items.length} compromissos · escritório`}
+        description={items.length ? `${items.length} compromisso${items.length > 1 ? "s" : ""} · escritório` : "Escritório"}
         action={
           <Link
             href="/agenda"
@@ -45,7 +45,7 @@ export function TodayAgenda() {
           </Link>
         }
       />
-      {items.length === 0 && <EmptyState compact title="Nenhum compromisso hoje." />}
+      {items.length === 0 && <EmptyState compact title="Agenda livre hoje." description="Audiências, reuniões e prazos do dia aparecem aqui." />}
       <ol ref={listRef} className="relative flex-1 px-3 pb-3 thin-scrollbar lg:max-h-[436px] lg:overflow-y-auto">
         {items.map((a, i) => {
           const { category, style } = lookup(a.categoryId)
