@@ -62,7 +62,15 @@ export function AIPanel({
 
 /* --------------------------------- estados --------------------------------- */
 
+/** Depois disso, o indicador avisa que a análise continua (e não travou). */
+const SLOW_AFTER_MS = 12_000
+
 export function AIThinking({ label, onCancel, className }: { label: string; onCancel?: () => void; className?: string }) {
+  const [slow, setSlow] = React.useState(false)
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), SLOW_AFTER_MS)
+    return () => window.clearTimeout(timer)
+  }, [])
   return (
     <div className={cn("space-y-4", className)} role="status" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
@@ -79,6 +87,11 @@ export function AIThinking({ label, onCancel, className }: { label: string; onCa
           </Button>
         )}
       </div>
+      {slow && (
+        <p className="animate-in fade-in-0 text-[12px] text-muted-foreground duration-300">
+          Ainda analisando: com muitos dados, a resposta pode levar um pouco mais.
+        </p>
+      )}
       <div className="space-y-2.5" aria-hidden>
         <Skeleton className="h-3 w-11/12" />
         <Skeleton className="h-3 w-4/5" />

@@ -52,6 +52,11 @@ function useRouteContext(): AIContext {
   }, [root, id, processCode, clientName])
 }
 
+/** Conversas mantidas vivas na sessão (as mais recentes). Trocar de tela não aborta nem apaga nenhuma delas. */
+const KEEP_CONVERSATIONS = 6
+
+type PendingRequest = { id: number; key: string; prompt: string }
+
 export function LexaAIProvider({ children }: { children: React.ReactNode }) {
   const status = useAIStatus()
   const pathname = usePathname()
@@ -60,28 +65,39 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setOpen] = React.useState(false)
   // Contexto pedido por uma ação (ex.: tarefa → processo). Vale só na tela em que foi pedido.
   const [override, setOverride] = React.useState<{ context: AIContext; path: string } | null>(null)
-  const [request, setRequest] = React.useState<{ id: number; prompt: string } | null>(null)
+  // Contextos em que a pessoa já conversou: cada um mantém a própria conversa (e a pergunta em andamento).
+  const [visited, setVisited] = React.useState<AIContext[]>([])
+  const [request, setRequest] = React.useState<PendingRequest | null>(null)
   const requestId = React.useRef(0)
   const sourceHandler = React.useRef<SourceHandler | null>(null)
 
   const context = override && override.path === pathname ? override.context : routeContext
+  const activeKey = scopeKey(context.scope)
+
+  const remember = React.useCallback((ctx: AIContext) => {
+    const key = scopeKey(ctx.scope)
+    setVisited((list) => [ctx, ...list.filter((c) => scopeKey(c.scope) !== key)].slice(0, KEEP_CONVERSATIONS))
+  }, [])
 
   const open = React.useCallback(
     (next?: AIContext) => {
       setOverride(next ? { context: next, path: pathname } : null)
+      remember(next ?? routeContext)
       setOpen(true)
     },
-    [pathname],
+    [pathname, remember, routeContext],
   )
 
   const ask = React.useCallback(
     (prompt: string, next?: AIContext) => {
+      const target = next ?? routeContext
       setOverride(next ? { context: next, path: pathname } : null)
+      remember(target)
       requestId.current += 1
-      setRequest({ id: requestId.current, prompt })
+      setRequest({ id: requestId.current, key: scopeKey(target.scope), prompt })
       setOpen(true)
     },
-    [pathname],
+    [pathname, remember, routeContext],
   )
 
   const close = React.useCallback(() => setOpen(false), [])
@@ -109,24 +125,33 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
     [status, context, isOpen, open, ask, close, registerSourceHandler],
   )
 
+  // O contexto da tela sempre tem uma conversa pronta; os já usados continuam montados.
+  const hosts = [context, ...visited.filter((c) => scopeKey(c.scope) !== activeKey)]
+
   return (
     <LexaAIContext.Provider value={value}>
       {children}
-      <ChatHost
-        key={scopeKey(context.scope)}
-        context={context}
-        open={isOpen}
-        onOpenChange={setOpen}
-        status={status}
-        request={request}
-        onRequestHandled={handleRequest}
-        onOpenSource={openSource}
-      />
+      {hosts.map((ctx) => {
+        const key = scopeKey(ctx.scope)
+        const active = key === activeKey
+        return (
+          <ChatHost
+            key={key}
+            context={ctx}
+            open={active && isOpen}
+            onOpenChange={setOpen}
+            status={status}
+            request={request?.key === key ? request : null}
+            onRequestHandled={handleRequest}
+            onOpenSource={openSource}
+          />
+        )
+      })}
     </LexaAIContext.Provider>
   )
 }
 
-/** Uma conversa por contexto: a `key` do escopo reinicia o estado ao trocar de processo/cliente. */
+/** Uma conversa por contexto: a `key` do escopo separa processo, cliente e escritório. */
 function ChatHost({
   context,
   open,
@@ -140,7 +165,7 @@ function ChatHost({
   open: boolean
   onOpenChange: (open: boolean) => void
   status: AIStatus | null
-  request: { id: number; prompt: string } | null
+  request: PendingRequest | null
   onRequestHandled: (id: number) => void
   onOpenSource: SourceHandler
 }) {
@@ -149,8 +174,13 @@ function ChatHost({
 
   React.useEffect(() => {
     if (!request) return
-    onRequestHandled(request.id)
-    if (isAIReady(status)) send(request.prompt)
+    // Envia no próximo tique e cancela se o efeito for desfeito antes: uma conversa recém-montada
+    // (ou a remontagem de teste do StrictMode) não pode abortar a pergunta que acabou de receber.
+    const timer = window.setTimeout(() => {
+      onRequestHandled(request.id)
+      if (isAIReady(status)) send(request.prompt)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [request, send, onRequestHandled, status])
 
   return <AIChatSheet open={open} onOpenChange={onOpenChange} chat={chat} context={context} status={status} onOpenSource={onOpenSource} />
