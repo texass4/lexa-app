@@ -1,6 +1,9 @@
-import type { Client, Invoice, PracticeArea, RelatedEntity, Task } from "@/types"
-import type { DemoState } from "@/lib/store/demo-store"
-import { getNow, diffInDays, isSameDay, monthName, monthShort, parse } from "@/lib/dates"
+import type { Activity, Appointment, Client, Invoice, InvoiceStatus, LegalDocument, PracticeArea, Process, RelatedEntity, Task } from "@/types"
+import type { PersistedState } from "@/lib/store/storage"
+import { getNow, diffInDays, isSameDay, monthName, monthShort, parse, toLocalISO } from "@/lib/dates"
+
+/** O que os seletores precisam do store (o `DemoState` inteiro também serve). */
+type DemoState = PersistedState
 
 export const findClient = (s: DemoState, id?: string) => (id ? s.clients.find((c) => c.id === id) : undefined)
 export const findProcess = (s: DemoState, id?: string) => (id ? s.processes.find((p) => p.id === id) : undefined)
@@ -17,13 +20,93 @@ export function describeRelated(s: DemoState, related?: RelatedEntity) {
   return { label: `Processo ${p.code}`, kind: c?.name ?? "Processo", href: `/processos/${p.id}` }
 }
 
-export function clientFinance(s: DemoState, clientId: string) {
+/**
+ * Situação real da fatura: uma parcela "a vencer" cujo vencimento já passou está
+ * em atraso, mesmo que ninguém tenha mudado o status salvo.
+ */
+export function invoiceStatus(invoice: Invoice, now: Date = getNow()): InvoiceStatus {
+  if (invoice.status === "pago") return "pago"
+  if (invoice.status === "atrasado") return "atrasado"
+  return invoice.dueDate < toLocalISO(now).slice(0, 10) ? "atrasado" : "pendente"
+}
+
+export function clientFinance(s: Pick<DemoState, "invoices">, clientId: string, now: Date = getNow()) {
   const invoices = s.invoices.filter((i) => i.clientId === clientId)
   const paid = sum(invoices.filter((i) => i.status === "pago"))
   const open = sum(invoices.filter((i) => i.status !== "pago"))
-  const overdue = sum(invoices.filter((i) => i.status === "atrasado"))
+  const overdueItems = invoices.filter((i) => invoiceStatus(i, now) === "atrasado")
+  const overdue = sum(overdueItems)
+  const upcoming = invoices.filter((i) => invoiceStatus(i, now) === "pendente").sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   // Contratado = tudo o que foi faturado para o cliente (pago + em aberto).
-  return { invoices, contracted: paid + open, paid, open, overdue }
+  return { invoices, contracted: paid + open, paid, open, overdue, overdueCount: overdueItems.length, upcoming }
+}
+
+/** Clientes com alguma parcela vencida e não paga. */
+export function delinquentClientIds(invoices: Invoice[], now: Date = getNow()) {
+  return new Set(invoices.filter((i) => invoiceStatus(i, now) === "atrasado").map((i) => i.clientId))
+}
+
+/** Cliente de uma tarefa: o vínculo direto ou o cliente do processo vinculado. */
+export function relatedClientId(s: Pick<DemoState, "processes">, related?: RelatedEntity) {
+  if (!related) return undefined
+  if (related.type === "client") return related.id
+  return s.processes.find((p) => p.id === related.id)?.clientId || undefined
+}
+
+export interface ClientHub {
+  processes: Process[]
+  activeProcesses: Process[]
+  tasks: Task[]
+  documents: LegalDocument[]
+  appointments: Appointment[]
+  activities: Activity[]
+}
+
+/**
+ * Tudo o que está ligado ao cliente, direto ou por um processo dele. Uma tarefa,
+ * documento ou compromisso vinculado só ao processo também é do cliente.
+ */
+export function clientHub(s: DemoState, clientId: string): ClientHub {
+  const processes = s.processes
+    .filter((p) => p.clientId === clientId)
+    .sort(
+      (a, b) =>
+        (a.status === "concluido" ? 1 : 0) - (b.status === "concluido" ? 1 : 0) ||
+        (a.nextDeadline?.date ?? "9").localeCompare(b.nextDeadline?.date ?? "9") ||
+        b.lastMovementAt.localeCompare(a.lastMovementAt),
+    )
+  const ids = new Set(processes.map((p) => p.id))
+  const ofClient = (item: { clientId?: string; processId?: string }) => item.clientId === clientId || (!!item.processId && ids.has(item.processId))
+  return {
+    processes,
+    activeProcesses: processes.filter((p) => p.status !== "concluido"),
+    tasks: s.tasks
+      .filter((t) => (t.related?.type === "client" && t.related.id === clientId) || (t.related?.type === "process" && ids.has(t.related.id)))
+      .sort((a, b) => (a.status === b.status ? a.dueAt.localeCompare(b.dueAt) : a.status === "pendente" ? -1 : 1)),
+    documents: s.documents.filter(ofClient).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)),
+    appointments: s.appointments.filter(ofClient).sort((a, b) => a.start.localeCompare(b.start)),
+    activities: s.activities.filter(ofClient).sort((a, b) => b.at.localeCompare(a.at)),
+  }
+}
+
+/** Momento da última atividade registrada de cada cliente (inclui a dos processos dele). */
+export function lastActivityByClient(s: Pick<DemoState, "activities" | "processes">) {
+  const clientOfProcess = new Map(s.processes.map((p) => [p.id, p.clientId]))
+  const last = new Map<string, string>()
+  for (const a of s.activities) {
+    const clientId = a.clientId ?? (a.processId ? clientOfProcess.get(a.processId) : undefined)
+    if (!clientId) continue
+    const current = last.get(clientId)
+    if (!current || a.at > current) last.set(clientId, a.at)
+  }
+  return last
+}
+
+/** Prazo mais próximo entre os processos ativos — um prazo já vencido vem primeiro, para não passar despercebido. */
+export function nextClientDeadline(processes: Process[]) {
+  return processes
+    .filter((p) => p.status !== "concluido" && p.nextDeadline)
+    .sort((a, b) => a.nextDeadline!.date.localeCompare(b.nextDeadline!.date))[0]
 }
 
 export const sum = (items: Invoice[]) => items.reduce((acc, i) => acc + i.amount, 0)
@@ -69,7 +152,7 @@ export function monthlyRevenue(invoices: Invoice[], now: Date = getNow(), months
 export function financeSummary(invoices: Invoice[], now: Date = getNow()) {
   const [previous, current] = monthlyRevenue(invoices, now, 2)
   const billed = sum(invoices)
-  const overdue = sum(invoices.filter((i) => i.status === "atrasado"))
+  const overdue = sum(invoices.filter((i) => invoiceStatus(i, now) === "atrasado"))
   return {
     month: current.label,
     previousMonth: previous.label,

@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FileIcon } from "./file-icon"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
-import { downloadDocument } from "@/lib/documents"
+import { copyDocumentLink, downloadDocument } from "@/lib/documents"
 import { fmtNumericDate } from "@/lib/dates"
 import { formatFileSize } from "@/lib/format"
 import { getUser } from "@/lib/account"
@@ -40,12 +40,11 @@ export function DocumentActions({ doc }: { doc: LegalDocument }) {
             <DropdownMenuItem className="h-8 px-2" onClick={() => downloadDocument(doc)}>
               <Download /> Baixar
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="h-8 px-2"
-              onClick={() => toast.success("Link copiado.", { description: "Válido por 7 dias para o cliente." })}
-            >
-              <Link2 /> Copiar link seguro
-            </DropdownMenuItem>
+            {doc.storagePath && (
+              <DropdownMenuItem className="h-8 px-2" onClick={() => copyDocumentLink(doc)}>
+                <Link2 /> Copiar link (7 dias)
+              </DropdownMenuItem>
+            )}
             <Can permission="documents.edit">
               <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setDeleting(true)}>
                 <Trash2 /> Excluir
@@ -71,6 +70,7 @@ export function DocumentActions({ doc }: { doc: LegalDocument }) {
 /** Lista compacta de documentos (perfil do cliente e do processo). */
 export function DocumentList({ documents, showClient = false }: { documents: LegalDocument[]; showClient?: boolean }) {
   const data = useDemoData()
+  const { openDialog } = useUI()
   return (
     <ul className="divide-y divide-border">
       <AnimatePresence initial={false}>
@@ -88,7 +88,13 @@ export function DocumentList({ documents, showClient = false }: { documents: Leg
             >
               <FileIcon extension={d.extension} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-medium text-foreground">{d.name}</p>
+                <button
+                  type="button"
+                  onClick={() => openDialog("document-preview", { documentId: d.id })}
+                  className="block max-w-full truncate text-left text-[13.5px] font-medium text-foreground outline-none hover:underline focus-visible:underline"
+                >
+                  {d.name}
+                </button>
                 <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12px] text-muted-foreground">
                   <span>{d.kind}</span>
                   {showClient && client && (

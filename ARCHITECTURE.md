@@ -195,6 +195,16 @@ Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZ
 
 ---
 
+### Clientes (hub do cliente)
+
+O cliente é a entidade central: processos (`clientId`), tarefas (`related`), documentos, compromissos e faturas apontam para ele — e o que aponta só para um processo dele também é dele. `clientHub()` e `clientFinance()` (`lib/selectors.ts`) reúnem tudo; o perfil (`components/clientes/profile/`) tem abas Visão geral, Processos, Tarefas, Documentos, Compromissos, Financeiro e Timeline, cada uma exigindo a permissão `.view` do módulo.
+
+- Regras do cadastro (CPF/CNPJ com dígito verificador, duplicidade, telefone, endereço, tags, WhatsApp): `lib/clients.ts`. O formulário único de criar/editar é `components/clientes/client-form.tsx`. O banco repete a checagem do documento (`0002_clients_hub.sql`); a violação volta como aviso próprio (`SyncResult.conflicts`).
+- Fatura "a vencer" com vencimento passado conta como atrasada: use `invoiceStatus()`, nunca `invoice.status` direto.
+- Lançamentos financeiros: diálogo global `"invoice"` (`components/financeiro/new-invoice-dialog.tsx`), gravando em `invoices` — o mesmo dado do módulo Financeiro.
+- `updateClient` registra na timeline mudança de status, de responsável e de dados; atividades de tarefa, documento e compromisso vinculados a processo levam o `clientId` do processo.
+- WhatsApp: link oficial (wa.me) no cadastro; a conversa em si fica na Central de Atendimento (seção 4b).
+
 ## 5. UI global
 
 `app/layout.tsx` → `Providers` (tema, stores, toasts) → `app/(app)/layout.tsx` → `SplashGate` (intro) → `AppShell` (sidebar, topbar, busca, modais).
@@ -205,7 +215,7 @@ Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZ
 
 ```ts
 const { openDialog } = useUI()
-openDialog("task", { processId })   // "client" | "task" | "appointment" | "document" | "process"
+openDialog("task", { processId })   // "client" | "task" | "appointment" | "document" | "process" | "invoice"
 ```
 
 Design system — reutilize, não invente: `page-header`, `panel`, `button`, `status-badge`, `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens de cor em `app/globals.css`.
@@ -232,7 +242,7 @@ Transições: `app/(app)/template.tsx` (entrada de página em CSS, `.page-enter`
 
 ## 7. O que ainda é simulado
 
-Envio de e-mail (links saem no terminal), integrações (agenda, assinatura, boletos), cobrança e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos e o WhatsApp (Z-API) são reais.
+Envio de e-mail (links saem no terminal), integrações (agenda, assinatura, boletos), envio de cobrança e exportação de relatório na tela Financeiro, e mudança de plano. Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos e o WhatsApp (Z-API) são reais.
 
 ## 8. Como rodar
 

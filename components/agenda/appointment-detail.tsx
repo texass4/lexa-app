@@ -61,15 +61,6 @@ export function AppointmentDetail({ appointment, onClose }: { appointment?: Appo
               <Trash2 />
             </Button>
           </Can>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              onClose()
-              toast.success("Lembrete enviado.", { description: `${a.personName ?? "Participantes"} receberá a confirmação por WhatsApp.` })
-            }}
-          >
-            Enviar lembrete
-          </Button>
           {process ? (
             <Link href={`/processos/${process.id}`} className={buttonVariants()} onClick={onClose}>
               Abrir processo <ArrowUpRight />

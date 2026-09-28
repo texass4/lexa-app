@@ -48,8 +48,7 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
   const data = useDemoData()
   const { addDocument } = useDemoActions()
   const inputRef = React.useRef<HTMLInputElement>(null)
-  /** `source` ausente = arquivo de exemplo, só com os metadados. */
-  const [file, setFile] = React.useState<{ name: string; size: number; source?: File } | null>(null)
+  const [file, setFile] = React.useState<{ name: string; size: number; source: File } | null>(null)
   const [dragging, setDragging] = React.useState(false)
   const [kind, setKind] = React.useState<DocumentKind>("Comprovante")
   const [clientId, setClientId] = React.useState(defaults?.clientId ?? "")
@@ -67,15 +66,6 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
     setError("")
   }
 
-  const pickSample = () => {
-    const client = data.clients.find((c) => c.id === clientId)
-    setFile({
-      name: `Comprovante de rendimentos${client ? ` — ${client.name}` : ""}.pdf`,
-      size: 684_000,
-    })
-    setError("")
-  }
-
   const submit = async () => {
     if (!file) {
       setError("Selecione ou arraste um arquivo.")
@@ -85,16 +75,13 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
     const ext = (file.name.split(".").pop()?.toLowerCase() ?? "pdf") as (typeof EXTENSIONS)[number]
     const extension = EXTENSIONS.includes(ext) ? ext : "pdf"
 
-    let storagePath: string | undefined
-    if (file.source) {
-      // Pasta do escritório: a política do Storage só aceita a de quem está logado.
-      storagePath = `${currentOrgId()}/${uid("file")}.${extension}`
-      const { error: uploadError } = await getSupabase().storage.from("documents").upload(storagePath, file.source, { contentType: MIME[extension] })
-      if (uploadError) {
-        setUploading(false)
-        setError("Não foi possível enviar o arquivo. Verifique se você pode adicionar documentos e tente de novo.")
-        return
-      }
+    // Pasta do escritório: a política do Storage só aceita a de quem está logado.
+    const storagePath = `${currentOrgId()}/${uid("file")}.${extension}`
+    const { error: uploadError } = await getSupabase().storage.from("documents").upload(storagePath, file.source, { contentType: MIME[extension] })
+    if (uploadError) {
+      setUploading(false)
+      setError("Não foi possível enviar o arquivo. Verifique se você pode adicionar documentos e tente de novo.")
+      return
     }
 
     addDocument({
@@ -166,9 +153,6 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 <Button variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>
                   Escolher arquivo
-                </Button>
-                <Button variant="ghost" size="sm" onClick={pickSample}>
-                  Usar arquivo de exemplo
                 </Button>
               </div>
               <input ref={inputRef} type="file" className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => pick(e.target.files?.[0])} />

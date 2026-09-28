@@ -2,10 +2,12 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import type { Activity, Appointment, AppointmentCategory, Client, LegalDocument, Process, ProcessMovement, Task, TaskColumn } from "@/types"
+import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Process, ProcessMovement, Task, TaskColumn } from "@/types"
 import * as account from "@/lib/account"
-import { getNow, toLocalISO } from "@/lib/dates"
-import { uid } from "@/lib/format"
+import { CLIENT_STATUS } from "@/lib/config"
+import { fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
+import { formatCurrency, uid } from "@/lib/format"
+import { relatedClientId } from "@/lib/selectors"
 import { collectHashes, diffMovements } from "@/lib/services/processes/movements"
 import { buildProcessDraft, toProcessMovements, type ImportProcessMeta } from "@/lib/services/processes/import"
 import type { ProcessSheet } from "@/lib/services/processes/sheet"
@@ -23,6 +25,8 @@ import { COLLECTION_LABELS, diffState, loadState, syncState, type PersistedState
 export interface DemoState extends PersistedState {
   /** `true` depois que os dados do escritório foram carregados do banco. */
   hydrated: boolean
+  /** A primeira carga falhou (rede, servidor). As telas mostram erro com "tentar de novo". */
+  loadError: boolean
 }
 
 const initialState = (): DemoState => ({
@@ -37,12 +41,14 @@ const initialState = (): DemoState => ({
   activities: [],
   notifications: [],
   hydrated: false,
+  loadError: false,
 })
 
 /** O que vai para o armazenamento: o estado sem os sinalizadores de sessão. */
 const persisted = (state: DemoState): PersistedState => {
   const data: Partial<DemoState> = { ...state }
   delete data.hydrated
+  delete data.loadError
   return data as PersistedState
 }
 
@@ -52,7 +58,9 @@ function mergeById<T extends { id: string }>(current: T[], saved: T[] = []): T[]
   return [...current, ...saved.filter((item) => !known.has(item.id))]
 }
 
-export type NewClientInput = Pick<Client, "name" | "kind" | "document" | "email" | "phone" | "area" | "ownerId" | "address">
+export type NewClientInput = Pick<Client, "name" | "kind" | "document" | "email" | "phone" | "area" | "ownerId" | "address"> &
+  Partial<Pick<Client, "status" | "whatsapp" | "addressDetails" | "birthDate" | "tags" | "notes" | "contact" | "profession">>
+export type NewInvoiceInput = Pick<Invoice, "clientId" | "processId" | "description" | "amount" | "dueDate" | "status" | "paidAt" | "method">
 export type NewTaskInput = Pick<Task, "title" | "dueAt" | "priority" | "assigneeId" | "description" | "related" | "columnId">
 export type NewAppointmentInput = Pick<
   Appointment,
@@ -74,7 +82,10 @@ export interface SyncOutcome {
 }
 
 interface DemoActions {
+  /** Tenta carregar de novo os dados do escritório depois de uma falha. */
+  retryLoad(): void
   addClient(input: NewClientInput): Client
+  /** Atualiza o cadastro e registra na timeline o que mudou (status, responsável, dados). */
   updateClient(id: string, patch: Partial<Client>): void
   /** Exclui o cliente. Processos, documentos, tarefas e compromissos vinculados ficam sem cliente. */
   deleteClient(id: string): void
@@ -107,6 +118,10 @@ interface DemoActions {
   deleteAppointmentCategory(id: string): void
   addDocument(input: NewDocumentInput): LegalDocument
   deleteDocument(id: string): void
+  /** Lançamento de honorários (fatura) do módulo financeiro, sempre de um cliente. */
+  addInvoice(input: NewInvoiceInput): Invoice
+  markInvoicePaid(id: string, paidAt: string, method?: Invoice["method"]): void
+  deleteInvoice(id: string): void
   markNotificationRead(id: string): void
   markAllNotificationsRead(): void
 }
@@ -140,12 +155,35 @@ function initialLoad() {
   preloaded ??= loadState(getSupabase())
   return preloaded
 }
+/** Campos do cadastro com nome legível — para descrever a edição na timeline. */
+const CLIENT_FIELD_LABELS: Partial<Record<keyof Client, string>> = {
+  name: "nome",
+  kind: "tipo",
+  document: "documento",
+  email: "e-mail",
+  phone: "telefone",
+  whatsapp: "WhatsApp",
+  address: "endereço",
+  birthDate: "data de nascimento/fundação",
+  area: "área",
+  tags: "tags",
+  notes: "observações",
+  contact: "contato principal",
+  profession: "profissão",
+}
+
+const sameValue = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+/** Cliente de um item vinculado a cliente e/ou processo. */
+const clientOfItem = (s: PersistedState, item: { clientId?: string; processId?: string }) =>
+  item.clientId || (item.processId ? s.processes.find((p) => p.id === item.processId)?.clientId || undefined : undefined)
 
 export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<DemoState>(initialState)
-  const [loadFailed, setLoadFailed] = React.useState(false)
-  useSplashReady("app", state.hydrated || loadFailed)
+  useSplashReady("app", state.hydrated || state.loadError)
   const stateRef = React.useRef(state)
+  // Recarregar após falha (`retryLoad`); aponta para `load`, definido mais abaixo.
+  const loadRef = React.useRef<() => void>(() => {})
   React.useEffect(() => {
     stateRef.current = state
   }, [state])
@@ -165,15 +203,20 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     return {
+      retryLoad() {
+        loadRef.current()
+      },
+
       addClient(input) {
         const at = nowISO()
         const client: Client = {
           ...base(),
           ...input,
           id: uid("c"),
-          status: "novo",
+          status: input.status ?? "novo",
           clientSince: at.slice(0, 10),
           lastActivityAt: at,
+          updatedAt: at,
         }
         commit((s) => ({
           ...s,
@@ -193,7 +236,32 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       },
 
       updateClient(id, patch) {
-        commit((s) => ({ ...s, clients: s.clients.map((c) => (c.id === id ? { ...c, ...patch } : c)) }))
+        const current = stateRef.current.clients.find((c) => c.id === id)
+        if (!current) return
+        const changed = (Object.keys(patch) as (keyof Client)[]).filter((key) => !sameValue(current[key], patch[key]))
+        if (!changed.length) return
+        const at = nowISO()
+        const updated: Client = { ...current, ...patch, updatedAt: at, lastActivityAt: at }
+        const actor = account.getUser(account.currentUserId()).name
+        const entry = (message: string, detail?: string) =>
+          logActivity({ type: "client", actor, message, detail, clientId: id, actorUserId: account.currentUserId(), href: `/clientes/${id}` })
+
+        const log: Activity[] = []
+        if (changed.includes("status")) {
+          log.push(
+            entry(
+              `alterou o status do cliente para ${CLIENT_STATUS[updated.status].label.toLowerCase()}.`,
+              `Antes: ${CLIENT_STATUS[current.status].label}`,
+            ),
+          )
+        }
+        if (changed.includes("ownerId")) {
+          log.push(entry(`definiu ${account.getUser(updated.ownerId).name} como responsável.`, `Antes: ${account.getUser(current.ownerId).name}`))
+        }
+        const fields = changed.map((key) => CLIENT_FIELD_LABELS[key]).filter(Boolean)
+        if (fields.length) log.push(entry("atualizou o cadastro do cliente.", `Alterado: ${fields.join(", ")}`))
+
+        commit((s) => ({ ...s, clients: s.clients.map((c) => (c.id === id ? updated : c)), activities: [...log, ...s.activities] }))
       },
 
       deleteClient(id) {
@@ -388,12 +456,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                   message: "concluiu uma tarefa.",
                   detail: task.title,
                   actorUserId: account.currentUserId(),
-                  clientId:
-                    related?.type === "client"
-                      ? related.id
-                      : related?.type === "process"
-                        ? s.processes.find((p) => p.id === related.id)?.clientId
-                        : undefined,
+                  clientId: relatedClientId(s, related),
                   processId: related?.type === "process" ? related.id : undefined,
                   href: "/tarefas",
                 }),
@@ -416,9 +479,9 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               message: "criou uma tarefa.",
               detail: task.title,
               actorUserId: account.currentUserId(),
-              clientId: input.related?.type === "client" ? input.related.id : undefined,
+              clientId: relatedClientId(s, input.related),
               processId: input.related?.type === "process" ? input.related.id : undefined,
-              href: "/tarefas",
+              href: `/tarefas?tarefa=${task.id}`,
             }),
             ...s.activities,
           ],
@@ -443,6 +506,8 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               message: "excluiu uma tarefa.",
               detail: task.title,
               actorUserId: account.currentUserId(),
+              clientId: relatedClientId(s, task.related),
+              processId: task.related?.type === "process" ? task.related.id : undefined,
             }),
             ...s.activities,
           ],
@@ -474,12 +539,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                     message: "concluiu uma tarefa.",
                     detail: task.title,
                     actorUserId: account.currentUserId(),
-                    clientId:
-                      related?.type === "client"
-                        ? related.id
-                        : related?.type === "process"
-                          ? s.processes.find((p) => p.id === related.id)?.clientId
-                          : undefined,
+                    clientId: relatedClientId(s, related),
                     processId: related?.type === "process" ? related.id : undefined,
                     href: "/tarefas",
                   }),
@@ -544,7 +604,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               type: "appointment",
               message: `${input.title} agendado${input.personName ? ` com ${input.personName}` : ""}.`,
               detail: input.start.slice(8, 10) + "/" + input.start.slice(5, 7) + ", às " + input.start.slice(11, 16),
-              clientId: input.clientId,
+              clientId: clientOfItem(s, input),
               processId: input.processId,
               actorUserId: account.currentUserId(),
               href: "/agenda",
@@ -565,7 +625,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             logActivity({
               type: "appointment",
               message: `${appt.title} foi removido da agenda.`,
-              clientId: appt.clientId,
+              clientId: clientOfItem(s, appt),
               processId: appt.processId,
               actorUserId: account.currentUserId(),
             }),
@@ -615,10 +675,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               actor: account.getUser(account.currentUserId()).name,
               message: "adicionou um documento.",
               detail: doc.name,
-              clientId: doc.clientId,
+              clientId: clientOfItem(s, doc),
               processId: doc.processId,
               actorUserId: account.currentUserId(),
-              href: doc.clientId ? `/clientes/${doc.clientId}?tab=documentos` : "/documentos",
+              href: clientOfItem(s, doc) ? `/clientes/${clientOfItem(s, doc)}?tab=documentos` : "/documentos",
             }),
             ...s.activities,
           ],
@@ -638,8 +698,76 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               actor: account.getUser(account.currentUserId()).name,
               message: "excluiu um documento.",
               detail: doc.name,
-              clientId: doc.clientId,
+              clientId: clientOfItem(s, doc),
               processId: doc.processId,
+              actorUserId: account.currentUserId(),
+            }),
+            ...s.activities,
+          ],
+        }))
+      },
+
+      addInvoice(input) {
+        const invoice: Invoice = { ...base(), ...input, id: uid("inv") }
+        commit((s) => ({
+          ...s,
+          invoices: [invoice, ...s.invoices],
+          activities: [
+            logActivity({
+              type: "payment",
+              actor: account.getUser(account.currentUserId()).name,
+              message: invoice.status === "pago" ? "registrou um pagamento recebido." : "lançou uma cobrança de honorários.",
+              detail: `${invoice.description} · ${formatCurrency(invoice.amount)} · ${
+                invoice.status === "pago" && invoice.paidAt ? `pago em ${fmtNumericDate(invoice.paidAt)}` : `vence ${fmtNumericDate(invoice.dueDate)}`
+              }`,
+              clientId: invoice.clientId,
+              processId: invoice.processId,
+              actorUserId: account.currentUserId(),
+              href: `/clientes/${invoice.clientId}?tab=financeiro`,
+            }),
+            ...s.activities,
+          ],
+        }))
+        return invoice
+      },
+
+      markInvoicePaid(id, paidAt, method) {
+        const invoice = stateRef.current.invoices.find((i) => i.id === id)
+        if (!invoice || invoice.status === "pago") return
+        const updated: Invoice = { ...invoice, status: "pago", paidAt, method: method ?? invoice.method }
+        commit((s) => ({
+          ...s,
+          invoices: s.invoices.map((i) => (i.id === id ? updated : i)),
+          activities: [
+            logActivity({
+              type: "payment",
+              actor: account.getUser(account.currentUserId()).name,
+              message: "registrou um pagamento recebido.",
+              detail: `${invoice.description} · ${formatCurrency(invoice.amount)} · pago em ${fmtNumericDate(paidAt)}`,
+              clientId: invoice.clientId,
+              processId: invoice.processId,
+              actorUserId: account.currentUserId(),
+              href: `/clientes/${invoice.clientId}?tab=financeiro`,
+            }),
+            ...s.activities,
+          ],
+        }))
+      },
+
+      deleteInvoice(id) {
+        const invoice = stateRef.current.invoices.find((i) => i.id === id)
+        if (!invoice) return
+        commit((s) => ({
+          ...s,
+          invoices: s.invoices.filter((i) => i.id !== id),
+          activities: [
+            logActivity({
+              type: "payment",
+              actor: account.getUser(account.currentUserId()).name,
+              message: "excluiu um lançamento financeiro.",
+              detail: `${invoice.description} · ${formatCurrency(invoice.amount)}`,
+              clientId: invoice.clientId,
+              processId: invoice.processId,
               actorUserId: account.currentUserId(),
             }),
             ...s.activities,
@@ -665,22 +793,27 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
 
   const replaceWithServer = React.useCallback((saved: PersistedState) => {
     savedRef.current = saved
-    const next: DemoState = { ...saved, hydrated: true }
+    const next: DemoState = { ...saved, hydrated: true, loadError: false }
     stateRef.current = next
     setState(next)
   }, [])
 
-  // Carrega o que a RLS deixa esta pessoa ver. Uma única vez por sessão.
-  React.useEffect(() => {
-    let cancelled = false
+  // Carrega o que a RLS deixa esta pessoa ver. Uma vez por sessão (ou de novo, após falha).
+  const cancelledRef = React.useRef(false)
+  const load = React.useCallback(() => {
+    if (stateRef.current.loadError) {
+      stateRef.current = { ...stateRef.current, loadError: false }
+      setState(stateRef.current)
+    }
+    // A primeira carga reaproveita a que começou junto com a sessão; novas tentativas buscam de novo.
     initialLoad()
       .then((saved) => {
-        if (cancelled) return
+        if (cancelledRef.current) return
         preloaded = null
         savedRef.current = saved
         // O que foi criado antes de terminar de carregar entra junto (e é gravado a seguir).
         const current = stateRef.current
-        const next = { hydrated: true } as DemoState
+        const next = { hydrated: true, loadError: false } as DemoState
         for (const key of Object.keys(saved) as (keyof PersistedState)[]) {
           ;(next as unknown as Record<string, unknown>)[key] = mergeById<{ id: string }>(current[key], saved[key])
         }
@@ -689,15 +822,21 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       })
       .catch((error) => {
         console.error(error)
-        if (cancelled) return
+        if (cancelledRef.current) return
         preloaded = null
-        setLoadFailed(true)
-        toast.error("Não foi possível carregar os dados do escritório.", { description: "Verifique a conexão e recarregue a página." })
+        stateRef.current = { ...stateRef.current, loadError: true }
+        setState(stateRef.current)
+        toast.error("Não foi possível carregar os dados do escritório.", { description: "Verifique a conexão e tente de novo." })
       })
-    return () => {
-      cancelled = true
-    }
   }, [])
+  React.useEffect(() => {
+    loadRef.current = load
+    cancelledRef.current = false
+    load()
+    return () => {
+      cancelledRef.current = true
+    }
+  }, [load])
 
   // Gravação agrupada: várias mudanças seguidas viram uma ida ao banco. Se o banco
   // recusar (sem permissão, falha de rede), a tela volta a mostrar o que está salvo.
@@ -712,12 +851,16 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
 
     queueRef.current = queueRef.current.then(async () => {
       const supabase = getSupabase()
-      const result = await syncState(supabase, organizationId, diff).catch((): SyncResult => ({ denied: [], failed: true }))
-      if (!result.denied.length && !result.failed) return
+      const result = await syncState(supabase, organizationId, diff).catch((): SyncResult => ({ denied: [], conflicts: [], failed: true }))
+      if (!result.denied.length && !result.conflicts.length && !result.failed) return
       toast.error(
         result.denied.length
           ? `Você não tem permissão para alterar ${result.denied.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
-          : "Não foi possível salvar as últimas alterações.",
+          : result.conflicts.includes("clients")
+            ? "Já existe um cliente com este CPF/CNPJ no escritório (ou o documento é inválido)."
+            : result.conflicts.length
+              ? `O banco recusou alterações em ${result.conflicts.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
+              : "Não foi possível salvar as últimas alterações.",
         { description: "A tela foi atualizada com o que está salvo no escritório." },
       )
       try {

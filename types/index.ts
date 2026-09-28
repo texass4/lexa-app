@@ -51,22 +51,58 @@ export interface User extends TenantEntity {
 
 export type ClientStatus = "ativo" | "inativo" | "novo" | "inadimplente"
 
+/** Endereço em partes. `Client.address` guarda a mesma informação em uma linha. */
+export interface ClientAddress {
+  zipCode?: string
+  street?: string
+  number?: string
+  complement?: string
+  district?: string
+  city?: string
+  /** UF, duas letras. */
+  state?: string
+}
+
 export interface Client extends TenantEntity {
   name: string
   kind: "PF" | "PJ"
+  /** CPF (PF) ou CNPJ (PJ), com máscara. Único por escritório (índice no banco). */
   document: string
   email: string
   phone: string
+  /** Número de WhatsApp, quando diferente do telefone. */
+  whatsapp?: string
+  /** Endereço em uma linha — usado nas listas e nas versões antigas do cadastro. */
   address: string
+  addressDetails?: ClientAddress
   profession?: string
+  /** Data de nascimento (PF) ou de fundação (PJ), `YYYY-MM-DD`. */
   birthDate?: string
   area: PracticeArea
   ownerId: ID
   status: ClientStatus
   clientSince: string
   lastActivityAt: string
+  updatedAt?: string
   source?: ClientSource
+  /** Marcadores livres do escritório (ex.: "VIP", "Indicação do Dr. X"). */
+  tags?: string[]
+  notes?: string
+  /** Contato principal — representante da empresa (PJ) ou alguém que fala pelo cliente. */
   contact?: { name: string; relation: string; phone: string; email?: string }
+}
+
+/**
+ * Resumo da conversa de WhatsApp mostrado no painel do cliente. A conversa completa
+ * é `WhatsAppConversation` (`types/whatsapp.ts`, Central de Atendimento).
+ */
+export interface ClientWhatsAppSummary {
+  clientId: ID
+  phone: string
+  provider: "zapi"
+  externalId?: string
+  lastMessageAt?: string
+  lastMessagePreview?: string
 }
 
 /* ------------------------------- Processos -------------------------------- */
