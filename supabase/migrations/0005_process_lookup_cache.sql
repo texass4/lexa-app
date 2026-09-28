@@ -1,6 +1,6 @@
 -- LEXA — cache da consulta de processos e índices de leitura.
 --
--- Rode no SQL Editor do Supabase depois da 0001. Pode rodar de novo sem erro.
+-- Rode no SQL Editor do Supabase depois da 0001 (independe das outras). Pode rodar de novo sem erro.
 --
 -- Sem esta migração o LEXA continua funcionando: a consulta usa só o cache em
 -- memória do servidor (e avisa no log).

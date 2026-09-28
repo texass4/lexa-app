@@ -65,7 +65,7 @@ export interface LookupStore {
 
 const TABLE = "process_lookup_cache"
 
-/** Tabela ausente (migração 0002 não aplicada): o cache persistente fica desligado, sem quebrar a consulta. */
+/** Tabela ausente (migração 0005 não aplicada): o cache persistente fica desligado, sem quebrar a consulta. */
 let tableMissing = false
 const isMissingTable = (error: { code?: string }) => error.code === "42P01" || error.code === "PGRST205"
 
@@ -83,7 +83,7 @@ export function supabaseLookupStore(supabase: SupabaseClient): LookupStore {
         if (isMissingTable(error)) {
           tableMissing = true
           console.warn(
-            `[process-lookup] tabela ${TABLE} não encontrada — rode supabase/migrations/0002_process_lookup_cache.sql. Seguindo só com o cache em memória.`,
+            `[process-lookup] tabela ${TABLE} não encontrada — rode supabase/migrations/0005_process_lookup_cache.sql. Seguindo só com o cache em memória.`,
           )
           return null
         }

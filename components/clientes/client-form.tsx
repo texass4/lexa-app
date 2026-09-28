@@ -99,7 +99,7 @@ function toPayload(form: FormState, client?: Client): ClientPayload {
 /**
  * Formulário único de cadastro e edição de cliente. Valida CPF/CNPJ (dígitos e
  * duplicidade no escritório), e-mail, telefones e datas; o banco repete a checagem
- * do documento (`0002_clients_hub.sql`).
+ * do documento (`0004_clients_hub.sql`).
  */
 export function ClientForm({
   client,

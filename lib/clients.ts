@@ -2,7 +2,7 @@
  * Regras do cadastro de clientes: validação de CPF/CNPJ, telefone e e-mail,
  * duplicidade, endereço, tags e WhatsApp. Funções puras — usadas pelo formulário,
  * pela lista e pelos testes. A unicidade do documento também é garantida no banco
- * (`supabase/migrations/0002_clients_hub.sql`).
+ * (`supabase/migrations/0004_clients_hub.sql`).
  */
 
 import type { Client, ClientAddress } from "@/types"

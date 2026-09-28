@@ -1,6 +1,6 @@
 -- LEXA — Painel Admin: planos, assinaturas, pagamentos, auditoria, uso e configurações.
 --
--- Rode depois de `0001_lexa_auth.sql` (não depende das 0002 de WhatsApp ou clientes), no SQL Editor do Supabase (uma vez). É
+-- Rode depois de `0001_lexa_auth.sql` (não depende das migrações de WhatsApp, clientes ou cache de processos), no SQL Editor do Supabase (uma vez). É
 -- idempotente onde dá para ser: pode rodar de novo sem duplicar dados.
 --
 -- Regras de segurança (mesmas da 0001):

@@ -1,5 +1,7 @@
 # LEXA — Relatório Técnico de Arquitetura
 
+> **Nota de integração (branch `claude/cool-meitner-xdx2o8`).** Este relatório é um retrato das branches antes de serem juntadas. Na versão integrada: todas as frentes (WhatsApp, LEXA IA, hub de clientes, Lexa Admin e a consulta de processos em TypeScript) estão na mesma branch; `python/datajud.py` não existe mais (a consulta roda em `lib/services/processes/lookup-service.ts`); e as migrações foram renumeradas sem repetição — `0002_whatsapp`, `0003_lexa_admin`, `0004_clients_hub` (antes `0002_clients_hub`) e `0005_process_lookup_cache`. O mapa atualizado é o `ARCHITECTURE.md`.
+
 > **Escopo e método (versão 2).** Análise estática de **três versões do código** que existem no GitHub (ver seção 0):
 > - `main` (commit `042e353`) — a base; ~200 arquivos, ≈19.400 linhas.
 > - `claude/loving-keller-fwyhxd` (commit `2d53083`) — **main + WhatsApp (Z-API) + LEXA IA (Gemini) + IA da Central (Claude)**; +106 arquivos alterados, ≈13.000 linhas novas. **É a versão tratada como "o LEXA atual" nas seções de WhatsApp e IA.**

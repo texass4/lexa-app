@@ -119,7 +119,7 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 
 | | |
 |---|---|
-| Cache | memória do servidor (LRU, 500) → tabela `process_lookup_cache` no Supabase (migração 0002), **sempre por escritório** (RLS). Um cache global revelaria a um escritório quais processos outro acompanha. |
+| Cache | memória do servidor (LRU, 500) → tabela `process_lookup_cache` no Supabase (migração 0005), **sempre por escritório** (RLS). Um cache global revelaria a um escritório quais processos outro acompanha. |
 | Validade | 6 h fresco · até 7 dias servido enquanto atualiza · "não encontrado" 10 min, só em memória |
 | Deduplicação | chamadas simultâneas (mesmo escritório + CNJ) compartilham uma ida à fonte; no navegador, `refreshProcess` também deduplica por processo |
 | Rede (`datajud/client.ts`) | 35 s por tentativa, 60 s no total, até 3 tentativas com backoff + jitter, `Retry-After` no 429; 401/403 e 4xx não se repetem |
@@ -199,7 +199,7 @@ Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZ
 
 O cliente é a entidade central: processos (`clientId`), tarefas (`related`), documentos, compromissos e faturas apontam para ele — e o que aponta só para um processo dele também é dele. `clientHub()` e `clientFinance()` (`lib/selectors.ts`) reúnem tudo; o perfil (`components/clientes/profile/`) tem abas Visão geral, Processos, Tarefas, Documentos, Compromissos, Financeiro e Timeline, cada uma exigindo a permissão `.view` do módulo.
 
-- Regras do cadastro (CPF/CNPJ com dígito verificador, duplicidade, telefone, endereço, tags, WhatsApp): `lib/clients.ts`. O formulário único de criar/editar é `components/clientes/client-form.tsx`. O banco repete a checagem do documento (`0002_clients_hub.sql`); a violação volta como aviso próprio (`SyncResult.conflicts`).
+- Regras do cadastro (CPF/CNPJ com dígito verificador, duplicidade, telefone, endereço, tags, WhatsApp): `lib/clients.ts`. O formulário único de criar/editar é `components/clientes/client-form.tsx`. O banco repete a checagem do documento (`0004_clients_hub.sql`); a violação volta como aviso próprio (`SyncResult.conflicts`).
 - Fatura "a vencer" com vencimento passado conta como atrasada: use `invoiceStatus()`, nunca `invoice.status` direto.
 - Lançamentos financeiros: diálogo global `"invoice"` (`components/financeiro/new-invoice-dialog.tsx`), gravando em `invoices` — o mesmo dado do módulo Financeiro.
 - `updateClient` registra na timeline mudança de status, de responsável e de dados; atividades de tarefa, documento e compromisso vinculados a processo levam o `clientId` do processo.

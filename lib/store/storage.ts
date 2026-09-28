@@ -134,7 +134,7 @@ export interface SyncResult {
 }
 
 const isRlsDenial = (error: { code?: string; message?: string }) => error.code === "42501" || /row-level security/i.test(error.message ?? "")
-/** Índice único ou restrição de validação do banco (`0002_clients_hub.sql`). */
+/** Índice único ou restrição de validação do banco (`0004_clients_hub.sql`). */
 const isConflict = (error: { code?: string }) => error.code === "23505" || error.code === "23514"
 
 /** Grava as mudanças no escritório. Arquivos de documentos excluídos saem do Storage. */
