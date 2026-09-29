@@ -120,15 +120,18 @@ function CreateCategory({ onCreated }: { onCreated: (category: AppointmentCatego
 }
 
 function CategoryRow({ category, usage }: { category: AppointmentCategory; usage: number }) {
-  const { updateAppointmentCategory, deleteAppointmentCategory } = useDemoActions()
-  const [name, setName] = React.useState(category.name)
+  const { updateAppointmentCategory, deleteAppointmentCategory, versionOf } = useDemoActions()
+  // Enquanto o campo está em foco, o texto digitado e a versão da categoria nesse momento;
+  // fora dele, o campo mostra o nome atual (que pode ter mudado por outra pessoa).
+  const [draft, setDraft] = React.useState<{ name: string; baseVersion: string | null } | null>(null)
   const [editingColor, setEditingColor] = React.useState(false)
   const [confirming, setConfirming] = React.useState(false)
 
   const commitName = () => {
-    const trimmed = name.trim()
-    if (trimmed && trimmed !== category.name) updateAppointmentCategory(category.id, { name: trimmed })
-    else setName(category.name)
+    const trimmed = draft?.name.trim()
+    if (draft && trimmed && trimmed !== category.name)
+      void updateAppointmentCategory(category.id, { name: trimmed }, { baseVersion: draft.baseVersion })
+    setDraft(null)
   }
 
   return (
@@ -146,8 +149,11 @@ function CategoryRow({ category, usage }: { category: AppointmentCategory; usage
           aria-label="Nome da categoria"
           className="h-8 flex-1"
           maxLength={MAX_NAME}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={draft?.name ?? category.name}
+          onFocus={() => setDraft({ name: category.name, baseVersion: versionOf("appointmentCategories", category.id) })}
+          onChange={(e) =>
+            setDraft((d) => ({ name: e.target.value, baseVersion: d?.baseVersion ?? versionOf("appointmentCategories", category.id) }))
+          }
           onBlur={commitName}
           onKeyDown={(e) => {
             if (e.key === "Enter") {

@@ -72,15 +72,23 @@ function AddColumn() {
 }
 
 function ColumnHeader({ column, count, canDelete, editable }: { column: TaskColumn; count: number; canDelete: boolean; editable: boolean }) {
-  const { updateTaskColumn, deleteTaskColumn } = useDemoActions()
+  const { updateTaskColumn, deleteTaskColumn, versionOf } = useDemoActions()
   const { openDialog } = useUI()
   const [renaming, setRenaming] = React.useState(false)
   const [name, setName] = React.useState(column.name)
+  // Versão da coluna ao começar a renomear: se outra pessoa renomear antes, esta é recusada.
+  const [baseVersion, setBaseVersion] = React.useState<string | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+
+  const startRenaming = () => {
+    setName(column.name)
+    setBaseVersion(versionOf("taskColumns", column.id))
+    setRenaming(true)
+  }
 
   const commitName = () => {
     const trimmed = name.trim()
-    if (trimmed && trimmed !== column.name) updateTaskColumn(column.id, { name: trimmed })
+    if (trimmed && trimmed !== column.name) void updateTaskColumn(column.id, { name: trimmed }, { baseVersion })
     else setName(column.name)
     setRenaming(false)
   }
@@ -129,7 +137,7 @@ function ColumnHeader({ column, count, canDelete, editable }: { column: TaskColu
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44 rounded-[10px] p-1">
               <DropdownMenuGroup>
-                <DropdownMenuItem className="h-8 px-2" onClick={() => setRenaming(true)}>
+                <DropdownMenuItem className="h-8 px-2" onClick={startRenaming}>
                   <Pencil /> Renomear
                 </DropdownMenuItem>
                 {canDelete && (
@@ -159,7 +167,7 @@ function ColumnHeader({ column, count, canDelete, editable }: { column: TaskColu
  */
 export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: string) => void }) {
   const data = useDemoData()
-  const { addTaskColumn, moveTask, deleteTask } = useDemoActions()
+  const { ensureDefaultTaskColumns, moveTask, deleteTask } = useDemoActions()
   const editable = useSession().can("tasks.edit")
   const [dragOver, setDragOver] = React.useState<string | null>(null)
   const [toDelete, setToDelete] = React.useState<Task | null>(null)
@@ -168,8 +176,8 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
   React.useEffect(() => {
     if (!editable || !data.hydrated || seeded.current || data.taskColumns.length > 0) return
     seeded.current = true
-    DEFAULT_COLUMNS.forEach((c) => addTaskColumn(c))
-  }, [editable, data.hydrated, data.taskColumns.length, addTaskColumn])
+    void ensureDefaultTaskColumns(DEFAULT_COLUMNS)
+  }, [editable, data.hydrated, data.taskColumns.length, ensureDefaultTaskColumns])
 
   // Quem só pode ver e abre um quadro ainda sem colunas vê as padrão, sem gravar nada.
   const columns = data.taskColumns.length

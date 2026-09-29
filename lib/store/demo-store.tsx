@@ -13,13 +13,17 @@ import { buildProcessDraft, toProcessMovements, type ImportProcessMeta } from "@
 import type { ProcessSheet } from "@/lib/services/processes/sheet"
 import { getSupabase } from "@/lib/supabase/client"
 import { useSplashReady } from "@/components/layout/app-splash"
-import { COLLECTION_LABELS, diffState, loadState, syncState, type PersistedState, type SyncResult } from "./storage"
+import { COLLECTION_LABELS, loadState, type Collection, type PersistedState, type Snapshot } from "./storage"
+import { OfficeSync, REVALIDATE_AFTER_HIDDEN_MS, type SaveResult, type SyncNotice } from "./office-sync"
+
+export type { SaveResult } from "./office-sync"
 
 /**
- * Store da aplicação, com os dados do escritório de quem está logado. As ações
- * atualizam a memória na hora e a gravação no Supabase acontece em seguida
- * (`storage.ts`), agrupada. Os componentes consomem apenas `useDemoData` e
- * `useDemoActions`; quem decide o que cada pessoa lê e grava é a RLS do banco.
+ * Store da aplicação, com os dados do escritório de quem está logado — uma cópia
+ * local do Supabase, que é a fonte de verdade. As ações atualizam a memória na hora
+ * e a gravação no Supabase acontece em seguida, agrupada; o que outras pessoas
+ * gravam chega pelo Realtime (`office-sync.ts`). Os componentes consomem apenas
+ * `useDemoData` e `useDemoActions`; quem decide o que cada pessoa lê e grava é a RLS.
  */
 
 export interface DemoState extends PersistedState {
@@ -44,14 +48,6 @@ const initialState = (): DemoState => ({
   loadError: false,
 })
 
-/** O que vai para o armazenamento: o estado sem os sinalizadores de sessão. */
-const persisted = (state: DemoState): PersistedState => {
-  const data: Partial<DemoState> = { ...state }
-  delete data.hydrated
-  delete data.loadError
-  return data as PersistedState
-}
-
 /** Junta o que foi salvo com o que foi criado antes do carregamento terminar. */
 function mergeById<T extends { id: string }>(current: T[], saved: T[] = []): T[] {
   const known = new Set(current.map((item) => item.id))
@@ -74,6 +70,14 @@ export type NewProcessInput = Pick<
 export type NewDocumentInput = Pick<LegalDocument, "name" | "kind" | "clientId" | "processId" | "extension" | "sizeBytes" | "storagePath">
 export type TaskColumnInput = Pick<TaskColumn, "name" | "color" | "isDone">
 
+/**
+ * Opções de quem salva a partir de um formulário: a versão do registro quando o
+ * formulário abriu (`versionOf`). Se outra pessoa gravou depois, salvar é recusado.
+ */
+export interface SaveOptions {
+  baseVersion?: string | null
+}
+
 /** Resultado de uma sincronização com a fonte externa. */
 export interface SyncOutcome {
   /** Movimentações que ainda não existiam no escritório. */
@@ -85,15 +89,18 @@ interface DemoActions {
   /** Tenta carregar de novo os dados do escritório depois de uma falha. */
   retryLoad(): void
   addClient(input: NewClientInput): Client
+  /** Versão (`updated_at`) do registro no banco — o formulário guarda ao abrir e passa em `SaveOptions`. */
+  versionOf(collection: Collection, id: string): string | null
   /** Atualiza o cadastro e registra na timeline o que mudou (status, responsável, dados). */
-  updateClient(id: string, patch: Partial<Client>): void
+  updateClient(id: string, patch: Partial<Client>, options?: SaveOptions): Promise<SaveResult<Client>>
   /** Exclui o cliente. Processos, documentos, tarefas e compromissos vinculados ficam sem cliente. */
   deleteClient(id: string): void
-  addProcess(input: NewProcessInput): Process
+  /** Cadastra e espera o banco, que gera o código interno. `null` se não foi possível (aviso já mostrado). */
+  addProcess(input: NewProcessInput): Promise<Process | null>
   /** Ajusta os dados do escritório de um processo (cliente, área, responsável…). */
-  updateProcess(id: string, patch: Partial<NewProcessInput>): Process | undefined
-  /** Cria um processo a partir de uma ficha vinda de consulta externa. */
-  importProcess(sheet: ProcessSheet, meta: ImportProcessMeta): Process
+  updateProcess(id: string, patch: Partial<NewProcessInput>, options?: SaveOptions): Promise<SaveResult<Process>>
+  /** Cria um processo a partir de uma ficha vinda de consulta externa (código gerado pelo banco). */
+  importProcess(sheet: ProcessSheet, meta: ImportProcessMeta): Promise<Process | null>
   /**
    * Aplica uma ficha reconsultada, importando só o que é novo. `checkedAt` (ISO)
    * é quando a fonte foi conferida — pode vir do cache do escritório.
@@ -102,18 +109,20 @@ interface DemoActions {
   deleteProcess(id: string): void
   toggleTask(id: string): Task | undefined
   addTask(input: NewTaskInput): Task
-  updateTask(id: string, patch: Partial<Task>): void
+  updateTask(id: string, patch: Partial<Task>, options?: SaveOptions): Promise<SaveResult<Task>>
   deleteTask(id: string): void
   /** Move a tarefa para outra coluna do quadro, sincronizando o status de conclusão. */
   moveTask(taskId: string, columnId: string): Task | undefined
   addTaskColumn(input: TaskColumnInput): TaskColumn
-  updateTaskColumn(id: string, patch: Partial<TaskColumnInput>): void
+  /** Colunas iniciais do quadro, com id fixo: duas pessoas abrindo o quadro vazio não duplicam. */
+  ensureDefaultTaskColumns(columns: TaskColumnInput[]): Promise<void>
+  updateTaskColumn(id: string, patch: Partial<TaskColumnInput>, options?: SaveOptions): Promise<SaveResult<TaskColumn>>
   /** Exclui a coluna (nunca a última); as tarefas dela vão para a coluna restante mais à esquerda. */
   deleteTaskColumn(id: string): void
   addAppointment(input: NewAppointmentInput): Appointment
   deleteAppointment(id: string): void
   addAppointmentCategory(input: AppointmentCategoryInput): AppointmentCategory
-  updateAppointmentCategory(id: string, patch: Partial<AppointmentCategoryInput>): void
+  updateAppointmentCategory(id: string, patch: Partial<AppointmentCategoryInput>, options?: SaveOptions): Promise<SaveResult<AppointmentCategory>>
   /** Exclui a categoria; os compromissos dela ficam sem categoria. */
   deleteAppointmentCategory(id: string): void
   addDocument(input: NewDocumentInput): LegalDocument
@@ -131,18 +140,13 @@ const ActionsContext = React.createContext<DemoActions | null>(null)
 
 const nowISO = () => toLocalISO(getNow())
 
-/** Código interno sequencial (#103000, #103001…), sem repetir após recarregar. */
-const nextProcessCode = (processes: Process[]) => {
-  const highest = processes.reduce((max, p) => Math.max(max, Number(p.code.replace(/\D/g, "")) || 0), 102999)
-  return `#${highest + 1}`
-}
 const base = () => ({ organizationId: account.currentOrgId(), createdAt: nowISO() })
 
 /**
  * Primeira carga dos dados, iniciada antes de a sessão terminar de carregar
  * (`SessionProvider`). O store usa esta promessa em vez de abrir outra.
  */
-let preloaded: Promise<PersistedState> | null = null
+let preloaded: Promise<Snapshot> | null = null
 
 export function preloadOfficeData() {
   preloaded ??= loadState(getSupabase())
@@ -178,15 +182,67 @@ const sameValue = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON
 const clientOfItem = (s: PersistedState, item: { clientId?: string; processId?: string }) =>
   item.clientId || (item.processId ? s.processes.find((p) => p.id === item.processId)?.clientId || undefined : undefined)
 
+/** Uma mensagem por situação (o `id` evita empilhar o mesmo aviso). */
+function showNotice(notice: SyncNotice) {
+  switch (notice.kind) {
+    case "stale":
+      toast.error(notice.removed ? "Este registro foi excluído por outra pessoa." : "Este registro foi alterado por outra pessoa.", {
+        id: "record-conflict",
+        description: notice.removed ? "Sua alteração não foi gravada." : "Sua alteração não foi gravada. Os dados atuais foram carregados novamente.",
+      })
+      return
+    case "insert-failed":
+      toast.error(
+        notice.error === "denied"
+          ? `Você não tem permissão para alterar ${COLLECTION_LABELS[notice.key]}.`
+          : "Não foi possível salvar. Tente de novo em instantes.",
+        { id: "insert-failed" },
+      )
+      return
+    case "write-failed": {
+      const { result } = notice
+      toast.error(
+        result.denied.length
+          ? `Você não tem permissão para alterar ${result.denied.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
+          : result.conflicts.includes("clients")
+            ? "Já existe um cliente com este CPF/CNPJ no escritório (ou o documento é inválido)."
+            : result.conflicts.length
+              ? `O banco recusou alterações em ${result.conflicts.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
+              : "Não foi possível salvar as últimas alterações.",
+        { description: "A tela foi atualizada com o que está salvo no escritório." },
+      )
+      return
+    }
+    case "realtime":
+      if (notice.connected) toast.dismiss("realtime")
+      else
+        toast.warning("Sem atualização em tempo real no momento.", {
+          id: "realtime",
+          description: "Tentando reconectar. O que outras pessoas alterarem aparece assim que a conexão voltar.",
+          duration: Infinity,
+        })
+      return
+  }
+}
+
 export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<DemoState>(initialState)
   useSplashReady("app", state.hydrated || state.loadError)
   const stateRef = React.useRef(state)
   // Recarregar após falha (`retryLoad`); aponta para `load`, definido mais abaixo.
   const loadRef = React.useRef<() => void>(() => {})
-  React.useEffect(() => {
-    stateRef.current = state
-  }, [state])
+
+  // Uma camada só para gravação, Realtime e revalidação, criada uma vez por montagem.
+  const [sync] = React.useState(
+    () =>
+      new OfficeSync<DemoState>({
+        supabase: getSupabase(),
+        organizationId: account.currentOrgId(),
+        state: stateRef,
+        render: setState,
+        notify: showNotice,
+      }),
+  )
 
   const actions = React.useMemo<DemoActions>(() => {
     const logActivity = (a: Omit<Activity, "id" | "organizationId" | "createdAt" | "at">): Activity => ({
@@ -202,9 +258,25 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       setState(next)
     }
 
+    /**
+     * Salva a edição de um registro vinda de um formulário: confere a versão que o
+     * formulário abriu, aplica e espera o banco confirmar (nada de "salvo" antes disso).
+     * `apply` devolve `false` quando não há o que gravar.
+     */
+    const save = async <T extends { id: string }>(collection: Collection, id: string, options: SaveOptions | undefined, apply: () => boolean) => {
+      const refused = sync.checkBase<T>(collection, id, options?.baseVersion)
+      if (refused) return refused
+      if (!apply()) return { status: "saved" } as SaveResult<T>
+      return sync.outcomeFor<T>(await sync.flush(), collection, id)
+    }
+
     return {
       retryLoad() {
         loadRef.current()
+      },
+
+      versionOf(collection, id) {
+        return sync.versionOf(collection, id)
       },
 
       addClient(input) {
@@ -235,33 +307,36 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return client
       },
 
-      updateClient(id, patch) {
-        const current = stateRef.current.clients.find((c) => c.id === id)
-        if (!current) return
-        const changed = (Object.keys(patch) as (keyof Client)[]).filter((key) => !sameValue(current[key], patch[key]))
-        if (!changed.length) return
-        const at = nowISO()
-        const updated: Client = { ...current, ...patch, updatedAt: at, lastActivityAt: at }
-        const actor = account.getUser(account.currentUserId()).name
-        const entry = (message: string, detail?: string) =>
-          logActivity({ type: "client", actor, message, detail, clientId: id, actorUserId: account.currentUserId(), href: `/clientes/${id}` })
+      updateClient(id, patch, options) {
+        return save<Client>("clients", id, options, () => {
+          const current = stateRef.current.clients.find((c) => c.id === id)
+          if (!current) return false
+          const changed = (Object.keys(patch) as (keyof Client)[]).filter((key) => !sameValue(current[key], patch[key]))
+          if (!changed.length) return false
+          const at = nowISO()
+          const updated: Client = { ...current, ...patch, updatedAt: at, lastActivityAt: at }
+          const actor = account.getUser(account.currentUserId()).name
+          const entry = (message: string, detail?: string) =>
+            logActivity({ type: "client", actor, message, detail, clientId: id, actorUserId: account.currentUserId(), href: `/clientes/${id}` })
 
-        const log: Activity[] = []
-        if (changed.includes("status")) {
-          log.push(
-            entry(
-              `alterou o status do cliente para ${CLIENT_STATUS[updated.status].label.toLowerCase()}.`,
-              `Antes: ${CLIENT_STATUS[current.status].label}`,
-            ),
-          )
-        }
-        if (changed.includes("ownerId")) {
-          log.push(entry(`definiu ${account.getUser(updated.ownerId).name} como responsável.`, `Antes: ${account.getUser(current.ownerId).name}`))
-        }
-        const fields = changed.map((key) => CLIENT_FIELD_LABELS[key]).filter(Boolean)
-        if (fields.length) log.push(entry("atualizou o cadastro do cliente.", `Alterado: ${fields.join(", ")}`))
+          const log: Activity[] = []
+          if (changed.includes("status")) {
+            log.push(
+              entry(
+                `alterou o status do cliente para ${CLIENT_STATUS[updated.status].label.toLowerCase()}.`,
+                `Antes: ${CLIENT_STATUS[current.status].label}`,
+              ),
+            )
+          }
+          if (changed.includes("ownerId")) {
+            log.push(entry(`definiu ${account.getUser(updated.ownerId).name} como responsável.`, `Antes: ${account.getUser(current.ownerId).name}`))
+          }
+          const fields = changed.map((key) => CLIENT_FIELD_LABELS[key]).filter(Boolean)
+          if (fields.length) log.push(entry("atualizou o cadastro do cliente.", `Alterado: ${fields.join(", ")}`))
 
-        commit((s) => ({ ...s, clients: s.clients.map((c) => (c.id === id ? updated : c)), activities: [...log, ...s.activities] }))
+          commit((s) => ({ ...s, clients: s.clients.map((c) => (c.id === id ? updated : c)), activities: [...log, ...s.activities] }))
+          return true
+        })
       },
 
       deleteClient(id) {
@@ -281,14 +356,14 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         }))
       },
 
-      addProcess(input) {
+      async addProcess(input) {
         const at = nowISO()
-        const code = nextProcessCode(stateRef.current.processes)
-        const process: Process = {
+        const draft: Process = {
           ...base(),
           ...input,
           id: uid("p"),
-          code,
+          // O banco gera o código (`0007_process_code.sql`).
+          code: "",
           distributedAt: at.slice(0, 10),
           lastMovementAt: at,
           movements: [
@@ -301,13 +376,14 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             },
           ],
         }
+        const process = await sync.insertNow("processes", draft)
+        if (!process) return null
         commit((s) => ({
           ...s,
-          processes: [process, ...s.processes],
           activities: [
             logActivity({
               type: "petition",
-              message: `Processo ${code} cadastrado.`,
+              message: `Processo ${process.code} cadastrado.`,
               detail: `${input.type} · ${s.clients.find((c) => c.id === input.clientId)?.name ?? ""}`,
               clientId: input.clientId,
               processId: process.id,
@@ -320,33 +396,35 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return process
       },
 
-      updateProcess(id, patch) {
-        const current = stateRef.current.processes.find((p) => p.id === id)
-        if (!current) return undefined
-        const updated: Process = { ...current, ...patch }
-        commit((s) => ({ ...s, processes: s.processes.map((p) => (p.id === id ? updated : p)) }))
-        return updated
+      updateProcess(id, patch, options) {
+        return save<Process>("processes", id, options, () => {
+          const current = stateRef.current.processes.find((p) => p.id === id)
+          if (!current) return false
+          const updated: Process = { ...current, ...patch }
+          commit((s) => ({ ...s, processes: s.processes.map((p) => (p.id === id ? updated : p)) }))
+          return true
+        })
       },
 
-      importProcess(sheet, meta) {
+      async importProcess(sheet, meta) {
         const at = nowISO()
-        const code = nextProcessCode(stateRef.current.processes)
         const draft = buildProcessDraft(sheet, meta, at)
-        const process: Process = {
+        const process = await sync.insertNow<Process>("processes", {
           ...base(),
           ...draft,
           id: uid("p"),
-          code,
+          // O banco gera o código (`0007_process_code.sql`).
+          code: "",
           movements: draft.movements.map((movement) => ({ ...movement, id: uid("m") })),
-        }
+        })
+        if (!process) return null
 
         commit((s) => ({
           ...s,
-          processes: [process, ...s.processes],
           activities: [
             logActivity({
               type: "petition",
-              message: `Processo ${code} importado da consulta processual.`,
+              message: `Processo ${process.code} importado da consulta processual.`,
               detail: [sheet.tribunal, process.type].filter(Boolean).join(" · "),
               clientId: process.clientId,
               processId: process.id,
@@ -489,8 +567,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return task
       },
 
-      updateTask(id, patch) {
-        commit((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }))
+      updateTask(id, patch, options) {
+        return save<Task>("tasks", id, options, () => {
+          if (!stateRef.current.tasks.some((t) => t.id === id)) return false
+          commit((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }))
+          return true
+        })
       },
 
       deleteTask(id) {
@@ -564,14 +646,32 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return column
       },
 
-      updateTaskColumn(id, patch) {
-        const name = patch.name?.trim()
-        commit((s) => ({
-          ...s,
-          taskColumns: s.taskColumns.map((c) =>
-            c.id === id ? { ...c, ...(name ? { name } : {}), ...(patch.color ? { color: patch.color } : {}) } : c,
-          ),
-        }))
+      ensureDefaultTaskColumns(columns) {
+        return sync.ensure<TaskColumn>(
+          "taskColumns",
+          columns.map((input, order) => ({
+            ...base(),
+            id: `col_padrao_${order}`,
+            name: input.name.trim(),
+            color: input.color,
+            order,
+            isDone: input.isDone,
+          })),
+        )
+      },
+
+      updateTaskColumn(id, patch, options) {
+        return save<TaskColumn>("taskColumns", id, options, () => {
+          if (!stateRef.current.taskColumns.some((c) => c.id === id)) return false
+          const name = patch.name?.trim()
+          commit((s) => ({
+            ...s,
+            taskColumns: s.taskColumns.map((c) =>
+              c.id === id ? { ...c, ...(name ? { name } : {}), ...(patch.color ? { color: patch.color } : {}) } : c,
+            ),
+          }))
+          return true
+        })
       },
 
       deleteTaskColumn(id) {
@@ -640,14 +740,18 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return category
       },
 
-      updateAppointmentCategory(id, patch) {
-        const name = patch.name?.trim()
-        commit((s) => ({
-          ...s,
-          appointmentCategories: s.appointmentCategories.map((c) =>
-            c.id === id ? { ...c, ...(name ? { name } : {}), ...(patch.color ? { color: patch.color } : {}) } : c,
-          ),
-        }))
+      updateAppointmentCategory(id, patch, options) {
+        return save<AppointmentCategory>("appointmentCategories", id, options, () => {
+          if (!stateRef.current.appointmentCategories.some((c) => c.id === id)) return false
+          const name = patch.name?.trim()
+          commit((s) => ({
+            ...s,
+            appointmentCategories: s.appointmentCategories.map((c) =>
+              c.id === id ? { ...c, ...(name ? { name } : {}), ...(patch.color ? { color: patch.color } : {}) } : c,
+            ),
+          }))
+          return true
+        })
       },
 
       deleteAppointmentCategory(id) {
@@ -783,20 +887,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         commit((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }))
       },
     }
-  }, [])
-
-  // Último estado que já foi para o banco (ou veio dele). Base da comparação na
-  // próxima gravação: só o que mudou desde então é enviado.
-  const savedRef = React.useRef<PersistedState | null>(null)
-  // Gravações em fila, na ordem em que aconteceram (criar e depois excluir, por exemplo).
-  const queueRef = React.useRef<Promise<void>>(Promise.resolve())
-
-  const replaceWithServer = React.useCallback((saved: PersistedState) => {
-    savedRef.current = saved
-    const next: DemoState = { ...saved, hydrated: true, loadError: false }
-    stateRef.current = next
-    setState(next)
-  }, [])
+  }, [sync])
 
   // Carrega o que a RLS deixa esta pessoa ver. Uma vez por sessão (ou de novo, após falha).
   const cancelledRef = React.useRef(false)
@@ -807,17 +898,17 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     }
     // A primeira carga reaproveita a que começou junto com a sessão; novas tentativas buscam de novo.
     initialLoad()
-      .then((saved) => {
+      .then((snapshot) => {
         if (cancelledRef.current) return
         preloaded = null
-        savedRef.current = saved
         // O que foi criado antes de terminar de carregar entra junto (e é gravado a seguir).
         const current = stateRef.current
         const next = { hydrated: true, loadError: false } as DemoState
-        for (const key of Object.keys(saved) as (keyof PersistedState)[]) {
-          ;(next as unknown as Record<string, unknown>)[key] = mergeById<{ id: string }>(current[key], saved[key])
+        for (const key of Object.keys(snapshot.state) as (keyof PersistedState)[]) {
+          ;(next as unknown as Record<string, unknown>)[key] = mergeById<{ id: string }>(current[key], snapshot.state[key])
         }
         stateRef.current = next
+        sync.hydrate(snapshot)
         setState(next)
       })
       .catch((error) => {
@@ -828,7 +919,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         setState(stateRef.current)
         toast.error("Não foi possível carregar os dados do escritório.", { description: "Verifique a conexão e tente de novo." })
       })
-  }, [])
+  }, [sync])
   React.useEffect(() => {
     loadRef.current = load
     cancelledRef.current = false
@@ -838,57 +929,38 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [load])
 
-  // Gravação agrupada: várias mudanças seguidas viram uma ida ao banco. Se o banco
-  // recusar (sem permissão, falha de rede), a tela volta a mostrar o que está salvo.
-  const persist = React.useCallback(() => {
-    const saved = savedRef.current
-    if (!saved || !stateRef.current.hydrated) return
-    const next = persisted(stateRef.current)
-    const diff = diffState(saved, next)
-    if (!Object.keys(diff).length) return
-    savedRef.current = next
-    const organizationId = account.currentOrgId()
+  // Tempo real: uma assinatura por montagem do store, removida ao desmontar.
+  React.useEffect(() => sync.subscribe(), [sync])
 
-    queueRef.current = queueRef.current.then(async () => {
-      const supabase = getSupabase()
-      const result = await syncState(supabase, organizationId, diff).catch((): SyncResult => ({ denied: [], conflicts: [], failed: true }))
-      if (!result.denied.length && !result.conflicts.length && !result.failed) return
-      toast.error(
-        result.denied.length
-          ? `Você não tem permissão para alterar ${result.denied.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
-          : result.conflicts.includes("clients")
-            ? "Já existe um cliente com este CPF/CNPJ no escritório (ou o documento é inválido)."
-            : result.conflicts.length
-              ? `O banco recusou alterações em ${result.conflicts.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
-              : "Não foi possível salvar as últimas alterações.",
-        { description: "A tela foi atualizada com o que está salvo no escritório." },
-      )
-      try {
-        replaceWithServer(await loadState(supabase))
-      } catch (error) {
-        console.error(error)
-      }
-    })
-  }, [replaceWithServer])
-
+  // Gravação agrupada: várias mudanças seguidas viram uma ida ao banco.
   React.useEffect(() => {
     if (!state.hydrated) return
-    const timer = window.setTimeout(persist, 300)
+    const timer = window.setTimeout(() => void sync.flush(), 300)
     return () => window.clearTimeout(timer)
-  }, [state, persist])
+  }, [state, sync])
 
-  // Ao sair ou trocar de aba, grava na hora.
+  // Ao sair ou trocar de aba, grava na hora. Ao voltar depois de alguns minutos (ou
+  // se o tempo real caiu no meio), confere com o banco o que mudou enquanto isso.
   React.useEffect(() => {
-    const onHidden = () => {
-      if (document.visibilityState === "hidden") persist()
+    let hiddenAt: number | null = null
+    const flush = () => void sync.flush()
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt ??= Date.now()
+        flush()
+        return
+      }
+      const away = hiddenAt === null ? 0 : Date.now() - hiddenAt
+      hiddenAt = null
+      if (away >= REVALIDATE_AFTER_HIDDEN_MS || !sync.realtimeConnected) void sync.revalidate()
     }
-    window.addEventListener("pagehide", persist)
-    document.addEventListener("visibilitychange", onHidden)
+    window.addEventListener("pagehide", flush)
+    document.addEventListener("visibilitychange", onVisibility)
     return () => {
-      window.removeEventListener("pagehide", persist)
-      document.removeEventListener("visibilitychange", onHidden)
+      window.removeEventListener("pagehide", flush)
+      document.removeEventListener("visibilitychange", onVisibility)
     }
-  }, [persist])
+  }, [sync])
 
   return (
     <ActionsContext.Provider value={actions}>

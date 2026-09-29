@@ -48,14 +48,18 @@ type FormState = ReturnType<typeof initialState>
 
 function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Defaults; onClose: () => void }) {
   const data = useDemoData()
-  const { addTask, updateTask } = useDemoActions()
+  const { addTask, updateTask, versionOf } = useDemoActions()
   const [form, setForm] = React.useState(() => initialState(task, defaults))
   const [error, setError] = React.useState("")
+  // Versão da tarefa quando o formulário abriu: se outra pessoa salvar antes, esta edição é recusada.
+  const [baseVersion, setBaseVersion] = React.useState(() => (task ? versionOf("tasks", task.id) : null))
+  const [saving, setSaving] = React.useState(false)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
     if (form.title.trim().length < 3) {
       setError("Descreva a tarefa em poucas palavras.")
       return
@@ -69,8 +73,17 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
       related: decodeRelated(form.related),
     }
     if (task) {
-      updateTask(task.id, payload)
-      toast.success("Alterações salvas.")
+      setSaving(true)
+      const result = await updateTask(task.id, payload, { baseVersion })
+      setSaving(false)
+      if (result.status === "conflict") {
+        // O aviso já apareceu; o formulário mostra a tarefa como está agora para revisar.
+        setForm(initialState(result.current, defaults))
+        setBaseVersion(versionOf("tasks", task.id))
+        return
+      }
+      if (result.status === "error") return
+      if (result.status === "saved") toast.success("Alterações salvas.")
     } else {
       const columnId = defaults?.columnId ?? data.taskColumns.find((c) => !c.isDone)?.id
       addTask({ ...payload, columnId })
@@ -161,7 +174,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit" form="task-form">
+        <Button type="submit" form="task-form" disabled={saving}>
           {task ? "Salvar alterações" : "Criar tarefa"}
         </Button>
       </ModalFooter>

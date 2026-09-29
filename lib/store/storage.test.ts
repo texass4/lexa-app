@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { diffCollection, diffState, orderCollection, type PersistedState } from "./storage"
+import { compareVersions, diffCollection, diffState, orderCollection, removeById, upsertById, versionValue, type PersistedState } from "./storage"
 
 const empty = (): PersistedState => ({
   clients: [],
@@ -68,5 +68,47 @@ describe("sincronização com o banco", () => {
       orderCollection("appointments", items).map((x) => x.id),
       ["1", "3", "2"],
     )
+  })
+})
+
+describe("versão dos registros (updated_at)", () => {
+  it("entende o formato da API e o do Realtime como a mesma versão", () => {
+    assert.equal(compareVersions("2026-09-29T10:00:00.123456+00:00", "2026-09-29 10:00:00.123456+00"), 0)
+    assert.equal(compareVersions("2026-09-29T07:00:00.5-03:00", "2026-09-29T10:00:00.500000Z"), 0)
+  })
+
+  it("distingue microssegundos (o Date do JS só vê milissegundos)", () => {
+    assert.ok(compareVersions("2026-09-29T10:00:00.123457+00:00", "2026-09-29T10:00:00.123456+00:00") > 0)
+    assert.ok(compareVersions("2026-09-29T10:00:00.123456+00:00", "2026-09-29T10:00:00.123457+00:00") < 0)
+  })
+
+  it("não aceita data inválida como versão", () => {
+    assert.ok(Number.isNaN(versionValue("ontem")))
+  })
+})
+
+describe("aplicar registros do banco no store", () => {
+  it("não duplica: o mesmo id é substituído no lugar", () => {
+    const a = { id: "a", v: 1 }
+    const b = { id: "b", v: 1 }
+    const b2 = { id: "b", v: 2 }
+    const list = upsertById("tasks", [a, b], b2)
+    assert.deepEqual(list, [a, b2])
+    // Aplicar de novo (eco do Realtime) não muda nada — nem a identidade da lista.
+    assert.equal(upsertById("tasks", list, b2), list)
+  })
+
+  it("registro novo entra onde as ações colocariam", () => {
+    const a = { id: "a" }
+    const n = { id: "n" }
+    assert.deepEqual(upsertById("tasks", [a], n), [n, a])
+    assert.deepEqual(upsertById("appointments", [a], n), [a, n])
+  })
+
+  it("remove por id, e remover de novo não faz nada", () => {
+    const a = { id: "a" }
+    const list = removeById([a, { id: "b" }], "b")
+    assert.deepEqual(list, [a])
+    assert.equal(removeById(list, "b"), list)
   })
 })

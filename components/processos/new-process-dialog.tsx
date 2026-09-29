@@ -36,8 +36,12 @@ export function NewProcessDialog({ open, onOpenChange, clientId }: { open: boole
 type Lookup =
   | { state: "idle" }
   | { state: "loading"; startedAt: number }
-  /** Consulta concluída: o processo já está salvo em Processos (`processId`). */
-  | { state: "filled"; cnj: string; summary: LookupSummary; processId: string; existed: boolean }
+  /**
+   * Consulta concluída: o processo já está salvo em Processos (`processId`).
+   * `baseVersion`: versão do processo quando o formulário foi preenchido — se outra
+   * pessoa alterar depois, "Salvar processo" é recusado em vez de sobrescrever.
+   */
+  | { state: "filled"; cnj: string; summary: LookupSummary; processId: string; existed: boolean; baseVersion: string | null }
   | { state: "error"; title: string; message: string; retry: boolean }
 
 const ERROR_TITLE: Partial<Record<LookupFailure["reason"], string>> = {
@@ -49,12 +53,26 @@ const ERROR_TITLE: Partial<Record<LookupFailure["reason"], string>> = {
   disabled: "Consulta automática desativada",
 }
 
+/** Campos do formulário a partir de um processo salvo. */
+const pickForm = (existing: Process) => ({
+  number: existing.number,
+  clientId: existing.clientId,
+  area: existing.area,
+  type: existing.type,
+  court: existing.court,
+  district: existing.district,
+  opposingParty: existing.opposingParty,
+  ownerId: existing.ownerId,
+  status: existing.status,
+  claimValue: existing.claimValue,
+})
+
 /** Já salvo e atualizado há pouco: não precisa consultar de novo. */
 const isRecent = (process: Process) => !!process.lastSyncedAt && getNow().getTime() - parse(process.lastSyncedAt).getTime() < AUTO_REFRESH_AFTER_MS
 
 function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => void }) {
   const data = useDemoData()
-  const { addProcess, importProcess, updateProcess, applyProcessSync } = useDemoActions()
+  const { addProcess, importProcess, updateProcess, applyProcessSync, versionOf } = useDemoActions()
   const router = useRouter()
   const initial = () => ({
     number: "",
@@ -72,6 +90,8 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
   const [form, setForm] = React.useState(initial)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
   const [lookup, setLookup] = React.useState<Lookup>({ state: "idle" })
+  // Esperando o banco (código do processo, conferência de versão): evita cadastrar duas vezes.
+  const [saving, setSaving] = React.useState(false)
   const abortRef = React.useRef<AbortController | null>(null)
 
   // Fechar o modal no meio da consulta encerra a espera (o servidor ainda guarda o resultado no cache).
@@ -98,25 +118,21 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
 
     const open = (id: string) => ({ label: "Abrir", onClick: () => router.push(`/processos/${id}`) })
     const known = findByCnj(digits)
-    const formFrom = (existing: Process) => ({
-      number: existing.number,
-      clientId: existing.clientId,
-      area: existing.area,
-      type: existing.type,
-      court: existing.court,
-      district: existing.district,
-      opposingParty: existing.opposingParty,
-      ownerId: existing.ownerId,
-      status: existing.status,
-      claimValue: existing.claimValue,
-    })
+    const formFrom = pickForm
 
     // Já está em Processos e foi atualizado há pouco: responde na hora, sem consulta.
     if (known && isRecent(known) && isAutoTracked(known.source?.provider)) {
       abortRef.current?.abort()
       setForm(formFrom(known))
       setErrors({})
-      setLookup({ state: "filled", cnj: digits, summary: summaryFromProcess(known), processId: known.id, existed: true })
+      setLookup({
+        state: "filled",
+        cnj: digits,
+        summary: summaryFromProcess(known),
+        processId: known.id,
+        existed: true,
+        baseVersion: versionOf("processes", known.id),
+      })
       toast.success("Esse processo já está em Processos.", { description: `${known.code} · informações em dia.`, action: open(known.id) })
       return
     }
@@ -150,10 +166,11 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
 
     if (existing) {
       // Já estava em Processos: atualiza e traz os dados do escritório para o formulário.
+      const baseVersion = versionOf("processes", existing.id)
       const { added } = applyProcessSync(existing.id, found, result.checkedAt)
       fillForm(formFrom(existing))
       setErrors({})
-      setLookup({ state: "filled", cnj: found.cnj, summary: summaryFromSheet(found), processId: existing.id, existed: true })
+      setLookup({ state: "filled", cnj: found.cnj, summary: summaryFromSheet(found), processId: existing.id, existed: true, baseVersion })
       toast.success("Esse processo já estava em Processos.", {
         description: added
           ? `${existing.code} atualizado com ${added === 1 ? "1 nova movimentação" : `${added} novas movimentações`}.`
@@ -174,7 +191,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
       opposingParty: found.parties.passive[0]?.name ?? form.opposingParty,
       area,
     }
-    const created = importProcess(found, {
+    const created = await importProcess(found, {
       clientId: filled.clientId,
       ownerId: filled.ownerId,
       area: filled.area,
@@ -185,17 +202,30 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
       court: filled.court,
       opposingParty: filled.opposingParty || undefined,
     })
+    // Não foi possível salvar (o aviso já apareceu): o formulário continua para tentar de novo.
+    if (!created) {
+      setLookup({ state: "idle" })
+      return
+    }
     fillForm(filled)
     setErrors({})
-    setLookup({ state: "filled", cnj: found.cnj, summary: summaryFromSheet(found), processId: created.id, existed: false })
+    setLookup({
+      state: "filled",
+      cnj: found.cnj,
+      summary: summaryFromSheet(found),
+      processId: created.id,
+      existed: false,
+      baseVersion: versionOf("processes", created.id),
+    })
     toast.success("Processo salvo em Processos.", {
       description: `${created.code} · ${found.movements.length} movimentações importadas`,
       action: open(created.id),
     })
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
     const next: Record<string, string> = {}
     if (digits.length !== 20) next.number = "Número CNJ deve ter 20 dígitos."
     if (form.type.trim().length < 3) next.type = "Informe o tipo de ação."
@@ -208,7 +238,8 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
 
     // Consultado: o processo já existe — só grava os ajustes do formulário.
     if (linked) {
-      const updated = updateProcess(linked.processId, {
+      setSaving(true)
+      const patch = {
         clientId: form.clientId,
         area: form.area,
         type: form.type.trim(),
@@ -218,17 +249,31 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
         ownerId: form.ownerId,
         status: form.status,
         claimValue: form.claimValue,
-      })
+      }
+      const result = await updateProcess(linked.processId, patch, { baseVersion: linked.baseVersion })
+      setSaving(false)
+      if (result.status === "conflict") {
+        // Outra pessoa alterou: o formulário mostra o processo como está agora.
+        setForm((current) => ({ ...current, ...pickForm(result.current) }))
+        setLookup({ ...linked, baseVersion: versionOf("processes", linked.processId) })
+        return
+      }
+      if (result.status === "error") return
       onClose()
-      if (updated) toast.success("Processo salvo.", { description: `${updated.code} · ${updated.type}`, action: open(updated.id) })
+      const saved = data.processes.find((p) => p.id === linked.processId)
+      if (result.status === "saved" && saved)
+        toast.success("Processo salvo.", { description: `${saved.code} · ${patch.type}`, action: open(saved.id) })
       return
     }
 
-    const process = addProcess({
+    setSaving(true)
+    const process = await addProcess({
       ...form,
       court: form.court || "A definir",
       opposingParty: form.opposingParty || "A definir",
     })
+    setSaving(false)
+    if (!process) return
     onClose()
     toast.success("Processo cadastrado.", { description: `${process.code} · ${process.type}`, action: open(process.id) })
   }
@@ -351,7 +396,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
         <Button variant="secondary" onClick={onClose}>
           {linked ? "Fechar" : "Cancelar"}
         </Button>
-        <Button type="submit" form="process-form" disabled={loading}>
+        <Button type="submit" form="process-form" disabled={loading || saving}>
           {linked ? "Salvar processo" : "Cadastrar processo"}
         </Button>
       </ModalFooter>
