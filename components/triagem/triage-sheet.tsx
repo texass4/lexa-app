@@ -20,6 +20,7 @@ import { KIND_LABEL, SOURCE_LABEL, isOpen, requiresAction, stateBadge, suggested
 import type { Intimacao, TriageItem } from "@/types"
 import { useTriagem, type TriageEvent } from "./triagem-provider"
 import { ConfirmPrazoDialog } from "./confirm-prazo-dialog"
+import { AIPrivacyNote } from "@/components/ai/ai-privacy"
 
 const ACTION_LABEL: Record<TriageEvent["action"], string> = {
   capturado: "registrou o evento",
@@ -217,6 +218,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
               <p className="flex items-center gap-1 text-[11.5px] text-subtle">
                 <Sparkles className="size-3" /> Interpretado uma vez em {fmtDateTime(i.ai.generatedAt)}. Confira no original antes de decidir.
               </p>
+              <AIPrivacyNote />
             </div>
           ) : (
             <p className="text-[12.5px] text-muted-foreground">

@@ -14,6 +14,7 @@ import { ProfileSection } from "./profile-section"
 import { OfficeSection } from "./office-section"
 import { MembersManager } from "./members-manager"
 import { PermissionsSection } from "./permissions-section"
+import { AIPrivacyCard } from "@/components/ai/ai-privacy"
 import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
 import type { Tone } from "@/lib/config"
@@ -96,8 +97,10 @@ function WhatsAppCard() {
     whatsappApi
       .instance()
       .then((info) => !cancelled && setState({ info, loading: false }))
-      .catch((error: unknown) =>
-        !cancelled && setState({ info: null, loading: false, failure: error instanceof Error ? error.message : "Não foi possível verificar a conexão." }),
+      .catch(
+        (error: unknown) =>
+          !cancelled &&
+          setState({ info: null, loading: false, failure: error instanceof Error ? error.message : "Não foi possível verificar a conexão." }),
       )
     return () => {
       cancelled = true
@@ -228,6 +231,7 @@ function MonitoringCard() {
 function IntegrationsSection() {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <AIPrivacyCard />
       <MonitoringCard />
       <WhatsAppCard />
       {UPCOMING.map((it) => (

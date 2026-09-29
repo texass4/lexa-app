@@ -1,9 +1,12 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { DEFAULT_GEMINI_MODEL, getAIConfig, getAIStatus } from "./config"
+import { DEFAULT_AI_LIGHT_MODEL, DEFAULT_AI_MODEL, describeAIModels, getAIConfig, getAIStatus } from "./config"
 import { AIError } from "./errors"
 import { GeminiProvider, type GeminiClientLike, type GeminiResponseLike } from "./gemini"
-import { RateLimiter, ResultCache } from "./guard"
+import { InFlight, MemoryAICache } from "./guard"
+import { meteredCall } from "./metering"
+import { estimateCost, priceOf, priceTable } from "./pricing"
+import { fakeProvider, memoryMeter } from "./__fixtures__/data"
 import { groundingWarnings, keepKnownNotes, keepKnownRefs, stripUnknownRefs } from "./grounding"
 import { readChatInput, readId } from "./input"
 import { SchemaError } from "./schema"
@@ -23,20 +26,41 @@ const code = (fn: () => unknown) => {
 
 describe("configuração da IA", () => {
   it("sem GEMINI_API_KEY não configura (e não inventa resposta)", () => {
-    assert.equal(code(() => getAIConfig({})), "NOT_CONFIGURED")
-    assert.equal(code(() => getAIConfig({ GEMINI_API_KEY: "   " })), "NOT_CONFIGURED")
+    assert.equal(
+      code(() => getAIConfig({})),
+      "NOT_CONFIGURED",
+    )
+    assert.equal(
+      code(() => getAIConfig({ GEMINI_API_KEY: "   " })),
+      "NOT_CONFIGURED",
+    )
     assert.deepEqual(getAIStatus({}), { enabled: true, configured: false })
   })
 
   it("AI_ENABLED=false desliga mesmo com chave", () => {
-    assert.equal(code(() => getAIConfig({ AI_ENABLED: "false", GEMINI_API_KEY: "k" })), "DISABLED")
+    assert.equal(
+      code(() => getAIConfig({ AI_ENABLED: "false", GEMINI_API_KEY: "k" })),
+      "DISABLED",
+    )
     assert.deepEqual(getAIStatus({ AI_ENABLED: "false", GEMINI_API_KEY: "k" }), { enabled: false, configured: true })
   })
 
-  it("usa o modelo Flash padrão e aceita GEMINI_MODEL", () => {
-    assert.equal(getAIConfig({ GEMINI_API_KEY: "k" }).model, DEFAULT_GEMINI_MODEL)
+  it("modelo por ambiente: AI_MODEL (ou o nome antigo GEMINI_MODEL) e AI_MODEL_LIGHT", () => {
+    const defaults = getAIConfig({ GEMINI_API_KEY: "k" })
+    assert.deepEqual([defaults.model, defaults.lightModel], [DEFAULT_AI_MODEL, DEFAULT_AI_LIGHT_MODEL])
     assert.equal(getAIConfig({ GEMINI_API_KEY: "k", GEMINI_MODEL: "gemini-flash-latest" }).model, "gemini-flash-latest")
-    assert.equal(code(() => getAIConfig({ GEMINI_API_KEY: "k", GEMINI_MODEL: "x; rm -rf" })), "NOT_CONFIGURED")
+    assert.equal(getAIConfig({ GEMINI_API_KEY: "k", AI_MODEL: "gemini-x", GEMINI_MODEL: "velho" }).model, "gemini-x")
+    assert.equal(getAIConfig({ GEMINI_API_KEY: "k", AI_MODEL: "gemini-x", AI_MODEL_LIGHT: "off" }).lightModel, "gemini-x")
+    assert.equal(
+      code(() => getAIConfig({ GEMINI_API_KEY: "k", GEMINI_MODEL: "x; rm -rf" })),
+      "NOT_CONFIGURED",
+    )
+    assert.equal(
+      code(() => getAIConfig({ GEMINI_API_KEY: "k", AI_MODEL_LIGHT: "a b" })),
+      "NOT_CONFIGURED",
+    )
+    // A descrição para as telas nunca inclui a chave.
+    assert.doesNotMatch(JSON.stringify(describeAIModels({ GEMINI_API_KEY: "segredo" })), /segredo/)
   })
 })
 
@@ -86,9 +110,52 @@ describe("GeminiProvider", () => {
     assert.equal(calls[1].config?.thinkingConfig, undefined)
   })
 
+  it("operação simples usa o modelo leve (sem raciocínio); se ele falhar, o principal responde", async () => {
+    const calls: { model: string; config?: { thinkingConfig?: unknown } }[] = []
+    let first = true
+    const client: GeminiClientLike = {
+      models: {
+        generateContent: async (params) => {
+          calls.push(params as { model: string })
+          if (first) {
+            first = false
+            throw apiError(503)
+          }
+          return {
+            text: "ok",
+            usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 10, thoughtsTokenCount: 5, cachedContentTokenCount: 60 },
+          }
+        },
+      },
+    }
+    const provider = new GeminiProvider({
+      apiKey: "k",
+      model: "gemini-2.5-flash",
+      lightModel: "gemini-2.5-flash-lite",
+      timeoutMs: 5_000,
+      client,
+      retryDelayMs: 0,
+    })
+    const result = await provider.generateText({ ...request, tier: "light" })
+    assert.deepEqual(
+      calls.map((c) => c.model),
+      ["gemini-2.5-flash-lite", "gemini-2.5-flash"],
+    )
+    assert.equal(calls[0].config?.thinkingConfig, undefined)
+    // Raciocínio conta como saída; o que veio do cache do provedor fica separado.
+    assert.deepEqual(result.usage, { inputTokens: 100, outputTokens: 15, cachedTokens: 60, model: "gemini-2.5-flash" })
+  })
+
   it("mapeia o papel do assistente para 'model'", async () => {
     const { provider, calls } = gemini({ text: "ok" })
-    await provider.generateText({ system: "s", messages: [{ role: "user", content: "a" }, { role: "assistant", content: "b" }, { role: "user", content: "c" }] })
+    await provider.generateText({
+      system: "s",
+      messages: [
+        { role: "user", content: "a" },
+        { role: "assistant", content: "b" },
+        { role: "user", content: "c" },
+      ],
+    })
     assert.deepEqual(
       (calls[0].contents as { role: string }[]).map((c) => c.role),
       ["user", "model", "user"],
@@ -129,7 +196,9 @@ describe("GeminiProvider", () => {
       assert.doesNotMatch((failure as AIError).userMessage, /xyz|detalhe interno/)
     }
     assert.equal(await rejects(gemini(apiError(400, "API key not valid")).provider.generateText(request)), "INVALID_API_KEY")
-    const missingModel = (await gemini(apiError(404)).provider.generateText(request).catch((e: AIError) => e)) as AIError
+    const missingModel = (await gemini(apiError(404))
+      .provider.generateText(request)
+      .catch((e: AIError) => e)) as AIError
     assert.equal(missingModel.providerStatus, 404)
   })
 
@@ -194,57 +263,71 @@ describe("GeminiProvider", () => {
   })
 })
 
-describe("limite de uso e cache", () => {
-  it("bloqueia depois do limite e libera quando a janela passa", () => {
-    let now = 0
-    const limiter = new RateLimiter(() => now)
-    const rules = [{ limit: 2, windowMs: 1000 }]
-    limiter.consume([{ key: "u", rules }])
-    limiter.consume([{ key: "u", rules }])
-    const error = (() => {
-      try {
-        limiter.consume([{ key: "u", rules }])
-      } catch (e) {
-        return e as AIError
-      }
-    })()
-    assert.equal(error?.code, "RATE_LIMITED")
-    assert.equal(error?.retryAfter, 1)
-    now = 1001
-    assert.doesNotThrow(() => limiter.consume([{ key: "u", rules }]))
+describe("custo, medição e cache", () => {
+  it("custo estimado por modelo, com desconto do cache do provedor", () => {
+    assert.equal(estimateCost("gemini-2.5-flash", { inputTokens: 1_000_000, outputTokens: 1_000_000 }), 2.8)
+    assert.equal(estimateCost("gemini-2.5-flash-lite", { inputTokens: 1_000_000, outputTokens: 0, cachedTokens: 1_000_000 }), 0.01)
+    assert.equal(estimateCost("gemini-2.5-flash-preview-09-2025", { inputTokens: 1000, outputTokens: 0 }), 0.0003)
+    assert.equal(estimateCost("modelo-sem-preco", { inputTokens: 10, outputTokens: 10 }), null)
+    assert.equal(estimateCost("gemini-2.5-flash", {}), null)
   })
 
-  it("pedido bloqueado por uma regra não conta nas outras chaves", () => {
-    const limiter = new RateLimiter(() => 0)
-    const tight = [{ limit: 1, windowMs: 1000 }]
-    const loose = [{ limit: 5, windowMs: 1000 }]
-    limiter.consume([{ key: "user", rules: tight }, { key: "org", rules: loose }])
-    assert.throws(() => limiter.consume([{ key: "user", rules: tight }, { key: "org", rules: loose }]))
-    for (let i = 0; i < 4; i++) limiter.consume([{ key: `other${i}`, rules: tight }, { key: "org", rules: loose }])
+  it("AI_PRICES sobrepõe a tabela sem mexer no código", () => {
+    const table = priceTable({ AI_PRICES: '{"gemini-3-flash":{"input":0.5,"output":3},"ruim":{"input":"x"}}' })
+    assert.deepEqual(priceOf("gemini-3-flash", table), { input: 0.5, output: 3 })
+    assert.equal(priceOf("ruim", table), undefined)
+    assert.ok(priceOf("gemini-2.5-flash", priceTable({ AI_PRICES: "{quebrado" })))
   })
 
-  it("cliques repetidos viram uma chamada; resultado expira", async () => {
-    let now = 0
+  it("toda chamada ao modelo é reservada e registrada: modelo, tokens, custo, sucesso ou erro", async () => {
+    const { meter, events } = memoryMeter()
+    const { provider } = fakeProvider(() => ({ ok: true }))
+    const context = { organizationId: "org", userId: "u1", operation: "process.summary" }
+    await meteredCall(meter, provider, context, "standard", () => provider.generateJSON({ ...request, schema: {} }))
+    await assert.rejects(meteredCall(meter, provider, context, "light", async () => Promise.reject(new AIError("TIMEOUT"))))
+    assert.deepEqual(
+      events.map((e) => [e.status, e.model, e.outcome?.errorCode]),
+      [
+        ["ok", "fake-flash", undefined],
+        ["erro", "fake-flash-lite", "TIMEOUT"],
+      ],
+    )
+    assert.deepEqual(events[0].outcome?.usage, { inputTokens: 10, outputTokens: 5, model: "fake-flash" })
+  })
+
+  it("limite do plano: recusa antes de chamar o modelo", async () => {
+    const { meter } = memoryMeter({ monthlyLimit: 1 })
+    const { provider, calls } = fakeProvider(() => ({}))
+    const context = { organizationId: "org", userId: null, operation: "triage.interpret" }
+    await meteredCall(meter, provider, context, "light", () => provider.generateJSON({ ...request, schema: {} }))
+    await assert.rejects(
+      meteredCall(meter, provider, context, "light", () => provider.generateJSON({ ...request, schema: {} })),
+      (error: AIError) => {
+        assert.equal(error.code, "PLAN_LIMIT")
+        assert.equal(error.status, 429)
+        return true
+      },
+    )
+    assert.equal(calls.length, 1)
+  })
+
+  it("pedidos iguais ao mesmo tempo viram uma chamada; falha não fica guardada", async () => {
+    const inFlight = new InFlight<number>()
     let produced = 0
-    const cache = new ResultCache<number>({ ttlMs: 100, now: () => now })
-    const produce = async () => {
-      produced += 1
-      return 42
-    }
-    const [a, b] = await Promise.all([cache.run("k", produce), cache.run("k", produce)])
-    assert.equal(a, 42)
-    assert.equal(b, 42)
-    assert.equal(produced, 1)
-    assert.equal(cache.get("k"), 42)
-    now = 101
-    assert.equal(cache.get("k"), undefined)
+    const produce = async () => ++produced
+    const [a, b] = await Promise.all([inFlight.run("k", produce), inFlight.run("k", produce)])
+    assert.deepEqual([a, b, produced], [1, 1, 1])
+    await assert.rejects(inFlight.run("x", async () => Promise.reject(new Error("x"))))
+    assert.equal(await inFlight.run("x", async () => 7), 7)
   })
 
-  it("falha não fica no cache", async () => {
-    const cache = new ResultCache<number>()
-    await assert.rejects(cache.run("k", async () => Promise.reject(new Error("x"))))
-    assert.equal(cache.get("k"), undefined)
-    assert.equal(await cache.run("k", async () => 1), 1)
+  it("cache expira", async () => {
+    let now = 0
+    const cache = new MemoryAICache(() => now)
+    await cache.set("k", { organizationId: "o", operation: "op", value: 42, ttlMs: 100 })
+    assert.equal(await cache.get("k"), 42)
+    now = 101
+    assert.equal(await cache.get("k"), undefined)
   })
 })
 

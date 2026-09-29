@@ -2,16 +2,20 @@
  * Panorama do escritório. O backend calcula os números (`computeOfficeMetrics`)
  * e escolhe listas curtas do que merece atenção; a IA só interpreta.
  * Nenhum registro completo é enviado.
+ *
+ * Leitura enxuta: clientes e documentos entram só como contagens do banco; tarefas
+ * só as pendentes; prazos só os abertos; agenda só dos próximos dias; faturas só as em
+ * aberto e as do mês atual e do anterior; processos sem o histórico de movimentações.
  */
 
 import { PROCESS_STATUS } from "@/lib/config"
 import { STALE_DAYS } from "@/lib/attention"
-import { addDays, parse, startOfDay, startOfWeek } from "@/lib/dates"
+import { addDays, parse, startOfDay, startOfWeek, toLocalISO } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
 import { financeSummary, isOverdue } from "@/lib/selectors"
 import { isOpenPrazo, nextPrazo } from "@/lib/prazos"
 import type { OfficeMetrics } from "@/lib/ai/types"
-import type { Appointment, Client, Invoice, LegalDocument, Prazo, Task } from "@/types"
+import type { Appointment, Invoice, Prazo, Task } from "@/types"
 import type { AIRepository, Member, ProcessOverview } from "./repository"
 import {
   type BuiltContext,
@@ -41,35 +45,47 @@ export const OFFICE_LIMITS = {
 } as const
 
 export interface OfficeData {
-  clients: Client[]
+  /** Contagens de clientes (null = sem acesso ou falha). */
+  clientStats: { total: number; active: number; delinquent: number } | null
+  /** Nome só dos clientes citados (processos e faturas listados). */
+  clientNames: Map<string, string>
   processes: ProcessOverview[]
+  /** Só pendentes. */
   tasks: Task[]
+  /** Só abertos. */
   prazos: Prazo[]
+  /** De hoje até os próximos 7 dias. */
   appointments: Appointment[]
-  documents: LegalDocument[]
+  documentStats: { total: number; addedLast30Days: number } | null
+  /** Em aberto, ou com vencimento/pagamento no mês atual ou no anterior. */
   invoices: Invoice[]
   members: Member[]
   can: { clients: boolean; processes: boolean; tasks: boolean; agenda: boolean; documents: boolean; finance: boolean }
 }
 
-export async function loadOfficeData(repo: AIRepository): Promise<OfficeData> {
-  const [clients, processes, tasks, prazos, appointments, documents, invoices, members] = await Promise.all([
-    repo.listClients(),
+export async function loadOfficeData(repo: AIRepository, now: Date = new Date()): Promise<OfficeData> {
+  const today = startOfDay(now)
+  const [clientStats, processes, tasks, prazos, appointments, documents, invoices, members] = await Promise.all([
+    repo.countClients(),
     repo.listProcessOverviews(),
-    repo.listTasks(),
-    repo.listPrazos(),
-    repo.listAppointments(),
-    repo.listDocuments(),
-    repo.listInvoices(),
+    repo.listTasks({ pendingOnly: true }),
+    repo.listPrazos({ openOnly: true }),
+    repo.listAppointments({ endsAfter: toLocalISO(today), startsBefore: toLocalISO(addDays(today, 8)) }),
+    repo.countDocuments(toLocalISO(addDays(today, -30))),
+    // O resumo financeiro compara o mês atual com o anterior.
+    repo.listInvoices({ relevantSince: toLocalISO(new Date(now.getFullYear(), now.getMonth() - 1, 1)).slice(0, 10) }),
     repo.listMembers(),
   ])
+  // Nomes só de quem aparece: clientes dos processos e das faturas em atraso.
+  const clientNames = await repo.clientNames([...processes.map((p) => p.clientId), ...invoices.map((i) => i.clientId)])
   return {
-    clients,
+    clientStats,
+    clientNames,
     processes,
     tasks,
     prazos,
     appointments,
-    documents,
+    documentStats: documents && { total: documents.total, addedLast30Days: documents.addedSince },
     invoices,
     members,
     can: {
@@ -97,13 +113,7 @@ export function computeOfficeMetrics(data: OfficeData, now: Date): OfficeMetrics
   const metrics: OfficeMetrics = {}
   const today = startOfDay(now)
 
-  if (data.can.clients) {
-    metrics.clients = {
-      total: data.clients.length,
-      active: data.clients.filter((c) => c.status === "ativo" || c.status === "novo").length,
-      delinquent: data.clients.filter((c) => c.status === "inadimplente").length,
-    }
-  }
+  if (data.can.clients && data.clientStats) metrics.clients = { ...data.clientStats }
 
   if (data.can.processes) {
     const active = data.processes.filter(isActive)
@@ -143,12 +153,7 @@ export function computeOfficeMetrics(data: OfficeData, now: Date): OfficeMetrics
     }
   }
 
-  if (data.can.documents) {
-    metrics.documents = {
-      total: data.documents.length,
-      addedLast30Days: data.documents.filter((d) => (daysSince(d.uploadedAt, now) ?? Infinity) <= 30).length,
-    }
-  }
+  if (data.can.documents && data.documentStats) metrics.documents = { ...data.documentStats }
 
   if (data.can.finance) {
     const overdue = data.invoices.filter((i) => i.status === "atrasado")
@@ -170,7 +175,7 @@ export function computeOfficeMetrics(data: OfficeData, now: Date): OfficeMetrics
 export function buildOfficeContext(data: OfficeData, now: Date, { forChat = false } = {}): BuiltContext & { metrics: OfficeMetrics } {
   const registry = new SourceRegistry()
   const metrics = computeOfficeMetrics(data, now)
-  const clientName = new Map(data.clients.map((c) => [c.id, c.name]))
+  const clientName = data.clientNames
   const weekStart = startOfWeek(now)
 
   const processRef = (p: ProcessOverview) =>
@@ -243,7 +248,8 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
             .slice(0, OFFICE_LIMITS.list)
             .map(describeProcess)
         : undefined,
-    processos_ativos: forChat && data.can.processes ? [...active].sort(byLastMovement).slice(0, OFFICE_LIMITS.activeProcesses).map(describeProcess) : undefined,
+    processos_ativos:
+      forChat && data.can.processes ? [...active].sort(byLastMovement).slice(0, OFFICE_LIMITS.activeProcesses).map(describeProcess) : undefined,
     processos_ativos_omitidos: forChat && active.length > OFFICE_LIMITS.activeProcesses ? active.length - OFFICE_LIMITS.activeProcesses : undefined,
     clientes_com_processos_ativos:
       forChat && data.can.clients && data.can.processes
@@ -264,17 +270,16 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
           .slice(0, OFFICE_LIMITS.list)
           .map(([clientId, amount]) => ({ cliente: clientName.get(clientId) ?? "Cliente sem acesso", valor_em_atraso: formatCurrency(amount) }))
       : undefined,
-    modulos_sem_acesso:
-      Object.entries({
-        clientes: data.can.clients,
-        processos: data.can.processes,
-        tarefas: data.can.tasks,
-        agenda: data.can.agenda,
-        documentos: data.can.documents,
-        financeiro: data.can.finance,
-      })
-        .filter(([, allowed]) => !allowed)
-        .map(([name]) => name),
+    modulos_sem_acesso: Object.entries({
+      clientes: data.can.clients,
+      processos: data.can.processes,
+      tarefas: data.can.tasks,
+      agenda: data.can.agenda,
+      documentos: data.can.documents,
+      financeiro: data.can.finance,
+    })
+      .filter(([, allowed]) => !allowed)
+      .map(([name]) => name),
   }
 
   return { context, sources: registry.sources, metrics, basis: "Baseado em métricas calculadas pela Íntegra a partir dos dados do escritório." }

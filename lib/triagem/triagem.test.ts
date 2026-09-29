@@ -242,6 +242,8 @@ describe("triagem: interpretação da IA", () => {
   it("o modelo recebe só o evento, sem HTML", () => {
     const context = interpretationContext(input({ text: "<p>Intime-se.</p>" }))
     assert.equal(context.texto, "Intime-se.")
+    const masked = interpretationContext(input({ text: "Autor CPF 529.982.247-25, e-mail joao@exemplo.com." }))
+    assert.doesNotMatch(masked.texto, /529\.982|joao@exemplo/)
     assert.deepEqual(Object.keys(context).sort(), ["classe", "data", "texto", "tipo_evento", "titulo", "tribunal"])
   })
 })

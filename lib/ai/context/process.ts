@@ -11,6 +11,7 @@ import { PROCESS_STATUS } from "@/lib/config"
 import { formatCurrency } from "@/lib/format"
 import { isAutoTracked } from "@/lib/services/processes/labels"
 import { prazosOfProcess } from "@/lib/prazos"
+import { toLocalISO } from "@/lib/dates"
 import type { Appointment, Client, LegalDocument, Prazo, Process, ProcessParty, Task } from "@/types"
 import type { AIRepository, Member } from "./repository"
 import {
@@ -60,17 +61,18 @@ export interface ProcessData {
   hidden: string[]
 }
 
-export async function loadProcessData(repo: AIRepository, processId: string): Promise<ProcessData> {
+/** Só o que o contexto usa, recortado no banco: tarefas e prazos do processo, compromissos futuros, documentos recentes. */
+export async function loadProcessData(repo: AIRepository, processId: string, now: Date = new Date()): Promise<ProcessData> {
   if (!repo.can("processes.view")) throw new AIError("FORBIDDEN")
   const process = await repo.getProcess(processId)
   if (!process) throw new AIError("NOT_FOUND")
 
   const [client, tasks, prazos, appointments, documents, members] = await Promise.all([
     process.clientId ? repo.getClient(process.clientId) : Promise.resolve(null),
-    repo.listTasks(),
+    repo.listTasks({ processId: process.id }),
     repo.listPrazos({ processId: process.id }),
-    repo.listAppointments(),
-    repo.listDocuments(),
+    repo.listAppointments({ processId: process.id, endsAfter: toLocalISO(now) }),
+    repo.listDocuments({ processId: process.id, limit: PROCESS_LIMITS.documents }),
     repo.listMembers(),
   ])
 

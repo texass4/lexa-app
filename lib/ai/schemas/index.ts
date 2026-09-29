@@ -4,7 +4,16 @@
  */
 
 import { array, object, oneOf, string, type Schema } from "@/lib/ai/schema"
-import type { ActionSuggestion, AttentionPoint, ClientSummary, MovementAnalysis, NextActions, OfficeOverview, ProcessSummary, ReferencedNote } from "@/lib/ai/types"
+import type {
+  ActionSuggestion,
+  AttentionPoint,
+  ClientSummary,
+  MovementAnalysis,
+  NextActions,
+  OfficeOverview,
+  ProcessSummary,
+  ReferencedNote,
+} from "@/lib/ai/types"
 
 const text = (description?: string, max?: number) => string({ description, max })
 const texts = (description: string, max = 8) => array(string({ max: 500 }), { description, max })

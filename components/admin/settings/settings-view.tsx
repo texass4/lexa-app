@@ -14,7 +14,7 @@ import { ErrorState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { adminFetch, useAdminData } from "@/lib/admin/client"
 import { LIMIT_KEYS, LIMIT_META, type PlanLimits } from "@/lib/admin/catalog"
-import { AI_PROVIDERS, WHATSAPP_PROVIDERS, type PlatformSettings } from "@/lib/admin/settings"
+import { WHATSAPP_PROVIDERS, type PlatformSettings } from "@/lib/admin/settings"
 import { AdminHeader } from "../ui/admin-header"
 import { ConfirmAction, type ConfirmRequest } from "../ui/confirm-action"
 import { useAdminShell } from "../shell/admin-context"
@@ -23,6 +23,7 @@ interface SettingsData {
   settings: PlatformSettings
   plans: { name: string; status: string }[]
   secrets: { ai: boolean; whatsapp: boolean; datajud: boolean; email: boolean }
+  ai: { provider: { id: string; label: string }; model: string; lightModel: string }
 }
 
 const SECTIONS = [
@@ -60,7 +61,19 @@ function SecretStatus({ ok, name }: { ok: boolean; name: string }) {
   )
 }
 
-function Section({ id, title, description, children, className }: { id: string; title: string; description?: string; children: React.ReactNode; className?: string }) {
+function Section({
+  id,
+  title,
+  description,
+  children,
+  className,
+}: {
+  id: string
+  title: string
+  description?: string
+  children: React.ReactNode
+  className?: string
+}) {
   return (
     <Panel id={id} className={cn("scroll-mt-24", className)}>
       <PanelHeader title={title} description={description} className="border-b border-border pb-4" />
@@ -75,7 +88,8 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
   const [busy, setBusy] = React.useState(false)
   const [confirm, setConfirm] = React.useState<ConfirmRequest | null>(null)
   const dirty = JSON.stringify(s) !== JSON.stringify(data.settings)
-  const set = <K extends keyof PlatformSettings>(section: K, patch: Partial<PlatformSettings[K]>) => setS((cur) => ({ ...cur, [section]: { ...cur[section], ...patch } }))
+  const set = <K extends keyof PlatformSettings>(section: K, patch: Partial<PlatformSettings[K]>) =>
+    setS((cur) => ({ ...cur, [section]: { ...cur[section], ...patch } }))
 
   const persist = async (next: PlatformSettings) => {
     setBusy(true)
@@ -97,7 +111,8 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
     if (!turningOn) return void persist(s).catch(() => undefined)
     setConfirm({
       title: "Ligar o modo manutenção?",
-      description: "Todos os escritórios perdem o acesso ao CRM assim que você salvar (inclusive quem está usando agora) e veem a mensagem de manutenção. O Admin continua funcionando.",
+      description:
+        "Todos os escritórios perdem o acesso ao CRM assim que você salvar (inclusive quem está usando agora) e veem a mensagem de manutenção. O Admin continua funcionando.",
       confirmLabel: "Ligar manutenção e salvar",
       requireText: "MANUTENÇÃO",
       onConfirm: () => persist(s),
@@ -141,10 +156,20 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
               <TextInput id="st-name" value={s.platform.name} onChange={(e) => set("platform", { name: e.target.value })} />
             </Field>
             <Field label="Site" htmlFor="st-site" optional>
-              <TextInput id="st-site" placeholder="https://" value={s.platform.website} onChange={(e) => set("platform", { website: e.target.value })} />
+              <TextInput
+                id="st-site"
+                placeholder="https://"
+                value={s.platform.website}
+                onChange={(e) => set("platform", { website: e.target.value })}
+              />
             </Field>
             <Field label="E-mail de suporte" htmlFor="st-email" optional>
-              <TextInput id="st-email" type="email" value={s.platform.supportEmail} onChange={(e) => set("platform", { supportEmail: e.target.value })} />
+              <TextInput
+                id="st-email"
+                type="email"
+                value={s.platform.supportEmail}
+                onChange={(e) => set("platform", { supportEmail: e.target.value })}
+              />
             </Field>
             <Field label="Telefone/WhatsApp de suporte" htmlFor="st-phone" optional>
               <TextInput id="st-phone" value={s.platform.supportPhone} onChange={(e) => set("platform", { supportPhone: e.target.value })} />
@@ -157,10 +182,20 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
             <ToggleSwitch label="Cadastro público" checked={s.general.publicSignup} onChange={(v) => set("general", { publicSignup: v })} />
           </Row>
           <Row title="Exigir aprovação" description="Cadastros públicos ficam “aguardando aprovação” até você aprovar. Desligado, já entram ativos.">
-            <ToggleSwitch label="Exigir aprovação" checked={s.general.requireApproval} disabled={!s.general.publicSignup} onChange={(v) => set("general", { requireApproval: v })} />
+            <ToggleSwitch
+              label="Exigir aprovação"
+              checked={s.general.requireApproval}
+              disabled={!s.general.publicSignup}
+              onChange={(v) => set("general", { requireApproval: v })}
+            />
           </Row>
           <Row title="Plano padrão" description="Plano de quem se cadastra pela página pública.">
-            <NativeSelect aria-label="Plano padrão" value={s.general.defaultPlan} onChange={(e) => set("general", { defaultPlan: e.target.value })} className="w-48">
+            <NativeSelect
+              aria-label="Plano padrão"
+              value={s.general.defaultPlan}
+              onChange={(e) => set("general", { defaultPlan: e.target.value })}
+              className="w-48"
+            >
               {activePlans.map((p) => (
                 <option key={p.name}>{p.name}</option>
               ))}
@@ -171,7 +206,9 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
           </Row>
           <Row title="Alerta de uso a partir de" description="Percentual do limite em que o escritório entra em “próximo do limite”.">
             <div className="flex items-center gap-1.5">
-              {numberInput(s.general.usageWarningPercent, (n) => set("general", { usageWarningPercent: Math.min(Math.max(n, 50), 99) }), { "aria-label": "Percentual de alerta" })}
+              {numberInput(s.general.usageWarningPercent, (n) => set("general", { usageWarningPercent: Math.min(Math.max(n, 50), 99) }), {
+                "aria-label": "Percentual de alerta",
+              })}
               <span className="text-[12.5px] text-muted-foreground">%</span>
             </div>
           </Row>
@@ -179,7 +216,11 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
             title="Aplicar limite de usuários"
             description="Bloqueia convites do sócio quando o escritório atinge o limite de usuários do plano. O Admin pode passar do limite."
           >
-            <ToggleSwitch label="Aplicar limite de usuários" checked={s.general.enforceUserLimits} onChange={(v) => set("general", { enforceUserLimits: v })} />
+            <ToggleSwitch
+              label="Aplicar limite de usuários"
+              checked={s.general.enforceUserLimits}
+              onChange={(v) => set("general", { enforceUserLimits: v })}
+            />
           </Row>
         </Section>
 
@@ -196,7 +237,10 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
           <Row title="Integração WhatsApp" description="Em preparação: o consumo já é medido por escritório (usage_events).">
             <ToggleSwitch label="WhatsApp" checked={s.features.whatsapp} onChange={(v) => set("features", { whatsapp: v })} />
           </Row>
-          <Row title="Assistente de IA" description="Em preparação: cada chamada será contada por escritório contra o limite do plano.">
+          <Row
+            title="Assistente de IA"
+            description="Ainda sem efeito: a Íntegra IA é ligada no servidor (AI_ENABLED e GEMINI_API_KEY). Cada chamada já é medida e limitada pelo plano do escritório (Consumo de IA)."
+          >
             <ToggleSwitch label="IA" checked={s.features.ai} onChange={(v) => set("features", { ai: v })} />
           </Row>
         </Section>
@@ -204,18 +248,23 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Section id="ia" title="Configurações de IA">
             <div className="space-y-4 p-5">
-              <Field label="Provedor" htmlFor="st-ai-provider">
-                <NativeSelect id="st-ai-provider" value={s.ai.provider} onChange={(e) => set("ai", { provider: e.target.value })}>
-                  {AI_PROVIDERS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field label="Modelo" htmlFor="st-ai-model" optional hint="Identificador do modelo no provedor.">
-                <TextInput id="st-ai-model" value={s.ai.model} onChange={(e) => set("ai", { model: e.target.value })} />
-              </Field>
+              {/* Um provedor só no núcleo da Íntegra; modelos definidos no ambiente do servidor. */}
+              <dl className="divide-y divide-border rounded-[10px] border border-border text-[13px]">
+                {[
+                  ["Provedor", data.ai.provider.label],
+                  ["Modelo das análises (AI_MODEL)", data.ai.model],
+                  ["Modelo das operações simples (AI_MODEL_LIGHT)", data.ai.lightModel],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-baseline justify-between gap-4 px-3 py-2">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="font-medium tabular break-all text-right">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="text-[12px] leading-relaxed text-subtle">
+                Para trocar, altere as variáveis no servidor e publique de novo. Os preços usados na estimativa de custo podem ser ajustados em
+                AI_PRICES.
+              </p>
               <SecretStatus ok={data.secrets.ai} name="GEMINI_API_KEY" />
             </div>
           </Section>
@@ -231,7 +280,12 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
                 </NativeSelect>
               </Field>
               <Field label="Número comercial" htmlFor="st-wa-number" optional>
-                <TextInput id="st-wa-number" placeholder="+55 48 99999-0000" value={s.whatsapp.businessNumber} onChange={(e) => set("whatsapp", { businessNumber: e.target.value })} />
+                <TextInput
+                  id="st-wa-number"
+                  placeholder="+55 48 99999-0000"
+                  value={s.whatsapp.businessNumber}
+                  onChange={(e) => set("whatsapp", { businessNumber: e.target.value })}
+                />
               </Field>
               <SecretStatus ok={data.secrets.whatsapp} name="ZAPI_TOKEN" />
             </div>
@@ -241,7 +295,11 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
         <Section id="limites" title="Limites padrão" description="Sugeridos ao criar um plano novo. Em branco = ilimitado.">
           <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3">
             {LIMIT_KEYS.map((k) => (
-              <Field key={k} label={`${LIMIT_META[k].label}${k === "storage" ? " (MB)" : LIMIT_META[k].monthly ? " / mês" : ""}`} htmlFor={`st-lim-${k}`}>
+              <Field
+                key={k}
+                label={`${LIMIT_META[k].label}${k === "storage" ? " (MB)" : LIMIT_META[k].monthly ? " / mês" : ""}`}
+                htmlFor={`st-lim-${k}`}
+              >
                 <TextInput
                   id={`st-lim-${k}`}
                   inputMode="numeric"
@@ -268,7 +326,9 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
             title="Modo manutenção"
             description={
               s.maintenance.enabled ? (
-                <span className="text-warning">Ligado — {data.settings.maintenance.enabled ? "escritórios sem acesso agora." : "será aplicado ao salvar."}</span>
+                <span className="text-warning">
+                  Ligado — {data.settings.maintenance.enabled ? "escritórios sem acesso agora." : "será aplicado ao salvar."}
+                </span>
               ) : (
                 "Desligado — acesso normal."
               )
@@ -278,7 +338,12 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
           </Row>
           <div className="p-5">
             <Field label="Mensagem exibida aos escritórios" htmlFor="st-maint-msg">
-              <TextArea id="st-maint-msg" maxLength={500} value={s.maintenance.message} onChange={(e) => set("maintenance", { message: e.target.value })} />
+              <TextArea
+                id="st-maint-msg"
+                maxLength={500}
+                value={s.maintenance.message}
+                onChange={(e) => set("maintenance", { message: e.target.value })}
+              />
             </Field>
           </div>
         </Section>

@@ -60,7 +60,14 @@ export function supabaseInterpretRepository(admin: SupabaseClient): InterpretRep
         "save_triage_ai",
         outcome.ok
           ? { p_id: id, p_ai: outcome.ai, p_ok: true, p_review_reason: outcome.reviewReason ?? null }
-          : { p_id: id, p_ai: null, p_ok: false, p_review_reason: null, p_retry_seconds: Math.round(outcome.retryAfterMs / 1000) },
+          : {
+              p_id: id,
+              p_ai: null,
+              p_ok: false,
+              p_review_reason: null,
+              p_retry_seconds: Math.round(outcome.retryAfterMs / 1000),
+              p_count_attempt: outcome.countAttempt ?? true,
+            },
       )
       if (error) throw error
     },

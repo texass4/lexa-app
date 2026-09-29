@@ -5,6 +5,7 @@ import { AIError } from "@/lib/ai/errors"
 import type { AIProvider } from "@/lib/ai/provider"
 import { suggestDeadline } from "@/lib/intimacoes/deadline"
 import type { InterpretInput } from "@/lib/triagem/interpret"
+import { memoryMeter } from "@/lib/ai/__fixtures__/data"
 import { retryAfterFailure, runTriageInterpretation, type InterpretOutcome, type InterpretRepository } from "./interpret"
 
 const TEOR = "Fica a parte ré intimada para contestar no prazo de 15 (quinze) dias."
@@ -42,13 +43,14 @@ function provider(reply: (call: number, prompt: string) => unknown): AIProvider 
   return {
     name: "gemini",
     model: "gemini-2.5-flash",
+    modelFor: (tier) => (tier === "light" ? "gemini-2.5-flash-lite" : "gemini-2.5-flash"),
     calls,
     generateText: async () => ({ value: "" }),
     generateJSON: async (request) => {
       calls.push(request.messages[0].content)
       const value = reply(calls.length, request.messages[0].content)
       if (value instanceof Error) throw value
-      return { value, usage: { model: "gemini-2.5-flash" } }
+      return { value, usage: { model: request.tier === "light" ? "gemini-2.5-flash-lite" : "gemini-2.5-flash", inputTokens: 900, outputTokens: 60 } }
     },
   }
 }
@@ -61,15 +63,15 @@ const good = {
   prazoContagem: "nao_informado",
   prazoTrecho: "no prazo de 15 (quinze) dias",
 }
-const run = (repo: InterpretRepository, ai: AIProvider, deadline = NOW.getTime() + 60_000) =>
-  runTriageInterpretation({ repo, provider: ai, deadline, now: () => NOW, log: () => {}, logEvent: () => {} })
+const run = (repo: InterpretRepository, ai: AIProvider, deadline = NOW.getTime() + 60_000, meter = memoryMeter()) =>
+  runTriageInterpretation({ repo, provider: ai, meter: meter.meter, deadline, now: () => NOW, log: () => {}, logEvent: () => {} })
 
 describe("interpretação da Triagem pela IA", () => {
   it("interpreta cada evento novo uma vez e guarda o resultado", async () => {
     const db = memoryRepo([event("a"), event("b")])
     const ai = provider(() => good)
     const summary = await run(db.repo, ai)
-    assert.deepEqual(summary, { claimed: 2, interpreted: 2, failed: 0, stopped: null })
+    assert.deepEqual(summary, { claimed: 2, interpreted: 2, failed: 0, deferred: 0, stopped: null })
     const outcome = db.saved.get("a")!
     assert.equal(outcome.ok, true)
     if (outcome.ok) {
@@ -117,6 +119,36 @@ describe("interpretação da Triagem pela IA", () => {
     assert.equal(summary.stopped, "PROVIDER_RATE_LIMITED")
     assert.equal(ai.calls.length, 1)
     assert.deepEqual(db.saved.get("a"), { ok: false, retryAfterMs: 7_200_000 })
+  })
+
+  it("cada interpretação é medida: modelo leve, tokens e custo, sem pessoa (automática)", async () => {
+    const meter = memoryMeter()
+    await run(
+      memoryRepo([event("a")]).repo,
+      provider(() => good),
+      undefined,
+      meter,
+    )
+    const [call] = meter.events
+    assert.deepEqual(
+      [call.status, call.model, call.context.operation, call.context.userId],
+      ["ok", "gemini-2.5-flash-lite", "triage.interpret", null],
+    )
+    assert.equal(call.outcome?.costUsd, 0.000114) // 900 × 0,10 + 60 × 0,40 por milhão
+  })
+
+  it("escritório sem cota no mês: os eventos dele esperam (sem gastar tentativa); os dos outros seguem", async () => {
+    const meter = memoryMeter({ monthlyLimit: 1 })
+    const db = memoryRepo([event("a1"), event("a2"), event("a3"), event("b1", { organizationId: "outro" })])
+    const ai = provider(() => good)
+    const summary = await run(db.repo, ai, undefined, meter)
+    assert.equal(summary.interpreted, 2) // a1 e b1
+    assert.equal(summary.deferred, 2)
+    assert.equal(summary.stopped, null)
+    assert.equal(ai.calls.length, 2)
+    const waited = db.saved.get("a2")!
+    assert.ok(!waited.ok && waited.countAttempt === false && waited.retryAfterMs >= 3_600_000)
+    assert.equal(db.saved.get("b1")!.ok, true)
   })
 
   it("tempo da execução esgotado: não começa pedidos novos", async () => {

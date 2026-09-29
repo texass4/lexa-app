@@ -147,7 +147,9 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
             {active.error && <AIErrorNotice error={active.error} onRetry={view === "summary" ? runSummary : runNext} />}
             {active.loading && (
               <AIThinking
-                label={view === "summary" ? `Íntegra IA está analisando o processo ${process.code}…` : "Íntegra IA está verificando o que fazer agora…"}
+                label={
+                  view === "summary" ? `Íntegra IA está analisando o processo ${process.code}…` : "Íntegra IA está verificando o que fazer agora…"
+                }
                 onCancel={active.cancel}
               />
             )}

@@ -1,4 +1,4 @@
-import { Building2, Gauge, Layers, LayoutDashboard, Radar, ScrollText, Settings2, UsersRound, Wallet, type LucideIcon } from "lucide-react"
+import { Building2, Cpu, Gauge, Layers, LayoutDashboard, Radar, ScrollText, Settings2, UsersRound, Wallet, type LucideIcon } from "lucide-react"
 
 export type BadgeKey = "pending" | "usage" | "pastDue"
 
@@ -21,6 +21,7 @@ export const ADMIN_NAV: { label: string; items: AdminNavItem[] }[] = [
       { href: "/admin/escritorios", label: "Escritórios", icon: Building2, description: "Cadastros, status, planos e equipes", badge: "pending" },
       { href: "/admin/usuarios", label: "Usuários", icon: UsersRound, description: "Todas as pessoas de todos os escritórios" },
       { href: "/admin/uso", label: "Uso da plataforma", icon: Gauge, description: "Consumo de cada escritório contra o limite", badge: "usage" },
+      { href: "/admin/ia", label: "Consumo de IA", icon: Cpu, description: "Chamadas, tokens, custo e erros da IA por escritório" },
     ],
   },
   {

@@ -182,7 +182,7 @@ próximas fontes           ─┘                                         → ad
 | DJEN | `lib/services/intimacoes/capture.ts`, no agendador da Etapa 5: OABs ativas, uma consulta por número+UF (mesmo em dois escritórios), janela com 1 dia de sobra, retry/backoff, 429 para a execução, falha de uma OAB não para as outras. `intimacoes` guarda a comunicação como veio (teor original, imutável); `save_intimacoes` cria o evento na mesma transação |
 | DataJud | `monitor.ts` (Etapa 5): das movimentações novas, as que pedem atenção (julgamento, audiência, prazo, citação, trânsito em julgado; não "conclusos", "mero expediente", juntadas) e dos últimos 30 dias entram como evento, no máximo 10 por processo |
 | Vínculo | pelo CNJ, só com UM processo do escritório com o número. Nenhum → "Sem processo" (cadastrar e vincular pela própria tela). Mais de um → revisão. Processo cadastrado depois → `relink_triage_items` na execução seguinte. Nada é criado sozinho |
-| Íntegra IA | `lib/triagem/interpret.ts` + `lib/services/triagem/interpret.ts`, no agendador, depois da captura: resumo em uma frase, "exige ação?" e o prazo **copiado** do teor. O trecho citado precisa existir no original e trazer o número — senão é descartado. A data nunca vem da IA (é calculada pelas regras). Divergência ou dúvida → `em_revisao` com o motivo. Guardado em `triage_items.ai`, gerado uma vez; abrir a tela não chama o modelo. Falhou: o evento continua com o original; nova tentativa em 15 min, 1 h, 4 h |
+| Íntegra IA | `lib/triagem/interpret.ts` + `lib/services/triagem/interpret.ts`, no agendador, depois da captura, com o modelo leve, 30 s por evento e a mesma medição/limite do plano (escritório sem cota espera o mês virar, sem gastar tentativa): resumo em uma frase, "exige ação?" e o prazo **copiado** do teor. O trecho citado precisa existir no original e trazer o número — senão é descartado. A data nunca vem da IA (é calculada pelas regras). Divergência ou dúvida → `em_revisao` com o motivo. Guardado em `triage_items.ai`, gerado uma vez; abrir a tela não chama o modelo. Falhou: o evento continua com o original; nova tentativa em 15 min, 1 h, 4 h |
 | Prazo | `lib/intimacoes/deadline.ts`: publicação = 1º dia útil após a disponibilização (Lei 11.419/2006, art. 4º, §3º); contagem a partir do dia útil seguinte (§4º; CPC 224, §3º); dias úteis (CPC 219), recesso de 20/12 a 20/01 (CPC 220), feriados nacionais (+ Lei 5.010/66 na Justiça Federal). Horas, mais de um prazo, "prazo legal", prazo em dobro, matéria penal ou nenhum prazo → revisão, sem data. Confirmar cria o Prazo da Etapa 4 (origem `intimacao` ou `movimentacao`, `triageItemId` único no banco) e a tarefa; rejeitar não cria nada |
 | Timeline | vincular uma intimação registra UMA atividade no processo (id determinístico). Movimentações já estão na timeline. O perfil do processo tem o painel "Triagem" com tipo, origem, data, resumo e responsável |
 | Auditoria | `triage_events`, só por gatilho: registrou, visualizou (uma vez por pessoa), vinculou, atribuiu, marcou revisão, confirmou prazo, decidiu sem prazo, ignorou, reabriu, interpretou |
@@ -347,6 +347,7 @@ Centro de controle do Super Admin, com shell próprio (barra lateral escura, bus
 | `/admin/usuarios` | `components/admin/users/users-view.tsx` | `GET /api/admin/users`, `PATCH /api/admin/users/[id]` (mover) |
 | `/admin/planos` | `components/admin/plans/plans-view.tsx` | `/api/admin/plans[/id]` |
 | `/admin/uso` | `components/admin/usage/usage-view.tsx` | `GET /api/admin/organizations` |
+| `/admin/ia` | `components/admin/usage/ai-usage-view.tsx` | `GET /api/admin/ai-usage?from&to` (consumo de IA por escritório: chamadas, cache, tokens, custo, operações, modelos, erros) |
 | `/admin/financeiro` | `components/admin/finance/finance-view.tsx` | `GET /api/admin/finance` |
 | `/admin/atividade` | `components/admin/audit/audit-view.tsx` | `GET /api/admin/audit` |
 | `/admin/monitoramento` | `components/admin/monitoring/monitoring-view.tsx` | `GET /api/admin/monitoring` |
@@ -396,20 +397,31 @@ lib/ai/context/repository.ts               somente leitura: sessão do usuário 
     ↓
 lib/ai/context/{process,client,office}.ts  escolhe campos e limita volume; refs curtas (M1, T1, P1) → fontes reais
     ↓ sanitizeAIContext                    remove senha/token/e-mail/CPF/raw/storagePath/organizationId…
-lib/ai/services/*  →  services/run.ts      cache curto + pedido igual em andamento → limite de uso → provedor
-    ↓                                      → schema (schemas/) → grounding.ts (refs inexistentes saem; data/prazo sem origem = aviso) → log seguro
-lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai
+lib/ai/services/*  →  services/run.ts      cache no banco (cache.ts) + pedido igual em andamento → reserva no banco (metering.ts)
+    ↓                                      → provedor → schema (schemas/) → grounding.ts (refs inexistentes saem; data/prazo sem origem = aviso)
+    ↓                                      → consumo em usage_events (modelo, tokens, custo, erro) → log seguro
+lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai; modelo por nível (standard/light)
 ```
 
-**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `chat` e `GET /api/ai/status` (ligada/configurada; não chama o modelo). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
+**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `chat`, `GET /api/ai/status` (ligada/configurada; não chama o modelo) e `GET /api/ai/usage` (uso do mês contra o plano). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
 
-**Modelo reserva** — `GEMINI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva, repete o principal uma vez. O log (`model`) mostra quem respondeu.
+**Modelo reserva** — `AI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva, repete o principal uma vez. O log (`model`) mostra quem respondeu.
 
 **Trocar de provedor** — implemente `AIProvider` (`generateText` e `generateJSON`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
 
 **Regras do modelo** — prompt único em `lib/ai/prompts/system.ts` (fato × inferência × limitação; sem prazos, jurisprudência ou fatos inventados; dados tratados como dados). Mudou o texto? Suba `PROMPT_VERSION`. Instruções de cada funcionalidade em `prompts/tasks.ts`; formato das respostas em `schemas/`.
 
-**Custo** — modelo Flash (`GEMINI_MODEL`), temperatura baixa, contexto enxuto (até 20 movimentações, listas curtas, métricas agregadas no panorama), histórico do chat limitado a 10 mensagens, cache de 10 min para análises idênticas e limite de uso por pessoa (8/min, 60/h) e por escritório (200/h) em `guard.ts` — em memória, por instância do servidor.
+**Provedor e modelos** — um provedor só no núcleo (Gemini): toda chamada passa por `lib/ai/provider.ts`, e os nomes de modelo só existem em `lib/ai/config.ts`, lidos do ambiente: `AI_MODEL` (análises e chat) e `AI_MODEL_LIGHT` (operações simples: Triagem automática e análise de uma movimentação; padrão Flash-Lite, sem raciocínio). Se o leve falhar, o principal responde. A Central de Atendimento (WhatsApp) usa a Anthropic em `lib/services/whatsapp/ai.ts` e fica fora desta camada por enquanto.
+
+**Custo e consumo** — cada chamada é reservada no banco antes de ir ao modelo (`ai_reserve`, `0013_ia_consumo.sql`) e registrada depois (`ai_finish`) em `usage_events`: escritório, pessoa (ou nenhuma, se automática), operação, provedor, modelo, tokens de entrada/saída/cache, custo estimado em US$ (`lib/ai/pricing.ts`, sobreposto por `AI_PRICES`), duração e erro — nunca prompt ou resposta. Admin › Consumo de IA mostra por escritório e período.
+
+**Limites** — no banco, atômicos por escritório (trava transacional), valendo com vários servidores: limite mensal do plano (`plans.max_ai_requests`, ou `custom_limits.ai` do escritório; só contam chamadas que chegaram ao modelo) e ritmo de 8/min e 60/h por pessoa e 200/h por escritório (regras em `guard.ts`). Estourou o plano → `PLAN_LIMIT`; o ritmo → `RATE_LIMITED`, com `Retry-After`. Sem conseguir reservar, o modelo não é chamado.
+
+**Cache** — análises idênticas (mesmo escritório, operação, modelo, prompt e contexto — que inclui a data de hoje) são reaproveitadas por 12 h a partir de `ai_result_cache`, por todos os servidores; o acerto é registrado como "cache" e não conta no plano. O prefixo estável (instruções de sistema) aproveita o cache implícito do Gemini, medido em `cached_tokens`.
+
+**Contexto enxuto** — `repository.ts` pede ao banco só o recorte de cada análise: tarefas, prazos, compromissos futuros e documentos recentes do processo; do cliente e dos processos dele; no panorama, contagens (clientes, documentos), tarefas pendentes, prazos abertos, agenda da semana e faturas em aberto/do mês. Até 20 movimentações, listas curtas, chat com 10 mensagens.
+
+**Privacidade** — Configurações › Integrações › "Íntegra IA e privacidade" diz o que usa IA, o que é enviado (só o necessário; CPF, CNPJ, e-mails e telefones retirados ou mascarados) e para quê; cada análise traz a nota com o link.
 
 **Tarefas sugeridas** — nunca são gravadas pela IA: "Criar tarefa" abre `openDialog("task", { title, description, priority, processId })`, o mesmo formulário da Íntegra.
 
@@ -419,4 +431,4 @@ lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/
 
 **Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
 
-Variáveis: `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.
+Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.

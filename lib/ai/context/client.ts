@@ -8,6 +8,7 @@ import { AIError } from "@/lib/ai/errors"
 import { CLIENT_STATUS, INVOICE_STATUS, PROCESS_STATUS } from "@/lib/config"
 import { formatCurrency } from "@/lib/format"
 import { isOpenPrazo, nextPrazo } from "@/lib/prazos"
+import { toLocalISO } from "@/lib/dates"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Task } from "@/types"
 import type { AIRepository, Member, ProcessOverview } from "./repository"
 import {
@@ -55,22 +56,24 @@ export interface ClientData {
   hidden: string[]
 }
 
-export async function loadClientData(repo: AIRepository, clientId: string): Promise<ClientData> {
+/** Só o que o contexto usa, recortado no banco pelo cliente e pelos processos dele. */
+export async function loadClientData(repo: AIRepository, clientId: string, now: Date = new Date()): Promise<ClientData> {
   if (!repo.can("clients.view")) throw new AIError("FORBIDDEN")
   const client = await repo.getClient(clientId)
   if (!client) throw new AIError("NOT_FOUND")
 
-  const [processes, tasks, prazos, appointments, documents, invoices, activities, members] = await Promise.all([
-    repo.listProcessOverviews({ clientId }),
-    repo.listTasks(),
-    repo.listPrazos(),
-    repo.listAppointments(),
-    repo.listDocuments(),
-    repo.listInvoices(),
-    repo.listActivities({ clientId }),
+  const processes = await repo.listProcessOverviews({ clientId })
+  const ids = processes.map((p) => p.id)
+  const [tasks, prazos, appointments, documents, invoices, activities, members] = await Promise.all([
+    repo.listTasks({ clientId, processIds: ids }),
+    repo.listPrazos({ processIds: ids }),
+    repo.listAppointments({ clientId, processIds: ids, endsAfter: toLocalISO(now) }),
+    repo.listDocuments({ clientId, processIds: ids, limit: CLIENT_LIMITS.documents }),
+    repo.listInvoices({ clientId }),
+    repo.listActivities({ clientId, limit: CLIENT_LIMITS.activities }),
     repo.listMembers(),
   ])
-  const processIds = new Set(processes.map((p) => p.id))
+  const processIds = new Set(ids)
 
   const hidden = [
     !repo.can("processes.view") && "processos",
@@ -104,7 +107,10 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
   const clientRef = registry.add("client", { id: client.id, label: client.name, href: `/clientes/${client.id}` })
 
   const processes = [...data.processes]
-    .sort((a, b) => (a.status === "concluido" ? 1 : 0) - (b.status === "concluido" ? 1 : 0) || (b.lastMovementAt ?? "").localeCompare(a.lastMovementAt ?? ""))
+    .sort(
+      (a, b) =>
+        (a.status === "concluido" ? 1 : 0) - (b.status === "concluido" ? 1 : 0) || (b.lastMovementAt ?? "").localeCompare(a.lastMovementAt ?? ""),
+    )
     .slice(0, CLIENT_LIMITS.processes)
 
   const openPrazos = data.prazos.filter(isOpenPrazo).sort((a, b) => a.fatalDate.localeCompare(b.fatalDate))

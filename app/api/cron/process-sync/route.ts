@@ -29,6 +29,7 @@ import { runTriageInterpretation, type InterpretSummary } from "@/lib/services/t
 import { hasTriage, supabaseInterpretRepository } from "@/lib/services/triagem/store"
 import { getAIStatus } from "@/lib/ai/config"
 import { getAIProvider } from "@/lib/ai/provider"
+import { databaseMeter } from "@/lib/ai/metering"
 import { djenClient } from "@/lib/integrations/legal/djen/provider"
 import { monitorConfig, OFFICE_TIME_ZONE, startOfDayIn } from "@/lib/services/processes/monitoring-policy"
 import { processLookup } from "@/lib/services/processes/process-lookup"
@@ -114,6 +115,7 @@ async function handle(request: Request) {
       interpretacao = await runTriageInterpretation({
         repo: supabaseInterpretRepository(admin),
         provider: getAIProvider(),
+        meter: databaseMeter(),
         deadline: started + INTERPRET_UNTIL_MS,
       })
     } catch (error) {

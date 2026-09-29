@@ -124,11 +124,25 @@ export interface AIResult<T> {
 /** Números calculados pelo banco — a IA só interpreta. */
 export interface OfficeMetrics {
   clients?: { total: number; active: number; delinquent: number }
-  processes?: { total: number; active: number; movedLast7Days: number; staleOver60Days: number; withDeadlineNext7Days: number; byArea: Record<string, number> }
+  processes?: {
+    total: number
+    active: number
+    movedLast7Days: number
+    staleOver60Days: number
+    withDeadlineNext7Days: number
+    byArea: Record<string, number>
+  }
   tasks?: { open: number; overdue: number; dueToday: number; dueNext7Days: number }
   agenda?: { next7Days: number; today: number }
   documents?: { total: number; addedLast30Days: number }
-  finance?: { openAmount: number; overdueAmount: number; overdueInvoices: number; clientsWithOverdue: number; receivedThisMonth: number; expectedThisMonth: number }
+  finance?: {
+    openAmount: number
+    overdueAmount: number
+    overdueInvoices: number
+    clientsWithOverdue: number
+    receivedThisMonth: number
+    expectedThisMonth: number
+  }
 }
 
 export interface OfficeOverviewResult extends AIResult<OfficeOverview> {
@@ -171,6 +185,7 @@ export type AIErrorCode =
   | "BAD_REQUEST"
   | "INSUFFICIENT_DATA"
   | "RATE_LIMITED"
+  | "PLAN_LIMIT"
   | "PROVIDER_RATE_LIMITED"
   | "TIMEOUT"
   | "CANCELLED"

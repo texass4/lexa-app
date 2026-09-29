@@ -16,6 +16,7 @@ import { object, oneOf, string, type Infer } from "@/lib/ai/schema"
 import { fold } from "@/lib/format"
 import { findTerms, suggestDeadline, type DeadlineSuggestion } from "@/lib/intimacoes/deadline"
 import { readableContent } from "@/lib/integrations/legal/djen/mapper"
+import { maskSensitiveText } from "@/lib/ai/context/sanitize"
 import type { TriageAI, TriageKind } from "@/types"
 
 /** Mudou o pedido? Suba a versão (fica registrada em cada interpretação). */
@@ -62,9 +63,9 @@ export const interpretationSchema = object({
 
 export type Interpretation = Infer<typeof interpretationSchema>
 
-/** Dados enviados ao modelo: só o evento (nada de outros clientes ou processos). */
+/** Dados enviados ao modelo: só o evento (nada de outros clientes ou processos), com CPF/CNPJ e e-mails mascarados. */
 export function interpretationContext(input: InterpretInput) {
-  const text = readableContent(input.text)
+  const text = maskSensitiveText(readableContent(input.text))
   return {
     tipo_evento: input.kind === "intimacao" ? "Intimação (DJEN)" : "Movimentação processual",
     titulo: input.title,
