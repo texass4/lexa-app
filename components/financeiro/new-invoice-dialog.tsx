@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CircleDollarSign } from "lucide-react"
+import { CircleDollarSign, Pencil } from "lucide-react"
 import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
@@ -10,35 +10,58 @@ import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/f
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { getNow, toLocalISO } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
-import type { Invoice } from "@/types"
+import { documentRequiredIssue } from "@/lib/clients"
+import type { Invoice, Process } from "@/types"
 
 const SITUATIONS = ["A receber", "Já recebido"] as const
 const METHODS: NonNullable<Invoice["method"]>[] = ["Pix", "Boleto", "Transferência", "Cartão"]
 
 type Defaults = { clientId?: string; processId?: string }
 
-/** Lançamento de honorários — grava uma fatura do módulo financeiro, sempre vinculada a um cliente. */
-export function NewInvoiceDialog({ open, onOpenChange, defaults }: { open: boolean; onOpenChange: (o: boolean) => void; defaults?: Defaults }) {
+/**
+ * Lançamento de honorários — grava uma fatura do módulo financeiro, sempre vinculada a
+ * um cliente. Com `invoice`, o mesmo formulário edita (inclusive a baixa).
+ */
+export function NewInvoiceDialog({
+  open,
+  onOpenChange,
+  defaults,
+  invoice,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  defaults?: Defaults
+  invoice?: Invoice
+}) {
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Novo lançamento"
-      description="Honorários a receber ou um pagamento já recebido."
-      icon={<CircleDollarSign />}
+      title={invoice ? "Editar lançamento" : "Novo lançamento"}
+      description={invoice ? "Altere valores, datas ou a situação do lançamento." : "Honorários a receber ou um pagamento já recebido."}
+      icon={invoice ? <Pencil /> : <CircleDollarSign />}
       bare
     >
-      <InvoiceForm defaults={defaults} onClose={() => onOpenChange(false)} />
+      <InvoiceForm invoice={invoice} defaults={defaults} onClose={() => onOpenChange(false)} />
     </Modal>
   )
 }
 
-function InvoiceForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => void }) {
-  const data = useDemoData()
-  const { addInvoice } = useDemoActions()
-  const today = toLocalISO(getNow()).slice(0, 10)
-  const [form, setForm] = React.useState(() => ({
-    clientId: defaults?.clientId ?? (defaults?.processId ? (data.processes.find((p) => p.id === defaults.processId)?.clientId ?? "") : ""),
+function initialState(invoice: Invoice | undefined, defaults: Defaults | undefined, processes: Process[], today: string) {
+  if (invoice) {
+    return {
+      clientId: invoice.clientId,
+      processId: invoice.processId ?? "",
+      description: invoice.description,
+      amount: invoice.amount,
+      dueDate: invoice.dueDate,
+      situation: (invoice.status === "pago" ? "Já recebido" : "A receber") as (typeof SITUATIONS)[number],
+      paidAt: invoice.paidAt ?? today,
+      method: (invoice.method ?? "") as Invoice["method"] | "",
+    }
+  }
+  return {
+    clientId: defaults?.clientId ?? (defaults?.processId ? (processes.find((p) => p.id === defaults.processId)?.clientId ?? "") : ""),
     processId: defaults?.processId ?? "",
     description: "",
     amount: 0,
@@ -46,8 +69,18 @@ function InvoiceForm({ defaults, onClose }: { defaults?: Defaults; onClose: () =
     situation: "A receber" as (typeof SITUATIONS)[number],
     paidAt: today,
     method: "" as Invoice["method"] | "",
-  }))
+  }
+}
+
+function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaults?: Defaults; onClose: () => void }) {
+  const data = useDemoData()
+  const { addInvoice, updateInvoice, versionOf } = useDemoActions()
+  const today = toLocalISO(getNow()).slice(0, 10)
+  const [form, setForm] = React.useState(() => initialState(invoice, defaults, data.processes, today))
   const [errors, setErrors] = React.useState<Record<string, string>>({})
+  // Versão do lançamento quando o formulário abriu: se outra pessoa salvar antes, esta edição é recusada.
+  const [baseVersion, setBaseVersion] = React.useState(() => (invoice ? versionOf("invoices", invoice.id) : null))
+  const [saving, setSaving] = React.useState(false)
   type FormState = typeof form
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -57,10 +90,19 @@ function InvoiceForm({ defaults, onClose }: { defaults?: Defaults; onClose: () =
   const paid = form.situation === "Já recebido"
   const processes = data.processes.filter((p) => p.clientId === form.clientId)
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
     const next: Record<string, string> = {}
     if (!form.clientId) next.clientId = "Escolha o cliente."
+    // Honorários exigem CPF/CNPJ do cliente (vínculo novo ou trocado; o banco também confere).
+    else if (!invoice || invoice.clientId !== form.clientId) {
+      const issue = documentRequiredIssue(
+        data.clients.find((c) => c.id === form.clientId),
+        "fatura",
+      )
+      if (issue) next.clientId = issue
+    }
     if (form.description.trim().length < 3) next.description = "Descreva o lançamento (ex.: Honorários iniciais — parcela 1/3)."
     if (form.amount <= 0) next.amount = "Informe um valor maior que zero."
     if (!form.dueDate) next.dueDate = "Informe o vencimento."
@@ -69,19 +111,38 @@ function InvoiceForm({ defaults, onClose }: { defaults?: Defaults; onClose: () =
     setErrors(next)
     if (Object.values(next).some(Boolean)) return
 
-    const invoice = addInvoice({
+    const payload = {
       clientId: form.clientId,
       processId: form.processId || undefined,
       description: form.description.trim(),
       amount: form.amount,
       dueDate: form.dueDate,
-      status: paid ? "pago" : "pendente",
+      status: (paid ? "pago" : "pendente") as Invoice["status"],
       paidAt: paid ? form.paidAt : undefined,
       method: form.method || undefined,
-    })
+    }
+
+    if (invoice) {
+      setSaving(true)
+      const result = await updateInvoice(invoice.id, payload, { baseVersion })
+      setSaving(false)
+      if (result.status === "conflict") {
+        // O aviso já apareceu; o formulário mostra o lançamento como está agora para revisar.
+        setForm(initialState(result.current, defaults, data.processes, today))
+        setBaseVersion(versionOf("invoices", invoice.id))
+        return
+      }
+      if (result.status === "error") return
+      onClose()
+      if (result.status === "saved")
+        toast.success("Alterações salvas.", { description: `${payload.description} · ${formatCurrency(payload.amount)}` })
+      return
+    }
+
+    const created = addInvoice(payload)
     onClose()
     toast.success(paid ? "Pagamento registrado." : "Lançamento criado.", {
-      description: `${invoice.description} · ${formatCurrency(invoice.amount)}`,
+      description: `${created.description} · ${formatCurrency(created.amount)}`,
     })
   }
 
@@ -165,8 +226,8 @@ function InvoiceForm({ defaults, onClose }: { defaults?: Defaults; onClose: () =
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit" form="invoice-form">
-          {paid ? "Registrar pagamento" : "Criar lançamento"}
+        <Button type="submit" form="invoice-form" disabled={saving}>
+          {invoice ? "Salvar alterações" : paid ? "Registrar pagamento" : "Criar lançamento"}
         </Button>
       </ModalFooter>
     </>

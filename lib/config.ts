@@ -16,6 +16,7 @@ export const CLIENT_STATUS: Record<ClientStatus, { label: string; tone: Tone }> 
   novo: { label: "Novo", tone: "info" },
   inativo: { label: "Inativo", tone: "neutral" },
   inadimplente: { label: "Inadimplente", tone: "danger" },
+  contato: { label: "Contato", tone: "violet" },
 }
 
 export const PROCESS_STATUS: Record<ProcessStatus, { label: string; tone: Tone }> = {

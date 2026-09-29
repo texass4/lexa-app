@@ -264,12 +264,12 @@ export async function fetchRecord(supabase: SupabaseClient, key: Collection, id:
   return (data as ServerRow | null) ?? null
 }
 
-type WriteError = "denied" | "conflict" | "failed"
+export type WriteError = "denied" | "conflict" | "failed"
 
 const isRlsDenial = (error: { code?: string; message?: string }) => error.code === "42501" || /row-level security/i.test(error.message ?? "")
 /** Índice único ou restrição de validação do banco (`0004_clients_hub.sql`). */
 const isConstraint = (error: { code?: string }) => error.code === "23505" || error.code === "23514"
-const classify = (error: { code?: string; message?: string }): WriteError =>
+export const classify = (error: { code?: string; message?: string }): WriteError =>
   isRlsDenial(error) ? "denied" : isConstraint(error) ? "conflict" : "failed"
 
 /** Cria um registro e devolve a linha como o banco gravou (ex.: com o código do processo). */

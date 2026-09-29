@@ -53,7 +53,11 @@ export interface User extends TenantEntity {
 
 /* -------------------------------- Clientes -------------------------------- */
 
-export type ClientStatus = "ativo" | "inativo" | "novo" | "inadimplente"
+/**
+ * `contato`: pessoa cadastrada ainda sem CPF/CNPJ (ex.: veio do WhatsApp). Pode ser
+ * atendida e agendada; para abrir processo, contrato ou fatura, o documento é exigido.
+ */
+export type ClientStatus = "ativo" | "inativo" | "novo" | "inadimplente" | "contato"
 
 /** Endereço em partes. `Client.address` guarda a mesma informação em uma linha. */
 export interface ClientAddress {

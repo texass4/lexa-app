@@ -2,23 +2,16 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import type {
-  Activity,
-  Appointment,
-  AppointmentCategory,
-  Client,
-  Invoice,
-  LegalDocument,
-  Prazo,
-  Process,
-  Task,
-  TaskColumn,
-} from "@/types"
+import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Prazo, Process, Task, TaskColumn } from "@/types"
 import * as account from "@/lib/account"
 import { CLIENT_STATUS } from "@/lib/config"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
 import { formatCurrency, uid } from "@/lib/format"
 import { relatedClientId } from "@/lib/selectors"
+import { resolveClientStatus } from "@/lib/clients"
+import type { NewClientDraft } from "@/lib/client-import"
+import { describeAppointmentChange } from "@/lib/agenda"
+import { describeInvoiceChange } from "@/lib/invoices"
 import { buildProcessDraft, type ImportProcessMeta } from "@/lib/services/processes/import"
 import { mergeProcessSheet, newMovementsMessage } from "@/lib/services/processes/process-sync"
 import type { ProcessSheet } from "@/lib/services/processes/sheet"
@@ -105,6 +98,11 @@ interface DemoActions {
   /** Tenta carregar de novo os dados do escritório depois de uma falha. */
   retryLoad(): void
   addClient(input: NewClientInput): Client
+  /**
+   * Importação de planilha: grava os cadastros já validados (`lib/client-import.ts`) e
+   * espera o banco. Devolve os gravados e, para os recusados, a posição e o motivo.
+   */
+  importClients(drafts: NewClientDraft[]): Promise<{ saved: Client[]; failed: { index: number; reason: string }[] }>
   /** Versão (`updated_at`) do registro no banco — o formulário guarda ao abrir e passa em `SaveOptions`. */
   versionOf(collection: Collection, id: string): string | null
   /** Atualiza o cadastro e registra na timeline o que mudou (status, responsável, dados). */
@@ -146,16 +144,26 @@ interface DemoActions {
   /** Exclui a coluna (nunca a última); as tarefas dela vão para a coluna restante mais à esquerda. */
   deleteTaskColumn(id: string): void
   addAppointment(input: NewAppointmentInput): Appointment
+  /** Edita ou remarca (arrastar na agenda) e registra na timeline quem fez e o que mudou. */
+  updateAppointment(id: string, patch: Partial<NewAppointmentInput>, options?: SaveOptions): Promise<SaveResult<Appointment>>
   deleteAppointment(id: string): void
   addAppointmentCategory(input: AppointmentCategoryInput): AppointmentCategory
   updateAppointmentCategory(id: string, patch: Partial<AppointmentCategoryInput>, options?: SaveOptions): Promise<SaveResult<AppointmentCategory>>
   /** Exclui a categoria; os compromissos dela ficam sem categoria. */
   deleteAppointmentCategory(id: string): void
   addDocument(input: NewDocumentInput): LegalDocument
+  /** Nome, tipo e vínculos (cliente/processo) do documento. O arquivo não muda. */
+  updateDocument(
+    id: string,
+    patch: Partial<Pick<LegalDocument, "name" | "kind" | "clientId" | "processId">>,
+    options?: SaveOptions,
+  ): Promise<SaveResult<LegalDocument>>
   deleteDocument(id: string): void
   /** Lançamento de honorários (fatura) do módulo financeiro, sempre de um cliente. */
   addInvoice(input: NewInvoiceInput): Invoice
   markInvoicePaid(id: string, paidAt: string, method?: Invoice["method"]): void
+  /** Edita o lançamento (valores, datas, situação — inclusive a baixa) e registra na timeline do cliente. */
+  updateInvoice(id: string, patch: Partial<NewInvoiceInput>, options?: SaveOptions): Promise<SaveResult<Invoice>>
   deleteInvoice(id: string): void
   markNotificationRead(id: string): void
   markAllNotificationsRead(): void
@@ -208,6 +216,10 @@ const sameValue = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON
 const clientOfItem = (s: PersistedState, item: { clientId?: string; processId?: string }) =>
   item.clientId || (item.processId ? s.processes.find((p) => p.id === item.processId)?.clientId || undefined : undefined)
 
+/** Coleções em que o banco exige CPF/CNPJ do cliente vinculado (`0010_contacts.sql`). */
+const NEEDS_CLIENT_DOCUMENT: Collection[] = ["processes", "invoices", "documents"]
+const CLIENT_DOCUMENT_MESSAGE = "O cliente ainda não tem CPF/CNPJ. Complete o cadastro para vincular processo, contrato ou fatura."
+
 /** Uma mensagem por situação (o `id` evita empilhar o mesmo aviso). */
 function showNotice(notice: SyncNotice) {
   switch (notice.kind) {
@@ -221,7 +233,9 @@ function showNotice(notice: SyncNotice) {
       toast.error(
         notice.error === "denied"
           ? `Você não tem permissão para alterar ${COLLECTION_LABELS[notice.key]}.`
-          : "Não foi possível salvar. Tente de novo em instantes.",
+          : notice.error === "conflict" && NEEDS_CLIENT_DOCUMENT.includes(notice.key)
+            ? CLIENT_DOCUMENT_MESSAGE
+            : "Não foi possível salvar. Tente de novo em instantes.",
         { id: "insert-failed" },
       )
       return
@@ -231,10 +245,12 @@ function showNotice(notice: SyncNotice) {
         result.denied.length
           ? `Você não tem permissão para alterar ${result.denied.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
           : result.conflicts.includes("clients")
-            ? "Já existe um cliente com este CPF/CNPJ no escritório (ou o documento é inválido)."
-            : result.conflicts.length
-              ? `O banco recusou alterações em ${result.conflicts.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
-              : "Não foi possível salvar as últimas alterações.",
+            ? "O banco recusou o CPF/CNPJ: já existe no escritório, é inválido ou o cadastro tem processo, fatura ou contrato."
+            : result.conflicts.some((key) => NEEDS_CLIENT_DOCUMENT.includes(key))
+              ? CLIENT_DOCUMENT_MESSAGE
+              : result.conflicts.length
+                ? `O banco recusou alterações em ${result.conflicts.map((key) => COLLECTION_LABELS[key]).join(", ")}.`
+                : "Não foi possível salvar as últimas alterações.",
         { description: "A tela foi atualizada com o que está salvo no escritório." },
       )
       return
@@ -311,7 +327,8 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ...base(),
           ...input,
           id: uid("c"),
-          status: input.status ?? "novo",
+          // Sem CPF/CNPJ, a pessoa entra como Contato (`resolveClientStatus`).
+          status: resolveClientStatus(input.status ?? "novo", input.document),
           clientSince: at.slice(0, 10),
           lastActivityAt: at,
           updatedAt: at,
@@ -322,7 +339,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           activities: [
             logActivity({
               type: "client",
-              message: `${client.name} cadastrado como cliente.`,
+              message: client.status === "contato" ? `${client.name} cadastrado como contato.` : `${client.name} cadastrado como cliente.`,
               clientId: client.id,
               actorUserId: account.currentUserId(),
               href: `/clientes/${client.id}`,
@@ -331,6 +348,47 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ],
         }))
         return client
+      },
+
+      async importClients(drafts) {
+        const at = nowISO()
+        const clients: Client[] = drafts.map((draft) => ({
+          ...base(),
+          ...draft,
+          id: uid("c"),
+          status: resolveClientStatus(draft.status, draft.document),
+          clientSince: at.slice(0, 10),
+          lastActivityAt: at,
+          updatedAt: at,
+        }))
+        const { saved, failed } = await sync.insertMany("clients", clients)
+        const index = new Map(clients.map((c, i) => [c.id, i]))
+        const REASON = {
+          conflict: "O banco recusou: CPF/CNPJ já cadastrado no escritório ou inválido.",
+          denied: "Sem permissão para cadastrar clientes.",
+          failed: "Falha de conexão ou do servidor. Tente importar esta linha de novo.",
+        } as const
+        if (saved.length) {
+          commit((s) => ({
+            ...s,
+            activities: [
+              logActivity({
+                type: "client",
+                actor: account.getUser(account.currentUserId()).name,
+                message: `importou ${saved.length === 1 ? "1 cadastro" : `${saved.length} cadastros`} de uma planilha.`,
+                detail: saved
+                  .slice(0, 3)
+                  .map((c) => c.name)
+                  .join(", ")
+                  .concat(saved.length > 3 ? ` e mais ${saved.length - 3}` : ""),
+                actorUserId: account.currentUserId(),
+                href: "/clientes",
+              }),
+              ...s.activities,
+            ],
+          }))
+        }
+        return { saved, failed: failed.map(({ item, error }) => ({ index: index.get(item.id)!, reason: REASON[error] })) }
       },
 
       updateClient(id, patch, options) {
@@ -799,6 +857,33 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return appt
       },
 
+      updateAppointment(id, patch, options) {
+        return save<Appointment>("appointments", id, options, () => {
+          const current = stateRef.current.appointments.find((a) => a.id === id)
+          if (!current) return false
+          const updated: Appointment = { ...current, ...patch }
+          const change = describeAppointmentChange(current, updated)
+          if (!change.rescheduled && !change.fields.length) return false
+          const actor = account.getUser(account.currentUserId()).name
+          const entry = (message: string, detail: string) =>
+            logActivity({
+              type: "appointment",
+              actor,
+              message,
+              detail,
+              clientId: clientOfItem(stateRef.current, updated),
+              processId: updated.processId,
+              actorUserId: account.currentUserId(),
+              href: "/agenda",
+            })
+          const log: Activity[] = []
+          if (change.rescheduled) log.push(entry(change.rescheduleText, updated.title))
+          if (change.fields.length) log.push(entry("atualizou o compromisso.", `${updated.title} · Alterado: ${change.fields.join(", ")}`))
+          commit((s) => ({ ...s, appointments: s.appointments.map((a) => (a.id === id ? updated : a)), activities: [...log, ...s.activities] }))
+          return true
+        })
+      },
+
       deleteAppointment(id) {
         const appt = stateRef.current.appointments.find((a) => a.id === id)
         if (!appt) return
@@ -874,6 +959,40 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return doc
       },
 
+      updateDocument(id, patch, options) {
+        return save<LegalDocument>("documents", id, options, () => {
+          const current = stateRef.current.documents.find((d) => d.id === id)
+          if (!current) return false
+          const updated: LegalDocument = { ...current, ...patch }
+          const labels: [keyof LegalDocument, string][] = [
+            ["name", "nome"],
+            ["kind", "tipo"],
+            ["clientId", "cliente"],
+            ["processId", "processo"],
+          ]
+          const changed = labels.filter(([key]) => !sameValue(current[key], updated[key])).map(([, label]) => label)
+          if (!changed.length) return false
+          commit((s) => ({
+            ...s,
+            documents: s.documents.map((d) => (d.id === id ? updated : d)),
+            activities: [
+              logActivity({
+                type: "document",
+                actor: account.getUser(account.currentUserId()).name,
+                message: "atualizou um documento.",
+                detail: `${updated.name} · Alterado: ${changed.join(", ")}${updated.name !== current.name ? ` · Antes: ${current.name}` : ""}`,
+                clientId: clientOfItem(s, updated),
+                processId: updated.processId,
+                actorUserId: account.currentUserId(),
+                href: clientOfItem(s, updated) ? `/clientes/${clientOfItem(s, updated)}?tab=documentos` : "/documentos",
+              }),
+              ...s.activities,
+            ],
+          }))
+          return true
+        })
+      },
+
       deleteDocument(id) {
         const doc = stateRef.current.documents.find((d) => d.id === id)
         if (!doc) return
@@ -940,6 +1059,36 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             ...s.activities,
           ],
         }))
+      },
+
+      updateInvoice(id, patch, options) {
+        return save<Invoice>("invoices", id, options, () => {
+          const current = stateRef.current.invoices.find((i) => i.id === id)
+          if (!current) return false
+          const updated: Invoice = { ...current, ...patch }
+          // Só lançamento pago tem data de pagamento.
+          if (updated.status !== "pago") delete updated.paidAt
+          const change = describeInvoiceChange(current, updated)
+          if (!change.changed) return false
+          commit((s) => ({
+            ...s,
+            invoices: s.invoices.map((i) => (i.id === id ? updated : i)),
+            activities: [
+              logActivity({
+                type: "payment",
+                actor: account.getUser(account.currentUserId()).name,
+                message: change.message,
+                detail: change.detail,
+                clientId: updated.clientId,
+                processId: updated.processId,
+                actorUserId: account.currentUserId(),
+                href: `/clientes/${updated.clientId}?tab=financeiro`,
+              }),
+              ...s.activities,
+            ],
+          }))
+          return true
+        })
       },
 
       deleteInvoice(id) {

@@ -8,6 +8,7 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { hasValidCheckDigits, maskCNJ, onlyDigits } from "@/lib/cnj"
+import { documentRequiredIssue } from "@/lib/clients"
 import { PRACTICE_AREAS, PROCESS_STATUS } from "@/lib/config"
 import { getMembers, currentUserId } from "@/lib/account"
 import { getNow, parse } from "@/lib/dates"
@@ -104,8 +105,15 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
   // O vínculo com o processo salvo só vale para o número consultado.
   const linked = lookup.state === "filled" && lookup.cnj === digits ? lookup : null
   const findByCnj = (cnj: string) => data.processes.find((p) => (p.cnj ?? onlyDigits(p.number)) === cnj)
+  // Contato sem CPF/CNPJ não pode ter processo vinculado (o banco também recusa, `0010_contacts.sql`).
+  const clientIssue = documentRequiredIssue(
+    data.clients.find((c) => c.id === form.clientId),
+    "processo",
+  )
 
   const autofill = async () => {
+    // A consulta já salva o processo com o cliente escolhido.
+    if (clientIssue) return
     if (digits.length !== 20) {
       setErrors((e) => ({ ...e, number: "Digite os 20 dígitos do CNJ para preencher automaticamente." }))
       return
@@ -232,7 +240,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
     const duplicate = !linked && digits.length === 20 ? findByCnj(digits) : undefined
     if (duplicate) next.number = `Esse processo já está em Processos (${duplicate.code}). Use “Preencher” para atualizá-lo.`
     setErrors(next)
-    if (Object.values(next).some(Boolean)) return
+    if (Object.values(next).some(Boolean) || clientIssue) return
 
     const open = (id: string) => ({ label: "Abrir", onClick: () => router.push(`/processos/${id}`) })
 
@@ -309,7 +317,7 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
                 variant="secondary"
                 className="shrink-0"
                 onClick={autofill}
-                disabled={loading || digits.length !== 20}
+                disabled={loading || digits.length !== 20 || !!clientIssue}
                 title="Buscar as informações do processo e preencher os campos"
               >
                 {loading ? (
@@ -337,8 +345,8 @@ function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => 
             </div>
           )}
 
-          <Field label="Cliente" htmlFor="proc-client" optional>
-            <NativeSelect id="proc-client" value={form.clientId} onChange={(e) => set("clientId", e.target.value)}>
+          <Field label="Cliente" htmlFor="proc-client" optional error={clientIssue}>
+            <NativeSelect id="proc-client" value={form.clientId} aria-invalid={!!clientIssue} onChange={(e) => set("clientId", e.target.value)}>
               <option value="">Sem cliente</option>
               {data.clients.map((c) => (
                 <option key={c.id} value={c.id}>

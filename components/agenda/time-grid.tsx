@@ -4,6 +4,7 @@ import * as React from "react"
 import { motion } from "framer-motion"
 import { cn } from "cn"
 import { layoutDay } from "./layout-events"
+import { atMinutes, durationMinutes, moveAppointment, snapMinutes } from "@/lib/agenda"
 import { useCategoryLookup } from "./use-category"
 import { getNow, fmtTime, isSameDay, parse, toLocalISO, weekdayShort } from "@/lib/dates"
 import type { Appointment } from "@/types"
@@ -12,11 +13,15 @@ const START_HOUR = 7
 const END_HOUR = 21
 const HOUR_PX = 60
 
+/** Onde o compromisso arrastado vai cair (dia + minutos do início). */
+type DropPreview = { day: string; startMin: number }
+
 export function TimeGrid({
   days,
   events,
   onSelect,
   onCreate,
+  onMove,
   processCode,
 }: {
   days: Date[]
@@ -24,9 +29,29 @@ export function TimeGrid({
   onSelect: (a: Appointment) => void
   /** Ausente = sem permissão para criar: os horários não são clicáveis. */
   onCreate?: (date: string) => void
+  /** Ausente = sem permissão para editar: os compromissos não são arrastáveis. */
+  onMove?: (a: Appointment, date: string, startMinutes: number) => void
   processCode: (id?: string) => string | undefined
 }) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
+  // Arrastar para remarcar: o compromisso, onde foi agarrado e a posição de destino.
+  const drag = React.useRef<{ event: Appointment; grabOffset: number } | null>(null)
+  // Na tela (prévia, transparência): o compromisso arrastado. O ref acima é só para os eventos.
+  const [dragged, setDragged] = React.useState<Appointment | null>(null)
+  const [preview, setPreview] = React.useState<DropPreview | null>(null)
+
+  const dropMinutes = (e: React.DragEvent<HTMLElement>) => {
+    const current = drag.current
+    if (!current) return null
+    const top = e.currentTarget.getBoundingClientRect().top
+    const raw = START_HOUR * 60 + ((e.clientY - top - current.grabOffset) / HOUR_PX) * 60
+    return snapMinutes(raw, { min: START_HOUR * 60, max: END_HOUR * 60 - durationMinutes(current.event) })
+  }
+  const endDrag = () => {
+    drag.current = null
+    setDragged(null)
+    setPreview(null)
+  }
   const lookup = useCategoryLookup()
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
   const nowMin = getNow().getHours() * 60 + getNow().getMinutes()
@@ -87,11 +112,28 @@ export function TimeGrid({
             const positioned = layoutDay(dayEvents)
             const today = isSameDay(d, getNow())
             const weekend = d.getDay() === 0 || d.getDay() === 6
+            const dayKey = toLocalISO(d).slice(0, 10)
+            const showPreview = preview?.day === dayKey && dragged
             return (
               <div
                 key={d.toISOString()}
                 className={cn("relative border-l border-border", weekend && "bg-surface-muted/30")}
                 style={{ height: hours.length * HOUR_PX }}
+                onDragOver={(e) => {
+                  const startMin = dropMinutes(e)
+                  if (startMin === null) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = "move"
+                  if (preview?.day !== dayKey || preview.startMin !== startMin) setPreview({ day: dayKey, startMin })
+                }}
+                onDrop={(e) => {
+                  const startMin = dropMinutes(e)
+                  const current = drag.current
+                  if (startMin === null || !current) return
+                  e.preventDefault()
+                  endDrag()
+                  onMove?.(current.event, dayKey, startMin)
+                }}
               >
                 {hours.map((h, i) => (
                   <button
@@ -123,6 +165,21 @@ export function TimeGrid({
                   </div>
                 )}
 
+                {showPreview && dragged && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-1 z-30 rounded-[7px] border-2 border-dashed border-brand bg-brand-soft/60 px-2 py-1"
+                    style={{
+                      top: ((preview.startMin - START_HOUR * 60) / 60) * HOUR_PX + 1,
+                      height: Math.max((durationMinutes(dragged) / 60) * HOUR_PX - 2, 22),
+                    }}
+                  >
+                    <p className="tabular truncate text-[11px] font-semibold text-brand-strong">
+                      {fmtTime(atMinutes(dayKey, preview.startMin))} – {fmtTime(moveAppointment(dragged, dayKey, preview.startMin).end)}
+                    </p>
+                  </div>
+                )}
+
                 {positioned.map(({ event: a, startMin, endMin, lane, lanes }) => {
                   const { style } = lookup(a.categoryId)
                   const top = ((startMin - START_HOUR * 60) / 60) * HOUR_PX
@@ -132,42 +189,57 @@ export function TimeGrid({
                   const code = processCode(a.processId)
                   const label = code ? `${a.title} · ${code}` : a.title
                   return (
-                    <motion.button
+                    // O arrastar (HTML nativo) fica no invólucro: o `motion.button` usa os eventos de drag para outra coisa.
+                    <div
                       key={a.id}
-                      type="button"
-                      layout
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.18 }}
-                      onClick={() => onSelect(a)}
-                      className={cn(
-                        "absolute z-10 overflow-hidden rounded-[7px] border-l-[3px] px-2 text-left outline-none ring-1 ring-inset ring-black/[0.03] transition-[box-shadow,filter] hover:shadow-[0_6px_16px_-8px_rgb(15_23_42/0.35)] hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-brand/50",
-                        past && "opacity-60",
-                        compact ? "py-0.5" : "py-1.5",
-                      )}
+                      draggable={!!onMove}
+                      title={onMove ? "Arraste para remarcar" : undefined}
+                      onDragStart={(e) => {
+                        drag.current = { event: a, grabOffset: e.clientY - e.currentTarget.getBoundingClientRect().top }
+                        e.dataTransfer.effectAllowed = "move"
+                        e.dataTransfer.setData("text/plain", a.id)
+                        setDragged(a)
+                      }}
+                      onDragEnd={endDrag}
+                      className={cn("absolute z-10", dragged?.id === a.id && "opacity-40", onMove && "cursor-grab active:cursor-grabbing")}
                       style={{
-                        ...style.soft,
-                        ...style.bar,
                         top: top + 1,
                         height,
                         left: `calc(${(lane / lanes) * 100}% + 3px)`,
                         width: `calc(${100 / lanes}% - 6px)`,
                       }}
                     >
-                      <p className="truncate text-[11.5px] font-semibold leading-tight" style={style.text}>
-                        {compact ? `${fmtTime(a.start)} ${a.personName ?? label}` : label}
-                      </p>
-                      {!compact && (
-                        <>
-                          <p className="truncate text-[11.5px] leading-tight text-foreground/80">{a.personName}</p>
-                          {height > 58 && (
-                            <p className="tabular mt-0.5 truncate text-[10.5px] text-muted-foreground">
-                              {fmtTime(a.start)} – {fmtTime(a.end)}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </motion.button>
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.18 }}
+                        onClick={() => onSelect(a)}
+                        className={cn(
+                          "size-full overflow-hidden rounded-[7px] border-l-[3px] px-2 text-left outline-none ring-1 ring-inset ring-black/[0.03] transition-[box-shadow,filter] hover:shadow-[0_6px_16px_-8px_rgb(15_23_42/0.35)] hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-brand/50",
+                          past && "opacity-60",
+                          compact ? "py-0.5" : "py-1.5",
+                        )}
+                        style={{
+                          ...style.soft,
+                          ...style.bar,
+                        }}
+                      >
+                        <p className="truncate text-[11.5px] font-semibold leading-tight" style={style.text}>
+                          {compact ? `${fmtTime(a.start)} ${a.personName ?? label}` : label}
+                        </p>
+                        {!compact && (
+                          <>
+                            <p className="truncate text-[11.5px] leading-tight text-foreground/80">{a.personName}</p>
+                            {height > 58 && (
+                              <p className="tabular mt-0.5 truncate text-[10.5px] text-muted-foreground">
+                                {fmtTime(a.start)} – {fmtTime(a.end)}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
                   )
                 })}
               </div>

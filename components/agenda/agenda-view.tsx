@@ -3,6 +3,7 @@
 import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { FilterTabs } from "@/components/ui/filter-tabs"
@@ -12,7 +13,8 @@ import { MonthGrid } from "./month-grid"
 import { AgendaList } from "./agenda-list"
 import { AppointmentDetail } from "./appointment-detail"
 import { AgendaToday } from "./agenda-today"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { fmtSlot, moveAppointment, moveToDay } from "@/lib/agenda"
 import { useUI } from "@/lib/store/ui-store"
 import { categoryStyle } from "@/lib/config"
 import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, startOfDay, startOfWeek, weekdayName } from "@/lib/dates"
@@ -29,6 +31,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export function AgendaView() {
   const data = useDemoData()
+  const { updateAppointment, versionOf } = useDemoActions()
   const { openDialog } = useUI()
   const { can } = useSession()
   const editable = can("agenda.edit")
@@ -76,6 +79,22 @@ export function AgendaView() {
         : anchor.getMonth() === getNow().getMonth()
 
   const processCode = (id?: string) => data.processes.find((p) => p.id === id)?.code
+
+  /** Arrastar na agenda: grava o novo horário (mesma duração) e oferece desfazer. */
+  const reschedule = async (a: Appointment, next: { start: string; end: string }) => {
+    if (next.start === a.start && next.end === a.end) return
+    const result = await updateAppointment(a.id, next, { baseVersion: versionOf("appointments", a.id) })
+    if (result.status !== "saved") return
+    toast.success("Compromisso remarcado.", {
+      description: `${a.title} — ${fmtSlot(a.start)} → ${fmtSlot(next.start)}`,
+      action: {
+        label: "Desfazer",
+        onClick: () => void updateAppointment(a.id, { start: a.start, end: a.end }, { baseVersion: versionOf("appointments", a.id) }),
+      },
+    })
+  }
+  const moveInGrid = editable ? (a: Appointment, date: string, startMin: number) => reschedule(a, moveAppointment(a, date, startMin)) : undefined
+  const moveInMonth = editable ? (a: Appointment, date: string) => reschedule(a, moveToDay(a, date)) : undefined
 
   const toggleType = (t: string) =>
     setHidden((s) => {
@@ -225,6 +244,7 @@ export function AgendaView() {
                     events={events}
                     onSelect={setSelected}
                     onCreate={editable ? create : undefined}
+                    onMove={moveInGrid}
                     processCode={processCode}
                   />
                 </div>
@@ -234,7 +254,14 @@ export function AgendaView() {
               </>
             )}
             {view === "dia" && (
-              <TimeGrid days={[anchor]} events={events} onSelect={setSelected} onCreate={editable ? create : undefined} processCode={processCode} />
+              <TimeGrid
+                days={[anchor]}
+                events={events}
+                onSelect={setSelected}
+                onCreate={editable ? create : undefined}
+                onMove={moveInGrid}
+                processCode={processCode}
+              />
             )}
             {view === "mes" && (
               <MonthGrid
@@ -246,6 +273,7 @@ export function AgendaView() {
                   setAnchor(startOfDay(d))
                   setView("dia")
                 }}
+                onMove={moveInMonth}
               />
             )}
           </motion.div>

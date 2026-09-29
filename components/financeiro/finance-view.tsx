@@ -1,8 +1,9 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowUpRight, CircleDollarSign, Download, TrendingUp, TriangleAlert, Wallet, Percent } from "lucide-react"
+import { ArrowUpRight, CircleCheck, CircleDollarSign, Download, Ellipsis, Pencil, TrendingUp, TriangleAlert, Wallet, Percent } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
@@ -13,16 +14,23 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FadeIn } from "@/components/ui/motion"
+import { FilterTabs } from "@/components/ui/filter-tabs"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { RevenueBarChart } from "./revenue-chart"
+import { NewInvoiceDialog } from "./new-invoice-dialog"
+import { PayInvoiceDialog } from "./pay-invoice-dialog"
 import { useDemoData } from "@/lib/store/demo-store"
 import { INVOICE_STATUS } from "@/lib/config"
 import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
 import { downloadCSV } from "@/lib/csv"
 import { formatCurrency } from "@/lib/format"
 import { financeSummary, invoiceStatus, monthlyRevenue, openReceivables, revenueByArea } from "@/lib/selectors"
+import { useSession } from "@/lib/auth/session"
+import type { Invoice } from "@/types"
 
 export function FinanceView() {
   const data = useDemoData()
+  const { can } = useSession()
   const ready = data.hydrated
   const open = openReceivables(data)
   // Parcela a vencer com vencimento passado já está em atraso, mesmo sem mudar o status salvo.
@@ -30,6 +38,12 @@ export function FinanceView() {
   const overdueTotal = overdue.reduce((a, i) => a + i.amount, 0)
   const oldest = overdue[0]
   const upcoming = data.invoices.filter((i) => i.status !== "pago").sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+  const received = data.invoices.filter((i) => i.status === "pago").sort((a, b) => (b.paidAt ?? b.dueDate).localeCompare(a.paidAt ?? a.dueDate))
+  // Lista com ações: editar e dar baixa sem precisar abrir o perfil do cliente.
+  const [tab, setTab] = React.useState<"aberto" | "recebido">("aberto")
+  const [editing, setEditing] = React.useState<Invoice | undefined>()
+  const [paying, setPaying] = React.useState<Invoice | undefined>()
+  const listed = tab === "aberto" ? upcoming : received
   const summary = financeSummary(data.invoices)
   const series = monthlyRevenue(data.invoices)
   const byArea = revenueByArea(data.invoices, data.clients)
@@ -160,10 +174,35 @@ export function FinanceView() {
           )}
 
           <Panel>
-            <PanelHeader title="Próximos recebimentos" description={`${upcoming.length} parcelas · ${formatCurrency(open)}`} />
-            {upcoming.length === 0 && <EmptyState compact title="Nenhuma parcela a receber." description="Tudo o que foi faturado já está pago." />}
-            <ul className={cn("divide-y divide-border", upcoming.length > 0 && "border-t border-border")}>
-              {upcoming.map((inv) => {
+            <PanelHeader
+              title={tab === "aberto" ? "Próximos recebimentos" : "Recebidos"}
+              description={
+                tab === "aberto"
+                  ? `${upcoming.length} parcelas · ${formatCurrency(open)}`
+                  : `${received.length} ${received.length === 1 ? "lançamento" : "lançamentos"}`
+              }
+              action={
+                <FilterTabs
+                  ariaLabel="Lançamentos"
+                  layoutId="finance-list"
+                  value={tab}
+                  onChange={setTab}
+                  className="mx-0 px-0"
+                  options={[
+                    { value: "aberto", label: "A receber", count: upcoming.length },
+                    { value: "recebido", label: "Recebidos", count: received.length },
+                  ]}
+                />
+              }
+            />
+            {listed.length === 0 &&
+              (tab === "aberto" ? (
+                <EmptyState compact title="Nenhuma parcela a receber." description="Tudo o que foi faturado já está pago." />
+              ) : (
+                <EmptyState compact title="Nenhum pagamento recebido." description="As baixas registradas aparecem aqui." />
+              ))}
+            <ul className={cn("divide-y divide-border", listed.length > 0 && "border-t border-border")}>
+              {listed.map((inv) => {
                 const client = data.clients.find((c) => c.id === inv.clientId)
                 const current = invoiceStatus(inv)
                 const status = INVOICE_STATUS[current]
@@ -176,7 +215,9 @@ export function FinanceView() {
                         current === "atrasado" ? "border-danger/25 bg-danger-soft" : "border-border bg-surface",
                       )}
                     >
-                      <span className={cn("text-[9.5px] font-semibold tracking-[0.1em]", current === "atrasado" ? "text-danger" : "text-brand-strong")}>
+                      <span
+                        className={cn("text-[9.5px] font-semibold tracking-[0.1em]", current === "atrasado" ? "text-danger" : "text-brand-strong")}
+                      >
                         {month}
                       </span>
                       <span className="tabular text-[15px] font-semibold leading-tight">{day}</span>
@@ -190,7 +231,13 @@ export function FinanceView() {
                         <span className="truncate">{client?.name}</span>
                       </Link>
                       <p className="truncate text-[12px] text-muted-foreground">
-                        {[inv.description, inv.method, fmtDueIn(inv.dueDate)].filter(Boolean).join(" · ")}
+                        {[
+                          inv.description,
+                          inv.method,
+                          current === "pago" ? `pago em ${inv.paidAt ? fmtNumericDate(inv.paidAt) : "data não informada"}` : fmtDueIn(inv.dueDate),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                     </div>
                     <span className="hidden sm:block">
@@ -201,13 +248,39 @@ export function FinanceView() {
                     <span className={cn("tabular w-24 shrink-0 text-right text-[13.5px] font-semibold", current === "atrasado" && "text-danger")}>
                       {formatCurrency(inv.amount)}
                     </span>
-                    <Link
-                      href={`/clientes/${inv.clientId}?tab=financeiro`}
-                      aria-label={`Abrir financeiro de ${client?.name}`}
-                      className="hidden size-8 items-center justify-center rounded-[8px] text-subtle hover:bg-accent hover:text-foreground md:flex"
-                    >
-                      <ArrowUpRight className="size-4" />
-                    </Link>
+                    {can("finance.edit") ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          aria-label={`Ações para ${inv.description}`}
+                          className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"
+                        >
+                          <Ellipsis className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52 rounded-[10px] p-1">
+                          <DropdownMenuGroup>
+                            {current !== "pago" && (
+                              <DropdownMenuItem className="h-8 px-2" onClick={() => setPaying(inv)}>
+                                <CircleCheck /> Dar baixa
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="h-8 px-2" onClick={() => setEditing(inv)}>
+                              <Pencil /> Editar lançamento
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="h-8 px-2" render={<Link href={`/clientes/${inv.clientId}?tab=financeiro`} />}>
+                              <ArrowUpRight /> Abrir cliente
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <Link
+                        href={`/clientes/${inv.clientId}?tab=financeiro`}
+                        aria-label={`Abrir financeiro de ${client?.name}`}
+                        className="hidden size-8 items-center justify-center rounded-[8px] text-subtle hover:bg-accent hover:text-foreground md:flex"
+                      >
+                        <ArrowUpRight className="size-4" />
+                      </Link>
+                    )}
                   </li>
                 )
               })}
@@ -262,6 +335,9 @@ export function FinanceView() {
           </div>
         </>
       )}
+
+      <NewInvoiceDialog open={!!editing} onOpenChange={(o) => !o && setEditing(undefined)} invoice={editing} />
+      <PayInvoiceDialog invoice={paying} onOpenChange={(o) => !o && setPaying(undefined)} />
     </div>
   )
 }

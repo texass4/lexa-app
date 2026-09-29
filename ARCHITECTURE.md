@@ -193,6 +193,8 @@ Nova ação de negócio: método em `DemoActions` + implementação, registrando
 
 ### Categorias de compromisso
 
+Remarcar: arrastar o compromisso na semana/dia (encaixa em 15 min, mantém a duração) ou para outro dia no mês; "Editar" no detalhe abre o mesmo formulário do cadastro. A timeline registra "Fulana remarcou o compromisso de 10/10 14:00 para 11/10 15:00." e o aviso oferece desfazer.
+
 Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da paleta `CATEGORY_COLORS` em `lib/config.ts`) direto no formulário do compromisso — `components/agenda/category-picker.tsx`. Excluir uma categoria deixa os compromissos dela "Sem categoria". Para colorir um compromisso em qualquer tela, use `useCategoryLookup()` (`components/agenda/use-category.ts`) + `categoryStyle(color)`.
 
 ---
@@ -240,6 +242,9 @@ O cliente é a entidade central: processos (`clientId`), tarefas (`related`), do
 - Lançamentos financeiros: diálogo global `"invoice"` (`components/financeiro/new-invoice-dialog.tsx`), gravando em `invoices` — o mesmo dado do módulo Financeiro.
 - `updateClient` registra na timeline mudança de status, de responsável e de dados; atividades de tarefa, documento e compromisso vinculados a processo levam o `clientId` do processo.
 - WhatsApp: link oficial (wa.me) no cadastro; a conversa em si fica na Central de Atendimento (seção 4b).
+- **Contato** (status `contato`): pessoa sem CPF/CNPJ — criada no formulário, pela importação ou em "Transformar em cliente" na Central. O documento, quando informado, continua validado e único. `resolveClientStatus` mantém o status coerente (sem documento: Contato ou Inativo; ao ganhar documento, Novo). Para vincular processo, anexar contrato ou lançar honorários, o CPF/CNPJ é exigido (`documentRequiredIssue`) — e o banco repete a regra (`0010_contacts.sql`, só em vínculos novos ou alterados), além de impedir que um cliente com processo, fatura ou contrato perca o documento.
+- **Importação por planilha** (Clientes › Importar): `lib/csv.ts › parseCSV/decodeCSV` (`;`/`,`/tab, aspas, Windows-1252) → `lib/client-import.ts` (colunas pelo cabeçalho, mesmas validações do cadastro, duplicados por CPF/CNPJ — ou e-mail/telefone quando falta documento —, contra o escritório e dentro do arquivo) → prévia → confirmação → `importClients` (lotes de 100 pela sessão de quem importa, com a RLS de sempre; lote recusado é refeito um a um para apontar a linha) → relatório (importados, duplicados, inválidos, falhas e motivo; baixável em CSV).
+- Edição com conferência de versão (`SaveOptions.baseVersion`) em compromissos (`updateAppointment`), lançamentos (`updateInvoice`, inclusive a baixa pela lista do Financeiro) e documentos (`updateDocument`: nome — a extensão é mantida —, tipo, cliente e processo). Cada edição registra quem fez e o que mudou (`lib/agenda.ts`, `lib/invoices.ts`).
 
 ## 5. UI global
 

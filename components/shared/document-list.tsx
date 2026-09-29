@@ -3,11 +3,12 @@
 import * as React from "react"
 import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
-import { Download, Ellipsis, Eye, Link2, Trash2 } from "lucide-react"
+import { Download, Ellipsis, Eye, Link2, Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FileIcon } from "./file-icon"
+import { EditDocumentDialog } from "@/components/documentos/edit-document-dialog"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useUI } from "@/lib/store/ui-store"
 import { copyDocumentLink, downloadDocument } from "@/lib/documents"
@@ -21,6 +22,7 @@ export function DocumentActions({ doc }: { doc: LegalDocument }) {
   const { openDialog } = useUI()
   const { deleteDocument } = useDemoActions()
   const [deleting, setDeleting] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
 
   return (
     <>
@@ -46,6 +48,9 @@ export function DocumentActions({ doc }: { doc: LegalDocument }) {
               </DropdownMenuItem>
             )}
             <Can permission="documents.edit">
+              <DropdownMenuItem className="h-8 px-2" onClick={() => setEditing(true)}>
+                <Pencil /> Editar
+              </DropdownMenuItem>
               <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setDeleting(true)}>
                 <Trash2 /> Excluir
               </DropdownMenuItem>
@@ -53,6 +58,7 @@ export function DocumentActions({ doc }: { doc: LegalDocument }) {
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      <EditDocumentDialog doc={editing ? doc : undefined} onOpenChange={(o) => !o && setEditing(false)} />
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}

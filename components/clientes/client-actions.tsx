@@ -2,7 +2,7 @@
 
 import { toast } from "sonner"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { linkedRecordsSummary } from "@/lib/clients"
+import { linkedRecordsSummary, resolveClientStatus } from "@/lib/clients"
 import { clientHub } from "@/lib/selectors"
 import { downloadFile, fileSlug } from "@/lib/export"
 import { getNow, toLocalISO } from "@/lib/dates"
@@ -17,7 +17,8 @@ export function useClientActions() {
   return {
     /** Desativa (ou reativa) sem apagar nada — com "Desfazer". */
     toggleActive(client: Client) {
-      const next: ClientStatus = client.status === "inativo" ? "ativo" : "inativo"
+      // Reativar um cadastro sem CPF/CNPJ o devolve a Contato.
+      const next: ClientStatus = client.status === "inativo" ? resolveClientStatus("ativo", client.document) : "inativo"
       updateClient(client.id, { status: next })
       toast.success(next === "inativo" ? "Cliente desativado." : "Cliente reativado.", {
         description: client.name,

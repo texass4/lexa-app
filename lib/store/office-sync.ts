@@ -47,6 +47,8 @@ import {
   type StateDiff,
   type SyncResult,
   type Versions,
+  type WriteError,
+  classify,
 } from "./storage"
 
 type Entity = { id: string }
@@ -317,6 +319,58 @@ export class OfficeSync<S extends PersistedState> {
       this.inFlight.delete(id)
       this.replayDeferred()
     }
+  }
+
+  /**
+   * Cria vários registros e espera o banco (importação de planilha). Grava em lotes; se
+   * o banco recusar um lote (ex.: CPF/CNPJ que outra pessoa acabou de cadastrar), tenta
+   * um a um para saber exatamente quais falharam. Não mostra avisos: quem chama relata.
+   * Mesma RLS do cadastro normal — é o cliente do Supabase de quem está logado.
+   */
+  async insertMany<T extends Entity>(
+    key: Collection,
+    items: T[],
+    chunkSize = 100,
+  ): Promise<{ saved: T[]; failed: { item: T; error: WriteError }[] }> {
+    const { supabase, organizationId } = this.opts
+    const saved: T[] = []
+    const failed: { item: T; error: WriteError }[] = []
+    const ids = items.map((item) => ref(key, item.id))
+    ids.forEach((id) => this.inFlight.add(id))
+    try {
+      for (let i = 0; i < items.length; i += chunkSize) {
+        const chunk = items.slice(i, i + chunkSize)
+        const { data, error } = await supabase
+          .from(TABLES[key])
+          .insert(chunk.map((item) => ({ organization_id: organizationId, id: item.id, data: item })))
+          .select("id, data, updated_at")
+        if (!error) {
+          for (const row of data as ServerRow[]) {
+            this.inFlight.delete(ref(key, row.id))
+            this.put(key, row, { force: true, own: true })
+            saved.push(row.data as T)
+          }
+          continue
+        }
+        if (classify(error) === "denied") {
+          failed.push(...chunk.map((item) => ({ item, error: "denied" as const })))
+          continue
+        }
+        for (const item of chunk) {
+          const result = await insertRecord(supabase, organizationId, key, item).catch(() => ({ error: "failed" as const }))
+          if ("error" in result) failed.push({ item, error: result.error })
+          else {
+            this.inFlight.delete(ref(key, item.id))
+            this.put(key, result.row, { force: true, own: true })
+            saved.push(result.row.data as T)
+          }
+        }
+      }
+    } finally {
+      ids.forEach((id) => this.inFlight.delete(id))
+      this.replayDeferred()
+    }
+    return { saved, failed }
   }
 
   /**

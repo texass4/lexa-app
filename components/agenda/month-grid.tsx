@@ -1,8 +1,9 @@
 "use client"
 
+import * as React from "react"
 import { cn } from "cn"
 import { useCategoryLookup } from "./use-category"
-import { addDays, getNow, fmtTime, isSameDay, parse, startOfWeek } from "@/lib/dates"
+import { addDays, getNow, fmtTime, isSameDay, parse, startOfWeek, toLocalISO } from "@/lib/dates"
 import type { Appointment } from "@/types"
 
 const WEEK_LABELS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
@@ -12,13 +13,18 @@ export function MonthGrid({
   events,
   onSelect,
   onDayClick,
+  onMove,
 }: {
   anchor: Date
   events: Appointment[]
   onSelect: (a: Appointment) => void
   onDayClick: (d: Date) => void
+  /** Arrastar para outro dia (mesmo horário). Ausente = sem permissão para editar. */
+  onMove?: (a: Appointment, date: string) => void
 }) {
   const lookup = useCategoryLookup()
+  const dragged = React.useRef<Appointment | null>(null)
+  const [target, setTarget] = React.useState<string | null>(null)
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
   const start = startOfWeek(first)
   const days = Array.from({ length: 42 }, (_, i) => addDays(start, i))
@@ -42,6 +48,7 @@ export function MonthGrid({
           const today = isSameDay(d, getNow())
           const dayEvents = events.filter((e) => isSameDay(parse(e.start), d)).sort((a, b) => a.start.localeCompare(b.start))
           const weekend = d.getDay() === 0 || d.getDay() === 6
+          const dayKey = toLocalISO(d).slice(0, 10)
           return (
             <div
               key={d.toISOString()}
@@ -51,7 +58,22 @@ export function MonthGrid({
                 i >= 7 && "border-t",
                 !inMonth && "bg-surface-muted/40",
                 weekend && inMonth && "bg-surface-muted/20",
+                target === dayKey && "bg-brand-soft/60 ring-2 ring-inset ring-brand/50",
               )}
+              onDragOver={(e) => {
+                if (!dragged.current) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = "move"
+                if (target !== dayKey) setTarget(dayKey)
+              }}
+              onDrop={(e) => {
+                const a = dragged.current
+                if (!a) return
+                e.preventDefault()
+                dragged.current = null
+                setTarget(null)
+                if (a.start.slice(0, 10) !== dayKey) onMove?.(a, dayKey)
+              }}
             >
               <button
                 type="button"
@@ -72,6 +94,16 @@ export function MonthGrid({
                     <button
                       key={a.id}
                       type="button"
+                      draggable={!!onMove}
+                      onDragStart={(e) => {
+                        dragged.current = a
+                        e.dataTransfer.effectAllowed = "move"
+                        e.dataTransfer.setData("text/plain", a.id)
+                      }}
+                      onDragEnd={() => {
+                        dragged.current = null
+                        setTarget(null)
+                      }}
                       onClick={() => onSelect(a)}
                       className={cn(
                         "flex w-full items-center gap-1.5 truncate rounded-[5px] px-1.5 py-0.5 text-left text-[11px] outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/40",

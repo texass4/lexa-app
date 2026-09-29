@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowDown, ArrowUp, ChevronRight, Download, Ellipsis, Eye, Plus, Power, Trash2, UsersRound, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronRight, Download, Ellipsis, Eye, Plus, Power, Trash2, Upload, UsersRound, X } from "lucide-react"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
 import { useClientActions } from "./client-actions"
+import { ImportClientsDialog } from "./import-clients-dialog"
 import { useUI } from "@/lib/store/ui-store"
 import { CLIENT_STATUS, PRACTICE_AREAS } from "@/lib/config"
 import { fmtNumericDate, fmtRelative } from "@/lib/dates"
@@ -39,6 +40,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "inativo", label: "Inativos" },
   { value: "novo", label: "Novos" },
   { value: "inadimplente", label: "Inadimplentes" },
+  { value: "contato", label: "Contatos" },
 ]
 
 type Links = "" | "com-processos" | "sem-processos" | "tarefas-pendentes" | "tarefas-atrasadas"
@@ -72,6 +74,7 @@ export function ClientsView() {
   const router = useRouter()
   const ready = data.hydrated
   const [filter, setFilter] = React.useState<Filter>("todos")
+  const [importing, setImporting] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [ownerId, setOwnerId] = React.useState("")
   const [area, setArea] = React.useState<PracticeArea | "">("")
@@ -242,6 +245,9 @@ export function ClientsView() {
               </Button>
             )}
             <Can permission="clients.edit">
+              <Button variant="secondary" onClick={() => setImporting(true)} disabled={!ready}>
+                <Upload /> Importar
+              </Button>
               <Button onClick={() => openDialog("client")}>
                 <Plus /> Novo cliente
               </Button>
@@ -457,6 +463,7 @@ export function ClientsView() {
         </FadeIn>
       )}
 
+      <ImportClientsDialog open={importing} onOpenChange={setImporting} />
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
