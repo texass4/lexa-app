@@ -12,6 +12,8 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { useAdminData } from "@/lib/admin/client"
 import type { Tone } from "@/lib/config"
 import type { MonitorHealth, MonitoringOverview, MonitoringRun } from "@/lib/services/processes/monitor-status"
+import type { RunJob } from "@/lib/services/processes/monitor-store"
+import { FilterTabs } from "@/components/ui/filter-tabs"
 import { AdminHeader } from "../ui/admin-header"
 import { StatCard } from "../ui/stat-card"
 
@@ -34,7 +36,8 @@ const RUN_STATUS: Record<MonitoringRun["status"], { tone: Tone; label: string }>
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
 const fmtTimeOnly = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-const fmtDuration = (ms: number | null) => (ms === null ? "—" : ms < 1000 ? `${ms} ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60_000)} min`)
+const fmtDuration = (ms: number | null) =>
+  ms === null ? "—" : ms < 1000 ? `${ms} ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60_000)} min`
 const n = (value: number | null) => (value === null ? "—" : value.toLocaleString("pt-BR"))
 
 /** Soma das execuções das últimas 24 h. */
@@ -68,22 +71,44 @@ function SetupCheck({ ok, label, hint }: { ok: boolean; label: string; hint: str
 }
 
 const Num = ({ value, tone }: { value: number; tone?: "warning" | "danger" | "success" }) => (
-  <span className={cn("tabular", value === 0 ? "text-subtle" : tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "")}>
+  <span
+    className={cn(
+      "tabular",
+      value === 0
+        ? "text-subtle"
+        : tone === "danger"
+          ? "text-danger"
+          : tone === "warning"
+            ? "text-warning"
+            : tone === "success"
+              ? "text-success"
+              : "",
+    )}
+  >
     {value.toLocaleString("pt-BR")}
   </span>
 )
 
 export function MonitoringView() {
   const { data, error, loading, reload } = useAdminData<MonitoringOverview>("/api/admin/monitoring")
-  const health = data ? HEALTH[data.status.health] : null
-  const day = data ? last24h(data.runs) : null
+  // Processos (Etapa 5) ou intimações do DJEN (Etapa 8): mesmo agendador, mesmo registro.
+  const [job, setJob] = React.useState<RunJob>("processos")
+  const djen = job === "intimacoes" ? data?.intimacoes : null
+  const status = djen ? djen.status : data?.status
+  const setup = djen ? djen.setup : data?.setup
+  const runs = data ? data.runs.filter((r) => r.job === job) : []
+  const health = status ? HEALTH[status.health] : null
+  const day = data ? last24h(runs) : null
+  const labels =
+    job === "processos" ? { evaluated: "Avaliados", third: "Do cache", news: "Novidades" } : { evaluated: "OABs", third: "Vinculadas", news: "Novas" }
+  const third = (r: MonitoringRun) => (job === "processos" ? r.fromCache : r.updatedProcesses)
 
   return (
     <div className="space-y-6">
       <AdminHeader
         eyebrow="Sistema"
-        title="Monitoramento de processos"
-        description="Atualização automática das movimentações. Cada processo é consultado no máximo uma vez por dia; limite (429) e indisponibilidade (503) da fonte ativam espera automática."
+        title="Monitoramento"
+        description="Atualização automática das movimentações e captura das intimações do DJEN. Cada processo e cada OAB são consultados no máximo uma vez por dia; limite (429) e indisponibilidade (503) da fonte ativam espera automática."
         actions={
           <Button variant="secondary" size="sm" onClick={reload} disabled={loading}>
             <RefreshCw className={cn(loading && "animate-spin")} />
@@ -96,7 +121,7 @@ export function MonitoringView() {
         <Panel>
           <ErrorState onRetry={reload} description={error} />
         </Panel>
-      ) : !data || !health || !day ? (
+      ) : !data || !health || !day || !status || !setup ? (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
@@ -107,6 +132,19 @@ export function MonitoringView() {
         </div>
       ) : (
         <>
+          {data.intimacoes && (
+            <FilterTabs
+              ariaLabel="Tarefa"
+              layoutId="monitoring-job"
+              value={job}
+              onChange={setJob}
+              className="mx-0 px-0"
+              options={[
+                { value: "processos", label: "Processos (DataJud)" },
+                { value: "intimacoes", label: "Intimações (DJEN)" },
+              ]}
+            />
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Estado"
@@ -117,29 +155,43 @@ export function MonitoringView() {
               }
               icon={<Radar />}
               hint={
-                data.status.health === "paused" && data.status.resumeAfter
-                  ? `Volta às ${fmtTimeOnly(data.status.resumeAfter)}`
-                  : data.status.lastHealthyRunAt
-                    ? `Última execução concluída em ${fmtDateTime(data.status.lastHealthyRunAt)}`
+                status.health === "paused" && status.resumeAfter
+                  ? `Volta às ${fmtTimeOnly(status.resumeAfter)}`
+                  : status.lastHealthyRunAt
+                    ? `Última execução concluída em ${fmtDateTime(status.lastHealthyRunAt)}`
                     : health.hint
               }
               hintTone={health.tone === "success" ? undefined : health.tone}
             />
-            <StatCard
-              label="Processos monitorados"
-              value={n(data.queue.monitored)}
-              icon={<Gauge />}
-              hint={data.queue.failing ? `${n(data.queue.failing)} com falha na última consulta` : "Nenhum com falha na última consulta"}
-              hintTone={data.queue.failing ? "warning" : undefined}
-            />
+            {djen ? (
+              <StatCard
+                label="OABs cadastradas (ativas)"
+                value={n(djen.oabs.active)}
+                icon={<Gauge />}
+                hint={djen.oabs.failing ? `${n(djen.oabs.failing)} com falha na última consulta` : "Nenhuma com falha na última consulta"}
+                hintTone={djen.oabs.failing ? "warning" : undefined}
+              />
+            ) : (
+              <StatCard
+                label="Processos monitorados"
+                value={n(data.queue.monitored)}
+                icon={<Gauge />}
+                hint={data.queue.failing ? `${n(data.queue.failing)} com falha na última consulta` : "Nenhum com falha na última consulta"}
+                hintTone={data.queue.failing ? "warning" : undefined}
+              />
+            )}
             <StatCard
               label="Consultas à fonte (24 h)"
               value={n(day.queried)}
               icon={<Activity />}
-              hint={`${day.runs} ${day.runs === 1 ? "execução" : "execuções"} · lote de ${data.config.batchSize}, ${data.config.concurrency} por vez`}
+              hint={
+                djen
+                  ? `${day.runs} ${day.runs === 1 ? "execução" : "execuções"} · cada OAB uma vez por dia`
+                  : `${day.runs} ${day.runs === 1 ? "execução" : "execuções"} · lote de ${data.config.batchSize}, ${data.config.concurrency} por vez`
+              }
             />
             <StatCard
-              label="Novidades (24 h)"
+              label={djen ? "Intimações novas (24 h)" : "Novidades (24 h)"}
               value={n(day.newMovements)}
               icon={<TriangleAlert />}
               hint={`${day.errors} erros · ${day.rateLimited} × 429 · ${day.unavailable} × 503`}
@@ -147,24 +199,51 @@ export function MonitoringView() {
             />
           </div>
 
-          {data.status.health !== "active" && (
+          {status.health !== "active" && (
             <Panel>
-              <PanelHeader title="Configuração" description="O monitoramento só aparece como ativo quando tudo abaixo está pronto e uma execução foi concluída." />
+              <PanelHeader
+                title="Configuração"
+                description={
+                  djen
+                    ? "A captura só aparece como ativa quando tudo abaixo está pronto e uma execução foi concluída. O servidor precisa rodar no Brasil: a fonte recusa (403) acessos de outros países."
+                    : "O monitoramento só aparece como ativo quando tudo abaixo está pronto e uma execução foi concluída."
+                }
+              />
               <ul className="divide-y divide-border px-5 pb-3">
-                <SetupCheck ok={data.setup.enabled} label="Consulta automática ligada" hint="Admin › Configurações › Recursos." />
-                <SetupCheck ok={data.setup.cronSecret} label="Segredo do agendador (CRON_SECRET)" hint="Variável de ambiente do servidor, com 16 caracteres ou mais." />
-                <SetupCheck ok={data.setup.sourceKey} label="Chave da consulta processual (DATAJUD_API_KEY)" hint="Variável de ambiente do servidor." />
                 <SetupCheck
-                  ok={data.queue.monitored !== null}
-                  label="Tabelas do monitoramento"
-                  hint="supabase/migrations/0009_process_monitoring.sql aplicada no banco."
+                  ok={setup.enabled}
+                  label={djen ? "Captura de intimações (DJEN) ligada" : "Consulta automática ligada"}
+                  hint={
+                    djen ? "Admin › Configurações › Recursos — depois de confirmar os termos de uso da fonte." : "Admin › Configurações › Recursos."
+                  }
                 />
                 <SetupCheck
-                  ok={!!data.status.lastRunAt}
+                  ok={setup.cronSecret}
+                  label="Segredo do agendador (CRON_SECRET)"
+                  hint="Variável de ambiente do servidor, com 16 caracteres ou mais."
+                />
+                {!djen && (
+                  <SetupCheck ok={setup.sourceKey} label="Chave da consulta processual (DATAJUD_API_KEY)" hint="Variável de ambiente do servidor." />
+                )}
+                {djen ? (
+                  <SetupCheck
+                    ok={(djen.oabs.active ?? 0) > 0}
+                    label="Advogados com OAB cadastrada"
+                    hint="Configurações › Perfil › Inscrições na OAB (ou pelo Sócio, em Usuários)."
+                  />
+                ) : (
+                  <SetupCheck
+                    ok={data.queue.monitored !== null}
+                    label="Tabelas do monitoramento"
+                    hint="supabase/migrations/0009_process_monitoring.sql aplicada no banco."
+                  />
+                )}
+                <SetupCheck
+                  ok={!!status.lastRunAt}
                   label="Agendador chamando o worker"
                   hint={
-                    data.status.lastRunAt
-                      ? `Última chamada em ${fmtDateTime(data.status.lastRunAt)}.`
+                    status.lastRunAt
+                      ? `Última chamada em ${fmtDateTime(status.lastRunAt)}.`
                       : "Nenhuma chamada recebida em /api/cron/process-sync (ex.: a cada hora, com Authorization: Bearer <CRON_SECRET>)."
                   }
                 />
@@ -172,15 +251,19 @@ export function MonitoringView() {
             </Panel>
           )}
 
-          {data.runs.length === 0 ? (
+          {runs.length === 0 ? (
             <TableShell>
-              <EmptyState icon={<Radar />} title="Nenhuma execução registrada." description="As execuções aparecem aqui assim que o agendador chamar o worker." />
+              <EmptyState
+                icon={<Radar />}
+                title="Nenhuma execução registrada."
+                description="As execuções aparecem aqui assim que o agendador chamar o worker."
+              />
             </TableShell>
           ) : (
             <TableShell className={cn("transition-opacity", loading && "opacity-60")}>
               {/* Celular: lista compacta. */}
               <ul className="divide-y divide-border md:hidden">
-                {data.runs.map((r) => (
+                {runs.map((r) => (
                   <li key={r.id} className="px-4 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="tabular text-[12.5px] text-muted-foreground">{fmtDateTime(r.startedAt)}</span>
@@ -189,7 +272,8 @@ export function MonitoringView() {
                       </StatusBadge>
                     </div>
                     <p className="mt-1 text-[12.5px]">
-                      {r.evaluated} avaliados · {r.queried} consultados · {r.newMovements} novidades · {r.errors} erros
+                      {r.evaluated} {labels.evaluated.toLowerCase()} · {r.queried} consultados · {r.newMovements} {labels.news.toLowerCase()} ·{" "}
+                      {r.errors} erros
                       {r.rateLimited ? ` · ${r.rateLimited} × 429` : ""}
                       {r.unavailable ? ` · ${r.unavailable} × 503` : ""}
                     </p>
@@ -204,10 +288,10 @@ export function MonitoringView() {
                       <Th>Início</Th>
                       <Th>Situação</Th>
                       <Th className="text-right">Duração</Th>
-                      <Th className="text-right">Avaliados</Th>
+                      <Th className="text-right">{labels.evaluated}</Th>
                       <Th className="text-right">Consultados</Th>
-                      <Th className="text-right">Do cache</Th>
-                      <Th className="text-right">Novidades</Th>
+                      <Th className="text-right">{labels.third}</Th>
+                      <Th className="text-right">{labels.news}</Th>
                       <Th className="text-right">Erros</Th>
                       <Th className="text-right">429</Th>
                       <Th className="text-right">503</Th>
@@ -215,7 +299,7 @@ export function MonitoringView() {
                     </tr>
                   </thead>
                   <tbody className="[&_tr:last-child_td]:border-0">
-                    {data.runs.map((r) => (
+                    {runs.map((r) => (
                       <tr key={r.id}>
                         <Td className="tabular whitespace-nowrap text-[12.5px] text-muted-foreground">{fmtDateTime(r.startedAt)}</Td>
                         <Td>
@@ -231,7 +315,7 @@ export function MonitoringView() {
                           <Num value={r.queried} />
                         </Td>
                         <Td className="text-right">
-                          <Num value={r.fromCache} />
+                          <Num value={third(r)} />
                         </Td>
                         <Td className="text-right">
                           <Num value={r.newMovements} tone="success" />

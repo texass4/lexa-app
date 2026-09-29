@@ -64,7 +64,7 @@ export function GlobalDialogs() {
       {mounted("prazo") && <NewPrazoDialog open={isOpen("prazo")} onOpenChange={onOpenChange} defaults={defaults} />}
       {mounted("appointment") && <NewAppointmentDialog open={isOpen("appointment")} onOpenChange={onOpenChange} defaults={defaults} />}
       {mounted("document") && <NewDocumentDialog open={isOpen("document")} onOpenChange={onOpenChange} defaults={defaults} />}
-      {mounted("process") && <NewProcessDialog open={isOpen("process")} onOpenChange={onOpenChange} clientId={defaults?.clientId} />}
+      {mounted("process") && <NewProcessDialog open={isOpen("process")} onOpenChange={onOpenChange} clientId={defaults?.clientId} number={defaults?.number} />}
       {mounted("invoice") && <NewInvoiceDialog open={isOpen("invoice")} onOpenChange={onOpenChange} defaults={defaults} />}
       {mounted("document-preview") && (
         <DocumentPreviewSheet documentId={defaults?.documentId} open={isOpen("document-preview")} onOpenChange={onOpenChange} />

@@ -9,6 +9,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { MONITOR_HEALTHY_WITHIN_MS, type MonitorConfig } from "./monitoring-policy"
+import { hasJobColumn, type RunJob } from "./monitor-store"
 
 export type MonitorHealth = "active" | "waiting" | "paused" | "failing" | "disabled" | "unconfigured"
 
@@ -34,6 +35,8 @@ export interface MonitorSetup {
 /** Uma execução do worker, como o painel do Super Admin mostra (`process_sync_runs`). */
 export interface MonitoringRun {
   id: string
+  /** Monitoramento de processos ou captura de intimações (mesma tabela). */
+  job: RunJob
   status: "running" | "completed" | "partial" | "failed" | "skipped"
   startedAt: string
   finishedAt: string | null
@@ -60,6 +63,13 @@ export interface MonitoringOverview {
   config: MonitorConfig
   queue: { monitored: number | null; due: number | null; failing: number | null }
   runs: MonitoringRun[]
+  /** Captura de intimações do DJEN (Etapa 8). `null` = migração 0011 não aplicada. */
+  intimacoes: {
+    status: MonitorStatus
+    setup: MonitorSetup
+    /** Inscrições na OAB ativas e com falha na última consulta. */
+    oabs: { active: number | null; failing: number | null }
+  } | null
 }
 
 interface RunFacts {
@@ -87,11 +97,17 @@ export const monitorSetup = (enabled: boolean, env: Record<string, string | unde
 const isMissingTable = (error: { code?: string }) => error.code === "42P01" || error.code === "PGRST205"
 
 /** Lê as execuções com a service role. Somente servidor. */
-export async function loadMonitorStatus(admin: SupabaseClient, setup: MonitorSetup, now = new Date()): Promise<MonitorStatus> {
+export async function loadMonitorStatus(admin: SupabaseClient, setup: MonitorSetup, now = new Date(), job: RunJob = "processos"): Promise<MonitorStatus> {
+  // Só as execuções do monitoramento de processos (a captura de intimações registra na mesma tabela).
+  const byJob = await hasJobColumn(admin)
+  const runs = (columns: string) => {
+    const query = admin.from("process_sync_runs").select(columns)
+    return byJob ? query.eq("job", job) : query
+  }
   const [last, healthy, pause] = await Promise.all([
-    admin.from("process_sync_runs").select("started_at").order("started_at", { ascending: false }).limit(1),
-    admin.from("process_sync_runs").select("finished_at").in("status", ["completed", "partial"]).order("finished_at", { ascending: false }).limit(1),
-    admin.from("process_sync_runs").select("resume_after").gt("resume_after", now.toISOString()).order("resume_after", { ascending: false }).limit(1),
+    runs("started_at").order("started_at", { ascending: false }).limit(1),
+    runs("finished_at").in("status", ["completed", "partial"]).order("finished_at", { ascending: false }).limit(1),
+    runs("resume_after").gt("resume_after", now.toISOString()).order("resume_after", { ascending: false }).limit(1),
   ])
   const error = last.error ?? healthy.error ?? pause.error
   if (error && !isMissingTable(error)) throw error

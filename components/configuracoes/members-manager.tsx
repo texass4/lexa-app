@@ -25,6 +25,9 @@ import {
 import { ADMIN_PERMISSIONS, effectivePermissions, MEMBER_ROLES, MODULES, ROLE_LABELS, type MemberRole, type Permission } from "@/lib/auth/permissions"
 import type { MemberAccess } from "@/lib/auth/profile"
 import { isEmail } from "@/lib/auth/validation"
+import { UFS } from "@/lib/clients"
+import { validateOab } from "@/lib/intimacoes/oab"
+import { OabManager } from "./oab-manager"
 import { fmtNumericDate, fmtRelative } from "@/lib/dates"
 
 async function call<T>(url: string, method: string, body?: unknown): Promise<T> {
@@ -50,19 +53,24 @@ function statusOf(m: MemberAccess) {
 const EMAIL_PENDING = "O envio por e-mail ainda não está ativo — por enquanto, o link de acesso é entregue pelo suporte da Íntegra."
 
 function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }) {
-  const [form, setForm] = React.useState({ name: "", email: "", role: "lawyer" as MemberRole, jobTitle: "" })
+  const [form, setForm] = React.useState({ name: "", email: "", role: "lawyer" as MemberRole, jobTitle: "", oabNumber: "", oabUf: "" })
   const [error, setError] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }))
+  const lawyer = form.role === "lawyer"
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (form.name.trim().length < 3) return setError("Informe o nome completo.")
     if (!isEmail(form.email.trim())) return setError("E-mail inválido.")
+    // Advogado recebe intimações pela OAB: a inscrição é obrigatória.
+    const oabProblem = lawyer ? validateOab({ number: form.oabNumber, uf: form.oabUf }) : undefined
+    if (oabProblem) return setError(`${oabProblem} É obrigatória para advogados.`)
     setError("")
     setBusy(true)
     try {
-      await call(apiBase, "POST", form)
+      const { oabNumber, oabUf, ...rest } = form
+      await call(apiBase, "POST", { ...rest, ...(lawyer ? { oab: { number: oabNumber, uf: oabUf } } : {}) })
       toast.success("Convite criado.", { description: EMAIL_PENDING })
       onDone()
     } catch (err) {
@@ -98,6 +106,31 @@ function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }
           <Field label="Cargo" htmlFor="inv-job" optional>
             <TextInput id="inv-job" placeholder="Ex.: Advogada associada" value={form.jobTitle} onChange={(e) => set("jobTitle", e.target.value)} />
           </Field>
+          {lawyer && (
+            <>
+              <Field
+                label="Número da OAB"
+                htmlFor="inv-oab"
+                hint="Obrigatória para advogados — é por ela que as intimações chegam. Outras inscrições podem ser adicionadas no perfil."
+              >
+                <TextInput
+                  id="inv-oab"
+                  inputMode="numeric"
+                  placeholder="Ex.: 12.345"
+                  value={form.oabNumber}
+                  onChange={(e) => set("oabNumber", e.target.value.replace(/[^\d.]/g, "").slice(0, 9))}
+                />
+              </Field>
+              <Field label="UF da OAB" htmlFor="inv-oab-uf">
+                <NativeSelect id="inv-oab-uf" value={form.oabUf} onChange={(e) => set("oabUf", e.target.value)}>
+                  <option value="">—</option>
+                  {UFS.map((uf) => (
+                    <option key={uf}>{uf}</option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            </>
+          )}
         </form>
       </ModalBody>
       <ModalFooter>
@@ -114,7 +147,20 @@ function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }
 
 /* -------------------------------- Editar --------------------------------- */
 
-function EditForm({ member, self, url, onDone }: { member: MemberAccess; self: boolean; url: string; onDone: (changed: boolean) => void }) {
+function EditForm({
+  member,
+  self,
+  url,
+  manageOabs,
+  onDone,
+}: {
+  member: MemberAccess
+  self: boolean
+  url: string
+  /** No escritório (não no Admin): as inscrições são gravadas pela sessão, com a RLS. */
+  manageOabs: boolean
+  onDone: (changed: boolean) => void
+}) {
   const [form, setForm] = React.useState({ name: member.name, jobTitle: member.jobTitle ?? "", role: member.role as MemberRole })
   const [error, setError] = React.useState("")
   const [busy, setBusy] = React.useState(false)
@@ -171,6 +217,18 @@ function EditForm({ member, self, url, onDone }: { member: MemberAccess; self: b
             </NativeSelect>
           </Field>
         </form>
+        {form.role === "lawyer" && (
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="mb-2 text-[12.5px] font-medium">Inscrições na OAB</p>
+            {manageOabs ? (
+              <OabManager userId={member.id} required />
+            ) : (
+              <p className="text-[12.5px] text-muted-foreground">
+                {member.oab ?? "Nenhuma inscrição cadastrada — a própria pessoa cadastra em Configurações › Perfil."}
+              </p>
+            )}
+          </div>
+        )}
       </ModalBody>
       <ModalFooter>
         <Button variant="secondary" onClick={() => onDone(false)}>
@@ -511,7 +569,15 @@ export function MembersManager({
         icon={<Pencil />}
         bare
       >
-        {d?.kind === "edit" && <EditForm member={d.member} self={d.member.id === currentUserId} url={`${apiBase}/${d.member.id}`} onDone={close} />}
+        {d?.kind === "edit" && (
+          <EditForm
+            member={d.member}
+            self={d.member.id === currentUserId}
+            url={`${apiBase}/${d.member.id}`}
+            manageOabs={!apiBase.startsWith("/api/admin/")}
+            onDone={close}
+          />
+        )}
       </Modal>
 
       <Modal

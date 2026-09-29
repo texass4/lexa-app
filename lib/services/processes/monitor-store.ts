@@ -59,43 +59,52 @@ const stateColumns = (state: MonitoringState) => ({
 /** Processo excluído entre a consulta e a gravação do estado (FK). */
 const isMissingProcess = (error: { code?: string }) => error.code === "23503"
 
-export function supabaseMonitorRepository(admin: SupabaseClient): MonitorRepository {
-  async function fetchProcess(organizationId: string, id: string): Promise<ProcessRow | null> {
-    const { data, error } = await admin
-      .from("processes")
-      .select("organization_id, id, data, updated_at")
-      .eq("organization_id", organizationId)
-      .eq("id", id)
-      .maybeSingle<Row>()
-    if (error) throw error
-    return data ? toRow(data) : null
+/** Tarefas que registram execuções em `process_sync_runs` (coluna `job`, migração 0011). */
+export type RunJob = "processos" | "intimacoes"
+
+/** A coluna `job` existe? Sem a 0011, o monitoramento continua funcionando (só processos). */
+let jobColumn: boolean | undefined
+export async function hasJobColumn(admin: SupabaseClient) {
+  if (jobColumn === undefined) {
+    const { error } = await admin.from(RUNS).select("job").limit(1)
+    jobColumn = !error
   }
+  return jobColumn
+}
+
+type RunLog = Pick<MonitorRepository, "pausedUntil" | "isRunning" | "startRun" | "finishRun" | "recordSkipped">
+
+/** Registro das execuções de uma tarefa: pausa, "já rodando", início, fim e execuções ignoradas. */
+export function runLog(admin: SupabaseClient, job: RunJob): RunLog {
+  const withJob = async <T extends object>(row: T) => ((await hasJobColumn(admin)) ? { ...row, job } : row)
 
   return {
     async pausedUntil(now) {
-      const { data, error } = await admin
-        .from(RUNS)
-        .select("resume_after")
-        .gt("resume_after", now.toISOString())
-        .order("resume_after", { ascending: false })
-        .limit(1)
+      let query = admin.from(RUNS).select("resume_after").gt("resume_after", now.toISOString())
+      if (await hasJobColumn(admin)) query = query.eq("job", job)
+      const { data, error } = await query.order("resume_after", { ascending: false }).limit(1)
       if (error) throw error
       return (data?.[0] as { resume_after: string } | undefined)?.resume_after ?? null
     },
 
     async isRunning(now) {
-      const { data, error } = await admin
+      let query = admin
         .from(RUNS)
         .select("id")
         .eq("status", "running")
         .gt("started_at", new Date(now.getTime() - CLAIM_LEASE_MS).toISOString())
-        .limit(1)
+      if (await hasJobColumn(admin)) query = query.eq("job", job)
+      const { data, error } = await query.limit(1)
       if (error) throw error
       return !!data?.length
     },
 
     async startRun(startedAt) {
-      const { data, error } = await admin.from(RUNS).insert({ trigger: "cron", status: "running", started_at: startedAt.toISOString() }).select("id").single()
+      const { data, error } = await admin
+        .from(RUNS)
+        .insert(await withJob({ trigger: "cron", status: "running", started_at: startedAt.toISOString() }))
+        .select("id")
+        .single()
       if (error) throw error
       return (data as { id: string }).id
     },
@@ -116,9 +125,26 @@ export function supabaseMonitorRepository(admin: SupabaseClient): MonitorReposit
     },
 
     async recordSkipped(record) {
-      const { error } = await admin.from(RUNS).insert({ trigger: "cron", started_at: record.startedAt, ...runColumns(record) })
+      const { error } = await admin.from(RUNS).insert(await withJob({ trigger: "cron", started_at: record.startedAt, ...runColumns(record) }))
       if (error) throw error
     },
+  }
+}
+
+export function supabaseMonitorRepository(admin: SupabaseClient): MonitorRepository {
+  async function fetchProcess(organizationId: string, id: string): Promise<ProcessRow | null> {
+    const { data, error } = await admin
+      .from("processes")
+      .select("organization_id, id, data, updated_at")
+      .eq("organization_id", organizationId)
+      .eq("id", id)
+      .maybeSingle<Row>()
+    if (error) throw error
+    return data ? toRow(data) : null
+  }
+
+  return {
+    ...runLog(admin, "processos"),
 
     async claim(limit, leaseMs) {
       const { data, error } = await admin.rpc("claim_process_monitoring", { p_limit: limit, p_lease_seconds: Math.round(leaseMs / 1000) })

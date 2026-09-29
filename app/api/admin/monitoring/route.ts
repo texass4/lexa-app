@@ -5,12 +5,14 @@ import { loadSettings } from "@/lib/admin/platform"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { loadMonitorStatus, monitorSetup, type MonitoringOverview, type MonitoringRun } from "@/lib/services/processes/monitor-status"
 import { monitorConfig } from "@/lib/services/processes/monitoring-policy"
+import { hasJobColumn } from "@/lib/services/processes/monitor-store"
 
 /** Execuções mostradas no painel. */
-const LIMIT = 60
+const LIMIT = 120
 
 type RunRow = {
   id: string
+  job?: MonitoringRun["job"]
   status: MonitoringRun["status"]
   started_at: string
   finished_at: string | null
@@ -29,6 +31,7 @@ type RunRow = {
 
 const toRun = (r: RunRow): MonitoringRun => ({
   id: r.id,
+  job: r.job ?? "processos",
   status: r.status,
   startedAt: r.started_at,
   finishedAt: r.finished_at,
@@ -46,7 +49,8 @@ const toRun = (r: RunRow): MonitoringRun => ({
 })
 
 /**
- * Admin › Monitoramento: estado, fila e as últimas execuções do worker de processos.
+ * Admin › Monitoramento: estado, fila e as últimas execuções do monitoramento de
+ * processos e da captura de intimações (DJEN).
  * Só números da plataforma — nenhum dado de processo ou de escritório sai daqui.
  */
 export const GET = route(async (request) => {
@@ -72,6 +76,20 @@ export const GET = route(async (request) => {
     count((q) => q.select("process_id", { count: "exact", head: true }).gt("consecutive_failures", 0)),
   ])
 
-  const body: MonitoringOverview = { status, setup, config: monitorConfig(), queue: { monitored, due, failing }, runs }
+  // Captura de intimações: só com a migração 0011 aplicada. A fonte (DJEN) não tem chave.
+  let intimacoes: MonitoringOverview["intimacoes"] = null
+  if (await hasJobColumn(admin)) {
+    const djenSetup = { ...monitorSetup(settings.features.djen), sourceKey: true }
+    const oabCount = (failing: boolean) => {
+      const query = failing
+        ? admin.from("djen_oab_state").select("number", { count: "exact", head: true }).gt("consecutive_failures", 0)
+        : admin.from("lawyer_oabs").select("id", { count: "exact", head: true }).eq("active", true)
+      return query.then(({ count, error }) => (error ? null : (count ?? 0)))
+    }
+    const [djenStatus, active, failingOabs] = await Promise.all([loadMonitorStatus(admin, djenSetup, now, "intimacoes"), oabCount(false), oabCount(true)])
+    intimacoes = { status: djenStatus, setup: djenSetup, oabs: { active, failing: failingOabs } }
+  }
+
+  const body: MonitoringOverview = { status, setup, config: monitorConfig(), queue: { monitored, due, failing }, runs, intimacoes }
   return NextResponse.json(body)
 })

@@ -20,6 +20,7 @@ import { TaskRow } from "@/components/tasks/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
 import { useProcessRefresh } from "./use-process-refresh"
+import { ProcessIntimacoesPanel } from "@/components/intimacoes/process-intimacoes"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
@@ -259,6 +260,8 @@ export function ProcessProfile({ id }: { id: string }) {
               <ProcessTimeline movements={movements} />
             </div>
           </Panel>
+
+          <ProcessIntimacoesPanel process={process} />
 
           {activities.length > 0 && (
             <Panel>

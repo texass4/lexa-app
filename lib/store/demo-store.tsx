@@ -65,7 +65,7 @@ export type NewInvoiceInput = Pick<Invoice, "clientId" | "processId" | "descript
 export type NewTaskInput = Pick<Task, "title" | "dueAt" | "priority" | "assigneeId" | "description" | "related" | "columnId">
 export type NewPrazoInput = Pick<
   Prazo,
-  "processId" | "description" | "fatalDate" | "internalDate" | "internalDateReason" | "responsibleId" | "origin"
+  "processId" | "description" | "fatalDate" | "internalDate" | "internalDateReason" | "responsibleId" | "origin" | "intimacaoId"
 >
 export type NewAppointmentInput = Pick<
   Appointment,

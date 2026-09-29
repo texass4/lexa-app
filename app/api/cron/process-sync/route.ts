@@ -1,5 +1,6 @@
 /**
- * GET|POST /api/cron/process-sync — monitoramento automático de processos.
+ * GET|POST /api/cron/process-sync — monitoramento automático de processos e, na mesma
+ * chamada, a captura diária de intimações do DJEN (Etapa 8). Um agendador só.
  *
  * Chamada pelo agendador da hospedagem (ex.: a cada hora), nunca pelo navegador.
  * Exige `Authorization: Bearer <CRON_SECRET>` — o mesmo formato que o Vercel Cron
@@ -17,8 +18,11 @@ import { loadSettings } from "@/lib/admin/platform"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { supabaseLookupStore } from "@/lib/services/processes/lookup-cache"
 import { FRESH_FOR_MS } from "@/lib/services/processes/lookup-service"
-import { runProcessMonitor } from "@/lib/services/processes/monitor"
-import { supabaseMonitorRepository } from "@/lib/services/processes/monitor-store"
+import { runProcessMonitor, type RunRecord } from "@/lib/services/processes/monitor"
+import { hasJobColumn, supabaseMonitorRepository } from "@/lib/services/processes/monitor-store"
+import { captureConfig, runIntimacoesCapture } from "@/lib/services/intimacoes/capture"
+import { supabaseCaptureRepository } from "@/lib/services/intimacoes/capture-store"
+import { djenClient } from "@/lib/integrations/legal/djen/provider"
 import { monitorConfig, OFFICE_TIME_ZONE, startOfDayIn } from "@/lib/services/processes/monitoring-policy"
 import { processLookup } from "@/lib/services/processes/process-lookup"
 
@@ -51,20 +55,17 @@ async function handle(request: Request) {
   }
 
   const settings = await loadSettings({ fresh: true })
-  const disabledReason = !settings.features.datajud
-    ? "A consulta automática de processos está desativada pela administração."
-    : settings.maintenance.enabled
-      ? "Plataforma em manutenção."
-      : null
-
+  const maintenance = settings.maintenance.enabled ? "Plataforma em manutenção." : null
   const admin = getSupabaseAdmin()
   const store = supabaseLookupStore(admin)
 
+  // 1. Movimentações dos processos (Etapa 5).
+  let run: RunRecord | null = null
   try {
-    const run = await runProcessMonitor({
+    run = await runProcessMonitor({
       repo: supabaseMonitorRepository(admin),
       config: monitorConfig(),
-      disabledReason,
+      disabledReason: !settings.features.datajud ? "A consulta automática de processos está desativada pela administração." : maintenance,
       lookup: ({ organizationId, cnj }) => {
         // Consulta de hoje (de qualquer pessoa do escritório) vale: nada de ir à fonte duas vezes no mesmo dia.
         const now = new Date()
@@ -72,11 +73,31 @@ async function handle(request: Request) {
         return processLookup.lookup({ organizationId, cnj, store, maxAgeMs })
       },
     })
-    return NextResponse.json({ ok: run.status !== "failed", run }, { headers: NO_STORE })
   } catch (error) {
     console.error("[process-monitor] a execução não pôde ser registrada", error)
+  }
+
+  // 2. Intimações do DJEN (Etapa 8) — mesmo agendador; cada inscrição uma vez por dia.
+  // Sem a migração 0011 aplicada, não há onde registrar: a captura fica de fora.
+  let intimacoes: RunRecord | null = null
+  if (await hasJobColumn(admin)) {
+    try {
+      intimacoes = await runIntimacoesCapture({
+        repo: supabaseCaptureRepository(admin),
+        config: captureConfig(),
+        disabledReason: !settings.features.djen ? "A captura de intimações (DJEN) está desativada pela administração." : maintenance,
+        fetchCommunications: (query) => djenClient().listByOab(query),
+      })
+    } catch (error) {
+      console.error("[djen] a execução não pôde ser registrada", error)
+    }
+  }
+
+  const failed = !run || run.status === "failed" || (intimacoes?.status === "failed")
+  if (!run && !intimacoes) {
     return NextResponse.json({ ok: false, error: "Falha ao executar o monitoramento." }, { status: 500, headers: NO_STORE })
   }
+  return NextResponse.json({ ok: !failed, run, intimacoes }, { headers: NO_STORE })
 }
 
 export const GET = handle

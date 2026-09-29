@@ -35,6 +35,8 @@ export interface DialogDefaults {
   assigneeId?: string
   /** Tarefa criada para este prazo: fica vinculada a ele (por id). */
   prazoId?: string
+  /** Número CNJ já conhecido (cadastro de processo a partir de uma intimação). */
+  number?: string
 }
 
 interface UIState {

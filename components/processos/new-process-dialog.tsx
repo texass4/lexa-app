@@ -19,7 +19,18 @@ import type { PracticeArea, Process, ProcessStatus } from "@/types"
 import { LookupFailed, LookupFound, LookupProgress, summaryFromProcess, summaryFromSheet, type LookupSummary } from "./process-lookup-status"
 import { AUTO_REFRESH_AFTER_MS } from "./use-process-refresh"
 
-export function NewProcessDialog({ open, onOpenChange, clientId }: { open: boolean; onOpenChange: (o: boolean) => void; clientId?: string }) {
+export function NewProcessDialog({
+  open,
+  onOpenChange,
+  clientId,
+  number,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  clientId?: string
+  /** Número já conhecido (ex.: de uma intimação): o formulário abre com ele. */
+  number?: string
+}) {
   return (
     <Modal
       open={open}
@@ -29,7 +40,7 @@ export function NewProcessDialog({ open, onOpenChange, clientId }: { open: boole
       icon={<Scale />}
       bare
     >
-      <ProcessForm clientId={clientId} onClose={() => onOpenChange(false)} />
+      <ProcessForm clientId={clientId} number={number} onClose={() => onOpenChange(false)} />
     </Modal>
   )
 }
@@ -71,12 +82,12 @@ const pickForm = (existing: Process) => ({
 /** Já salvo e atualizado há pouco: não precisa consultar de novo. */
 const isRecent = (process: Process) => !!process.lastSyncedAt && getNow().getTime() - parse(process.lastSyncedAt).getTime() < AUTO_REFRESH_AFTER_MS
 
-function ProcessForm({ clientId, onClose }: { clientId?: string; onClose: () => void }) {
+function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?: string; onClose: () => void }) {
   const data = useDemoData()
   const { addProcess, importProcess, updateProcess, applyProcessSync, versionOf } = useDemoActions()
   const router = useRouter()
   const initial = () => ({
-    number: "",
+    number: number ? maskCNJ(number) : "",
     // Sem cliente pré-definido, começa "Sem cliente" — nunca vincula ao primeiro da lista por engano.
     clientId: clientId ?? "",
     area: "Cível" as PracticeArea,

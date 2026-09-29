@@ -26,7 +26,11 @@ export interface PlatformSettings {
     /** A partir de quantos % do limite o uso vira alerta. */
     usageWarningPercent: number
   }
-  features: { datajud: boolean; whatsapp: boolean; ai: boolean }
+  /**
+   * `djen`: captura de intimações do DJEN. Desligada por padrão: a fonte (API pública do
+   * CNJ) não publica termos de uso — ligar depois de confirmar que o uso comercial é permitido.
+   */
+  features: { datajud: boolean; whatsapp: boolean; ai: boolean; djen: boolean }
   ai: { provider: string; model: string }
   whatsapp: { provider: string; businessNumber: string }
   /** Sugeridos ao criar um plano novo. */
@@ -46,7 +50,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
     enforceUserLimits: false,
     usageWarningPercent: 80,
   },
-  features: { datajud: true, whatsapp: false, ai: false },
+  features: { datajud: true, whatsapp: false, ai: false, djen: false },
   ai: { provider: "gemini", model: "" },
   whatsapp: { provider: "", businessNumber: "" },
   defaultLimits: { users: 5, processes: 1000, clients: 2000, storage: 10240, whatsapp: 2000, ai: 500 },
@@ -122,6 +126,7 @@ export function sanitizeSettings(input: unknown): PlatformSettings {
       datajud: bool(features.datajud, d.features.datajud),
       whatsapp: bool(features.whatsapp, d.features.whatsapp),
       ai: bool(features.ai, d.features.ai),
+      djen: bool(features.djen, d.features.djen),
     },
     ai: {
       provider: oneOf(ai.provider, AI_PROVIDERS, d.ai.provider),

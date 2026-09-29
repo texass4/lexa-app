@@ -298,6 +298,74 @@ export interface Prazo extends TenantEntity {
   /** Quando foi cumprido ou marcado como perdido, e por quem. */
   closedAt?: string
   closedById?: ID
+  /** Intimação que originou o prazo (confirmada pelo advogado). Único por escritório. */
+  intimacaoId?: ID
+}
+
+/* ------------------------------- Intimações ------------------------------- */
+
+/** Inscrição na OAB de um membro do escritório (tabela `lawyer_oabs`). */
+export interface LawyerOab {
+  id: ID
+  organizationId: ID
+  userId: ID
+  /** Só dígitos. */
+  number: string
+  /** UF da seccional. */
+  uf: string
+  active: boolean
+  createdAt: string
+}
+
+/**
+ * Situação da intimação na triagem:
+ * - `pendente`: processo vinculado e prazo sugerido com segurança — aguarda o advogado;
+ * - `revisao`: há dúvida na interpretação (sem prazo no teor, mais de um prazo…);
+ * - `sem_processo`: o número CNJ não está cadastrado no escritório;
+ * - `confirmada`: o advogado confirmou e o Prazo foi criado;
+ * - `rejeitada`: o advogado rejeitou — nenhum prazo criado.
+ */
+export type TriageStatus = "pendente" | "revisao" | "sem_processo" | "confirmada" | "rejeitada"
+
+/** Intimação capturada de uma fonte oficial (tabela `intimacoes`). O teor original nunca muda. */
+export interface Intimacao {
+  id: ID
+  organizationId: ID
+  source: "djen"
+  externalId: string
+  hash?: string
+  /** Inscrições do escritório que receberam a comunicação. */
+  oabIds: ID[]
+  responsibleId?: ID
+  cnj?: string
+  processNumber?: string
+  tribunal?: string
+  orgao?: string
+  tipoComunicacao?: string
+  tipoDocumento?: string
+  classe?: string
+  meio?: string
+  /** `YYYY-MM-DD` — data de disponibilização na fonte. */
+  availableAt: string
+  /** `YYYY-MM-DD` — data de publicação considerada (1º dia útil seguinte). */
+  publishedAt?: string
+  /** Teor integral, como a fonte publicou. */
+  content: string
+  documentUrl?: string
+  officialUrl?: string
+  parties: { name: string; pole?: string }[]
+  lawyers: { name: string; number: string; uf: string }[]
+  processId?: ID
+  clientId?: ID
+  linkMethod?: "cnj" | "manual"
+  status: TriageStatus
+  /** Sugestão calculada na captura (`lib/intimacoes/deadline.ts`). */
+  suggestion?: import("@/lib/intimacoes/deadline").DeadlineSuggestion
+  prazoId?: ID
+  /** Motivo da rejeição ou da revisão, escrito pelo advogado. */
+  decisionNote?: string
+  createdAt: string
+  updatedAt: string
 }
 
 /* --------------------------------- Agenda --------------------------------- */
