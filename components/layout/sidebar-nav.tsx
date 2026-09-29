@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import * as React from "react"
 import { motion } from "framer-motion"
-import { ChevronRight } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 import { cn } from "cn"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { isActive, visibleSections, type NavItem } from "./nav-config"
@@ -56,10 +56,11 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
   const tooltipCls = mode === "expanded" ? "hidden" : mode === "auto" ? "lg:hidden" : ""
   // Recuo das telas internas só com rótulos (no modo compacto viram ícones como os outros).
   const childCls = mode === "expanded" ? "pl-8" : mode === "auto" ? "lg:pl-8" : ""
-  // A setinha só existe com rótulos.
+  // A setinha só existe com rótulos; fica dentro da linha, e o texto/badge abrem espaço para ela.
   const toggleCls = mode === "expanded" ? "flex" : mode === "auto" ? "hidden lg:flex" : "hidden"
+  const toggleSpaceCls = mode === "expanded" ? "pr-7" : mode === "auto" ? "lg:pr-7" : ""
 
-  const renderLink = (item: NavItem, active: boolean, child = false) => {
+  const renderLink = (item: NavItem, active: boolean, child = false, withToggle = false) => {
     const Icon = item.icon
     const badge = item.badgeKey && data.hydrated && badges[item.badgeKey].count > 0 ? badges[item.badgeKey] : undefined
     return (
@@ -76,6 +77,7 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                 active ? "text-foreground" : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
                 compactCls,
                 child && cn("h-8 text-[13px]", childCls),
+                withToggle && toggleSpaceCls,
               )}
             />
           }
@@ -130,8 +132,8 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
               const childVisibility = mode === "collapsed" ? "" : groupOpen ? "" : mode === "auto" ? "lg:hidden" : "hidden"
               return (
                 <li key={item.href}>
-                  <div className="flex items-center gap-0.5">
-                    {renderLink(item, isActive(pathname, item.href) && !childActive)}
+                  <div className="group/row relative flex items-center">
+                    {renderLink(item, isActive(pathname, item.href) && !childActive, false, children.length > 0)}
                     {children.length > 0 && (
                       <button
                         type="button"
@@ -148,11 +150,17 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                         }
                         disabled={childActive}
                         className={cn(
-                          "size-7 shrink-0 items-center justify-center rounded-[7px] text-subtle outline-none transition-colors hover:bg-sidebar-accent/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-60",
+                          "absolute top-1/2 right-1.5 size-5 -translate-y-1/2 items-center justify-center rounded-[5px] text-subtle/70 outline-none transition-[color,opacity] duration-150",
+                          "hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-default",
+                          "opacity-70 group-hover/row:opacity-100",
                           toggleCls,
                         )}
                       >
-                        <ChevronRight className={cn("size-3.5 transition-transform", groupOpen && "rotate-90")} />
+                        <ChevronDown
+                          className={cn("size-3.5 transition-transform duration-200", !groupOpen && "-rotate-90")}
+                          strokeWidth={2}
+                          aria-hidden
+                        />
                       </button>
                     )}
                   </div>
