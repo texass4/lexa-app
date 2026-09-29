@@ -20,6 +20,8 @@ import { isOverdue } from "@/lib/selectors"
 import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } from "@/lib/services/processes/movement-interpreter"
 import type { Permission } from "@/lib/auth/permissions"
 import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos"
+import { isAutoTracked } from "@/lib/services/processes/labels"
+import { MONITORING_STALE_AFTER_DAYS } from "@/lib/services/processes/monitoring-policy"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
 
 /** Sem movimentação há mais que isso = processo parado. Também usado pela Íntegra IA. */
@@ -130,7 +132,27 @@ export function prazoAlert(prazo: Prazo, now: Date = getNow()): { kind: SignalKi
 
 export const daysSinceMovement = (p: Process, now: Date = getNow()) => (p.lastMovementAt ? diffInDays(now, parse(p.lastMovementAt)) : undefined)
 
-export const isStale = (p: Process, now: Date = getNow()) => isActiveProcess(p) && (daysSinceMovement(p, now) ?? 0) > STALE_DAYS
+/** Dias desde a última consulta à fonte (automática ou manual) — diferente da última movimentação. */
+export const daysSinceCheck = (p: Process, now: Date = getNow()) => (p.lastSyncedAt ? diffInDays(now, parse(p.lastSyncedAt)) : undefined)
+
+/** A fonte foi conferida há pouco: se não há movimentação, é o processo que está parado no tribunal — não abandonado pelo sistema. */
+export const checkedRecently = (p: Process, now: Date = getNow()) => {
+  const days = daysSinceCheck(p, now)
+  return days !== undefined && days <= MONITORING_STALE_AFTER_DAYS
+}
+
+/**
+ * Processo parado: sem movimentação há mais de 60 dias E sem consulta recente à fonte.
+ * Consultado há pouco (monitoramento ou "Atualizar"), a ausência de movimentação está
+ * confirmada e o processo não é tratado como esquecido.
+ */
+export const isStale = (p: Process, now: Date = getNow()) => isActiveProcess(p) && (daysSinceMovement(p, now) ?? 0) > STALE_DAYS && !checkedRecently(p, now)
+
+/** "última consulta em 12/07/2026", "ainda não consultado", "sem consulta automática". */
+function checkText(p: Process) {
+  if (p.lastSyncedAt) return `última consulta em ${fmtNumericDate(p.lastSyncedAt)}`
+  return isAutoTracked(p.source?.provider) ? "ainda não consultado" : "sem consulta automática"
+}
 
 export const movedRecently = (p: Process, now: Date = getNow()) => {
   const days = daysSinceMovement(p, now)
@@ -244,7 +266,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
       kind: "process-stale",
       level: "warning",
       title: `Sem movimentação há ${since} dias`,
-      detail: `${processLabel(p)} · ${p.type}`,
+      detail: `${processLabel(p)} · ${p.type} · ${checkText(p)}`,
       at: p.lastMovementAt,
     })
   }

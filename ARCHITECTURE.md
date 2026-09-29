@@ -113,7 +113,7 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 2. `POST /api/processes/search` → `lookup-service.ts`, com stale-while-revalidate: cache fresco responde na hora; cache vencido responde na hora e atualiza em segundo plano (`after`).
 3. A ficha é salva na hora (`importProcess`). Se o CNJ já existe, é atualizado (`applyProcessSync`), nunca duplicado.
 
-**Abrir um processo** — `use-process-refresh.ts`: o que está salvo aparece imediatamente; se a última atualização passou de 6 h, uma atualização roda em segundo plano ("Atualizando informações…"), sem bloquear a página. Continua mesmo se a pessoa sair da tela. Só movimentações novas entram (hash em `movements.ts`).
+**Abrir um processo** — `use-process-refresh.ts`: o que está salvo aparece imediatamente; se a última consulta não é de hoje (mesma regra do monitoramento, `monitoring-policy.ts › isCheckDue`), uma atualização roda em segundo plano ("Atualizando informações…"), sem bloquear a página. Continua mesmo se a pessoa sair da tela. Só movimentações novas entram (hash em `movements.ts`; a regra de mescla é `process-sync.ts › mergeProcessSheet`, a mesma do servidor).
 
 **Atualizar** — botão no perfil → `POST /api/processes/[id]/sync` com `force` → vai à fonte (salvo se alguém do escritório acabou de fazer isso há menos de 1 min). Um processo cadastrado à mão com CNJ válido também pode ser atualizado e passa a ser acompanhado.
 
@@ -124,7 +124,7 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 | Cache | memória do servidor (LRU, 500) → tabela `process_lookup_cache` no Supabase (migração 0005), **sempre por escritório** (RLS). Um cache global revelaria a um escritório quais processos outro acompanha. |
 | Validade | 6 h fresco · até 7 dias servido enquanto atualiza · "não encontrado" 10 min, só em memória |
 | Deduplicação | chamadas simultâneas (mesmo escritório + CNJ) compartilham uma ida à fonte; no navegador, `refreshProcess` também deduplica por processo |
-| Rede (`datajud/client.ts`) | 35 s por tentativa, 60 s no total, até 3 tentativas com backoff + jitter, `Retry-After` no 429; 401/403 e 4xx não se repetem |
+| Rede (`datajud/client.ts`) | 35 s por tentativa, 60 s no total, até 3 tentativas com backoff + jitter; `Retry-After` nunca é antecipado (se passa de 8 s, desiste e devolve `retryAfterMs` no `LookupError`); 401/403 e 4xx não se repetem |
 | Erros | `LookupError` (código + detalhe) → log; `publicLookupError` → `invalid` · `not_found` · `unsupported` · `unavailable` + mensagem amigável |
 
 Trocar de fornecedor: implementar `ProcessProvider` (`lib/integrations/legal/types.ts`) e trocar em `process-lookup.ts`. Interface, cache e rotas não mudam.
@@ -136,6 +136,32 @@ Detalhes da fonte que valem lembrar:
 - Sob carga, a fonte responde **200 com shards falhos e sem resultados**. O cliente trata isso como falha temporária e tenta de novo — não como "não encontrado".
 
 Variáveis de ambiente (só servidor): `DATAJUD_API_KEY`; opcionais `PROCESS_LOOKUP_TIMEOUT_MS` e `DATAJUD_BASE_URL`.
+
+### Monitoramento automático
+
+Um processo que ninguém abriu continua sendo atualizado. O agendador da hospedagem chama `GET /api/cron/process-sync` (sugestão: a cada hora) com `Authorization: Bearer <CRON_SECRET>`; sem o segredo configurado, a rota não roda (`/api/cron/` é pública no `proxy.ts` porque se autentica sozinha).
+
+```
+agendador → /api/cron/process-sync → monitor.ts (runProcessMonitor)
+  → claim_process_monitoring (banco escolhe e reserva os elegíveis)
+  → lookup-service (cache do escritório → fonte; o mesmo das rotas)
+  → mergeProcessSheet → gravação condicionada à versão (updated_at)
+  → atividade "N novas movimentações no processo X" (autora: Íntegra) só se houver novidade
+  → process_monitoring (próxima consulta) + process_sync_runs (execução)
+  → Realtime entrega processo e atividade a quem está com a Íntegra aberta
+```
+
+| | |
+|---|---|
+| Elegível | escritório ativo, processo não concluído, acompanhado (`source.provider = datajud`), CNJ de 20 dígitos, `next_check_at` vencido — os nunca consultados e os mais antigos primeiro. Duas execuções simultâneas nunca pegam o mesmo processo (reserva de 15 min) |
+| Política (`monitoring-policy.ts`) | sucesso: próxima só no dia seguinte (fuso `America/Sao_Paulo`) e nunca antes de 12 h · falha passageira: 30 min × 2ⁿ até 24 h, nunca antes do `Retry-After` · não encontrado: 3 dias · tribunal sem consulta: 30 dias |
+| Parar a execução | 429 (pausa todas as execuções até o `Retry-After`, mínimo 15 min) · 3 indisponibilidades seguidas (10 min) · chave recusada (1 h). Qualquer outra falha fica só no processo e o lote segue |
+| Ritmo | lote de 20, 2 consultas por vez, 1 s de pausa entre idas à fonte, sem começar consultas depois de 120 s (`PROCESS_SYNC_*`, com limites) |
+| Cache | o do `lookup-service`; o worker aceita qualquer consulta do mesmo dia (de qualquer pessoa do escritório) sem ir à fonte |
+| Datas | `lastSyncedAt` = última consulta (qualquer caminho); `autoSyncedAt` = última sincronização do monitoramento — "Atualizado automaticamente em DD/MM às HH:MM" no perfil. Gravadas no horário do escritório (`toLocalISOIn`), não do servidor |
+| Isolamento | service role (sem sessão), então todo acesso em `monitor-store.ts` filtra por `organization_id`; o cache continua por escritório |
+
+Estado: `monitor-status.ts` — "Ativo" só com consulta ligada, `CRON_SECRET`, `DATAJUD_API_KEY`, migração 0009 e uma execução concluída nas últimas 26 h. Admin › Monitoramento mostra estado, fila e as execuções (avaliados, consultados, do cache, novidades, erros, 429, 503, duração); Configurações › Integrações mostra o cartão "Monitoramento processual" com o estado real.
 
 ---
 
@@ -259,7 +285,7 @@ A barra do Admin usa `admin-rail` (marinho) e `admin-rail-highlight` para o item
 
 ### O que merece atenção (sem IA)
 
-`lib/attention.ts` transforma os dados em sinais — prazo vencendo, tarefa atrasada, movimentação recente (as de prazo/julgamento/comunicação/audiência pedem revisão), processo parado há mais de `STALE_DAYS` (60, a mesma regra do panorama da IA), valor em atraso, documento novo. Cada sinal tem nível (`critical` · `warning` · `info` · `done`), frase, link para o registro real e, quando faz sentido, ação ("Criar tarefa" abre o formulário preenchido). Respeita as permissões de quem olha e agrupa sinais repetidos. Usado no Painel (`attention-panel.tsx`), nos perfis de Processo e Cliente, na lista de processos, no sino, na busca Ctrl K e nos badges do menu. Testes: `lib/attention.test.ts`.
+`lib/attention.ts` transforma os dados em sinais — prazo vencendo, tarefa atrasada, movimentação recente (as de prazo/julgamento/comunicação/audiência pedem revisão), processo parado há mais de `STALE_DAYS` (60) **e sem consulta à fonte nos últimos 7 dias** — consultado há pouco, a falta de movimentação está confirmada e o processo não é tratado como esquecido; o alerta mostra as duas datas, valor em atraso, documento novo. Cada sinal tem nível (`critical` · `warning` · `info` · `done`), frase, link para o registro real e, quando faz sentido, ação ("Criar tarefa" abre o formulário preenchido). Respeita as permissões de quem olha e agrupa sinais repetidos. Usado no Painel (`attention-panel.tsx`), nos perfis de Processo e Cliente, na lista de processos, no sino, na busca Ctrl K e nos badges do menu. Testes: `lib/attention.test.ts`.
 
 "Desde sua última visita" (`changesSince` + `lib/visits.ts`): a última presença fica no `localStorage` do navegador, por pessoa; o painel mostra o que outras pessoas registraram e as tarefas que venceram desde então.
 
@@ -290,6 +316,7 @@ Centro de controle do Super Admin, com shell próprio (barra lateral escura, bus
 | `/admin/uso` | `components/admin/usage/usage-view.tsx` | `GET /api/admin/organizations` |
 | `/admin/financeiro` | `components/admin/finance/finance-view.tsx` | `GET /api/admin/finance` |
 | `/admin/atividade` | `components/admin/audit/audit-view.tsx` | `GET /api/admin/audit` |
+| `/admin/monitoramento` | `components/admin/monitoring/monitoring-view.tsx` | `GET /api/admin/monitoring` |
 | `/admin/configuracoes` | `components/admin/settings/settings-view.tsx` | `GET/PUT /api/admin/settings` |
 
 Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e contadores do menu), `/api/auth/events` (login/logout na auditoria).
@@ -306,11 +333,11 @@ Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e 
 
 ## 8. O que ainda não existe
 
-Envio de e-mail (os links de convite e de nova senha saem no log do servidor), notificações, monitoramento automático de processos, cadastro de prazos, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
+Envio de e-mail (os links de convite e de nova senha saem no log do servidor), notificações, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
 
 **Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
 
-Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), o salvamento dos processos, os prazos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 

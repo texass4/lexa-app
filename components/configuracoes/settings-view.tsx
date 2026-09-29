@@ -144,9 +144,91 @@ function WhatsAppCard() {
   )
 }
 
+type MonitoringHealth = "active" | "waiting" | "paused" | "failing" | "disabled" | "unconfigured"
+
+const MONITORING_BADGE: Record<MonitoringHealth | "loading" | "error", { tone: Tone; label: string }> = {
+  loading: { tone: "neutral", label: "Verificando…" },
+  active: { tone: "success", label: "Ativo" },
+  waiting: { tone: "neutral", label: "Aguardando" },
+  paused: { tone: "warning", label: "Pausado" },
+  failing: { tone: "danger", label: "Atrasado" },
+  disabled: { tone: "neutral", label: "Desativado" },
+  unconfigured: { tone: "neutral", label: "Não configurado" },
+  error: { tone: "danger", label: "Indisponível" },
+}
+
+const fmtCheck = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+}
+
+/**
+ * Estado real do monitoramento automático (`GET /api/processes/monitoring`). "Ativo" só
+ * quando o servidor confirma execuções concluídas recentemente — configurado não basta.
+ */
+function MonitoringCard() {
+  const { can } = useSession()
+  const allowed = can("processes.view")
+  const [state, setState] = React.useState<{
+    health: MonitoringHealth | "loading" | "error"
+    lastHealthyRunAt?: string | null
+    resumeAfter?: string | null
+  }>({ health: "loading" })
+
+  React.useEffect(() => {
+    if (!allowed) return
+    let cancelled = false
+    fetch("/api/processes/monitoring", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data) => !cancelled && setState(data))
+      .catch(() => !cancelled && setState({ health: "error" }))
+    return () => {
+      cancelled = true
+    }
+  }, [allowed])
+
+  if (!allowed) {
+    return (
+      <IntegrationCard
+        mark="MP"
+        name="Monitoramento processual"
+        badge={null}
+        description="Você não tem acesso a Processos. Quem administra o escritório pode liberar a permissão."
+      />
+    )
+  }
+
+  const badge = MONITORING_BADGE[state.health]
+  const last = state.lastHealthyRunAt ? ` Última verificação em ${fmtCheck(state.lastHealthyRunAt)}.` : ""
+  const description = {
+    loading: "Consultando o estado do monitoramento.",
+    active: `Movimentações dos tribunais atualizadas automaticamente nos processos acompanhados.${last}`,
+    waiting: "O monitoramento está configurado e ainda não fez a primeira verificação.",
+    paused: `A fonte pública limitou as consultas; o monitoramento retoma sozinho${state.resumeAfter ? ` às ${fmtCheck(state.resumeAfter).split(" às ")[1]}` : ""}.${last}`,
+    failing: `As atualizações automáticas estão atrasadas.${last} Você pode atualizar cada processo pelo botão "Atualizar".`,
+    disabled: "A consulta automática de processos está desativada pela administração da Íntegra.",
+    unconfigured: 'O monitoramento automático ainda não foi configurado. Atualize os processos pelo botão "Atualizar".',
+    error: "Não foi possível verificar o monitoramento agora.",
+  }[state.health]
+
+  return (
+    <IntegrationCard
+      mark="MP"
+      name="Monitoramento processual"
+      badge={
+        <StatusBadge tone={badge.tone} size="sm">
+          {badge.label}
+        </StatusBadge>
+      }
+      description={description}
+    />
+  )
+}
+
 function IntegrationsSection() {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <MonitoringCard />
       <WhatsAppCard />
       {UPCOMING.map((it) => (
         <IntegrationCard

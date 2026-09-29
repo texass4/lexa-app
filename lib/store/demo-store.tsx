@@ -11,7 +11,6 @@ import type {
   LegalDocument,
   Prazo,
   Process,
-  ProcessMovement,
   Task,
   TaskColumn,
 } from "@/types"
@@ -20,8 +19,8 @@ import { CLIENT_STATUS } from "@/lib/config"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
 import { formatCurrency, uid } from "@/lib/format"
 import { relatedClientId } from "@/lib/selectors"
-import { collectHashes, diffMovements } from "@/lib/services/processes/movements"
-import { buildProcessDraft, toProcessMovements, type ImportProcessMeta } from "@/lib/services/processes/import"
+import { buildProcessDraft, type ImportProcessMeta } from "@/lib/services/processes/import"
+import { mergeProcessSheet, newMovementsMessage } from "@/lib/services/processes/process-sync"
 import type { ProcessSheet } from "@/lib/services/processes/sheet"
 import { getSupabase } from "@/lib/supabase/client"
 import { useSplashReady } from "@/components/layout/app-splash"
@@ -469,35 +468,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         if (!current) return { added: 0 }
 
         const at = checkedAt ? toLocalISO(new Date(checkedAt)) : nowISO()
-        const cnj = current.cnj ?? sheet.cnj
-        const incoming = toProcessMovements(sheet.movements, sheet.source.provider)
-        const { fresh } = diffMovements(collectHashes(cnj, current.movements), incoming)
-
-        const imported: ProcessMovement[] = fresh.map((movement) => ({ ...movement, id: uid("m") }))
-        const movements = [...imported, ...current.movements].sort((a, b) => b.at.localeCompare(a.at))
-
-        const updated: Process = {
-          ...current,
-          movements,
-          lastMovementAt: movements[0]?.at ?? current.lastMovementAt,
-          // Nunca volta no tempo (uma ficha do cache pode ser anterior à última atualização).
-          lastSyncedAt: current.lastSyncedAt && current.lastSyncedAt > at ? current.lastSyncedAt : at,
-          cnj,
-          // A fonte complementa o cadastro, mas nunca apaga o que já foi preenchido.
-          tribunal: sheet.tribunal ?? current.tribunal,
-          degree: sheet.degree ?? current.degree,
-          className: sheet.className ?? current.className,
-          subject: sheet.subject ?? current.subject,
-          judicialUnit: sheet.judicialUnit ?? current.judicialUnit,
-          system: sheet.system ?? current.system,
-          parties: sheet.parties.active.length || sheet.parties.passive.length || sheet.parties.others.length ? sheet.parties : current.parties,
-          source: {
-            provider: sheet.source.provider,
-            externalId: sheet.source.externalId,
-            dataset: sheet.source.dataset,
-            sourceStatus: sheet.sourceStatus,
-          },
-        }
+        const { process: updated, imported } = mergeProcessSheet(current, sheet, at, { newId: () => uid("m") })
 
         commit((s) => ({
           ...s,
@@ -507,7 +478,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             ? [
                 logActivity({
                   type: "movement",
-                  message: `${imported.length === 1 ? "Nova movimentação" : `${imported.length} novas movimentações`} no processo ${current.code}.`,
+                  message: newMovementsMessage(imported.length, current.code),
                   detail: imported[0]?.title,
                   clientId: current.clientId,
                   processId: current.id,

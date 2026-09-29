@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import type { Activity, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
-import { changesSince, clientSignals, countByLevel, officeSignals, processSignals, type AttentionData } from "./attention"
+import { changesSince, clientSignals, countByLevel, isStale, officeSignals, processSignals, type AttentionData } from "./attention"
 
 const NOW = new Date(2026, 8, 24, 10, 0) // qui, 24/09/2026 10:00
 
@@ -72,6 +72,28 @@ describe("processSignals", () => {
     const [signal] = processSignals(empty({ processes: [p] }), p, NOW)
     assert.equal(signal.kind, "process-stale")
     assert.match(signal.title, /Sem movimentação há 115 dias/)
+    assert.match(signal.detail ?? "", /sem consulta automática/)
+  })
+
+  it("consultado há pouco na fonte: sem movimentação não é processo abandonado", () => {
+    const p = process("p1", {
+      lastMovementAt: "2026-06-01T10:00:00",
+      lastSyncedAt: "2026-09-23T03:10:00",
+      source: { provider: "datajud" },
+    })
+    assert.deepEqual(processSignals(empty({ processes: [p] }), p, NOW), [])
+    assert.equal(isStale(p, NOW), false)
+  })
+
+  it("acompanhado, mas sem consulta recente: alerta diferencia movimentação e consulta", () => {
+    const old = process("p1", { lastMovementAt: "2026-06-01T10:00:00", lastSyncedAt: "2026-08-20T03:10:00", source: { provider: "datajud" } })
+    const [signal] = processSignals(empty({ processes: [old] }), old, NOW)
+    assert.equal(signal.kind, "process-stale")
+    assert.match(signal.detail ?? "", /última consulta em 20\/08\/2026/)
+
+    const never = process("p2", { lastMovementAt: "2026-06-01T10:00:00", source: { provider: "datajud" } })
+    const [unchecked] = processSignals(empty({ processes: [never] }), never, NOW)
+    assert.match(unchecked.detail ?? "", /ainda não consultado/)
   })
 
   it("movimentação recente de julgamento pede revisão; de tramitação só informa", () => {

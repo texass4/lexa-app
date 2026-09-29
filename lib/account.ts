@@ -1,5 +1,7 @@
 import type { Organization, User } from "@/types"
 import { ROLE_LABELS } from "@/lib/auth/permissions"
+import { BRAND } from "@/lib/brand"
+import { SYSTEM_ACTOR_ID } from "@/lib/system-actor"
 
 /**
  * Conta em uso: o escritório e a pessoa logada.
@@ -48,8 +50,12 @@ const removed = (id: string): User => ({
   active: false,
 })
 
+/** Autora dos registros feitos pelo próprio sistema (monitoramento automático). */
+const system = (): User => ({ ...removed(SYSTEM_ACTOR_ID), name: BRAND.name, firstName: BRAND.name })
+
 /** Qualquer membro, inclusive inativo; quem saiu do escritório vira "Usuário removido". */
 export function getUser(id: string) {
+  if (id === SYSTEM_ACTOR_ID) return system()
   return current().members.find((u) => u.id === id) ?? removed(id)
 }
 

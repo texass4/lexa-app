@@ -228,8 +228,10 @@ export interface Process extends TenantEntity {
   system?: string
   parties?: { active: ProcessParty[]; passive: ProcessParty[]; others: ProcessParty[] }
   source?: ProcessSource
-  /** Última vez que o processo foi sincronizado com a fonte. */
+  /** Última vez que as informações foram conferidas na fonte (por qualquer caminho). */
   lastSyncedAt?: string
+  /** Última sincronização feita pelo monitoramento automático (servidor). Ausente = nunca. */
+  autoSyncedAt?: string
 }
 
 /* -------------------------------- Tarefas --------------------------------- */

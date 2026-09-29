@@ -20,16 +20,28 @@ export type LookupErrorCode =
   | "UNAVAILABLE"
   | "UNEXPECTED"
 
+/** Dados da resposta da fonte que orientam a próxima tentativa (monitoramento automático). */
+export interface LookupErrorInfo {
+  /** Status HTTP da última resposta, quando houve resposta. */
+  status?: number
+  /** Espera pedida pela fonte (`Retry-After`), em ms. */
+  retryAfterMs?: number
+}
+
 export class LookupError extends Error {
   readonly code: LookupErrorCode
   /** Detalhe técnico — somente para log. */
   readonly detail?: string
+  readonly status?: number
+  readonly retryAfterMs?: number
 
-  constructor(code: LookupErrorCode, detail?: string) {
+  constructor(code: LookupErrorCode, detail?: string, info: LookupErrorInfo = {}) {
     super(detail ?? code)
     this.name = "LookupError"
     this.code = code
     this.detail = detail
+    this.status = info.status
+    this.retryAfterMs = info.retryAfterMs
   }
 }
 

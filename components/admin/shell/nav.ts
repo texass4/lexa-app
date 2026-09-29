@@ -1,4 +1,4 @@
-import { Building2, Gauge, Layers, LayoutDashboard, ScrollText, Settings2, UsersRound, Wallet, type LucideIcon } from "lucide-react"
+import { Building2, Gauge, Layers, LayoutDashboard, Radar, ScrollText, Settings2, UsersRound, Wallet, type LucideIcon } from "lucide-react"
 
 export type BadgeKey = "pending" | "usage" | "pastDue"
 
@@ -34,6 +34,7 @@ export const ADMIN_NAV: { label: string; items: AdminNavItem[] }[] = [
     label: "Sistema",
     items: [
       { href: "/admin/atividade", label: "Atividade / Logs", icon: ScrollText, description: "Auditoria de acessos e alterações" },
+      { href: "/admin/monitoramento", label: "Monitoramento", icon: Radar, description: "Execuções da atualização automática de processos" },
       { href: "/admin/configuracoes", label: "Configurações", icon: Settings2, description: "Plataforma, recursos, limites e manutenção" },
     ],
   },

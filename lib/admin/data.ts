@@ -8,6 +8,8 @@
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
+import { BRAND } from "@/lib/brand"
+import { SYSTEM_ACTOR_ID } from "@/lib/system-actor"
 import { toOrganization, type OrganizationRow, type ProfileRow } from "@/lib/auth/profile"
 import {
   AUDIT_ACTIONS,
@@ -378,6 +380,8 @@ export async function loadCrmActivity(organizationId: string, limit = 25) {
     admin.from("profiles").select("id, name").eq("organization_id", organizationId),
   ])
   const names = new Map(((people ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]))
+  // Registros do monitoramento automático não têm pessoa por trás.
+  names.set(SYSTEM_ACTOR_ID, BRAND.name)
   return ((data ?? []) as unknown as { id: string; created_at: string; type: string | null; actor: string | null }[]).map((a) => ({
     id: a.id,
     at: a.created_at,
