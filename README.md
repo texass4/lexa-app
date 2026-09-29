@@ -2,15 +2,21 @@
 
 **Inteligência para a gestão jurídica.**
 
-Gestão jurídica para o escritório Almeida & Associados: clientes, processos, prazos e agenda.
+Gestão para escritórios de advocacia: clientes, processos, tarefas, agenda, documentos, financeiro e atendimento por WhatsApp.
 
 ```bash
 npm run dev
 ```
 
-Abre em [http://localhost:3000](http://localhost:3000) e redireciona para `/dashboard`.
+Abre em [http://localhost:3000](http://localhost:3000). Sem sessão, vai para o login; depois de entrar, para o painel (`/dashboard`). Antes da primeira vez, copie `.env.example` para `.env.local` e rode as migrações de `supabase/migrations/` em ordem.
 
-A Íntegra começa vazio — não há dados de demonstração. Tudo o que você cadastra fica salvo no navegador. Os processos são reais: consulte pelo número CNJ em **Novo processo** e ele fica salvo em **Processos**. A consulta roda no próprio servidor do Next (TypeScript) — não precisa de Python. Copie `.env.example` para `.env.local` e rode as migrações de `supabase/migrations/` em ordem.
+## Onde os dados ficam
+
+Os dados do escritório ficam no **Supabase**: clientes, processos, tarefas, agenda, documentos, financeiro, atividades e WhatsApp em tabelas por escritório, isoladas pela RLS; os arquivos (documentos e anexos do WhatsApp) no Supabase Storage; contas e sessões no Supabase Auth. A Íntegra começa vazia — não há dados de demonstração. Ao entrar, o que a pessoa pode ver é carregado no navegador, e cada alteração é gravada no Supabase logo em seguida (`lib/store/storage.ts`).
+
+No navegador ficam só preferências e marcadores locais, nunca dados do escritório: tema claro ou escuro, barra lateral recolhida, visualização das tarefas (quadro ou lista) e a data da última visita, usada em "Desde sua última visita".
+
+Os processos são reais: consulte pelo número CNJ em **Novo processo** e ele fica salvo em **Processos**. A consulta roda no próprio servidor do Next (TypeScript) — não precisa de Python.
 
 **Mapa do código e como alterar:** [ARCHITECTURE.md](./ARCHITECTURE.md) · **Marca e identidade visual:** [ARCHITECTURE.md › Marca](./ARCHITECTURE.md#5b-marca-íntegra)
 

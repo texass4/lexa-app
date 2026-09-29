@@ -66,7 +66,7 @@ export function OfficeSection() {
         <PanelHeader
           title="Dados do escritório"
           description={
-            editable ? "Utilizados em contratos, procurações e comunicações." : "Somente quem administra o escritório pode alterar estes dados."
+            editable ? "Dados cadastrais do escritório na Íntegra." : "Somente quem administra o escritório pode alterar estes dados."
           }
         />
         <form onSubmit={submit} noValidate>

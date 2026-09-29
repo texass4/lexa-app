@@ -296,9 +296,13 @@ Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e 
 
 **Cobrança** — sem gateway, receita é estimada pelo preço dos planos × assinaturas ativas (marcado como "estimado"). Para integrar: guardar `gateway_*_id` nos planos/assinaturas, criar a rota de webhook que grava em `payments` e atualiza `subscriptions.status` (`past_due`, `canceled`…) — o Financeiro já lê daí.
 
-## 8. O que ainda é simulado
+## 8. O que ainda não existe
 
-Envio de e-mail (links saem no terminal), integrações (agenda, assinatura digital, boletos), envio de cobrança e exportação de relatório na tela Financeiro e cobrança automática (a estrutura está pronta — seção 7). Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Envio de e-mail (os links de convite e de nova senha saem no log do servidor), notificações, monitoramento automático de processos, cadastro de prazos, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
+
+**Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
+
+Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 

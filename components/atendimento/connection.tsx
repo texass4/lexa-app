@@ -8,25 +8,13 @@ import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { Skeleton } from "@/components/ui/skeleton"
 import { whatsappApi } from "@/lib/whatsapp/client"
+import { CONNECTION_LABEL as LABEL, connectionHealth, connectionProblem, type ConnectionHealth } from "@/lib/whatsapp/connection"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import { useInbox } from "./inbox-provider"
 
-type Health = "loading" | "connected" | "disconnected" | "unconfigured" | "error"
-
-export function useConnectionHealth(): Health {
+export function useConnectionHealth(): ConnectionHealth {
   const { instance, instanceLoading } = useInbox()
-  if (instanceLoading && !instance) return "loading"
-  if (!instance?.instance) return "unconfigured"
-  if (instance.live?.error) return "error"
-  return instance.instance.status === "connected" ? "connected" : "disconnected"
-}
-
-const LABEL: Record<Health, string> = {
-  loading: "Verificando conexão…",
-  connected: "WhatsApp conectado",
-  disconnected: "WhatsApp desconectado",
-  unconfigured: "WhatsApp não configurado",
-  error: "Z-API indisponível",
+  return connectionHealth(instance, instanceLoading)
 }
 
 export function ConnectionBadge({ className }: { className?: string }) {
@@ -56,12 +44,7 @@ export function ConnectionNotice() {
   const { instance } = useInbox()
   const [open, setOpen] = React.useState(false)
   if (health === "connected" || health === "loading") return null
-  const text =
-    health === "unconfigured"
-      ? "O WhatsApp do escritório ainda não foi configurado. Você pode ler o histórico, mas o envio está desativado."
-      : health === "error"
-        ? (instance?.live?.error ?? "Não foi possível falar com a Z-API.")
-        : "O WhatsApp do escritório está desconectado. Mensagens novas não chegam nem saem até reconectar."
+  const text = connectionProblem(health, instance)
   return (
     <>
       <div className="flex shrink-0 items-center gap-2.5 border-b border-warning/15 bg-warning-soft px-4 py-2 text-[12.5px] text-warning">

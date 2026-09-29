@@ -46,6 +46,9 @@ function statusOf(m: MemberAccess) {
 
 /* ------------------------------- Convidar -------------------------------- */
 
+/** Sem provedor de e-mail (`lib/auth/mailer.ts`), o convite é criado, mas o link não chega sozinho à pessoa. */
+const EMAIL_PENDING = "O envio por e-mail ainda não está ativo — por enquanto, o link de acesso é entregue pelo suporte da Íntegra."
+
 function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }) {
   const [form, setForm] = React.useState({ name: "", email: "", role: "lawyer" as MemberRole, jobTitle: "" })
   const [error, setError] = React.useState("")
@@ -60,7 +63,7 @@ function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }
     setBusy(true)
     try {
       await call(apiBase, "POST", form)
-      toast.success("Convite enviado.", { description: `${form.email} vai receber o link para criar a senha.` })
+      toast.success("Convite criado.", { description: EMAIL_PENDING })
       onDone()
     } catch (err) {
       setError((err as Error).message)
@@ -102,7 +105,7 @@ function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }
           Cancelar
         </Button>
         <Button type="submit" form="invite-form" disabled={busy}>
-          {busy ? "Enviando…" : "Enviar convite"}
+          {busy ? "Criando…" : "Criar convite"}
         </Button>
       </ModalFooter>
     </>
@@ -340,7 +343,7 @@ export function MembersManager({
         changed()
       } else {
         await call(`${apiBase}/${member.id}/invite`, "POST")
-        toast.success("Convite reenviado.", { description: member.email })
+        toast.success(member.invitePending ? "Novo convite gerado." : "Link de nova senha gerado.", { description: EMAIL_PENDING })
       }
     } catch (err) {
       toast.error((err as Error).message)
@@ -451,12 +454,12 @@ export function MembersManager({
                               )}
                               {m.invitePending && m.active && (
                                 <DropdownMenuItem className="h-8 px-2" onClick={() => act(m, "invite")}>
-                                  <MailPlus /> Reenviar convite
+                                  <MailPlus /> Gerar novo convite
                                 </DropdownMenuItem>
                               )}
                               {!self && !m.invitePending && (
                                 <DropdownMenuItem className="h-8 px-2" onClick={() => act(m, "invite")}>
-                                  <KeyRound /> Enviar link de nova senha
+                                  <KeyRound /> Gerar link de nova senha
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuGroup>
@@ -493,7 +496,7 @@ export function MembersManager({
         open={dialog?.kind === "invite"}
         onOpenChange={(o) => !o && close()}
         title="Convidar usuário"
-        description="A pessoa recebe um link para criar a própria senha."
+        description="A pessoa entra por um link de uso único e cria a própria senha. O envio desse link por e-mail ainda não está ativo."
         icon={<UserPlus />}
         bare
       >
