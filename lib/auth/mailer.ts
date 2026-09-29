@@ -1,8 +1,8 @@
 export type AuthLinkKind = "recovery" | "invite"
 
 const SUBJECT: Record<AuthLinkKind, string> = {
-  recovery: "Redefinir sua senha no LEXA",
-  invite: "Você foi convidado para o LEXA",
+  recovery: "Redefinir sua senha na Íntegra",
+  invite: "Você foi convidado para a Íntegra",
 }
 
 /**

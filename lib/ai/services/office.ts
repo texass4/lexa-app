@@ -28,6 +28,6 @@ export async function officeOverview(deps: AIServiceDeps): Promise<OfficeOvervie
       pontos_atencao: withKnownRefs(overview.pontos_atencao, sources),
     }),
   })
-  // As métricas exibidas vêm do cálculo do LEXA, não do texto do modelo.
+  // As métricas exibidas vêm do cálculo da Íntegra, não do texto do modelo.
   return { ...result, metrics: built.metrics }
 }

@@ -25,7 +25,7 @@ export function Greeting({ signals, empty = false }: { signals: AttentionSignal[
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <h1 className="font-serif text-[34px] leading-[1.05] tracking-[-0.01em] text-foreground sm:text-[42px]">
+        <h1 className="font-display text-[30px] leading-[1.1] font-semibold tracking-[-0.025em] text-foreground sm:text-[36px]">
           {greeting()}, {user.firstName}.
         </h1>
         <p className="mt-2.5 text-[14.5px] text-muted-foreground">{statusLine(signals, empty)}</p>
@@ -33,11 +33,11 @@ export function Greeting({ signals, empty = false }: { signals: AttentionSignal[
       {next && (
         <Link
           href="/agenda"
-          className="group flex max-w-full items-center gap-3 self-start rounded-[12px] border border-border bg-card py-2.5 pr-3 pl-3.5 shadow-card outline-none transition-[border-color,box-shadow] hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40 lg:self-auto"
+          className="group flex max-w-full items-center gap-3 self-start rounded-[12px] border border-border bg-card py-2.5 pr-3 pl-3.5 shadow-card outline-none transition-[border-color,box-shadow] hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-auto"
         >
           <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-gold/60" />
-            <span className="relative inline-flex size-2 rounded-full bg-gold" />
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand/60" />
+            <span className="relative inline-flex size-2 rounded-full bg-brand" />
           </span>
           <span className="min-w-0 text-[13px]">
             <span className="text-muted-foreground">Próximo · {fmtStartsIn(next.start)}</span>

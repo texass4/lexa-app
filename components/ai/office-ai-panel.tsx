@@ -13,7 +13,7 @@ import { useAIAction } from "./use-ai"
 /** O panorama estruturado tem botão próprio; as demais perguntas vão para a conversa. */
 const SHORTCUTS = OFFICE_PROMPTS.filter((prompt) => !prompt.startsWith("Faça um panorama"))
 
-/** Números exibidos direto do cálculo do LEXA — não do texto do modelo. */
+/** Números exibidos direto do cálculo da Íntegra — não do texto do modelo. */
 function metricItems(m: OfficeMetrics) {
   return [
     m.processes && { label: "Processos ativos", value: String(m.processes.active), hint: `${m.processes.movedLast7Days} com movimentação em 7 dias` },
@@ -39,7 +39,7 @@ export function OfficeAIPanel() {
   return (
     <AIPanel
       title="Pergunte sobre seu escritório"
-      description="A LEXA lê processos, tarefas, agenda e financeiro e responde citando as fontes."
+      description="A Íntegra lê processos, tarefas, agenda e financeiro e responde citando as fontes."
       actions={
         <Button variant="secondary" size="sm" onClick={run} disabled={!ready || overview.loading}>
           <LayoutDashboard /> {result ? "Atualizar panorama" : "Panorama do escritório"}
@@ -55,10 +55,10 @@ export function OfficeAIPanel() {
           <button
             type="button"
             onClick={() => lexa.open(context)}
-            className="group flex h-10 w-full items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3.5 text-left text-[13px] text-subtle shadow-xs outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+            className="group flex h-10 w-full items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3.5 text-left text-[13px] text-subtle shadow-xs outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             <span className="min-w-0 flex-1 truncate">Pergunte sobre prazos, clientes, tarefas ou valores…</span>
-            <ArrowUpRight className="size-4 shrink-0 transition-colors group-hover:text-gold-dark" />
+            <ArrowUpRight className="size-4 shrink-0 transition-colors group-hover:text-brand-strong" />
           </button>
           <div className="flex flex-wrap gap-1.5">
             {SHORTCUTS.map((prompt) => (
@@ -66,7 +66,7 @@ export function OfficeAIPanel() {
                 key={prompt}
                 type="button"
                 onClick={() => lexa.ask(prompt, context)}
-                className="h-7 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted-foreground outline-none transition-[border-color,color,transform] hover:border-gold/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 active:scale-[0.97]"
+                className="h-7 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted-foreground outline-none transition-[border-color,color,transform] hover:border-brand/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 active:scale-[0.97]"
               >
                 {prompt}
               </button>
@@ -78,7 +78,7 @@ export function OfficeAIPanel() {
       {(overview.loading || overview.error || result) && (
         <div className="space-y-5 border-t border-border px-5 pt-4 pb-5">
           {overview.error && <AIErrorNotice error={overview.error} onRetry={run} />}
-          {overview.loading && <AIThinking label="LEXA está analisando os dados do escritório…" onCancel={overview.cancel} />}
+          {overview.loading && <AIThinking label="Íntegra IA está analisando os dados do escritório…" onCancel={overview.cancel} />}
           {result && !overview.loading && (
             <>
               <dl className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">

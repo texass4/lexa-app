@@ -1,9 +1,9 @@
-/** Validação do corpo das rotas da LEXA IA. Qualquer desvio vira BAD_REQUEST. */
+/** Validação do corpo das rotas da Íntegra IA. Qualquer desvio vira BAD_REQUEST. */
 
 import { AIError } from "./errors"
 import { CHAT_LIMITS, type AIMessage, type ChatScope } from "./types"
 
-/** Ids internos do LEXA (`p_<uuid>`, `c_123`). */
+/** Ids internos da Íntegra (`p_<uuid>`, `c_123`). */
 const ID = /^[A-Za-z0-9_-]{1,80}$/
 
 const bad = (message: string) => new AIError("BAD_REQUEST", { message })

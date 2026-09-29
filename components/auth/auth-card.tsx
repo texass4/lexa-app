@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { Logo } from "@/components/layout/logo"
+import { Logo } from "@/components/brand/logo"
 
 /** Moldura das telas de entrada (login, cadastro, senha) e de status da conta. */
 export function AuthCard({
@@ -16,10 +16,10 @@ export function AuthCard({
   className?: string
 }) {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-[radial-gradient(90%_60%_at_50%_0%,color-mix(in_oklab,var(--gold)_9%,transparent),transparent_70%)] px-4 py-10">
-      <Logo className="mb-8" />
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-[radial-gradient(90%_60%_at_50%_0%,color-mix(in_oklab,var(--brand)_7%,transparent),transparent_70%)] px-4 py-10">
+      <Logo size="lg" className="mb-8" />
       <div className={cn("w-full max-w-[400px] rounded-[18px] border border-border bg-card p-6 shadow-card sm:p-8", className)}>
-        <h1 className="font-serif text-[26px] leading-tight tracking-[-0.01em] text-foreground">{title}</h1>
+        <h1 className="font-display text-[22px] leading-tight font-semibold tracking-[-0.02em] text-foreground">{title}</h1>
         {description && <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted-foreground">{description}</p>}
         {children && <div className="mt-6">{children}</div>}
       </div>

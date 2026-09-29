@@ -155,7 +155,7 @@ export function DocumentsView() {
                               <p className="flex max-w-[300px] items-center gap-2 font-medium">
                                 <span className="truncate">{d.name}</span>
                                 {isNew(d.uploadedAt) && (
-                                  <span className="shrink-0 rounded-[5px] bg-gold-soft px-1.5 text-[10.5px] font-semibold text-gold-dark">Novo</span>
+                                  <span className="shrink-0 rounded-[5px] bg-brand-soft px-1.5 text-[10.5px] font-semibold text-brand-strong">Novo</span>
                                 )}
                               </p>
                               <p className="text-[11.5px] text-subtle">{formatFileSize(d.sizeBytes)}</p>

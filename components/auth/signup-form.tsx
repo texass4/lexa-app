@@ -48,7 +48,7 @@ export function SignupForm() {
   return (
     <AuthCard
       title="Cadastre seu escritório"
-      description="Depois do cadastro, a equipe do LEXA aprova o acesso e você já pode convidar sua equipe."
+      description="Depois do cadastro, a equipe da Íntegra aprova o acesso e você já pode convidar sua equipe."
       className="max-w-[440px]"
       footer={
         <>

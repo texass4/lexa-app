@@ -1,4 +1,4 @@
-/** LEXA IA no cliente: panorama a partir dos dados reais do cadastro. */
+/** Íntegra IA no cliente: panorama a partir dos dados reais do cadastro. */
 
 import { AIError } from "@/lib/ai/errors"
 import { keepKnownNotes } from "@/lib/ai/grounding"

@@ -227,7 +227,7 @@ function LimitsForm({ org, plan, actions }: { org: AdminOrganization; plan: Admi
                   <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                     <input
                       type="checkbox"
-                      className="size-3.5 accent-[var(--gold)]"
+                      className="size-3.5 accent-[var(--brand)]"
                       disabled={!row.custom}
                       checked={row.unlimited}
                       onChange={(e) => setKey(k, { unlimited: e.target.checked })}

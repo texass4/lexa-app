@@ -1,4 +1,4 @@
-/** GET /api/ai/status — a LEXA IA está ligada e configurada? Não chama o modelo nem expõe a chave. */
+/** GET /api/ai/status — a Íntegra IA está ligada e configurada? Não chama o modelo nem expõe a chave. */
 
 import { NextResponse } from "next/server"
 import { requireMember, route } from "@/lib/auth/server"

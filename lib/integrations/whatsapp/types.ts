@@ -1,5 +1,5 @@
 /**
- * Contrato neutro entre o LEXA e um provedor de WhatsApp (hoje, a Z-API).
+ * Contrato neutro entre a Íntegra e um provedor de WhatsApp (hoje, a Z-API).
  *
  * Os serviços (`lib/services/whatsapp/*`) só conhecem estes tipos: trocar ou somar
  * um provedor é escrever outro adaptador que produza `WebhookEvent` e implemente
@@ -46,7 +46,7 @@ export interface InboundMedia {
   voiceNote?: boolean
 }
 
-/** Evento de webhook já traduzido para o vocabulário do LEXA. */
+/** Evento de webhook já traduzido para o vocabulário da Íntegra. */
 export type WebhookEvent =
   | {
       kind: "message"
@@ -54,7 +54,7 @@ export type WebhookEvent =
       messageId: string
       /** Contato da conversa (quem mandou, ou para quem foi quando `fromMe`). */
       phone: string
-      /** Enviada pelo próprio número do escritório (celular ou LEXA). */
+      /** Enviada pelo próprio número do escritório (celular ou Íntegra). */
       fromMe: boolean
       at: string
       contactName?: string

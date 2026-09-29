@@ -31,7 +31,7 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     })
   } catch {
-    throw new Error("Sem conexão com o LEXA. Verifique a internet e tente de novo.")
+    throw new Error("Sem conexão com a Íntegra. Verifique a internet e tente de novo.")
   }
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error((data as { error?: string }).error ?? "Não foi possível concluir a ação.")

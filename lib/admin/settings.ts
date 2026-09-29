@@ -1,5 +1,5 @@
 /**
- * Configurações globais do LEXA (`public.platform_settings`). O banco guarda só o que
+ * Configurações globais da Íntegra (`public.platform_settings`). O banco guarda só o que
  * foi alterado; `sanitizeSettings` completa com os padrões e descarta o que não é
  * conhecido — vale para o que vem do banco e para o que vem do formulário.
  *
@@ -7,6 +7,7 @@
  * variáveis de ambiente do servidor.
  */
 
+import { BRAND } from "@/lib/brand"
 import { LIMIT_KEYS, type PlanLimits } from "./catalog"
 
 export interface PlatformSettings {
@@ -36,7 +37,7 @@ export interface PlatformSettings {
 }
 
 export const DEFAULT_SETTINGS: PlatformSettings = {
-  platform: { name: "LEXA", supportEmail: "", supportPhone: "", website: "" },
+  platform: { name: BRAND.name, supportEmail: "", supportPhone: "", website: "" },
   general: {
     publicSignup: true,
     requireApproval: true,

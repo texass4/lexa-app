@@ -34,7 +34,7 @@ export function AgendaToday() {
       className="flex flex-col gap-4 rounded-[14px] border border-border bg-card p-4 shadow-card sm:p-5 lg:flex-row lg:items-center"
     >
       <div className="min-w-0 lg:w-[240px] lg:shrink-0">
-        <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-gold-dark">Hoje</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-brand-strong">Hoje</p>
         <p className="mt-1 truncate text-[13px] text-muted-foreground">{fmtFullDate(now)}</p>
         <p className="mt-2 text-[15px] font-semibold text-foreground">
           {remaining.length === 0
@@ -88,7 +88,7 @@ export function AgendaToday() {
       <button
         type="button"
         onClick={() => lexa.ask("Quais compromissos exigem preparação?", officeContext("agenda"))}
-        className="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-[9px] border border-gold/25 bg-gold-soft/60 px-3 text-[12.5px] font-medium text-gold-dark outline-none transition-[border-color,background-color] hover:border-gold/50 hover:bg-gold-soft focus-visible:ring-2 focus-visible:ring-gold/40 lg:self-center"
+        className="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-[9px] border border-brand/25 bg-brand-soft/60 px-3 text-[12.5px] font-medium text-brand-strong outline-none transition-[border-color,background-color] hover:border-brand/50 hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center"
       >
         <Sparkles className="size-3.5" /> O que exige preparação?
       </button>

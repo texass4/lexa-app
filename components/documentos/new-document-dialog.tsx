@@ -121,7 +121,7 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
               </div>
               {uploading && (
                 <motion.div
-                  className="absolute bottom-0 left-0 h-[2px] bg-gold"
+                  className="absolute bottom-0 left-0 h-[2px] bg-brand"
                   initial={{ width: "0%" }}
                   animate={{ width: "100%" }}
                   transition={{ duration: 0.7, ease: "easeInOut" }}
@@ -142,7 +142,7 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
               }}
               className={cn(
                 "flex flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-8 text-center transition-colors",
-                dragging ? "border-gold bg-gold-soft/60" : error ? "border-danger/50 bg-danger-soft/40" : "border-border-strong bg-surface-muted/40",
+                dragging ? "border-brand bg-brand-soft/60" : error ? "border-danger/50 bg-danger-soft/40" : "border-border-strong bg-surface-muted/40",
               )}
             >
               <span className="flex size-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground">

@@ -1,7 +1,7 @@
 /**
  * Provedor Gemini (SDK oficial `@google/genai`).
  *
- * É o único arquivo do LEXA que importa o SDK. Roda só no servidor: a chave
+ * É o único arquivo da Íntegra que importa o SDK. Roda só no servidor: a chave
  * vem de `config.ts` e nunca chega ao navegador.
  */
 
@@ -152,7 +152,7 @@ function usage(response: GeminiResponseLike, model: string): AIUsage {
   return { inputTokens: meta?.promptTokenCount, outputTokens: meta?.candidatesTokenCount, model }
 }
 
-/** Erro do SDK → código do LEXA. A mensagem original fica só em `cause`. */
+/** Erro do SDK → código da Íntegra. A mensagem original fica só em `cause`. */
 export function mapGeminiError(error: unknown): AIError {
   if (error instanceof AIError) return error
   const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : undefined

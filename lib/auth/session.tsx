@@ -132,7 +132,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         description={
           <>
             O cadastro de <strong className="font-medium text-foreground">{status.organization?.name ?? "seu escritório"}</strong> foi recebido. Assim
-            que a equipe do LEXA aprovar, você poderá entrar normalmente.
+            que a equipe da Íntegra aprovar, você poderá entrar normalmente.
           </>
         }
       >
@@ -152,7 +152,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         title="O CRM é de cada escritório"
         description="Você está conectado como Super Admin. Essa conta não pertence a nenhum escritório e, por isso, não abre dados jurídicos de clientes — é o que garante o isolamento entre escritórios."
       >
-        <div className="flex items-center gap-3 rounded-[12px] bg-gold-soft/70 px-3.5 py-3 text-[13px] text-gold-dark">
+        <div className="flex items-center gap-3 rounded-[12px] bg-brand-soft/70 px-3.5 py-3 text-[13px] text-brand-strong">
           <ShieldCheck className="size-4 shrink-0" /> Para ver o CRM como um cliente, entre com uma conta de escritório.
         </div>
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
@@ -188,8 +188,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   if (status.kind === "blocked") {
     const description = {
       user: "Seu acesso a este escritório foi desativado. Fale com o sócio responsável.",
-      organization: "O acesso deste escritório ao LEXA está desativado. Fale com a equipe do LEXA.",
-      suspended: "O acesso deste escritório ao LEXA está suspenso. Fale com a equipe do LEXA para regularizar.",
+      organization: "O acesso deste escritório à Íntegra está desativado. Fale com a equipe da Íntegra.",
+      suspended: "O acesso deste escritório à Íntegra está suspenso. Fale com a equipe da Íntegra para regularizar.",
       "no-organization": "Sua conta não está vinculada a nenhum escritório.",
     }[status.reason]
     return (

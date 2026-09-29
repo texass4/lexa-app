@@ -236,7 +236,7 @@ export function AppointmentsTab({ client, hub }: { client: Client; hub: ClientHu
           className="flex cursor-pointer items-center gap-3.5 px-4 py-3 outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent sm:px-5"
         >
           <span className="flex w-11 shrink-0 flex-col items-center rounded-[8px] border border-border bg-surface py-1">
-            <span className="text-[9.5px] font-semibold tracking-[0.1em] text-gold-dark">{month}</span>
+            <span className="text-[9.5px] font-semibold tracking-[0.1em] text-brand-strong">{month}</span>
             <span className="tabular text-[15px] font-semibold leading-tight">{day}</span>
           </span>
           <div className="min-w-0 flex-1">

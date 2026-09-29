@@ -82,7 +82,7 @@ export function SignalList({
                 <Link
                   href={signal.href}
                   className={cn(
-                    "min-w-0 flex-1 outline-none after:absolute after:inset-0 after:rounded-[10px] focus-visible:after:ring-2 focus-visible:after:ring-gold/40",
+                    "min-w-0 flex-1 outline-none after:absolute after:inset-0 after:rounded-[10px] focus-visible:after:ring-2 focus-visible:after:ring-brand/40",
                     dense ? "py-1.5" : "py-2.5",
                   )}
                 >

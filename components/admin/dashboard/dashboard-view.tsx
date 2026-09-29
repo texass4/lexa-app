@@ -91,7 +91,7 @@ export function AdminDashboardView() {
   return (
     <div className="space-y-8">
       <AdminHeader
-        eyebrow="Lexa Admin"
+        eyebrow="Íntegra Admin"
         title="Visão geral"
         description="A operação da plataforma em um só lugar — o que cresceu, o que está no limite e o que pede sua ação."
         actions={
@@ -115,11 +115,11 @@ export function AdminDashboardView() {
           {data.maintenance && (
             <Link
               href="/admin/configuracoes#manutencao"
-              className="flex items-center gap-3 rounded-[14px] border border-warning/25 bg-warning-soft px-4 py-3 text-[13px] text-warning outline-none hover:border-warning/40 focus-visible:ring-2 focus-visible:ring-gold/45"
+              className="flex items-center gap-3 rounded-[14px] border border-warning/25 bg-warning-soft px-4 py-3 text-[13px] text-warning outline-none hover:border-warning/40 focus-visible:ring-2 focus-visible:ring-brand/45"
             >
               <Wrench className="size-4 shrink-0" />
               <span className="flex-1">
-                <strong className="font-semibold">Modo manutenção ligado.</strong> Nenhum escritório está conseguindo acessar o LEXA.
+                <strong className="font-semibold">Modo manutenção ligado.</strong> Nenhum escritório está conseguindo acessar a Íntegra.
               </span>
               <span className="flex items-center gap-1 font-medium">
                 Desligar <ArrowRight className="size-3.5" />
@@ -155,7 +155,7 @@ export function AdminDashboardView() {
               value={formatCents(k.mrrCents)}
               icon={<Wallet />}
               hint={k.unpricedPlans ? `${k.unpricedPlans} plano(s) sem preço — estimativa parcial` : `${k.payingOrganizations} assinantes · estimado pelos planos`}
-              hintTone={k.unpricedPlans ? "gold" : undefined}
+              hintTone={k.unpricedPlans ? "brand" : undefined}
               href={k.unpricedPlans ? "/admin/planos" : "/admin/financeiro"}
               action={k.unpricedPlans ? "Definir preços" : "Financeiro"}
             />

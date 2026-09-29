@@ -12,7 +12,7 @@ export function MiniStat({
   value: React.ReactNode
   hint?: React.ReactNode
   icon?: React.ReactNode
-  tone?: "danger" | "gold"
+  tone?: "danger" | "brand"
   className?: string
 }) {
   return (
@@ -24,7 +24,7 @@ export function MiniStat({
       <p
         className={cn(
           "tabular mt-2.5 truncate text-[22px] font-semibold leading-none tracking-[-0.025em]",
-          tone === "danger" ? "text-danger" : tone === "gold" ? "text-gold-dark" : "text-foreground",
+          tone === "danger" ? "text-danger" : tone === "brand" ? "text-brand-strong" : "text-foreground",
         )}
       >
         {value}

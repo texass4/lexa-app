@@ -1,6 +1,6 @@
 /**
  * Linhas das tabelas `whatsapp_*` (snake_case, como o Supabase devolve) → entidades
- * do LEXA (camelCase, `types/whatsapp.ts`). Usado no navegador e no servidor.
+ * da Íntegra (camelCase, `types/whatsapp.ts`). Usado no navegador e no servidor.
  */
 
 import type {

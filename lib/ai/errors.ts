@@ -1,27 +1,27 @@
 /**
- * Erros da LEXA IA. Toda falha vira um código conhecido com mensagem pronta
+ * Erros da Íntegra IA. Toda falha vira um código conhecido com mensagem pronta
  * para a interface — nunca stack trace, chave, SQL ou resposta crua do provedor.
  */
 
 import type { AIErrorCode } from "./types"
 
 export const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
-  DISABLED: "A LEXA IA está desativada neste ambiente.",
-  NOT_CONFIGURED: "A configuração da LEXA IA ainda não foi concluída. Configure GEMINI_API_KEY no ambiente do servidor.",
+  DISABLED: "A Íntegra IA está desativada neste ambiente.",
+  NOT_CONFIGURED: "A configuração da Íntegra IA ainda não foi concluída. Configure GEMINI_API_KEY no ambiente do servidor.",
   INVALID_API_KEY: "A Gemini recusou a chave configurada em GEMINI_API_KEY. Confira se ela está correta e ativa no Google AI Studio.",
   MODEL_UNAVAILABLE: "O modelo configurado em GEMINI_MODEL não está disponível para esta chave. Troque por outro modelo Flash disponível na sua conta.",
-  UNAUTHORIZED: "Sua sessão expirou. Entre novamente para usar a LEXA IA.",
+  UNAUTHORIZED: "Sua sessão expirou. Entre novamente para usar a Íntegra IA.",
   FORBIDDEN: "Você não tem permissão para consultar estas informações.",
   NOT_FOUND: "Não encontramos este registro no seu escritório.",
-  BAD_REQUEST: "Não foi possível entender o pedido enviado à LEXA IA.",
+  BAD_REQUEST: "Não foi possível entender o pedido enviado à Íntegra IA.",
   INSUFFICIENT_DATA: "Nenhum dado suficiente foi encontrado para realizar esta análise.",
-  RATE_LIMITED: "A LEXA IA atingiu temporariamente o limite de consultas. Tente novamente em alguns instantes.",
-  PROVIDER_RATE_LIMITED: "A LEXA IA atingiu temporariamente o limite de consultas do provedor. Tente novamente em alguns instantes.",
+  RATE_LIMITED: "A Íntegra IA atingiu temporariamente o limite de consultas. Tente novamente em alguns instantes.",
+  PROVIDER_RATE_LIMITED: "A Íntegra IA atingiu temporariamente o limite de consultas do provedor. Tente novamente em alguns instantes.",
   TIMEOUT: "A análise demorou mais do que o esperado. Tente novamente.",
   CANCELLED: "Análise cancelada.",
-  EMPTY_RESPONSE: "A LEXA IA não conseguiu gerar uma resposta agora. Tente novamente.",
-  INVALID_RESPONSE: "A resposta da LEXA IA veio incompleta e foi descartada. Tente novamente.",
-  BLOCKED: "A LEXA IA não pôde responder a este pedido. Reformule a pergunta.",
+  EMPTY_RESPONSE: "A Íntegra IA não conseguiu gerar uma resposta agora. Tente novamente.",
+  INVALID_RESPONSE: "A resposta da Íntegra IA veio incompleta e foi descartada. Tente novamente.",
+  BLOCKED: "A Íntegra IA não pôde responder a este pedido. Reformule a pergunta.",
   UNAVAILABLE: "Não foi possível analisar agora: o serviço de IA está indisponível. Tente novamente em alguns instantes.",
   UNEXPECTED: "Não foi possível concluir a análise agora. Tente novamente.",
 }

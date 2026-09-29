@@ -79,7 +79,7 @@ export function ClientHeader({
     <div className="relative overflow-hidden rounded-[18px] border border-border bg-card shadow-card">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(120%_100%_at_0%_0%,color-mix(in_oklab,var(--gold)_10%,transparent),transparent_60%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(120%_100%_at_0%_0%,color-mix(in_oklab,var(--brand)_10%,transparent),transparent_60%)]"
       />
       <div className="relative p-5 sm:p-7">
         <Link
@@ -97,7 +97,7 @@ export function ClientHeader({
             />
             <div className="min-w-0 pt-0.5">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="font-serif text-[28px] leading-[1.1] tracking-[-0.01em] text-foreground sm:text-[36px]">{client.name}</h1>
+                <h1 className="font-display text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] text-foreground sm:text-[32px]">{client.name}</h1>
                 <StatusBadge tone={status.tone}>{STATUS_LONG[client.status]}</StatusBadge>
                 {delinquent && client.status !== "inadimplente" && (
                   <StatusBadge tone="danger" dot={false}>
@@ -115,7 +115,7 @@ export function ClientHeader({
                 <Tag icon={<UserAvatar name={owner.name} size="xs" className="!size-3.5 text-[7px]" />}>{owner.name}</Tag>
                 {client.source && <Tag icon={<SourceIcon source={client.source} />}>Origem: {client.source}</Tag>}
                 {client.tags?.map((tag) => (
-                  <Tag key={tag} className="border-gold/25 bg-gold-soft/50 text-gold-dark">
+                  <Tag key={tag} className="border-brand/25 bg-brand-soft/50 text-brand-strong">
                     {tag}
                   </Tag>
                 ))}

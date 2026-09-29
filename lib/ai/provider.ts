@@ -1,7 +1,7 @@
 /**
  * Contrato do provedor de IA.
  *
- * A LEXA IA (contexto, prompts, schemas, serviços, rotas e telas) só conhece
+ * A Íntegra IA (contexto, prompts, schemas, serviços, rotas e telas) só conhece
  * esta interface. Para usar outro modelo (OpenAI, por exemplo), basta criar
  * uma classe com estes dois métodos e escolhê-la em `getAIProvider` — nada
  * mais muda.
@@ -13,7 +13,7 @@ import type { JsonSchema } from "./schema"
 import type { AIMessage } from "./types"
 
 export interface AIRequest {
-  /** Instruções de sistema (papel da LEXA IA + regras da tarefa). */
+  /** Instruções de sistema (papel da Íntegra IA + regras da tarefa). */
   system: string
   /** Conversa, sempre terminando numa mensagem do usuário. */
   messages: AIMessage[]

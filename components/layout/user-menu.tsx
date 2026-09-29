@@ -31,7 +31,7 @@ export function UserMenu({ variant, compact }: { variant: "sidebar" | "header"; 
         <DropdownMenuTrigger
           aria-label="Menu do usuário"
           className={cn(
-            "group flex w-full items-center gap-2.5 rounded-[10px] p-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-sidebar-accent",
+            "group flex w-full items-center gap-2.5 rounded-[10px] p-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-sidebar-accent",
             compact && "justify-center",
           )}
         >
@@ -45,7 +45,7 @@ export function UserMenu({ variant, compact }: { variant: "sidebar" | "header"; 
       ) : (
         <DropdownMenuTrigger
           aria-label="Menu do usuário"
-          className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-gold/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <UserAvatar name={user.name} src={user.avatarUrl} size="md" tone="dark" />
         </DropdownMenuTrigger>

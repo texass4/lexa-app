@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight, Menu, Search } from "lucide-react"
 import { Kbd } from "@/components/ui/kbd"
-import { LogoMark } from "./logo"
+import { Logo } from "@/components/brand/logo"
 import { NewMenu } from "./new-menu"
 import { NotificationsMenu } from "./notifications-menu"
 import { LexaTrigger } from "@/components/ai/lexa-trigger"
@@ -14,12 +14,13 @@ import { useUI } from "@/lib/store/ui-store"
 import { useDemoData } from "@/lib/store/demo-store"
 import { getNow, fmtFullDate } from "@/lib/dates"
 import { useIsMac } from "@/lib/hooks"
+import { BRAND } from "@/lib/brand"
 
 function useHeaderContext() {
   const pathname = usePathname()
   const data = useDemoData()
   const [, root, id] = pathname.split("/")
-  const meta = ROUTE_META[`/${root}`] ?? { title: "LEXA", section: "" }
+  const meta = ROUTE_META[`/${root}`] ?? { title: BRAND.name, section: "" }
 
   if (id && root === "clientes") {
     const c = data.clients.find((x) => x.id === id)
@@ -48,17 +49,16 @@ export function Topbar() {
           type="button"
           onClick={() => setMobileNavOpen(true)}
           aria-label="Abrir menu"
-          className="-ml-1.5 flex size-9 items-center justify-center rounded-[9px] text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-gold/45 md:hidden"
+          className="-ml-1.5 flex size-9 items-center justify-center rounded-[9px] text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
         >
           <Menu className="size-5" strokeWidth={1.8} />
         </button>
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gold/45 md:hidden"
-          aria-label="LEXA — painel"
+          className="flex items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
+          aria-label={`${BRAND.name} — painel`}
         >
-          <LogoMark className="size-7" />
-          <span className="text-[13px] font-semibold tracking-[0.22em]">LEXA</span>
+          <Logo size="sm" />
         </Link>
 
         {/* Desktop: título contextual */}
@@ -83,7 +83,7 @@ export function Topbar() {
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="group hidden h-9 w-[260px] items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[13px] text-subtle shadow-xs outline-none transition-colors hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-gold/45 lg:flex xl:w-[300px]"
+            className="group hidden h-9 w-[260px] items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[13px] text-subtle shadow-xs outline-none transition-colors hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex xl:w-[300px]"
           >
             <Search className="size-4" />
             <span className="flex-1 text-left">Buscar no escritório…</span>
@@ -96,7 +96,7 @@ export function Topbar() {
             type="button"
             onClick={() => setCommandOpen(true)}
             aria-label="Buscar"
-            className="flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/45 lg:hidden"
+            className="flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:hidden"
           >
             <Search className="size-[18px]" strokeWidth={1.8} />
           </button>

@@ -19,7 +19,7 @@ export function ProcessListItem({ process: p }: { process: Process }) {
   return (
     <Link
       href={`/processos/${p.id}`}
-      className="group flex flex-col gap-4 rounded-[14px] border border-border bg-card p-4 shadow-card outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-[0_8px_24px_-16px_rgb(23_23_23/0.25)] focus-visible:ring-2 focus-visible:ring-gold/40 sm:flex-row sm:items-center sm:p-5"
+      className="group flex flex-col gap-4 rounded-[14px] border border-border bg-card p-4 shadow-card outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-[0_8px_24px_-16px_rgb(15_23_42/0.25)] focus-visible:ring-2 focus-visible:ring-brand/40 sm:flex-row sm:items-center sm:p-5"
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">

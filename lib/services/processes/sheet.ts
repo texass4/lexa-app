@@ -3,7 +3,7 @@
  *
  * É o contorno da integração — a partir daqui ninguém mais vê `_source`,
  * `hits`, `movimentos` ou qualquer campo com nome de provider. Datas já saem no
- * formato ISO local usado pelo restante do LEXA.
+ * formato ISO local usado pelo restante da Íntegra.
  */
 
 import { formatCNJ } from "@/lib/cnj"

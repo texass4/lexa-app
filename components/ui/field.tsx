@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react"
 import { cn } from "cn"
 
 const control =
-  "w-full min-w-0 rounded-[9px] border border-input bg-surface text-[14px] text-foreground shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-subtle hover:border-border-strong focus:border-gold/55 focus:ring-3 focus:ring-gold/12 aria-invalid:border-danger/60 aria-invalid:ring-danger/10 disabled:opacity-60 sm:text-[13.5px]"
+  "w-full min-w-0 rounded-[9px] border border-input bg-surface text-[14px] text-foreground shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-subtle hover:border-border-strong focus:border-brand/55 focus:ring-3 focus:ring-brand/12 aria-invalid:border-danger/60 aria-invalid:ring-danger/10 disabled:opacity-60 sm:text-[13.5px]"
 
 export function Field({
   label,

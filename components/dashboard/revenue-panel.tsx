@@ -29,7 +29,7 @@ export function RevenuePanel() {
         action={
           <Link
             href="/financeiro"
-            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             Financeiro <ArrowRight className="size-3.5" />
           </Link>
@@ -53,7 +53,7 @@ export function RevenuePanel() {
         </div>
         <div className="mt-2 flex items-center gap-4 text-[11.5px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="h-0.5 w-3 rounded-full bg-gold" /> Recebida
+            <span className="h-0.5 w-3 rounded-full bg-brand" /> Recebida
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-0 w-3 border-t border-dashed border-border-strong" /> Prevista

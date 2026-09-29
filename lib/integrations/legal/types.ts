@@ -1,5 +1,5 @@
 /**
- * Modelo externo normalizado — a fronteira entre o LEXA e qualquer fonte de
+ * Modelo externo normalizado — a fronteira entre a Íntegra e qualquer fonte de
  * dados processuais (DataJud hoje; Codilo, Judit ou Escavador amanhã).
  *
  * Trocar de fornecedor = escrever outro `ProcessProvider`. O serviço de

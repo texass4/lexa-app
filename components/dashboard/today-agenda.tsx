@@ -39,7 +39,7 @@ export function TodayAgenda() {
         action={
           <Link
             href="/agenda"
-            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             Agenda <ArrowRight className="size-3.5" />
           </Link>
@@ -56,9 +56,9 @@ export function TodayAgenda() {
             <li key={a.id} data-now={i === nowIndex ? "" : undefined}>
               {i === nowIndex && (
                 <div className="relative my-1.5 flex items-center gap-2 px-2" aria-label={`Agora, ${fmtTime(toLocalISO(getNow()))}`}>
-                  <span className="tabular text-[10.5px] font-semibold text-gold-dark">{fmtTime(toLocalISO(getNow()))}</span>
-                  <span className="size-1.5 rounded-full bg-gold" />
-                  <span className="h-px flex-1 bg-gold/50" />
+                  <span className="tabular text-[10.5px] font-semibold text-brand-strong">{fmtTime(toLocalISO(getNow()))}</span>
+                  <span className="size-1.5 rounded-full bg-brand" />
+                  <span className="h-px flex-1 bg-brand/50" />
                 </div>
               )}
               <Link
@@ -77,7 +77,7 @@ export function TodayAgenda() {
                         {category.name}
                       </span>
                     )}
-                    {current && <span className="rounded-[4px] bg-gold-soft px-1 text-[10px] font-semibold text-gold-dark">AGORA</span>}
+                    {current && <span className="rounded-[4px] bg-brand-soft px-1 text-[10px] font-semibold text-brand-strong">AGORA</span>}
                   </span>
                   <span className="mt-0.5 block truncate text-[13.5px] font-medium text-foreground">{a.title}</span>
                   <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">

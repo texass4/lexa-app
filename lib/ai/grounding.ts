@@ -58,13 +58,13 @@ export function groundingWarnings(output: unknown, contextText: string): string[
 
   const unknownDates = [...new Set([...text.matchAll(DATE)].map((m) => normDate(m[1], m[2], m[3])))].filter((d) => !known.has(d))
   if (unknownDates.length) {
-    warnings.push(`A resposta menciona data(s) que não constam nos dados do LEXA (${unknownDates.join(", ")}). Confira antes de usar.`)
+    warnings.push(`A resposta menciona data(s) que não constam nos dados da Íntegra (${unknownDates.join(", ")}). Confira antes de usar.`)
   }
 
   const lowerContext = contextText.toLowerCase()
   const dayCounts = [...text.matchAll(DAY_COUNT)].map((m) => m[0].trim()).filter((phrase) => !lowerContext.includes(phrase.toLowerCase()))
   if (dayCounts.length) {
-    warnings.push(`A resposta menciona contagem de prazo ("${dayCounts[0]}") que não vem dos dados do LEXA. Prazos processuais devem ser conferidos pelo advogado.`)
+    warnings.push(`A resposta menciona contagem de prazo ("${dayCounts[0]}") que não vem dos dados da Íntegra. Prazos processuais devem ser conferidos pelo advogado.`)
   }
 
   return warnings

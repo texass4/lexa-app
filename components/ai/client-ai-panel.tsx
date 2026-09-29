@@ -20,7 +20,7 @@ const headline = (count: number) =>
 
 /**
  * Inteligência do cliente: primeiro o que os dados já mostram (sinais), depois
- * a interpretação da LEXA IA, sob demanda. Montar com `key={client.id}`.
+ * a interpretação da Íntegra IA, sob demanda. Montar com `key={client.id}`.
  */
 export function ClientAIPanel({ client, signals }: { client: Client; signals: AttentionSignal[] }) {
   const lexa = useLexaAI()
@@ -42,7 +42,7 @@ export function ClientAIPanel({ client, signals }: { client: Client; signals: At
       actions={
         <>
           <Button variant="secondary" size="sm" onClick={run} disabled={!ready || summary.loading}>
-            <FileText /> {result ? "Atualizar análise" : "Ver análise da LEXA"}
+            <FileText /> {result ? "Atualizar análise" : "Ver análise da Íntegra"}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => lexa.open(context)}>
             <MessageSquare /> Perguntar
@@ -67,7 +67,7 @@ export function ClientAIPanel({ client, signals }: { client: Client; signals: At
               key={prompt}
               type="button"
               onClick={() => lexa.ask(prompt, context)}
-              className="h-7 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted-foreground outline-none transition-[border-color,color,transform] hover:border-gold/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 active:scale-[0.97]"
+              className="h-7 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted-foreground outline-none transition-[border-color,color,transform] hover:border-brand/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 active:scale-[0.97]"
             >
               {prompt}
             </button>
@@ -77,7 +77,7 @@ export function ClientAIPanel({ client, signals }: { client: Client; signals: At
       {(summary.loading || summary.error || result) && (
         <div className="space-y-5 border-t border-border px-5 pt-4 pb-5">
           {summary.error && <AIErrorNotice error={summary.error} onRetry={run} />}
-          {summary.loading && <AIThinking label={`LEXA está analisando ${client.name}…`} onCancel={summary.cancel} />}
+          {summary.loading && <AIThinking label={`Íntegra IA está analisando ${client.name}…`} onCancel={summary.cancel} />}
           {result && !summary.loading && (
             <>
               <p className="text-[14px] leading-relaxed text-foreground">

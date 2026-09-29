@@ -1,5 +1,5 @@
 /**
- * Log seguro da LEXA IA: operação, duração, resultado e modelo.
+ * Log seguro da Íntegra IA: operação, duração, resultado e modelo.
  * Nunca registra chave, prompt, contexto jurídico ou resposta do modelo;
  * pessoa e escritório aparecem só como hash curto.
  */

@@ -33,7 +33,7 @@ const DOT: Record<Tone, string> = {
   warning: "bg-warning",
   danger: "bg-danger",
   info: "bg-info",
-  gold: "bg-gold",
+  brand: "bg-brand",
   violet: "bg-violet",
 }
 
@@ -44,7 +44,7 @@ function Breadcrumb() {
   return (
     <nav aria-label="Trilha" className="flex min-w-0 items-center gap-1.5 text-[13.5px]">
       <span className="hidden shrink-0 items-center gap-1.5 text-subtle sm:flex">
-        <ShieldCheck className="size-3.5 text-gold" /> Admin
+        <ShieldCheck className="size-3.5 text-brand" /> Admin
         <ChevronRight className="size-3.5" />
       </span>
       {deeper ? (
@@ -70,11 +70,11 @@ function NotificationsButton() {
     <Popover onOpenChange={(open) => open && refresh()}>
       <PopoverTrigger
         aria-label={count ? `Notificações — ${count} pendências` : "Notificações"}
-        className="relative flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/45 aria-expanded:bg-accent aria-expanded:text-foreground"
+        className="relative flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 aria-expanded:bg-accent aria-expanded:text-foreground"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
         {count > 0 && (
-          <span className="absolute top-1.5 right-1.5 flex min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[9.5px] font-semibold text-white ring-2 ring-background">
+          <span className="absolute top-1.5 right-1.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9.5px] font-semibold text-brand-foreground ring-2 ring-background">
             {count > 9 ? "9+" : count}
           </span>
         )}
@@ -125,12 +125,12 @@ function ProfileMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Menu do administrador"
-        className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-gold/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:rounded-[10px] sm:py-1 sm:pr-2 sm:pl-1 sm:hover:bg-accent sm:aria-expanded:bg-accent"
+        className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:rounded-[10px] sm:py-1 sm:pr-2 sm:pl-1 sm:hover:bg-accent sm:aria-expanded:bg-accent"
       >
         <UserAvatar name={admin.name} size="md" tone="dark" />
         <span className="hidden min-w-0 text-left leading-tight xl:block">
           <span className="block max-w-[140px] truncate text-[12.5px] font-medium">{admin.name}</span>
-          <span className="block text-[11px] text-gold-dark">Super Admin</span>
+          <span className="block text-[11px] text-brand-strong">Super Admin</span>
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-[12px] p-1.5">
@@ -138,7 +138,7 @@ function ProfileMenu() {
           <DropdownMenuLabel className="px-2 py-1.5">
             <span className="block text-[13px] font-medium text-foreground">{admin.name}</span>
             <span className="block truncate text-[11.5px] font-normal text-muted-foreground">{admin.email}</span>
-            <span className="mt-1.5 inline-flex items-center gap-1 rounded-[5px] bg-gold-soft px-1.5 py-0.5 text-[10.5px] font-medium text-gold-dark">
+            <span className="mt-1.5 inline-flex items-center gap-1 rounded-[5px] bg-brand-soft px-1.5 py-0.5 text-[10.5px] font-medium text-brand-strong">
               <ShieldCheck className="size-3" /> Super Admin
             </span>
           </DropdownMenuLabel>
@@ -172,7 +172,7 @@ export function AdminTopbar() {
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Abrir menu"
-          className="-ml-1.5 flex size-9 items-center justify-center rounded-[9px] outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-gold/45 md:hidden"
+          className="-ml-1.5 flex size-9 items-center justify-center rounded-[9px] outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
         >
           <Menu className="size-5" strokeWidth={1.8} />
         </button>
@@ -183,7 +183,7 @@ export function AdminTopbar() {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="hidden h-9 w-[240px] items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[13px] text-subtle shadow-xs outline-none transition-colors hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-gold/45 lg:flex xl:w-[300px]"
+            className="hidden h-9 w-[240px] items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[13px] text-subtle shadow-xs outline-none transition-colors hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex xl:w-[300px]"
           >
             <Search className="size-4" />
             <span className="flex-1 text-left">Buscar escritórios, usuários…</span>
@@ -196,14 +196,14 @@ export function AdminTopbar() {
             type="button"
             onClick={() => setSearchOpen(true)}
             aria-label="Buscar"
-            className="flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/45 lg:hidden"
+            className="flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:hidden"
           >
             <Search className="size-[18px]" strokeWidth={1.8} />
           </button>
           <NotificationsButton />
           <a
             href="/dashboard?de=admin"
-            className="hidden h-9 items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[12.5px] font-medium text-foreground shadow-xs outline-none transition-colors hover:border-border-strong hover:bg-surface-muted/60 focus-visible:ring-2 focus-visible:ring-gold/45 sm:flex"
+            className="hidden h-9 items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[12.5px] font-medium text-foreground shadow-xs outline-none transition-colors hover:border-border-strong hover:bg-surface-muted/60 focus-visible:ring-2 focus-visible:ring-brand/45 sm:flex"
           >
             <ArrowLeftRight className="size-3.5" /> CRM
           </a>
@@ -221,14 +221,14 @@ export function AdminDrawer() {
   return (
     <DialogPrimitive.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#171717]/35 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0e1726]/35 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
         <DialogPrimitive.Popup className="fixed inset-y-0 left-0 z-50 flex w-[min(296px,86vw)] flex-col border-r border-admin-rail-border bg-admin-rail text-admin-rail-foreground shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
           <DialogPrimitive.Title className="sr-only">Menu do Admin</DialogPrimitive.Title>
           <div className="flex h-[64px] items-center justify-between px-4">
             <AdminBrand />
             <DialogPrimitive.Close
               aria-label="Fechar menu"
-              className="flex size-9 items-center justify-center rounded-[9px] text-admin-rail-muted outline-none hover:bg-admin-rail-accent hover:text-admin-rail-foreground focus-visible:ring-2 focus-visible:ring-gold/50"
+              className="flex size-9 items-center justify-center rounded-[9px] text-admin-rail-muted outline-none hover:bg-admin-rail-accent hover:text-admin-rail-foreground focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

@@ -3,7 +3,7 @@ import { createSupabaseServer } from "@/lib/supabase/server"
 import { AdminShell } from "@/components/admin/shell/admin-shell"
 
 /**
- * Lexa Admin. A checagem de papel acontece no servidor, antes de renderizar qualquer
+ * Íntegra Admin. A checagem de papel acontece no servidor, antes de renderizar qualquer
  * coisa; e cada dado vem de `/api/admin/*`, que confere de novo a cada requisição
  * (`requireAdmin`) — navegar entre páginas sem recarregar não pula a autorização.
  */

@@ -23,7 +23,7 @@ import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 
 /**
  * O que está em volta da tarefa: o processo (prazo, última movimentação) ou o
- * cliente — e perguntas da LEXA sobre ela, com os dados desse contexto.
+ * cliente — e perguntas da Íntegra sobre ela, com os dados desse contexto.
  */
 function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => void }) {
   const data = useDemoData()
@@ -41,7 +41,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
   if (!process && !client) {
     return (
       <p className="rounded-[12px] border border-dashed border-border px-3.5 py-3 text-[12.5px] leading-relaxed text-muted-foreground">
-        Esta tarefa não está ligada a um processo ou cliente. Vincule em “Editar” para ver o contexto aqui e perguntar à LEXA sobre ela.
+        Esta tarefa não está ligada a um processo ou cliente. Vincule em “Editar” para ver o contexto aqui e perguntar à Íntegra sobre ela.
       </p>
     )
   }
@@ -56,7 +56,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
       {process && (
         <Link
           href={`/processos/${process.id}`}
-          className="group block rounded-[12px] border border-border bg-surface p-3.5 outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40"
+          className="group block rounded-[12px] border border-border bg-surface p-3.5 outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <div className="flex items-center justify-between gap-3">
             <p className="min-w-0 truncate text-[13.5px] font-medium">
@@ -89,7 +89,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
       {client && (
         <Link
           href={`/clientes/${client.id}`}
-          className="flex items-center justify-between gap-3 rounded-[12px] border border-border bg-surface px-3.5 py-2.5 text-[13px] outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40"
+          className="flex items-center justify-between gap-3 rounded-[12px] border border-border bg-surface px-3.5 py-2.5 text-[13px] outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <span className="flex min-w-0 items-center gap-2">
             <UserAvatar name={client.name} size="xs" />
@@ -100,9 +100,9 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
           </StatusBadge>
         </Link>
       )}
-      <div className="rounded-[12px] border border-gold/20 bg-gold-soft/35 p-3">
-        <p className="flex items-center gap-1.5 text-[12px] font-medium text-gold-dark">
-          <Sparkles className="size-3.5" /> Pergunte à LEXA sobre esta tarefa
+      <div className="rounded-[12px] border border-brand/20 bg-brand-soft/35 p-3">
+        <p className="flex items-center gap-1.5 text-[12px] font-medium text-brand-strong">
+          <Sparkles className="size-3.5" /> Pergunte à Íntegra sobre esta tarefa
         </p>
         <div className="mt-2 flex flex-col gap-1">
           {prompts.map((prompt) => (
@@ -113,7 +113,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
                 onBeforeAsk()
                 lexa.ask(prompt, aiContext)
               }}
-              className="rounded-[8px] px-2 py-1.5 text-left text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface/80 focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="rounded-[8px] px-2 py-1.5 text-left text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface/80 focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {prompt}
             </button>

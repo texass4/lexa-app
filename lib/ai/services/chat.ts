@@ -1,5 +1,5 @@
 /**
- * Chat da LEXA IA.
+ * Chat da Íntegra IA.
  *
  * O servidor não guarda conversa: o navegador envia o histórico curto e o
  * escopo (processo, cliente ou escritório). A cada pergunta o contexto é
@@ -52,7 +52,7 @@ export async function chat(deps: AIServiceDeps, scope: ChatScope, messages: AIMe
 
   return track(deps, `chat.${scope.type}`, async () => {
     consumeQuota(deps)
-    const system = buildSystemPrompt(`${CHAT_TASK}\n\n${CHAT_SCOPE_LABEL[scope.type]}\n\nDADOS DO LEXA (JSON):\n<dados>\n${contextText}\n</dados>`)
+    const system = buildSystemPrompt(`${CHAT_TASK}\n\n${CHAT_SCOPE_LABEL[scope.type]}\n\nDADOS DA ÍNTEGRA (JSON):\n<dados>\n${contextText}\n</dados>`)
     const { value, usage } = await deps.provider.generateText({ system, messages: history, temperature: 0.3, signal: deps.signal })
     const text = stripUnknownRefs(value, built.sources).trim()
     if (!text) throw new AIError("EMPTY_RESPONSE")

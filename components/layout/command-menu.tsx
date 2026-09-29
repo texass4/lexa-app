@@ -58,7 +58,7 @@ export function CommandMenu() {
   return (
     <DialogPrimitive.Root open={commandOpen} onOpenChange={setCommandOpen}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#171717]/25 backdrop-blur-[2px] transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/55" />
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0e1726]/25 backdrop-blur-[2px] transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/55" />
         <DialogPrimitive.Popup className="fixed top-3 left-1/2 z-50 w-[calc(100%-1.5rem)] max-w-[620px] -translate-x-1/2 overflow-hidden rounded-[16px] border border-border bg-popover shadow-float outline-none transition-[opacity,transform] duration-150 ease-out data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 sm:top-[14vh]">
           <DialogPrimitive.Title className="sr-only">Busca global</DialogPrimitive.Title>
           <CommandContent />
@@ -114,7 +114,7 @@ function CommandContent() {
           value={query}
           onValueChange={setQuery}
           autoFocus
-          placeholder="Buscar no escritório ou perguntar à LEXA…"
+          placeholder="Buscar no escritório ou perguntar à Íntegra…"
           className="h-14 w-full bg-transparent text-[15px] text-foreground outline-none placeholder:text-subtle"
         />
         <Kbd className="hidden sm:inline-flex">Esc</Kbd>
@@ -127,9 +127,9 @@ function CommandContent() {
         </Command.Empty>
 
         {hasQuery && (
-          <Command.Group heading="LEXA IA" className={groupCls} forceMount>
+          <Command.Group heading="Íntegra IA" className={groupCls} forceMount>
             <Command.Item
-              value={`perguntar lexa ${query}`}
+              value={`perguntar integra ${query}`}
               forceMount
               onSelect={() => {
                 setCommandOpen(false)
@@ -137,11 +137,11 @@ function CommandContent() {
               }}
               className={itemCls}
             >
-              <span className="flex size-7 items-center justify-center rounded-[8px] border border-gold/25 bg-gold-soft text-gold-dark">
+              <span className="flex size-7 items-center justify-center rounded-[8px] border border-brand/25 bg-brand-soft text-brand-strong">
                 <Sparkles className="size-3.5" />
               </span>
               <span className="min-w-0 flex-1 truncate">
-                Perguntar à LEXA: <span className="font-medium">“{query.trim()}”</span>
+                Perguntar à Íntegra: <span className="font-medium">“{query.trim()}”</span>
               </span>
               <span className="hidden text-[11.5px] text-subtle sm:inline">{lexa.context.subtitle}</span>
             </Command.Item>
@@ -185,17 +185,17 @@ function CommandContent() {
                 </Command.Item>
               ))}
             <Command.Item
-              value="acao perguntar a lexa ia"
+              value="acao perguntar a integra ia"
               onSelect={() => {
                 setCommandOpen(false)
                 lexa.open()
               }}
               className={itemCls}
             >
-              <span className="flex size-7 items-center justify-center rounded-[8px] border border-gold/25 bg-gold-soft text-gold-dark">
+              <span className="flex size-7 items-center justify-center rounded-[8px] border border-brand/25 bg-brand-soft text-brand-strong">
                 <Sparkles className="size-3.5" />
               </span>
-              Perguntar à LEXA IA
+              Perguntar à Íntegra IA
               <span className="ml-auto hidden text-[11.5px] text-subtle sm:inline">{lexa.context.subtitle}</span>
             </Command.Item>
           </Command.Group>

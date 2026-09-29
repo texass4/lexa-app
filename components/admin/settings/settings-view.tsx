@@ -124,7 +124,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
             <li key={sec.id}>
               <a
                 href={`#${sec.id}`}
-                className="flex h-8 items-center gap-2 rounded-[8px] px-2.5 text-[13px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+                className="flex h-8 items-center gap-2 rounded-[8px] px-2.5 text-[13px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 <sec.icon className="size-3.5" /> {sec.label}
                 {sec.id === "manutencao" && s.maintenance.enabled && <span className="ml-auto size-1.5 rounded-full bg-warning" />}
@@ -135,7 +135,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
       </nav>
 
       <div className="min-w-0 space-y-5 pb-24">
-        <Section id="plataforma" title="Dados da plataforma" description="Como o LEXA se apresenta para os escritórios.">
+        <Section id="plataforma" title="Dados da plataforma" description="Como a Íntegra se apresenta para os escritórios.">
           <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
             <Field label="Nome da plataforma" htmlFor="st-name">
               <TextInput id="st-name" value={s.platform.name} onChange={(e) => set("platform", { name: e.target.value })} />
@@ -332,7 +332,7 @@ export function SettingsView() {
       <AdminHeader
         eyebrow="Sistema"
         title="Configurações"
-        description="Configurações globais do LEXA. Chaves de API e segredos ficam só nas variáveis de ambiente do servidor — nunca aqui."
+        description="Configurações globais da Íntegra. Chaves de API e segredos ficam só nas variáveis de ambiente do servidor — nunca aqui."
       />
       {error && !data ? (
         <Panel>

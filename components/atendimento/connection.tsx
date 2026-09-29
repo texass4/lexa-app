@@ -134,7 +134,7 @@ export function ConnectionSetup() {
         {info.missing.length ? (
           <>
             <p className="text-muted-foreground">
-              Preencha no <code className="rounded bg-surface-muted px-1 font-mono text-[12px]">.env.local</code> do servidor e reinicie o LEXA:
+              Preencha no <code className="rounded bg-surface-muted px-1 font-mono text-[12px]">.env.local</code> do servidor e reinicie a Íntegra:
             </p>
             <ul className="mt-2 flex flex-wrap gap-1.5">
               {info.missing.map((name) => (
@@ -186,7 +186,7 @@ export function ConnectionSetup() {
       <Step n={3} title="Receber mensagens (webhook)" done={false} optional>
         {info.webhookUrl ? (
           <div className="space-y-2.5">
-            <p className="text-muted-foreground">A Z-API avisa o LEXA a cada mensagem por este endereço (ele leva o segredo do webhook):</p>
+            <p className="text-muted-foreground">A Z-API avisa a Íntegra a cada mensagem por este endereço (ele leva o segredo do webhook):</p>
             <div className="flex items-center gap-2 rounded-[10px] border border-border bg-surface-muted/50 py-1.5 pr-1.5 pl-3">
               <Link2 className="size-3.5 shrink-0 text-subtle" />
               <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-muted-foreground">{info.webhookUrl.replace(/token=[^&]+/, "token=••••••")}</span>
@@ -204,7 +204,7 @@ export function ConnectionSetup() {
             </div>
             {info.webhookHttps === false ? (
               <p className="text-[12.5px] text-warning">
-                A Z-API só aceita HTTPS. Em produção, defina <code className="font-mono">ZAPI_WEBHOOK_BASE_URL</code> com o endereço público do LEXA.
+                A Z-API só aceita HTTPS. Em produção, defina <code className="font-mono">ZAPI_WEBHOOK_BASE_URL</code> com o endereço público da Íntegra.
               </p>
             ) : (
               <Button variant="secondary" size="sm" onClick={registerWebhooks} disabled={busy === "webhooks" || !info.instance}>

@@ -58,7 +58,7 @@ export function MonthGrid({
                 onClick={() => onDayClick(d)}
                 aria-label={`Ver dia ${d.getDate()}`}
                 className={cn(
-                  "tabular mb-1 flex size-7 items-center justify-center rounded-full text-[12.5px] font-medium outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-gold/40 max-sm:mx-auto",
+                  "tabular mb-1 flex size-7 items-center justify-center rounded-full text-[12.5px] font-medium outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/40 max-sm:mx-auto",
                   today ? "bg-foreground text-background hover:bg-foreground" : inMonth ? "text-foreground" : "text-subtle",
                 )}
               >
@@ -74,7 +74,7 @@ export function MonthGrid({
                       type="button"
                       onClick={() => onSelect(a)}
                       className={cn(
-                        "flex w-full items-center gap-1.5 truncate rounded-[5px] px-1.5 py-0.5 text-left text-[11px] outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-gold/40",
+                        "flex w-full items-center gap-1.5 truncate rounded-[5px] px-1.5 py-0.5 text-left text-[11px] outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/40",
                         parse(a.end) < getNow() && "opacity-60",
                       )}
                     >

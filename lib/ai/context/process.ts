@@ -142,8 +142,8 @@ export function buildProcessContext(data: ProcessData, now: Date): BuiltContext 
 
   const basis =
     movements.length < process.movements.length
-      ? `Baseado nos dados do processo no LEXA e nas ${movements.length} movimentações mais recentes (de ${process.movements.length}).`
-      : `Baseado nos dados do processo no LEXA e em ${movements.length} movimentação(ões) registrada(s).`
+      ? `Baseado nos dados do processo na Íntegra e nas ${movements.length} movimentações mais recentes (de ${process.movements.length}).`
+      : `Baseado nos dados do processo na Íntegra e em ${movements.length} movimentação(ões) registrada(s).`
 
   return { context, sources: registry.sources, basis }
 }
@@ -180,5 +180,5 @@ export function buildMovementContext(data: ProcessData, movementId: string, now:
     movimentacoes_posteriores: after.map((m) => describeMovement(m, registerMovement(registry, m, process.id))),
   }
 
-  return { context, sources: registry.sources, basis: `Baseado na movimentação de ${fmtDate(target.at)} e nas vizinhas registradas no LEXA.` }
+  return { context, sources: registry.sources, basis: `Baseado na movimentação de ${fmtDate(target.at)} e nas vizinhas registradas na Íntegra.` }
 }

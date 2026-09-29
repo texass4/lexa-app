@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { LayoutGrid, Menu, Scale, UsersRound, X } from "lucide-react"
 import { cn } from "cn"
-import { Logo } from "./logo"
+import { Logo } from "@/components/brand/logo"
 import { SidebarNav } from "./sidebar-nav"
 import { UserMenu } from "./user-menu"
 import { isActive, routePermission } from "./nav-config"
@@ -19,14 +19,14 @@ export function MobileDrawer() {
   return (
     <DialogPrimitive.Root open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#171717]/25 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0e1726]/25 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
         <DialogPrimitive.Popup className="fixed inset-y-0 left-0 z-50 flex w-[min(300px,86vw)] flex-col border-r border-border bg-sidebar shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
           <DialogPrimitive.Title className="sr-only">Menu de navegação</DialogPrimitive.Title>
           <div className="flex h-[60px] items-center justify-between px-4">
             <Logo subtitle={getOrganization().name} />
             <DialogPrimitive.Close
               aria-label="Fechar menu"
-              className="flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/45"
+              className="flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

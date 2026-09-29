@@ -60,7 +60,7 @@ export const POST = route(async (request) => {
   if (!instance) throw new HttpError(409, "O WhatsApp do escritório ainda não está configurado no servidor.")
   const url = webhookUrl(request)
   if (!url) throw new HttpError(409, "Defina ZAPI_WEBHOOK_SECRET no servidor.")
-  if (!url.startsWith("https://")) throw new HttpError(409, "A Z-API só aceita webhooks HTTPS. Defina ZAPI_WEBHOOK_BASE_URL com o endereço público do LEXA.")
+  if (!url.startsWith("https://")) throw new HttpError(409, "A Z-API só aceita webhooks HTTPS. Defina ZAPI_WEBHOOK_BASE_URL com o endereço público da Íntegra.")
   try {
     await providerFor(instance).configureWebhooks(url)
   } catch (error) {

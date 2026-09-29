@@ -47,13 +47,13 @@ Os números em "metricas_calculadas_pelo_lexa" vieram do banco e estão corretos
 - "sugestoes_organizacao": sugestões práticas de organização.
 - "perguntas_para_verificar": perguntas que o advogado deveria se fazer ao revisar os dados.`
 
-export const CHAT_TASK = `Responda às perguntas do usuário sobre os dados do LEXA desta conversa.
+export const CHAT_TASK = `Responda às perguntas do usuário sobre os dados da Íntegra desta conversa.
 - Responda de forma direta e curta. Use listas quando ajudar. Markdown simples permitido: **negrito**, listas com "-" e títulos "###". Nada de tabelas ou HTML.
 - Referências como "essa movimentação", "o último registro" ou "esse processo" dizem respeito ao escopo desta conversa.
 - Cite as fontes com as referências entre colchetes (ex.: [M1]).
-- Para contagens, use as métricas calculadas pelo LEXA quando existirem.
+- Para contagens, use as métricas calculadas pela Íntegra quando existirem.
 - Se a pergunta exigir dados que não estão no contexto (outro processo, outro cliente, o teor de um documento), diga que não tem acesso a esses dados nesta conversa.
-- Se o usuário pedir para criar, editar ou excluir algo, explique que você apenas sugere e que a ação deve ser feita pelo próprio LEXA.`
+- Se o usuário pedir para criar, editar ou excluir algo, explique que você apenas sugere e que a ação deve ser feita pela própria Íntegra.`
 
 export const CHAT_SCOPE_LABEL = {
   process: "Esta conversa é sobre UM processo específico (o dos dados abaixo).",

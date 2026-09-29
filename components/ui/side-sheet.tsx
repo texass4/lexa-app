@@ -25,7 +25,7 @@ export function SideSheet({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#171717]/20 backdrop-blur-[1.5px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/50" />
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0e1726]/20 backdrop-blur-[1.5px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/50" />
         <DialogPrimitive.Popup
           className={cn(
             "fixed z-50 flex flex-col overflow-hidden border-border bg-popover shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]",
@@ -40,7 +40,7 @@ export function SideSheet({
             {header}
             <DialogPrimitive.Close
               aria-label="Fechar"
-              className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-[8px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/45"
+              className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-[8px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

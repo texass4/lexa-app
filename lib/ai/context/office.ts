@@ -259,5 +259,5 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
         .map(([name]) => name),
   }
 
-  return { context, sources: registry.sources, metrics, basis: "Baseado em métricas calculadas pelo LEXA a partir dos dados do escritório." }
+  return { context, sources: registry.sources, metrics, basis: "Baseado em métricas calculadas pela Íntegra a partir dos dados do escritório." }
 }

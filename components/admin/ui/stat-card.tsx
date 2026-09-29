@@ -8,7 +8,7 @@ const HINT_TONE: Partial<Record<Tone, string>> = {
   danger: "text-danger",
   success: "text-success",
   info: "text-info",
-  gold: "text-gold-dark",
+  brand: "text-brand-strong",
 }
 
 /**
@@ -42,7 +42,7 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <p className="text-[12.5px] font-medium text-muted-foreground">{label}</p>
         {icon && (
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-border bg-surface-muted/60 text-muted-foreground transition-colors group-hover:border-gold/30 group-hover:text-gold-dark [&_svg]:size-4">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-border bg-surface-muted/60 text-muted-foreground transition-colors group-hover:border-brand/30 group-hover:text-brand-strong [&_svg]:size-4">
             {icon}
           </span>
         )}
@@ -66,7 +66,7 @@ export function StatCard({
   )
   const cls = cn(
     "group relative flex min-w-0 flex-col rounded-[14px] border border-border bg-card p-4.5 shadow-card transition-[border-color,box-shadow,transform] duration-200",
-    href && "outline-none hover:-translate-y-px hover:border-border-strong hover:shadow-float focus-visible:ring-2 focus-visible:ring-gold/45",
+    href && "outline-none hover:-translate-y-px hover:border-border-strong hover:shadow-float focus-visible:ring-2 focus-visible:ring-brand/45",
     className,
   )
   return href ? (

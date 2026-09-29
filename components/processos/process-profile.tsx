@@ -114,7 +114,7 @@ export function ProcessProfile({ id }: { id: string }) {
         </Link>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gold-dark">Processo {process.code}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-brand-strong">Processo {process.code}</p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <h1 className="break-all font-mono text-[22px] font-medium tracking-[-0.02em] text-foreground sm:text-[28px]">{process.number}</h1>
               <button
@@ -124,16 +124,16 @@ export function ProcessProfile({ id }: { id: string }) {
                   navigator.clipboard?.writeText(process.number).catch(() => {})
                   toast.success("Número copiado.", { description: process.number })
                 }}
-                className="flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+                className="flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 <Copy className="size-4" />
               </button>
             </div>
-            <p className="mt-2 font-serif text-[20px] leading-snug text-foreground sm:text-[22px]">{process.type}</p>
+            <p className="mt-2 font-display text-[19px] leading-snug font-semibold tracking-[-0.015em] text-foreground sm:text-[21px]">{process.type}</p>
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
               {client && (
-                <Link href={`/clientes/${client.id}`} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gold/40">
+                <Link href={`/clientes/${client.id}`} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
                   <Tag icon={<UserRound />} className="hover:border-border-strong hover:text-foreground">
                     {client.name}
                   </Tag>
@@ -238,7 +238,7 @@ export function ProcessProfile({ id }: { id: string }) {
             description={
               refresh.state.status === "refreshing" ? (
                 <span className="inline-flex items-center gap-1.5" role="status">
-                  <span className="size-1.5 animate-pulse rounded-full bg-gold" aria-hidden />
+                  <span className="size-1.5 animate-pulse rounded-full bg-brand" aria-hidden />
                   Atualizando informações…
                 </span>
               ) : (

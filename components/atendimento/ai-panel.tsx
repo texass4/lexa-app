@@ -68,7 +68,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
       const response = await whatsappApi.ai(conversation.id, action)
       setResult({ conversationId: conversation.id, response })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "A Lexa IA não respondeu.")
+      toast.error(error instanceof Error ? error.message : "A Íntegra IA não respondeu.")
     } finally {
       setRunning(null)
     }
@@ -76,7 +76,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
 
   const saveNote = async (text: string) => {
     try {
-      await whatsappApi.send(conversation.id, { id: crypto.randomUUID(), type: "note", text: `✨ Lexa IA\n${text}` })
+      await whatsappApi.send(conversation.id, { id: crypto.randomUUID(), type: "note", text: `✨ Íntegra IA\n${text}` })
       toast.success("Nota interna salva na conversa.")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível salvar a nota.")
@@ -104,10 +104,10 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
   if (configured === false) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-gold/25 bg-gold-soft text-gold-dark">
+        <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-brand/25 bg-brand-soft text-brand-strong">
           <Sparkles className="size-5" />
         </span>
-        <p className="text-[14px] font-semibold">Lexa IA não configurada</p>
+        <p className="text-[14px] font-semibold">Íntegra IA não configurada</p>
         <p className="mt-1 max-w-[260px] text-[12.5px] leading-relaxed text-muted-foreground">
           Defina <code className="font-mono">ANTHROPIC_API_KEY</code> no servidor para resumir conversas, sugerir respostas e identificar tarefas.
         </p>
@@ -119,11 +119,11 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 px-4 pt-4">
         <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-[8px] bg-gradient-to-br from-gold to-gold-dark text-white shadow-xs">
+          <span className="flex size-7 items-center justify-center rounded-[8px] bg-gradient-to-br from-brand to-brand-strong text-white shadow-xs">
             <Sparkles className="size-3.5" />
           </span>
           <div>
-            <p className="text-[13.5px] font-semibold leading-tight">Lexa IA</p>
+            <p className="text-[13.5px] font-semibold leading-tight">Íntegra IA</p>
             <p className="text-[11.5px] text-muted-foreground">Sugere. Você decide o que fazer.</p>
           </div>
         </div>
@@ -135,11 +135,11 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
               disabled={!!running || configured === null}
               onClick={() => run(a.action)}
               className={cn(
-                "group flex flex-col items-start gap-1 rounded-[11px] border border-border bg-surface px-2.5 py-2 text-left outline-none transition-[border-color,background-color] hover:border-gold/40 hover:bg-gold-soft/40 focus-visible:ring-2 focus-visible:ring-gold/40 disabled:opacity-60",
-                current?.action === a.action && "border-gold/50 bg-gold-soft/50",
+                "group flex flex-col items-start gap-1 rounded-[11px] border border-border bg-surface px-2.5 py-2 text-left outline-none transition-[border-color,background-color] hover:border-brand/40 hover:bg-brand-soft/40 focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-60",
+                current?.action === a.action && "border-brand/50 bg-brand-soft/50",
               )}
             >
-              <span className="text-gold-dark [&_svg]:size-4">{a.icon}</span>
+              <span className="text-brand-strong [&_svg]:size-4">{a.icon}</span>
               <span className="text-[12.5px] leading-tight font-medium">{a.label}</span>
               <span className="text-[11px] leading-tight text-muted-foreground">{a.hint}</span>
             </button>
@@ -152,7 +152,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
           {running ? (
             <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-2.5" aria-busy="true">
               <p className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                <Sparkles className="size-3.5 animate-pulse text-gold" /> Lendo a conversa…
+                <Sparkles className="size-3.5 animate-pulse text-brand" /> Lendo a conversa…
               </p>
               <Skeleton className="h-3 w-full" />
               <Skeleton className="h-3 w-11/12" />
@@ -235,7 +235,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
                             <p className="font-medium">“{m.reference}”</p>
                             <p className="mt-1 text-[12.5px] text-muted-foreground">{m.note}</p>
                             {process && (
-                              <Link href={`/processos/${process.id}`} className="mt-1.5 inline-flex items-center gap-0.5 text-[12px] font-medium text-gold-dark hover:underline">
+                              <Link href={`/processos/${process.id}`} className="mt-1.5 inline-flex items-center gap-0.5 text-[12px] font-medium text-brand-strong hover:underline">
                                 Abrir processo {process.number || process.code} <ArrowUpRight className="size-3.5" />
                               </Link>
                             )}
@@ -247,7 +247,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
                     <p className="text-muted-foreground">Nenhum processo mencionado.</p>
                   )}
                   {current.result.suggestion && (
-                    <div className="rounded-[12px] border border-gold/25 bg-gold-soft/50 p-3">
+                    <div className="rounded-[12px] border border-brand/25 bg-brand-soft/50 p-3">
                       <p className="text-[12.5px]">{current.result.suggestion}</p>
                       {clientId && can("processes.edit") && (
                         <Button variant="secondary" size="xs" className="mt-2" onClick={() => openDialog("process", { clientId })}>
@@ -264,7 +264,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
                   {current.result.documents.map((d, i) => (
                     <li key={i} className="rounded-[12px] border border-border bg-surface p-3">
                       <p className="font-medium">{d.fileName}</p>
-                      <p className="text-[11.5px] tracking-wide text-gold-dark uppercase">{d.kind}</p>
+                      <p className="text-[11.5px] tracking-wide text-brand-strong uppercase">{d.kind}</p>
                       <p className="mt-1.5 text-[12.5px] text-muted-foreground">{d.summary}</p>
                       {d.relevantFacts.length > 0 && <List title="Informações" items={d.relevantFacts} />}
                       {d.concerns.length > 0 && <List title="Atenção" items={d.concerns} tone="warning" />}
@@ -275,9 +275,9 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
 
               {current.action === "internal_summary" && (
                 <>
-                  <div className="rounded-[12px] border border-dashed border-gold/45 bg-gold-soft p-3 whitespace-pre-wrap">{current.result.note}</div>
+                  <div className="rounded-[12px] border border-dashed border-brand/45 bg-brand-soft p-3 whitespace-pre-wrap">{current.result.note}</div>
                   {can("whatsapp.edit") && (
-                    <Button size="sm" variant="gold" onClick={() => setPending({ kind: "note", text: current.result.note })}>
+                    <Button size="sm" variant="brand" onClick={() => setPending({ kind: "note", text: current.result.note })}>
                       <Lock /> Salvar como nota interna
                     </Button>
                   )}
@@ -288,7 +288,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
             <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center px-2 pt-6 text-center">
               <ShieldCheck className="size-5 text-subtle" />
               <p className="mt-2 max-w-[250px] text-[12.5px] leading-relaxed text-muted-foreground">
-                A Lexa IA lê esta conversa e sugere. Nenhuma mensagem é enviada e nada é criado sem a sua confirmação.
+                A Íntegra IA lê esta conversa e sugere. Nenhuma mensagem é enviada e nada é criado sem a sua confirmação.
               </p>
             </motion.div>
           )}
@@ -313,7 +313,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
             <p className="mt-1 text-muted-foreground">{tasks[pending.index].description}</p>
           </div>
         )}
-        {pending?.kind === "note" && <div className="max-h-60 overflow-y-auto rounded-[12px] border border-dashed border-gold/45 bg-gold-soft p-3 text-[13px] whitespace-pre-wrap">{pending.text}</div>}
+        {pending?.kind === "note" && <div className="max-h-60 overflow-y-auto rounded-[12px] border border-dashed border-brand/45 bg-brand-soft p-3 text-[13px] whitespace-pre-wrap">{pending.text}</div>}
       </ConfirmActionDialog>
     </div>
   )
@@ -333,7 +333,7 @@ function List({ title, items, tone }: { title: string; items: string[]; tone?: "
       <ul className="space-y-1">
         {items.map((item, i) => (
           <li key={i} className="flex gap-2 text-[12.5px]">
-            <span className={cn("mt-[7px] size-1 shrink-0 rounded-full", tone === "warning" ? "bg-warning" : "bg-gold")} />
+            <span className={cn("mt-[7px] size-1 shrink-0 rounded-full", tone === "warning" ? "bg-warning" : "bg-brand")} />
             <span>{item}</span>
           </li>
         ))}

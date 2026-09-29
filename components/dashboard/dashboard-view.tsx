@@ -39,7 +39,7 @@ export function DashboardView() {
   const empty = data.processes.length === 0 && data.tasks.length === 0 && data.clients.length === 0
 
   // Hierarquia: 1) o que merece atenção, 2) o que fazer hoje (agenda e tarefas),
-  // 3) perguntar à LEXA, 4) contexto (atividade, receita).
+  // 3) perguntar à Íntegra, 4) contexto (atividade, receita).
   // No mobile as colunas viram "contents" para a ordem seguir essa hierarquia.
   return (
     <div className="space-y-6 lg:space-y-7">

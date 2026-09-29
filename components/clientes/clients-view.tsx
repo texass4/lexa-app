@@ -424,7 +424,7 @@ export function ClientsView() {
                 <li key={c.id}>
                   <Link
                     href={`/clientes/${c.id}`}
-                    className="flex items-center gap-3 rounded-[14px] border border-border bg-card p-3.5 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-gold/40"
+                    className="flex items-center gap-3 rounded-[14px] border border-border bg-card p-3.5 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <UserAvatar name={c.name} size="lg" />
                     <div className="min-w-0 flex-1">
@@ -551,7 +551,7 @@ function ClientRow({
             <DropdownMenuTrigger
               aria-label={`Ações para ${c.name}`}
               onClick={(e) => e.stopPropagation()}
-              className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+              className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"
             >
               <Ellipsis className="size-4" />
             </DropdownMenuTrigger>

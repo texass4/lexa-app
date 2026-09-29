@@ -1,5 +1,5 @@
 /**
- * Configuração da LEXA IA — o único lugar que lê as variáveis de ambiente da IA.
+ * Configuração da Íntegra IA — o único lugar que lê as variáveis de ambiente da IA.
  *
  * Só roda no servidor: a chave nunca tem prefixo NEXT_PUBLIC_ e nunca sai daqui.
  */
@@ -27,7 +27,7 @@ const MODEL_NAME = /^[A-Za-z0-9._\-/]{3,80}$/
 type Env = Record<string, string | undefined>
 
 function assertServer() {
-  if (typeof window !== "undefined") throw new Error("A configuração da LEXA IA só pode ser lida no servidor.")
+  if (typeof window !== "undefined") throw new Error("A configuração da Íntegra IA só pode ser lida no servidor.")
 }
 
 /** `AI_ENABLED` ausente = ligada; só "false", "0" ou "off" desligam. */

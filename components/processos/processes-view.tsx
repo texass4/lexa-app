@@ -136,7 +136,7 @@ export function ProcessesView() {
             description={
               data.processes.length
                 ? "Ajuste o filtro ou a busca."
-                : "Consulte pelo número CNJ em “Novo processo”. A LEXA passa a acompanhar as movimentações e destaca o que merece atenção."
+                : "Consulte pelo número CNJ em “Novo processo”. A Íntegra passa a acompanhar as movimentações e destaca o que merece atenção."
             }
             action={
               <Can permission="processes.edit">
@@ -216,7 +216,7 @@ export function ProcessesView() {
                               <DropdownMenuTrigger
                                 aria-label={`Ações para o processo ${p.number}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+                                className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"
                               >
                                 <Ellipsis className="size-4" />
                               </DropdownMenuTrigger>
@@ -253,7 +253,7 @@ export function ProcessesView() {
                 <li key={p.id}>
                   <Link
                     href={`/processos/${p.id}`}
-                    className="block rounded-[14px] border border-border bg-card p-4 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-gold/40"
+                    className="block rounded-[14px] border border-border bg-card p-4 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">

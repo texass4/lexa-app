@@ -421,7 +421,7 @@ export function MembersManager({
                         </div>
                       </Td>
                       <Td>
-                        <StatusBadge tone={m.role === "owner" ? "gold" : "neutral"} dot={false}>
+                        <StatusBadge tone={m.role === "owner" ? "brand" : "neutral"} dot={false}>
                           {ROLE_LABELS[m.role]}
                         </StatusBadge>
                         {m.permissions && m.role !== "owner" && <p className="mt-1 text-[11px] text-subtle">Permissões personalizadas</p>}
@@ -435,7 +435,7 @@ export function MembersManager({
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             aria-label={`Ações para ${m.name}`}
-                            className="flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+                            className="flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"
                           >
                             <Ellipsis className="size-4" />
                           </DropdownMenuTrigger>

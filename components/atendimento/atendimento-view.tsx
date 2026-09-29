@@ -98,7 +98,7 @@ function Workspace() {
           onChange={(v) => setPanel(v)}
           tabs={[
             { value: "context", label: "Contexto" },
-            { value: "ai", label: "Lexa IA" },
+            { value: "ai", label: "Íntegra IA" },
           ]}
           className="mx-0 flex-1 border-b-0 px-0"
         />

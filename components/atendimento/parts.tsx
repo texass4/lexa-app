@@ -43,7 +43,7 @@ export function ConversationStatusBadge({ status, size }: { status: string; size
   )
 }
 
-/** Envio → entrega → leitura, discreto como o resto do LEXA. */
+/** Envio → entrega → leitura, discreto como o resto da Íntegra. */
 export function DeliveryStatus({ status, className }: { status?: MessageStatus; className?: string }) {
   if (!status || status === "received") return null
   const cls = cn("size-3.5 shrink-0", className)
@@ -76,7 +76,7 @@ export function TagChip({ tag, onRemove, className }: { tag: WhatsAppTag; onRemo
           type="button"
           onClick={onRemove}
           aria-label={`Remover a tag ${tag.name}`}
-          className="-mr-0.5 ml-0.5 flex size-3.5 items-center justify-center rounded-[4px] opacity-60 outline-none hover:opacity-100 focus-visible:ring-2 focus-visible:ring-gold/40"
+          className="-mr-0.5 ml-0.5 flex size-3.5 items-center justify-center rounded-[4px] opacity-60 outline-none hover:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           ×
         </button>

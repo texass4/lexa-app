@@ -168,8 +168,8 @@ function TimelineDayGroup({
     >
       <div className="relative pt-1 text-right">
         <div className="sticky top-20">
-          <p className="font-serif text-[26px] leading-none text-foreground sm:text-[30px]">{day}</p>
-          <p className="mt-1 text-[10.5px] font-semibold tracking-[0.14em] text-gold-dark">{month}</p>
+          <p className="font-display tabular text-[24px] leading-none font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">{day}</p>
+          <p className="mt-1 text-[10.5px] font-semibold tracking-[0.14em] text-brand-strong">{month}</p>
           <p className="tabular mt-0.5 text-[11px] capitalize text-subtle">{caption}</p>
         </div>
       </div>
@@ -194,7 +194,7 @@ function EntryIcon({ category, emphasis }: { category: MovementCategory; emphasi
     <span
       className={cn(
         "absolute top-0 -left-[39px] flex size-7 items-center justify-center rounded-full border bg-surface ring-4 ring-background sm:-left-[43px] [&_svg]:size-3.5",
-        emphasis ? "border-gold/50 text-gold-dark" : "border-border text-muted-foreground",
+        emphasis ? "border-brand/50 text-brand-strong" : "border-border text-muted-foreground",
       )}
       aria-hidden
     >
@@ -210,7 +210,7 @@ function EntryText({ title, description, unit, fresh }: { title: string; descrip
       <p className="text-[13.5px] font-medium leading-snug break-words text-foreground">
         {title}
         {fresh && (
-          <span className="ml-2 inline-block rounded-[5px] bg-gold-soft px-1.5 align-[1px] text-[10.5px] font-semibold text-gold-dark">Nova</span>
+          <span className="ml-2 inline-block rounded-[5px] bg-brand-soft px-1.5 align-[1px] text-[10.5px] font-semibold text-brand-strong">Nova</span>
         )}
       </p>
       {description && <p className="mt-1 text-[12.5px] leading-snug break-words text-muted-foreground">{description}</p>}
@@ -220,7 +220,7 @@ function EntryText({ title, description, unit, fresh }: { title: string; descrip
 }
 
 const rowButton =
-  "-mx-2 -my-1 block w-[calc(100%+1rem)] rounded-[10px] px-2 py-1 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-gold/40"
+  "-mx-2 -my-1 block w-[calc(100%+1rem)] rounded-[10px] px-2 py-1 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
 
 function SingleEntry({
   movement,
@@ -284,7 +284,7 @@ function ClusterEntry({
         aria-expanded={expanded}
         aria-controls={listId}
         onClick={() => setExpanded((value) => !value)}
-        className="mt-1.5 inline-flex items-center gap-1 rounded-md text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+        className="mt-1.5 inline-flex items-center gap-1 rounded-md text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         {expanded ? "Ocultar" : `Ver ${count} movimentações`}
         <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
@@ -296,7 +296,7 @@ function ClusterEntry({
               <button
                 type="button"
                 onClick={() => onOpen(movement)}
-                className="flex w-full items-baseline gap-3 rounded-[8px] px-2 py-1 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-gold/40"
+                className="flex w-full items-baseline gap-3 rounded-[8px] px-2 py-1 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 <span className="tabular shrink-0 text-[11.5px] text-subtle">{fmtTime(movement.at)}</span>
                 <span className="min-w-0 text-[12.5px] break-words text-foreground">{movement.title}</span>

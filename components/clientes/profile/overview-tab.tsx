@@ -81,7 +81,7 @@ function InfoRow({
               () => toast.error("Não foi possível copiar."),
             )
           }}
-          className="flex size-7 items-center justify-center rounded-[7px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-gold/40 group-hover:opacity-100 max-md:opacity-100"
+          className="flex size-7 items-center justify-center rounded-[7px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/40 group-hover:opacity-100 max-md:opacity-100"
         >
           <Copy className="size-3.5" />
         </button>
@@ -93,7 +93,7 @@ function InfoRow({
 /** Card de número que leva para a seção correspondente. */
 function StatLink({ onClick, href, label, children }: { onClick?: () => void; href?: string; label: string; children: React.ReactNode }) {
   const cls =
-    "block min-w-0 rounded-[14px] text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-gold/40 hover:[&>div]:border-border-strong"
+    "block min-w-0 rounded-[14px] text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-brand/40 hover:[&>div]:border-border-strong"
   if (href)
     return (
       <Link href={href} aria-label={label} className={cls}>
@@ -259,7 +259,7 @@ export function OverviewTab({
                       <button
                         type="button"
                         onClick={() => onNavigate("compromissos")}
-                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                       >
                         Ver todos
                       </button>
@@ -289,7 +289,7 @@ export function OverviewTab({
                           className="flex w-full items-center gap-3 rounded-[10px] px-2 py-2.5 text-left outline-none hover:bg-accent/60 focus-visible:bg-accent"
                         >
                           <span className="flex w-12 shrink-0 flex-col items-center rounded-[8px] border border-border bg-surface py-1">
-                            <span className="text-[10px] font-semibold tracking-[0.1em] text-gold-dark">{fmtDayMonth(a.start).split(" ")[1]}</span>
+                            <span className="text-[10px] font-semibold tracking-[0.1em] text-brand-strong">{fmtDayMonth(a.start).split(" ")[1]}</span>
                             <span className="tabular text-[16px] font-semibold leading-tight">{fmtDayMonth(a.start).split(" ")[0]}</span>
                           </span>
                           <span className="min-w-0 flex-1">
@@ -322,7 +322,7 @@ export function OverviewTab({
                       <button
                         type="button"
                         onClick={() => onNavigate("tarefas")}
-                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                       >
                         Ver todas
                       </button>
@@ -355,7 +355,7 @@ export function OverviewTab({
                   <button
                     type="button"
                     onClick={() => onNavigate("timeline")}
-                    className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+                    className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     Ver timeline
                   </button>

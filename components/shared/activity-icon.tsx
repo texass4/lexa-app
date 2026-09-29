@@ -9,7 +9,7 @@ const MAP: Record<ActivityType, { icon: React.ElementType; cls: string }> = {
   appointment: { icon: CalendarCheck, cls: "text-violet" },
   payment: { icon: CircleDollarSign, cls: "text-success" },
   task: { icon: ListChecks, cls: "text-muted-foreground" },
-  client: { icon: UsersRound, cls: "text-gold-dark" },
+  client: { icon: UsersRound, cls: "text-brand-strong" },
   hearing: { icon: Gavel, cls: "text-violet" },
   summons: { icon: Bell, cls: "text-warning" },
   movement: { icon: RefreshCw, cls: "text-info" },

@@ -122,7 +122,7 @@ describe("mapeamento de partes", () => {
 })
 
 describe("ficha e rascunho de processo interno", () => {
-  it("converte a ficha em campos do modelo do LEXA", () => {
+  it("converte a ficha em campos do modelo da Íntegra", () => {
     const external = mapSearchResponse(trf1Response, CNJ)
     assert.ok(external)
     const sheet = buildProcessSheet(external)

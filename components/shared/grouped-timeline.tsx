@@ -41,8 +41,8 @@ export function GroupedTimeline({ entries, className }: { entries: TimelineEntry
           >
             <div className="relative pt-1 text-right">
               <div className="sticky top-20">
-                <p className="font-serif text-[26px] leading-none text-foreground sm:text-[30px]">{day}</p>
-                <p className="mt-1 text-[10.5px] font-semibold tracking-[0.14em] text-gold-dark">{month}</p>
+                <p className="font-display tabular text-[24px] leading-none font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">{day}</p>
+                <p className="mt-1 text-[10.5px] font-semibold tracking-[0.14em] text-brand-strong">{month}</p>
                 <p className="mt-0.5 text-[11px] capitalize text-subtle">{relative}</p>
               </div>
             </div>
@@ -59,7 +59,7 @@ export function GroupedTimeline({ entries, className }: { entries: TimelineEntry
                     <span
                       className={cn(
                         "absolute top-0 -left-[39px] flex size-7 items-center justify-center rounded-full border bg-surface ring-4 ring-background sm:-left-[43px] [&_svg]:size-3.5",
-                        item.emphasis ? "border-gold/50 text-gold-dark" : "border-border text-muted-foreground",
+                        item.emphasis ? "border-brand/50 text-brand-strong" : "border-border text-muted-foreground",
                       )}
                     >
                       {item.icon}
@@ -69,7 +69,7 @@ export function GroupedTimeline({ entries, className }: { entries: TimelineEntry
                         {item.href ? (
                           <Link
                             href={item.href}
-                            className="block rounded-md outline-none hover:[&_p:first-child]:underline focus-visible:ring-2 focus-visible:ring-gold/40"
+                            className="block rounded-md outline-none hover:[&_p:first-child]:underline focus-visible:ring-2 focus-visible:ring-brand/40"
                           >
                             {body}
                           </Link>

@@ -459,7 +459,7 @@ export function UsersView() {
                         </Link>
                       </Td>
                       <Td>
-                        <StatusBadge tone={u.role === "owner" ? "gold" : "neutral"} dot={false}>
+                        <StatusBadge tone={u.role === "owner" ? "brand" : "neutral"} dot={false}>
                           {ROLE_LABELS[u.role]}
                         </StatusBadge>
                         {u.jobTitle && <p className="mt-1 max-w-[180px] truncate text-[11.5px] text-muted-foreground">{u.jobTitle}</p>}
@@ -501,7 +501,7 @@ export function UsersView() {
                   <StatusBadge tone={s.tone} size="sm">
                     {s.label}
                   </StatusBadge>
-                  <StatusBadge tone={u.role === "owner" ? "gold" : "neutral"} dot={false} size="sm">
+                  <StatusBadge tone={u.role === "owner" ? "brand" : "neutral"} dot={false} size="sm">
                     {ROLE_LABELS[u.role]}
                   </StatusBadge>
                 </div>

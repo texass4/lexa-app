@@ -37,7 +37,7 @@ export function ResetPasswordForm() {
 
   return (
     <AuthCard
-      title={invite ? "Bem-vindo ao LEXA" : "Nova senha"}
+      title={invite ? "Boas-vindas à Íntegra" : "Nova senha"}
       description={invite ? "Crie a senha que você vai usar para entrar." : "Escolha uma nova senha para a sua conta."}
     >
       <form onSubmit={submit} className="space-y-4" noValidate>

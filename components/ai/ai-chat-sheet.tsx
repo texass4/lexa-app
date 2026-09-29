@@ -40,7 +40,7 @@ function AnswerActions({ entry, context }: { entry: ChatEntry; context: AIContex
             close()
             openDialog("task", {
               ...(scope.type === "process" ? { processId: scope.id } : { clientId: scope.id }),
-              description: `${entry.content.slice(0, 1500)}\n\nOrigem: resposta da LEXA IA sobre ${context.subtitle}.`,
+              description: `${entry.content.slice(0, 1500)}\n\nOrigem: resposta da Íntegra IA sobre ${context.subtitle}.`,
             })
           }}
         >
@@ -69,7 +69,7 @@ function AnswerActions({ entry, context }: { entry: ChatEntry; context: AIContex
 }
 
 /**
- * Conversa com a LEXA IA num painel lateral (de baixo, no mobile). O estado da
+ * Conversa com a Íntegra IA num painel lateral (de baixo, no mobile). O estado da
  * conversa fica no `LexaAIProvider` (`useAIChat`), então fechar e reabrir
  * não perde o histórico — e trocar de processo começa outra conversa.
  */
@@ -106,15 +106,15 @@ export function AIChatSheet({
     <SideSheet
       open={open}
       onOpenChange={onOpenChange}
-      title="LEXA IA"
+      title="Íntegra IA"
       className="sm:w-[520px]"
       header={
         <div className="flex items-center gap-3 border-b border-border px-5 py-4 pr-14">
           <AIMark />
           <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">LEXA IA</h2>
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Íntegra IA</h2>
             <p className="flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
-              <span className="size-1.5 shrink-0 rounded-full bg-gold" aria-hidden />
+              <span className="size-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
               <span className="truncate">Contexto: {context.subtitle}</span>
             </p>
           </div>
@@ -133,9 +133,9 @@ export function AIChatSheet({
           }}
           className="space-y-2"
         >
-          <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface px-3 py-2 focus-within:border-border-strong focus-within:ring-2 focus-within:ring-gold/25">
+          <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface px-3 py-2 focus-within:border-border-strong focus-within:ring-2 focus-within:ring-brand/25">
             <label htmlFor="lexa-ai-input" className="sr-only">
-              Pergunte à LEXA IA
+              Pergunte à Íntegra IA
             </label>
             <textarea
               id="lexa-ai-input"
@@ -143,7 +143,7 @@ export function AIChatSheet({
               value={draft}
               maxLength={CHAT_LIMITS.messageChars}
               disabled={!ready}
-              placeholder={ready ? `Pergunte sobre ${TOPIC[context.scope.type]}…` : "LEXA IA indisponível"}
+              placeholder={ready ? `Pergunte sobre ${TOPIC[context.scope.type]}…` : "Íntegra IA indisponível"}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -157,7 +157,7 @@ export function AIChatSheet({
               <ArrowUp />
             </Button>
           </div>
-          <p className="text-[11px] text-subtle">A LEXA IA responde só com os dados do LEXA e pode errar. Confira antes de usar.</p>
+          <p className="text-[11px] text-subtle">A Íntegra IA responde só com os dados da Íntegra e pode errar. Confira antes de usar.</p>
         </form>
       }
     >
@@ -166,9 +166,9 @@ export function AIChatSheet({
 
         {chat.messages.length === 0 && ready && (
           <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
-            <p className="font-serif text-[21px] leading-snug text-foreground">{context.headline}</p>
+            <p className="font-display text-[18px] leading-snug font-semibold tracking-[-0.015em] text-foreground">{context.headline}</p>
             <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-              A LEXA lê os dados registrados sobre {TOPIC[context.scope.type]} e pode {CAPABILITIES.slice(0, -1).join(", ")} e {CAPABILITIES.at(-1)} —
+              A Íntegra lê os dados registrados sobre {TOPIC[context.scope.type]} e pode {CAPABILITIES.slice(0, -1).join(", ")} e {CAPABILITIES.at(-1)} —
               citando de onde tirou cada informação. Respostas viram tarefas com um clique.
             </p>
             <div className="mt-5 flex flex-col gap-1.5">
@@ -178,10 +178,10 @@ export function AIChatSheet({
                   type="button"
                   onClick={() => submit(prompt)}
                   disabled={chat.pending}
-                  className="group flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface px-3 py-2.5 text-left text-[13px] text-foreground outline-none transition-[border-color,background-color,transform] hover:border-border-strong hover:bg-surface-muted/60 focus-visible:ring-2 focus-visible:ring-gold/40 active:scale-[0.99] disabled:opacity-50"
+                  className="group flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface px-3 py-2.5 text-left text-[13px] text-foreground outline-none transition-[border-color,background-color,transform] hover:border-border-strong hover:bg-surface-muted/60 focus-visible:ring-2 focus-visible:ring-brand/40 active:scale-[0.99] disabled:opacity-50"
                 >
                   {prompt}
-                  <ArrowUp className="size-3.5 shrink-0 rotate-45 text-subtle transition-colors group-hover:text-gold-dark" />
+                  <ArrowUp className="size-3.5 shrink-0 rotate-45 text-subtle transition-colors group-hover:text-brand-strong" />
                 </button>
               ))}
             </div>
@@ -209,7 +209,7 @@ export function AIChatSheet({
 
         {chat.pending && (
           <AIThinking
-            label={`LEXA está analisando ${context.scope.type === "office" ? "os dados do escritório" : context.subtitle}…`}
+            label={`Íntegra IA está analisando ${context.scope.type === "office" ? "os dados do escritório" : context.subtitle}…`}
             onCancel={chat.cancel}
             className="pl-10"
           />

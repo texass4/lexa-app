@@ -28,7 +28,7 @@ export function DocumentActions({ doc }: { doc: LegalDocument }) {
         <DropdownMenuTrigger
           aria-label={`Ações para ${doc.name}`}
           onClick={(e) => e.stopPropagation()}
-          className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+          className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"
         >
           <Ellipsis className="size-4" />
         </DropdownMenuTrigger>

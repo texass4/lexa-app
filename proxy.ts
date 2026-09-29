@@ -21,7 +21,7 @@ export async function proxy(request: NextRequest) {
   // Sem Supabase configurado, nada além das telas públicas abre (falha fechada).
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     if (matchesAny(request.nextUrl.pathname, PUBLIC)) return NextResponse.next()
-    return new NextResponse("LEXA: configure o Supabase no .env.local (veja .env.example).", { status: 503 })
+    return new NextResponse("Íntegra: configure o Supabase no .env.local (veja .env.example).", { status: 503 })
   }
 
   let response = NextResponse.next({ request })
@@ -78,6 +78,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Tudo menos os internos do Next (estáticos, imagens, HMR) e arquivos públicos.
-  matcher: ["/((?!_next/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // Tudo menos os internos do Next (estáticos, imagens, HMR) e arquivos públicos
+  // (ícones e o manifest do app precisam abrir também na tela de login).
+  matcher: ["/((?!_next/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)"],
 }

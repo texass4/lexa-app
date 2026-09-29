@@ -1,8 +1,8 @@
 import { cn } from "cn"
 
 /**
- * Cabeçalho de página do Admin. Diferente do CRM (título serifado grande): sans,
- * compacto e com eyebrow dourado — leitura de painel de controle.
+ * Cabeçalho de página do Admin. Mais compacto que o do CRM e com eyebrow na cor
+ * de destaque da marca — leitura de painel de controle.
  */
 export function AdminHeader({
   eyebrow,
@@ -20,7 +20,7 @@ export function AdminHeader({
   return (
     <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="min-w-0">
-        {eyebrow && <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-dark">{eyebrow}</p>}
+        {eyebrow && <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-strong">{eyebrow}</p>}
         <h1 className="text-[24px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-[28px]">{title}</h1>
         {description && <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground">{description}</p>}
       </div>
@@ -43,4 +43,4 @@ export function SectionTitle({ title, description, action, className }: { title:
 }
 
 export const rowMenuTrigger =
-  "flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+  "flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"

@@ -31,7 +31,7 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (color: s
           aria-label={c.name}
           title={c.name}
           onClick={() => onChange(c.value)}
-          className="flex size-6 items-center justify-center rounded-full outline-none ring-offset-2 ring-offset-popover transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-gold/50"
+          className="flex size-6 items-center justify-center rounded-full outline-none ring-offset-2 ring-offset-popover transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-brand/50"
           style={{ backgroundColor: c.value }}
         >
           {value === c.value && <Check className="size-3.5 text-white" strokeWidth={3} />}
@@ -41,7 +41,7 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (color: s
   )
 }
 
-/** Chip de categoria — mesmo desenho dos chips de escolha do LEXA, com a cor da categoria. */
+/** Chip de categoria — mesmo desenho dos chips de escolha da Íntegra, com a cor da categoria. */
 function CategoryChip({ category, active, onClick }: { category: AppointmentCategory; active: boolean; onClick: () => void }) {
   const style = categoryStyle(category.color)
   return (
@@ -51,7 +51,7 @@ function CategoryChip({ category, active, onClick }: { category: AppointmentCate
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-8 max-w-full items-center gap-1.5 rounded-[8px] border px-2.5 text-[12.5px] font-medium outline-none transition-[background-color,border-color,color] duration-150 focus-visible:ring-2 focus-visible:ring-gold/40",
+        "inline-flex h-8 max-w-full items-center gap-1.5 rounded-[8px] border px-2.5 text-[12.5px] font-medium outline-none transition-[background-color,border-color,color] duration-150 focus-visible:ring-2 focus-visible:ring-brand/40",
         active
           ? "border-foreground bg-foreground text-background"
           : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground",
@@ -90,7 +90,7 @@ function CreateCategory({ onCreated }: { onCreated: (category: AppointmentCatego
         }
       }}
     >
-      <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-dashed border-border-strong px-2.5 text-[12.5px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40">
+      <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-dashed border-border-strong px-2.5 text-[12.5px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40">
         <Plus className="size-3.5" /> Nova categoria
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 gap-3 p-3">
@@ -139,7 +139,7 @@ function CategoryRow({ category, usage }: { category: AppointmentCategory; usage
           aria-label={`Cor de ${category.name}`}
           aria-expanded={editingColor}
           onClick={() => setEditingColor((v) => !v)}
-          className="size-5 shrink-0 rounded-full outline-none ring-offset-2 ring-offset-popover focus-visible:ring-2 focus-visible:ring-gold/50"
+          className="size-5 shrink-0 rounded-full outline-none ring-offset-2 ring-offset-popover focus-visible:ring-2 focus-visible:ring-brand/50"
           style={{ backgroundColor: category.color }}
         />
         <TextInput
@@ -160,7 +160,7 @@ function CategoryRow({ category, usage }: { category: AppointmentCategory; usage
           type="button"
           aria-label={`Excluir ${category.name}`}
           onClick={() => setConfirming((v) => !v)}
-          className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-danger-soft hover:text-danger focus-visible:ring-2 focus-visible:ring-gold/40"
+          className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-danger-soft hover:text-danger focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <Trash2 className="size-3.5" />
         </button>
@@ -200,7 +200,7 @@ function ManageCategories() {
 
   return (
     <Popover>
-      <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2 text-[12.5px] font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40">
+      <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2 text-[12.5px] font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40">
         <Pencil className="size-3.5" /> Editar
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 gap-1 p-3">

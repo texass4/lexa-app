@@ -1,7 +1,7 @@
 /**
  * Contrato das rotas de consulta (`/api/processes/search` e `/api/processes/:id/sync`).
  *
- * Compartilhado por servidor e navegador. Só o modelo interno do LEXA
+ * Compartilhado por servidor e navegador. Só o modelo interno da Íntegra
  * (`ProcessSheet`) e mensagens prontas para a tela — nenhum dado técnico da
  * fonte, código HTTP ou detalhe de erro.
  */
@@ -20,7 +20,7 @@ export interface LookupSuccessBody {
 
 export interface LookupFailureBody {
   ok: false
-  /** `disabled`: a administração do LEXA desligou a consulta automática. */
+  /** `disabled`: a administração da Íntegra desligou a consulta automática. */
   reason: LookupFailureReason | "forbidden" | "disabled"
   message: string
 }

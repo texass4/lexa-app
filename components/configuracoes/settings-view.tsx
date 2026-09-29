@@ -21,7 +21,7 @@ import type { Permission } from "@/lib/auth/permissions"
 const SECTIONS = [
   { id: "perfil", label: "Perfil", icon: UserRound, description: "Seus dados e preferências" },
   { id: "escritorio", label: "Escritório", icon: Building, description: "Dados do escritório e plano" },
-  { id: "usuarios", label: "Usuários", icon: UsersRound, description: "Equipe com acesso à LEXA", permission: "users.manage" },
+  { id: "usuarios", label: "Usuários", icon: UsersRound, description: "Equipe com acesso à Íntegra", permission: "users.manage" },
   { id: "permissoes", label: "Permissões", icon: ShieldCheck, description: "O que cada perfil pode fazer", permission: "users.manage" },
   { id: "notificacoes", label: "Notificações", icon: Bell, description: "Alertas e canais" },
   { id: "integracoes", label: "Integrações", icon: Plug, description: "Conecte suas ferramentas" },
@@ -50,7 +50,7 @@ function NotificationsSection() {
   const [state, setState] = React.useState(() => NOTIFS.map((_, i) => [true, i !== 2, i === 0 || i === 2]))
   return (
     <Panel>
-      <PanelHeader title="Notificações" description="Escolha como e quando a LEXA avisa você." />
+      <PanelHeader title="Notificações" description="Escolha como e quando a Íntegra avisa você." />
       <div className="border-t border-border">
         <div className="hidden grid-cols-[1fr_repeat(3,84px)] gap-2 border-b border-border bg-surface-muted/40 px-5 py-2.5 text-[11.5px] font-medium text-muted-foreground sm:grid">
           <span>Evento</span>
@@ -86,7 +86,7 @@ function NotificationsSection() {
   )
 }
 
-/** `builtin`: funciona de fato no LEXA e não se liga/desliga por aqui. */
+/** `builtin`: funciona de fato na Íntegra e não se liga/desliga por aqui. */
 type IntegrationStatus = "available" | "connected" | "builtin"
 
 const INTEGRATIONS: { name: string; description: string; status: IntegrationStatus; mark: string }[] = [
@@ -131,7 +131,7 @@ function IntegrationsSection() {
             </div>
             <div className="mt-4 flex justify-end">
               {it.status === "builtin" ? (
-                <span className="text-[12px] text-gold-dark">Ativo em todos os processos</span>
+                <span className="text-[12px] text-brand-strong">Ativo em todos os processos</span>
               ) : on ? (
                 <Button
                   variant="ghost"
@@ -192,7 +192,7 @@ export function SettingsView() {
                     onClick={() => go(s.id)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative flex h-9 w-full items-center gap-2.5 whitespace-nowrap rounded-[9px] px-3 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
+                      "relative flex h-9 w-full items-center gap-2.5 whitespace-nowrap rounded-[9px] px-3 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                       active ? "text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                     )}
                   >

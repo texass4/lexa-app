@@ -54,12 +54,12 @@ export function OfficeSection() {
   return (
     <div className="space-y-5">
       <Panel className="overflow-hidden">
-        <div className="flex flex-col gap-1 bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklab,var(--gold)_12%,transparent),transparent_60%)] p-5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gold-dark">Plano {organization.plan}</p>
+        <div className="flex flex-col gap-1 bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklab,var(--brand)_12%,transparent),transparent_60%)] p-5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-brand-strong">Plano {organization.plan}</p>
           <p className="text-[15px] font-semibold">
             {active} {active === 1 ? "usuário ativo" : "usuários ativos"}
           </p>
-          <p className="text-[12.5px] text-muted-foreground">Para mudar de plano, fale com a equipe do LEXA.</p>
+          <p className="text-[12.5px] text-muted-foreground">Para mudar de plano, fale com a equipe da Íntegra.</p>
         </div>
       </Panel>
       <Panel>

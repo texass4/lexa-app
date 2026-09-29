@@ -34,7 +34,7 @@ function RichText({ text, query }: { text: string; query?: string }) {
         const out: React.ReactNode[] = []
         let from = 0
         for (let at = folded.indexOf(q); at !== -1; at = folded.indexOf(q, at + q.length)) {
-          out.push(part.slice(from, at), <mark key={`${i}-${at}`} className="rounded-[3px] bg-gold/35 px-px text-inherit">{part.slice(at, at + q.length)}</mark>)
+          out.push(part.slice(from, at), <mark key={`${i}-${at}`} className="rounded-[3px] bg-brand/35 px-px text-inherit">{part.slice(at, at + q.length)}</mark>)
           from = at + q.length
         }
         out.push(part.slice(from))
@@ -50,7 +50,7 @@ function Quote({ message, onJump }: { message?: WhatsAppMessage; onJump: (id: st
     <button
       type="button"
       onClick={() => onJump(message.id)}
-      className="mb-1.5 block w-full rounded-[8px] border-l-2 border-gold/70 bg-black/[0.04] px-2 py-1 text-left outline-none hover:bg-black/[0.07] focus-visible:ring-2 focus-visible:ring-gold/40 dark:bg-white/[0.06]"
+      className="mb-1.5 block w-full rounded-[8px] border-l-2 border-brand/70 bg-black/[0.04] px-2 py-1 text-left outline-none hover:bg-black/[0.07] focus-visible:ring-2 focus-visible:ring-brand/40 dark:bg-white/[0.06]"
     >
       <span className="block text-[11px] font-semibold opacity-80">{message.direction === "inbound" ? "Cliente" : "Escritório"}</span>
       <span className="line-clamp-2 text-[12px] opacity-75">{message.body || TYPE_PREVIEW[message.type]}</span>
@@ -101,7 +101,7 @@ function Bubble({
     <div className={cn("group/message flex flex-col", inbound ? "items-start" : "items-end")}>
       {showSender && !inbound && (
         <span className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
-          {note && <Lock className="size-3 text-gold" />}
+          {note && <Lock className="size-3 text-brand" />}
           {note ? `Nota interna · ${author?.firstName ?? "Equipe"}` : message.fromDevice ? "Enviada pelo celular" : (author?.firstName ?? "Escritório")}
         </span>
       )}
@@ -114,9 +114,9 @@ function Bubble({
             "relative min-w-0 rounded-[16px] px-3 py-2 text-[13.5px] leading-[1.45] shadow-xs transition-shadow",
             inbound && "rounded-bl-[5px] border border-border bg-surface text-foreground",
             dark && "rounded-br-[5px] bg-primary text-primary-foreground",
-            note && "rounded-br-[5px] border border-dashed border-gold/45 bg-gold-soft text-foreground",
+            note && "rounded-br-[5px] border border-dashed border-brand/45 bg-brand-soft text-foreground",
             message.status === "failed" && "ring-1 ring-danger/40",
-            highlighted && "ring-2 ring-gold/60",
+            highlighted && "ring-2 ring-brand/60",
             media && !message.body && "p-1",
           )}
         >
@@ -155,7 +155,7 @@ function Bubble({
               type="button"
               onClick={() => onReply(message)}
               aria-label="Responder esta mensagem"
-              className="flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <Reply className="size-3.5" />
             </button>
@@ -168,7 +168,7 @@ function Bubble({
                 toast.success("Texto copiado.")
               }}
               aria-label="Copiar texto"
-              className="flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 max-md:hidden"
+              className="flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 max-md:hidden"
             >
               <Copy className="size-3.5" />
             </button>

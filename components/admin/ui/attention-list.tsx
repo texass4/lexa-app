@@ -8,7 +8,7 @@ const TONE: Record<Tone, { dot: string; ring: string }> = {
   danger: { dot: "bg-danger", ring: "hover:border-danger/35" },
   warning: { dot: "bg-warning", ring: "hover:border-warning/35" },
   info: { dot: "bg-info", ring: "hover:border-info/35" },
-  gold: { dot: "bg-gold", ring: "hover:border-gold/40" },
+  brand: { dot: "bg-brand", ring: "hover:border-brand/40" },
   neutral: { dot: "bg-subtle", ring: "hover:border-border-strong" },
   success: { dot: "bg-success", ring: "hover:border-success/35" },
   violet: { dot: "bg-violet", ring: "hover:border-violet/35" },
@@ -34,7 +34,7 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
           <Link
             href={item.href}
             className={cn(
-              "group flex h-full items-start gap-3 rounded-[12px] border border-border bg-card px-4 py-3.5 shadow-card outline-none transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-float focus-visible:ring-2 focus-visible:ring-gold/45",
+              "group flex h-full items-start gap-3 rounded-[12px] border border-border bg-card px-4 py-3.5 shadow-card outline-none transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-float focus-visible:ring-2 focus-visible:ring-brand/45",
               TONE[item.tone].ring,
             )}
           >

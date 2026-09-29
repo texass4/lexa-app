@@ -1,10 +1,10 @@
 "use client"
 
 /**
- * "Desde sua última visita" — quando a pessoa esteve no LEXA pela última vez.
+ * "Desde sua última visita" — quando a pessoa esteve na Íntegra pela última vez.
  *
  * Guardado só no navegador (por pessoa): `localStorage` tem o último momento
- * em que o LEXA esteve aberto; `sessionStorage` congela esse valor no início
+ * em que a Íntegra esteve aberto; `sessionStorage` congela esse valor no início
  * da sessão, para o painel comparar sempre com a mesma base enquanto a aba
  * estiver aberta. Sem armazenamento disponível, o recurso simplesmente não aparece.
  */
@@ -41,7 +41,7 @@ export function acknowledgeVisit(userId: string, now: Date = new Date()) {
 }
 
 /**
- * Marca presença enquanto o LEXA está aberto (ao entrar e ao sair da aba).
+ * Marca presença enquanto a Íntegra está aberto (ao entrar e ao sair da aba).
  * Devolve a função que remove os ouvintes.
  */
 export function trackVisit(userId: string): () => void {

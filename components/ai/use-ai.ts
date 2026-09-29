@@ -23,7 +23,7 @@ export function useAIStatus() {
 }
 
 /**
- * Uma ação da LEXA IA disparada pelo usuário. Ignora cliques repetidos enquanto
+ * Uma ação da Íntegra IA disparada pelo usuário. Ignora cliques repetidos enquanto
  * roda, mantém o resultado anterior visível durante a nova análise e cancela
  * a requisição ao sair da tela.
  */
@@ -63,7 +63,7 @@ export interface ChatEntry {
 }
 
 /**
- * Conversa com a LEXA IA num escopo (processo, cliente ou escritório).
+ * Conversa com a Íntegra IA num escopo (processo, cliente ou escritório).
  * Quem usa deve montar o hook com `key` do escopo: trocar de processo começa
  * outra conversa, sem reaproveitar mensagens nem dados do anterior.
  */
@@ -131,7 +131,7 @@ export function useCreateTaskFromSuggestion(target: { processId?: string; client
     openDialog("task", {
       ...target,
       title: suggestion.titulo,
-      description: [suggestion.descricao, suggestion.justificativa && `Motivo (LEXA IA): ${suggestion.justificativa}`].filter(Boolean).join("\n\n"),
+      description: [suggestion.descricao, suggestion.justificativa && `Motivo (Íntegra IA): ${suggestion.justificativa}`].filter(Boolean).join("\n\n"),
       priority: suggestion.prioridade,
     })
 }

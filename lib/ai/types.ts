@@ -1,5 +1,5 @@
 /**
- * Contratos da LEXA IA compartilhados entre servidor e navegador.
+ * Contratos da Íntegra IA compartilhados entre servidor e navegador.
  *
  * Só tipos e constantes: nada aqui fala com a Gemini, com o banco ou com o
  * ambiente. Os nomes dos campos das análises estão em português porque são
@@ -91,7 +91,7 @@ export interface ChatReply {
 export type SourceKind = "movement" | "process" | "task" | "appointment" | "document" | "client" | "invoice"
 
 /**
- * Registro real do LEXA que o modelo recebeu com uma referência curta ("M3").
+ * Registro real da Íntegra que o modelo recebeu com uma referência curta ("M3").
  * A interface mostra estes dados — vindos do banco, não do modelo — quando a
  * resposta cita a referência.
  */
@@ -113,7 +113,7 @@ export type AISources = Record<string, AISource>
 export interface AIResult<T> {
   data: T
   sources: AISources
-  /** Alertas da verificação feita pelo LEXA sobre a resposta (ex.: data que não consta dos dados). */
+  /** Alertas da verificação feita pela Íntegra sobre a resposta (ex.: data que não consta dos dados). */
   warnings: string[]
   /** De onde veio a análise, em uma frase ("Baseado em 12 movimentações…"). */
   basis: string

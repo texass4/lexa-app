@@ -1,5 +1,5 @@
 /**
- * Acesso do navegador à LEXA IA — só `fetch` para as rotas `/api/ai/*`.
+ * Acesso do navegador à Íntegra IA — só `fetch` para as rotas `/api/ai/*`.
  * Nenhum SDK de IA, nenhuma chave: tudo o que fala com o modelo roda no servidor.
  */
 
@@ -28,7 +28,7 @@ export class AIRequestError extends Error {
   }
 }
 
-const OFFLINE = "Sem conexão com o LEXA. Verifique sua internet e tente de novo."
+const OFFLINE = "Sem conexão com a Íntegra. Verifique sua internet e tente de novo."
 const GENERIC = "Não foi possível concluir a análise agora. Tente novamente."
 
 async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
