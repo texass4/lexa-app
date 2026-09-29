@@ -7,6 +7,7 @@
  *     → consulta cada um pelo serviço de sempre (`lookup-service`: cache → fonte)
  *     → aplica só o que é novo (`mergeProcessSheet`) com gravação condicionada à versão
  *     → atividade "N novas movimentações…" só quando há novidade (autora: Íntegra)
+ *     → as novas que pedem atenção (sentença, decisão, audiência…) entram na Triagem
  *     → estado de cada processo (próxima consulta permitida) + registro da execução
  *
  * O Realtime entrega as gravações a quem está com a Íntegra aberta — nada de
@@ -24,6 +25,7 @@
 import { toLocalISOIn } from "@/lib/dates"
 import { LookupError, type LookupErrorCode } from "@/lib/integrations/legal/errors"
 import { SYSTEM_ACTOR_ID } from "@/lib/system-actor"
+import { movementTriageItems, type TriageItemInput } from "@/lib/triagem/sources"
 import type { Activity, Process } from "@/types"
 import type { LookupResult } from "./lookup-service"
 import {
@@ -115,6 +117,8 @@ export interface MonitorRepository {
   loadProcesses(keys: { organizationId: string; processId: string }[]): Promise<ProcessRow[]>
   saveProcess(row: ProcessRow, data: Process): Promise<SaveOutcome>
   insertActivities(activities: Activity[]): Promise<void>
+  /** Eventos para a Triagem (sem duplicar); devolve quantos entraram. */
+  saveTriageItems(items: TriageItemInput[]): Promise<number>
   saveStates(states: MonitoringState[]): Promise<void>
   /** Devolve à fila, sem esperar a reserva vencer, o que não chegou a ser consultado. */
   release(claimed: ClaimedProcess[], now: Date): Promise<void>
@@ -281,11 +285,18 @@ export async function runProcessMonitor(deps: MonitorDeps): Promise<RunRecord> {
         if (reason) stop = mergeStop(stop, reason, error.retryAfterMs)
       }
 
-      const { applied, activities } = await applySuccesses(deps, successes, checkedAt, newId, summary)
+      const { applied, activities, triage } = await applySuccesses(deps, successes, checkedAt, newId, summary)
       states.push(...applied)
 
       // Atividades depois dos processos: só descrevem o que foi gravado.
       if (activities.length) await repo.insertActivities(activities)
+      // A Triagem é um extra: se falhar, o processo e as movimentações já estão salvos.
+      if (triage.length) {
+        await repo
+          .saveTriageItems(triage)
+          .then((count) => count && log(`[process-monitor] ${count} movimentações na Triagem`))
+          .catch((error) => console.error("[process-monitor] falha ao enviar movimentações para a Triagem", error))
+      }
       if (states.length) await repo.saveStates(states)
 
       if (reachedSource && queue.length && !stop) await sleep(config.pauseMs)
@@ -326,10 +337,11 @@ async function applySuccesses(
   checkedAt: Date,
   newId: (prefix: string) => string,
   summary: RunSummary,
-): Promise<{ applied: MonitoringState[]; activities: Activity[] }> {
+): Promise<{ applied: MonitoringState[]; activities: Activity[]; triage: TriageItemInput[] }> {
   const applied: MonitoringState[] = []
   const activities: Activity[] = []
-  if (!successes.length) return { applied, activities }
+  const triage: TriageItemInput[] = []
+  if (!successes.length) return { applied, activities, triage }
 
   const rows = await deps.repo.loadProcesses(successes.map(({ claimed }) => ({ organizationId: claimed.organizationId, processId: claimed.processId })))
   const byKey = new Map(rows.map((row) => [keyOf(row.organizationId, row.id), row]))
@@ -394,6 +406,7 @@ async function applySuccesses(
         actorUserId: SYSTEM_ACTOR_ID,
         href: `/processos/${process.id}`,
       })
+      triage.push(...movementTriageItems({ organizationId: claimed.organizationId, process, movements: merged.imported, today: localNow.slice(0, 10) }))
     }
 
     applied.push({
@@ -408,5 +421,5 @@ async function applySuccesses(
     })
   }
 
-  return { applied, activities }
+  return { applied, activities, triage }
 }

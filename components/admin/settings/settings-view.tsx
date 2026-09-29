@@ -189,7 +189,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
           </Row>
           <Row
             title="Captura de intimações (DJEN)"
-            description="API pública de Comunicações Processuais do CNJ. Ligue só depois de confirmar com o CNJ que o uso comercial é permitido — a fonte não publica termos de uso. O servidor precisa rodar no Brasil (a fonte bloqueia outros países)."
+            description="API pública de Comunicações Processuais do CNJ. Ligue só depois de confirmar com o CNJ que o uso comercial é permitido — a fonte não publica termos de uso. O servidor precisa rodar no Brasil (a fonte bloqueia outros países). Cada intimação capturada entra na Triagem."
           >
             <ToggleSwitch label="DJEN" checked={s.features.djen} onChange={(v) => set("features", { djen: v })} />
           </Row>

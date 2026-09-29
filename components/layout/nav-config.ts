@@ -19,7 +19,7 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   /** Contador que só aparece quando pede ação (ver `SidebarNav`). */
-  badgeKey?: "tasks" | "processes" | "prazos" | "intimacoes"
+  badgeKey?: "tasks" | "processes" | "prazos" | "triagem"
   /** Sem ela, o item some do menu e a rota mostra "sem acesso". */
   permission?: Permission
   /** Telas dentro deste item (abrem pela setinha ao lado dele). */
@@ -29,7 +29,10 @@ export interface NavItem {
 export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Visão geral",
-    items: [{ href: "/dashboard", label: "Painel", icon: LayoutGrid }],
+    items: [
+      { href: "/dashboard", label: "Painel", icon: LayoutGrid },
+      { href: "/triagem", label: "Triagem", icon: Inbox, badgeKey: "triagem", permission: "processes.view" },
+    ],
   },
   {
     label: "Escritório",
@@ -42,7 +45,6 @@ export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         icon: Scale,
         badgeKey: "processes",
         permission: "processes.view",
-        children: [{ href: "/intimacoes", label: "Intimações", icon: Inbox, badgeKey: "intimacoes", permission: "processes.view" }],
       },
       {
         href: "/tarefas",
@@ -73,7 +75,7 @@ export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/clientes": { title: "Clientes", section: "Escritório" },
   "/atendimento": { title: "Central de atendimento", section: "WhatsApp" },
   "/processos": { title: "Processos", section: "Escritório" },
-  "/intimacoes": { title: "Intimações", section: "Processos" },
+  "/triagem": { title: "Triagem", section: "Visão geral" },
   "/tarefas": { title: "Tarefas", section: "Escritório" },
   "/tarefas/prazos": { title: "Prazos", section: "Tarefas" },
   "/agenda": { title: "Agenda", section: "Escritório" },

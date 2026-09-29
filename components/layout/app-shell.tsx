@@ -14,7 +14,7 @@ import { routePermission } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { LexaAIProvider } from "@/components/ai/lexa-ai-provider"
-import { IntimacoesProvider } from "@/components/intimacoes/intimacoes-provider"
+import { TriagemProvider } from "@/components/triagem/triagem-provider"
 import { trackVisit } from "@/lib/visits"
 import * as React from "react"
 
@@ -32,7 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const fullHeight = allowed && FULL_HEIGHT.some((href) => pathname === href || pathname.startsWith(`${href}/`))
   return (
     <LexaAIProvider>
-      <IntimacoesProvider>
+      <TriagemProvider>
         <div className="min-h-dvh">
           <a
             href="#conteudo"
@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <CommandMenu />
           <GlobalDialogs />
         </div>
-      </IntimacoesProvider>
+      </TriagemProvider>
     </LexaAIProvider>
   )
 }

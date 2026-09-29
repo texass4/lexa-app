@@ -9,7 +9,7 @@
 import { addDays, diffInDays, getNow, parse, startOfWeek } from "@/lib/dates"
 import type { Prazo, PrazoOrigin, Task } from "@/types"
 
-export const PRAZO_ORIGINS: PrazoOrigin[] = ["manual", "intimacao"]
+export const PRAZO_ORIGINS: PrazoOrigin[] = ["manual", "intimacao", "movimentacao"]
 
 /** Só prazos abertos contam como próximos/pendentes. */
 export const isOpenPrazo = (prazo: Prazo) => prazo.status === "aberto"

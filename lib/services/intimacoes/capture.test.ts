@@ -68,7 +68,7 @@ function memoryRepo(options: { claimed: ClaimedOab[]; holders: OabHolder[]; proc
         }
         saved.set(key, row)
         inserted += 1
-        if (row.process_id) linked += 1
+        if (row.triage.process_id) linked += 1
       }
       return { inserted, linked }
     },
@@ -126,21 +126,38 @@ describe("captura de intimações — execução", () => {
     assert.equal(record.queried, 1)
     assert.equal(record.newMovements, 1)
     const [row] = [...db.saved.values()]
-    assert.equal(row.process_id, "p1")
-    assert.equal(row.client_id, "c1")
-    assert.equal(row.responsible_id, "ana")
-    assert.equal(row.status, "pendente")
+    assert.equal(row.triage.process_id, "p1")
+    assert.equal(row.triage.client_id, "c1")
+    assert.equal(row.triage.responsible_id, "ana")
+    assert.equal(row.triage.state, "pendente")
+    assert.equal(row.triage.event_date, "2026-09-29")
     assert.equal(row.published_at, "2026-09-29")
-    assert.equal(row.suggestion.fatalDate, "2026-10-21")
+    assert.equal(row.triage.suggestion!.fatalDate, "2026-10-21")
     assert.equal(row.content, item().texto) // teor integral, sem alteração
     assert.equal(db.states[0].windowEnd, "2026-09-29")
     assert.equal(db.states[0].nextCheckAt, "2026-09-30T09:00:00.000Z")
   })
 
-  it("processo não cadastrado: vai para a triagem como 'sem processo'", async () => {
+  it("processo não cadastrado: entra na Triagem sem processo (nada é criado)", async () => {
     const db = memoryRepo({ claimed: [{ number: "12345", uf: "SC", failures: 0 }], holders: [holder(ORG_A, "ana")] })
     await run(db.repo, async () => [item()])
-    assert.equal([...db.saved.values()][0].status, "sem_processo")
+    const { triage } = [...db.saved.values()][0]
+    assert.equal(triage.process_id, undefined)
+    assert.equal(triage.cnj, CNJ)
+    assert.equal(triage.state, "pendente")
+  })
+
+  it("prazo duvidoso no teor: entra em revisão, com o motivo", async () => {
+    const db = memoryRepo({
+      claimed: [{ number: "12345", uf: "SC", failures: 0 }],
+      holders: [holder(ORG_A, "ana")],
+      processes: { [ORG_A]: [{ cnj: CNJ, processId: "p1" }] },
+    })
+    await run(db.repo, async () => [item({ texto: "Ciência da decisão." })])
+    const { triage } = [...db.saved.values()][0]
+    assert.equal(triage.state, "em_revisao")
+    assert.match(triage.review_reason!, /Nenhum prazo explícito/)
+    assert.equal(triage.suggestion!.fatalDate, undefined)
   })
 
   it("mesma OAB em dois escritórios: uma consulta, uma cópia para cada escritório", async () => {
@@ -151,7 +168,7 @@ describe("captura de intimações — execução", () => {
     await run(db.repo, async () => [item()])
     assert.equal(queries.length, 1)
     assert.deepEqual([...db.saved.keys()].sort(), [`${ORG_A}:1`, `${ORG_B}:1`])
-    assert.equal(db.saved.get(`${ORG_B}:1`)!.responsible_id, "caio")
+    assert.equal(db.saved.get(`${ORG_B}:1`)!.triage.responsible_id, "caio")
   })
 
   it("responsável: o dono do processo, se for um dos advogados intimados", async () => {
@@ -162,7 +179,7 @@ describe("captura de intimações — execução", () => {
     })
     await run(db.repo, async () => [item()])
     const row = [...db.saved.values()][0]
-    assert.equal(row.responsible_id, "beto")
+    assert.equal(row.triage.responsible_id, "beto")
     assert.equal(row.oab_ids.length, 2)
   })
 
@@ -174,9 +191,9 @@ describe("captura de intimações — execução", () => {
     })
     await run(db.repo, async () => [item()])
     const row = [...db.saved.values()][0]
-    assert.equal(row.process_id, undefined)
-    assert.equal(row.status, "revisao")
-    assert.match(row.suggestion.reasons[0], /mais de um processo/)
+    assert.equal(row.triage.process_id, undefined)
+    assert.equal(row.triage.state, "em_revisao")
+    assert.match(row.triage.review_reason!, /mais de um processo/)
   })
 
   it("capturar de novo não duplica", async () => {

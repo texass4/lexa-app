@@ -63,7 +63,7 @@ export interface MonitoringOverview {
   config: MonitorConfig
   queue: { monitored: number | null; due: number | null; failing: number | null }
   runs: MonitoringRun[]
-  /** Captura de intimações do DJEN (Etapa 8). `null` = migração 0011 não aplicada. */
+  /** Captura de intimações do DJEN (Etapa 8). `null` = migrações 0011/0012 não aplicadas. */
   intimacoes: {
     status: MonitorStatus
     setup: MonitorSetup

@@ -14,48 +14,52 @@ import { fmtNumericDate } from "@/lib/dates"
 import { validatePrazo, type PrazoErrors } from "@/lib/prazos"
 import { suggestDeadline } from "@/lib/intimacoes/deadline"
 import { subtractBusinessDays } from "@/lib/intimacoes/calendar"
-import type { Intimacao } from "@/types"
-import { useIntimacoes } from "./intimacoes-provider"
+import { KIND_LABEL, SOURCE_LABEL, suggestedDeadline } from "@/lib/triagem/model"
+import type { TriageItem } from "@/types"
+import { useTriagem } from "./triagem-provider"
 
 /**
- * Intimação → sugestão → o advogado confere e confirma → Prazo (Etapa 4, com a tarefa
+ * Evento → sugestão → o advogado confere e confirma → Prazo (Etapa 4, com a tarefa
  * vinculada). Nada é criado sem este passo. Ajustar os dias recalcula a data fatal
  * pelas mesmas regras; a data continua editável (feriado local, por exemplo).
  */
-export function ConfirmPrazoDialog({ intimacao, onOpenChange }: { intimacao?: Intimacao; onOpenChange: (open: boolean) => void }) {
+export function ConfirmPrazoDialog({ item, onOpenChange }: { item?: TriageItem; onOpenChange: (open: boolean) => void }) {
   return (
     <Modal
-      open={!!intimacao}
+      open={!!item}
       onOpenChange={onOpenChange}
       title="Confirmar prazo"
       description="Confira a sugestão antes de criar o prazo."
       icon={<Hourglass />}
       bare
     >
-      {intimacao && <ConfirmForm intimacao={intimacao} onClose={() => onOpenChange(false)} />}
+      {item && <ConfirmForm item={item} onClose={() => onOpenChange(false)} />}
     </Modal>
   )
 }
 
-function ConfirmForm({ intimacao, onClose }: { intimacao: Intimacao; onClose: () => void }) {
+function ConfirmForm({ item, onClose }: { item: TriageItem; onClose: () => void }) {
   const data = useDemoData()
   const { addPrazo } = useDemoActions()
-  const { markConfirmed } = useIntimacoes()
+  const { markConfirmed } = useTriagem()
   const { can } = useSession()
   const canTask = can("tasks.edit")
-  const suggestion = intimacao.suggestion
-  const process = data.processes.find((p) => p.id === intimacao.processId)
-  const federal = /^TRF/i.test(intimacao.tribunal ?? "")
+  const suggested = suggestedDeadline(item)
+  const process = data.processes.find((p) => p.id === item.processId)
+  const federal = /^TRF/i.test(item.tribunal ?? "")
+  // Só a intimação tem disponibilização: é dela que as regras contam. Movimentação: data informada.
+  const countable = item.kind === "intimacao" && !!item.availableAt
+  const origin = item.kind === "intimacao" ? ("intimacao" as const) : ("movimentacao" as const)
 
-  const [days, setDays] = React.useState(suggestion?.days ? String(suggestion.days) : "")
-  const [unit, setUnit] = React.useState<"uteis" | "corridos">(suggestion?.unit ?? "uteis")
-  const initialFatal = suggestion?.fatalDate ?? ""
+  const [days, setDays] = React.useState(suggested ? String(suggested.days) : "")
+  const [unit, setUnit] = React.useState<"uteis" | "corridos">(suggested?.unit ?? "uteis")
+  const initialFatal = suggested?.fatalDate ?? ""
   const [form, setForm] = React.useState(() => ({
-    description: `${intimacao.tipoDocumento ?? intimacao.tipoComunicacao ?? "Intimação"} — DJEN ${fmtNumericDate(intimacao.publishedAt ?? intimacao.availableAt)}`,
+    description: `${item.title} — ${SOURCE_LABEL[item.source]} ${fmtNumericDate(item.eventDate)}`.slice(0, 500),
     fatalDate: initialFatal,
     internalDate: initialFatal ? subtractBusinessDays(initialFatal, 2, { federal }) : "",
     internalDateReason: "",
-    responsibleId: intimacao.responsibleId ?? process?.ownerId ?? currentUserId(),
+    responsibleId: item.responsibleId ?? process?.ownerId ?? currentUserId(),
     createTask: canTask,
   }))
   const [errors, setErrors] = React.useState<PrazoErrors>({})
@@ -65,15 +69,8 @@ function ConfirmForm({ intimacao, onClose }: { intimacao: Intimacao; onClose: ()
   // Dias informados pelo advogado: mesma regra de contagem da sugestão.
   const recompute = (nextDays: string, nextUnit: "uteis" | "corridos") => {
     const n = Number(nextDays)
-    if (!Number.isInteger(n) || n <= 0 || n > 365) return
-    const s = suggestDeadline({
-      availableAt: intimacao.availableAt,
-      text: intimacao.content,
-      tribunal: intimacao.tribunal,
-      classe: intimacao.classe,
-      days: n,
-      unit: nextUnit,
-    })
+    if (!countable || !Number.isInteger(n) || n <= 0 || n > 365) return
+    const s = suggestDeadline({ availableAt: item.availableAt!, text: item.excerpt ?? "", tribunal: item.tribunal, days: n, unit: nextUnit })
     if (s.fatalDate) setForm((f) => ({ ...f, fatalDate: s.fatalDate!, internalDate: subtractBusinessDays(s.fatalDate!, 2, { federal }) }))
   }
 
@@ -87,21 +84,25 @@ function ConfirmForm({ intimacao, onClose }: { intimacao: Intimacao; onClose: ()
       internalDate: form.internalDate,
       internalDateReason: form.internalDateReason,
       responsibleId: form.responsibleId,
-      origin: "intimacao",
+      origin,
     }
     const next = validatePrazo(input)
     setErrors(next)
     if (Object.keys(next).length) return
     setSaving(true)
-    // Um prazo por intimação (o banco garante): se já existe, só conclui a triagem.
-    const existing = data.deadlines.find((d) => d.intimacaoId === intimacao.id)
+    // Um prazo por evento (o banco garante): se já existe, só conclui a triagem.
+    const existing = data.deadlines.find((d) => d.triageItemId === item.id || (!!item.intimacaoId && d.intimacaoId === item.intimacaoId))
     const prazo =
-      existing ?? (await addPrazo({ ...input, origin: "intimacao", intimacaoId: intimacao.id }, { createTask: form.createTask && canTask }))
+      existing ??
+      (await addPrazo(
+        { ...input, triageItemId: item.id, ...(item.intimacaoId ? { intimacaoId: item.intimacaoId } : {}) },
+        { createTask: form.createTask && canTask },
+      ))
     if (!prazo) {
       setSaving(false)
       return
     }
-    const result = await markConfirmed(intimacao, prazo.id)
+    const result = await markConfirmed(item, prazo.id)
     setSaving(false)
     if (!result.ok) {
       toast.error(result.message)
@@ -114,7 +115,7 @@ function ConfirmForm({ intimacao, onClose }: { intimacao: Intimacao; onClose: ()
   if (!process) {
     return (
       <ModalBody>
-        <p className="text-[13px] text-muted-foreground">Vincule a intimação a um processo antes de confirmar o prazo.</p>
+        <p className="text-[13px] text-muted-foreground">Vincule o evento a um processo antes de confirmar o prazo.</p>
       </ModalBody>
     )
   }
@@ -125,12 +126,14 @@ function ConfirmForm({ intimacao, onClose }: { intimacao: Intimacao; onClose: ()
         <form id="confirm-prazo" onSubmit={submit} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="rounded-[10px] border border-border bg-surface-muted/40 px-3 py-2.5 text-[12.5px] sm:col-span-2">
             <p className="font-medium text-foreground">
-              Processo {process.code} · publicada em {fmtNumericDate(suggestion?.publishedAt ?? intimacao.publishedAt ?? intimacao.availableAt)}
+              Processo {process.code} · {KIND_LABEL[item.kind].toLowerCase()} de {fmtNumericDate(item.eventDate)}
             </p>
             <p className="mt-0.5 text-muted-foreground">
-              {suggestion?.daysSource === "teor" && suggestion.excerpt
-                ? `No teor: “${suggestion.excerpt}”`
-                : "O número de dias não veio do teor: informe abaixo."}
+              {suggested?.excerpt
+                ? `${suggested.from === "ia" ? "Lido pela Íntegra IA no teor" : "No teor"}: “${suggested.excerpt}”`
+                : countable
+                  ? "O número de dias não veio do teor: informe abaixo."
+                  : "Movimentação sem publicação: informe a data fatal."}
             </p>
           </div>
           <Field label="Descrição" htmlFor="cp-description" error={errors.description} className="sm:col-span-2">
@@ -141,32 +144,36 @@ function ConfirmForm({ intimacao, onClose }: { intimacao: Intimacao; onClose: ()
               onChange={(e) => set("description", e.target.value)}
             />
           </Field>
-          <Field label="Prazo (dias)" htmlFor="cp-days" hint="Recalcula a data fatal pelas regras da sugestão.">
-            <TextInput
-              id="cp-days"
-              inputMode="numeric"
-              value={days}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, "").slice(0, 3)
-                setDays(value)
-                recompute(value, unit)
-              }}
-            />
-          </Field>
-          <Field label="Contagem" htmlFor="cp-unit">
-            <NativeSelect
-              id="cp-unit"
-              value={unit}
-              onChange={(e) => {
-                const value = e.target.value as "uteis" | "corridos"
-                setUnit(value)
-                recompute(days, value)
-              }}
-            >
-              <option value="uteis">Dias úteis (CPC, art. 219)</option>
-              <option value="corridos">Dias corridos</option>
-            </NativeSelect>
-          </Field>
+          {countable && (
+            <>
+              <Field label="Prazo (dias)" htmlFor="cp-days" hint="Recalcula a data fatal pelas regras da sugestão.">
+                <TextInput
+                  id="cp-days"
+                  inputMode="numeric"
+                  value={days}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "").slice(0, 3)
+                    setDays(value)
+                    recompute(value, unit)
+                  }}
+                />
+              </Field>
+              <Field label="Contagem" htmlFor="cp-unit">
+                <NativeSelect
+                  id="cp-unit"
+                  value={unit}
+                  onChange={(e) => {
+                    const value = e.target.value as "uteis" | "corridos"
+                    setUnit(value)
+                    recompute(days, value)
+                  }}
+                >
+                  <option value="uteis">Dias úteis (CPC, art. 219)</option>
+                  <option value="corridos">Dias corridos</option>
+                </NativeSelect>
+              </Field>
+            </>
+          )}
           <Field label="Data fatal" htmlFor="cp-fatal" error={errors.fatalDate}>
             <TextInput
               id="cp-fatal"
@@ -221,7 +228,7 @@ function ConfirmForm({ intimacao, onClose }: { intimacao: Intimacao; onClose: ()
               </span>
             </span>
           </label>
-          {suggestion?.caveat && <p className="text-[11.5px] leading-relaxed text-subtle sm:col-span-2">{suggestion.caveat}</p>}
+          {item.suggestion?.caveat && <p className="text-[11.5px] leading-relaxed text-subtle sm:col-span-2">{item.suggestion.caveat}</p>}
         </form>
       </ModalBody>
       <ModalFooter>

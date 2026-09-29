@@ -1,0 +1,275 @@
+"use client"
+
+import * as React from "react"
+import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { CheckCheck, Hourglass, Inbox, TriangleAlert } from "lucide-react"
+import { cn } from "cn"
+import { PageHeader } from "@/components/ui/page-header"
+import { FilterTabs } from "@/components/ui/filter-tabs"
+import { Panel } from "@/components/ui/panel"
+import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
+import { SkeletonTable } from "@/components/ui/skeleton"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { useDemoData } from "@/lib/store/demo-store"
+import { useSession } from "@/lib/auth/session"
+import { getUser } from "@/lib/account"
+import { fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
+import { formatCNJ } from "@/lib/cnj"
+import {
+  KIND_LABEL,
+  SOURCE_LABEL,
+  byPriority,
+  isOpen,
+  requiresAction,
+  stateBadge,
+  suggestedDeadline,
+  summaryOf,
+  tabOf,
+  urgencyOf,
+  type TriageTab,
+  type Urgency,
+} from "@/lib/triagem/model"
+import type { TriageItem } from "@/types"
+import { useTriagem } from "./triagem-provider"
+import { ACTION_TEXT, TriageSheet } from "./triage-sheet"
+import { ConfirmPrazoDialog } from "./confirm-prazo-dialog"
+
+const TABS: { value: TriageTab; label: string }[] = [
+  { value: "a_revisar", label: "A revisar" },
+  { value: "sem_processo", label: "Sem processo" },
+  { value: "revisar", label: "Revisar" },
+  { value: "decididos", label: "Decididos" },
+]
+
+const URGENCY_DOT: Record<Urgency, string> = { alta: "bg-danger", media: "bg-warning", baixa: "bg-border" }
+const URGENCY_LABEL: Record<Urgency, string> = { alta: "Urgente", media: "Atenção", baixa: "Sem urgência" }
+
+/**
+ * Triagem jurídica: uma caixa única com os eventos que podem exigir ação — intimações
+ * do DJEN, movimentações relevantes do DataJud e o que vier de outras fontes. Chegam
+ * sozinhos (agendador no servidor + tempo real); aqui o advogado entende, decide e age.
+ */
+export function TriagemView() {
+  const data = useDemoData()
+  const { user, can } = useSession()
+  const { items, oabs, loading, unavailable } = useTriagem()
+  const params = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [tab, setTab] = React.useState<TriageTab>("a_revisar")
+  const [mine, setMine] = React.useState(user.role === "lawyer")
+  const [confirming, setConfirming] = React.useState<TriageItem>()
+  const today = toLocalISO(getNow()).slice(0, 10)
+
+  // `?id=` abre o evento (links da timeline do processo e das atividades).
+  const selectedId = params.get("id")
+  const selected = selectedId ? items.find((i) => i.id === selectedId) : undefined
+  const select = (id?: string) => router.replace(id ? `${pathname}?id=${id}` : pathname, { scroll: false })
+
+  const scoped = items.filter((i) => !mine || i.responsibleId === user.id)
+  const rows = scoped.filter((i) => tabOf(i) === tab).sort(byPriority(today))
+  const attention = scoped.filter(isOpen).length
+  const myOabs = oabs.filter((o) => o.userId === user.id && o.active)
+  const noOab = user.role === "lawyer" && !loading && !unavailable && !myOabs.length
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Triagem"
+        description="O que precisa da sua atenção: intimações do DJEN e movimentações relevantes dos processos, interpretadas pela Íntegra. Nenhum prazo é criado sem a sua confirmação."
+      />
+
+      {noOab && (
+        <Panel className="flex items-start gap-3 border-warning/25 bg-warning-soft/40 p-4">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+          <p className="text-[13px]">
+            Você não tem inscrição na OAB cadastrada: as intimações do DJEN não chegam para você.{" "}
+            <Link href="/configuracoes?secao=perfil" className="font-medium underline">
+              Cadastrar em Configurações › Perfil
+            </Link>
+          </p>
+        </Panel>
+      )}
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <FilterTabs
+          ariaLabel="Situação"
+          layoutId="triagem-filter"
+          value={tab}
+          onChange={setTab}
+          options={TABS.map((t) => ({ ...t, count: scoped.filter((i) => tabOf(i) === t.value).length }))}
+        />
+        <button
+          type="button"
+          role="switch"
+          aria-checked={mine}
+          onClick={() => setMine((v) => !v)}
+          className={cn(
+            "h-8 self-start rounded-[9px] border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+            mine ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Somente minhas
+        </button>
+      </div>
+
+      {!loading && !unavailable && attention > 0 && (
+        <p className="text-[13.5px] font-medium">
+          {attention === 1 ? "1 evento precisa" : `${attention} eventos precisam`} {mine ? "da sua atenção" : "de atenção no escritório"}.
+        </p>
+      )}
+
+      {unavailable ? (
+        <Panel>
+          <EmptyState
+            icon={<Inbox />}
+            title="Triagem indisponível."
+            description="A Triagem depende da atualização do banco (migração 0012). Fale com a administração da Íntegra."
+          />
+        </Panel>
+      ) : loading ? (
+        <SkeletonTable rows={6} />
+      ) : rows.length === 0 ? (
+        <Panel>
+          {tab !== "decididos" && attention === 0 ? (
+            <EmptyState icon={<CheckCheck />} title="Tudo em dia" description="Nenhum evento exige sua atenção no momento." />
+          ) : (
+            <EmptyState
+              icon={<Inbox />}
+              title="Nenhum evento nesta situação."
+              description="Intimações do DJEN e movimentações relevantes aparecem aqui automaticamente."
+            />
+          )}
+        </Panel>
+      ) : (
+        <Panel className="overflow-hidden">
+          <ul className="divide-y divide-border">
+            {rows.map((i) => (
+              <TriageRow
+                key={i.id}
+                item={i}
+                today={today}
+                processLabel={processLabel(i, data.processes.find((p) => p.id === i.processId)?.code)}
+                clientName={data.clients.find((c) => c.id === (i.clientId ?? data.processes.find((p) => p.id === i.processId)?.clientId))?.name}
+                canConfirm={can("processes.edit")}
+                onOpen={() => select(i.id)}
+                onConfirm={() => setConfirming(i)}
+              />
+            ))}
+          </ul>
+        </Panel>
+      )}
+
+      <TriageSheet item={selected} onOpenChange={(open) => !open && select()} />
+      <ConfirmPrazoDialog item={confirming} onOpenChange={(open) => !open && setConfirming(undefined)} />
+    </div>
+  )
+}
+
+function processLabel(i: TriageItem, code?: string) {
+  if (code) return `Processo ${code}`
+  return i.processNumber ?? (i.cnj ? formatCNJ(i.cnj) : "Processo não informado")
+}
+
+/** Um evento na lista: urgência e tipo → processo e cliente → resumo → exige ação e prazo → ações. */
+function TriageRow({
+  item: i,
+  today,
+  processLabel,
+  clientName,
+  canConfirm,
+  onOpen,
+  onConfirm,
+}: {
+  item: TriageItem
+  today: string
+  processLabel: string
+  clientName?: string
+  canConfirm: boolean
+  onOpen: () => void
+  onConfirm: () => void
+}) {
+  const open = isOpen(i)
+  const urgency = urgencyOf(i, today)
+  const action = requiresAction(i)
+  const suggested = suggestedDeadline(i)
+  const responsible = i.responsibleId ? getUser(i.responsibleId) : undefined
+  const badge = stateBadge(i)
+
+  return (
+    <li className="flex flex-col gap-2 px-4 py-3.5 sm:px-5">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full flex-col gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          {open && (
+            <span
+              className={cn("size-2 shrink-0 rounded-full", URGENCY_DOT[urgency])}
+              aria-label={URGENCY_LABEL[urgency]}
+              title={URGENCY_LABEL[urgency]}
+            />
+          )}
+          <span className="text-[13px] font-semibold">{KIND_LABEL[i.kind]}</span>
+          <span className="text-[12px] text-subtle">{[SOURCE_LABEL[i.source], i.tribunal].filter(Boolean).join(" · ")}</span>
+          <StatusBadge tone={badge.tone} size="sm">
+            {badge.label}
+          </StatusBadge>
+          {!i.processId && open && (
+            <StatusBadge tone="violet" size="sm" dot={false}>
+              Não cadastrado
+            </StatusBadge>
+          )}
+        </div>
+        <p className="text-[13.5px] font-medium">
+          {processLabel}
+          {clientName && <span className="font-normal text-muted-foreground"> · {clientName}</span>}
+        </p>
+        <p className="line-clamp-2 text-[12.5px] text-muted-foreground">{summaryOf(i)}</p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-subtle">
+          <span>
+            {i.kind === "intimacao" ? "Publicada em" : "Em"} {fmtNumericDate(i.eventDate)}
+          </span>
+          {responsible && (
+            <>
+              <span>·</span>
+              <span>{responsible.firstName}</span>
+            </>
+          )}
+          {open && action && (
+            <>
+              <span>·</span>
+              <span className={cn(action.value === "sim" && "font-medium text-foreground")}>
+                Exige ação: {ACTION_TEXT[action.value]}
+                {action.by === "ia" ? " (IA)" : ""}
+              </span>
+            </>
+          )}
+          {open && suggested && (
+            <>
+              <span>·</span>
+              <span className={cn("font-medium", urgency === "alta" ? "text-danger" : "text-foreground")}>
+                Prazo sugerido: {fmtNumericDate(suggested.fatalDate)}
+              </span>
+            </>
+          )}
+        </p>
+      </button>
+      {open && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={onOpen}>
+            Revisar
+          </Button>
+          {canConfirm && i.processId && (
+            <Button size="sm" onClick={onConfirm}>
+              <Hourglass /> Confirmar prazo
+            </Button>
+          )}
+        </div>
+      )}
+    </li>
+  )
+}

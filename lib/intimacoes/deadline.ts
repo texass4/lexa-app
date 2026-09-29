@@ -32,7 +32,7 @@ export interface DeadlineSuggestion {
   /** Data fatal sugerida. Ausente quando não há número de dias. */
   fatalDate?: string
   /** De onde veio o número de dias. */
-  daysSource?: "teor" | "advogado"
+  daysSource?: "teor" | "advogado" | "ia"
   /** Trecho do teor em que o prazo foi encontrado (texto original). */
   excerpt?: string
   confidence: SuggestionConfidence
@@ -96,6 +96,10 @@ export interface SuggestionInput {
   /** Dias informados pelo advogado (substitui o que veio do teor). */
   days?: number
   unit?: "uteis" | "corridos"
+  /** Quem informou `days`: o advogado (padrão) ou a Íntegra IA, a partir de um trecho do teor. */
+  daysFrom?: "advogado" | "ia"
+  /** Trecho do teor que sustenta os dias informados pela IA. */
+  excerpt?: string
 }
 
 const fmt = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
@@ -118,8 +122,9 @@ export function suggestDeadline(input: SuggestionInput): DeadlineSuggestion {
 
   let days = input.days
   let unit: "uteis" | "corridos" = input.unit ?? (criminal ? "corridos" : "uteis")
-  let excerpt: string | undefined
-  let daysSource: DeadlineSuggestion["daysSource"] = input.days ? "advogado" : undefined
+  let excerpt: string | undefined = input.days ? input.excerpt : undefined
+  let daysSource: DeadlineSuggestion["daysSource"] = input.days ? (input.daysFrom ?? "advogado") : undefined
+  if (daysSource === "ia") reasons.push("Prazo lido pela Íntegra IA no teor: confira o trecho antes de confirmar.")
 
   if (!input.days) {
     const terms = findTerms(input.text)

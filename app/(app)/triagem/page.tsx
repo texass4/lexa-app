@@ -1,14 +1,14 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 import { SkeletonTable } from "@/components/ui/skeleton"
-import { IntimacoesView } from "@/components/intimacoes/intimacoes-view"
+import { TriagemView } from "@/components/triagem/triagem-view"
 
-export const metadata: Metadata = { title: "Intimações" }
+export const metadata: Metadata = { title: "Triagem" }
 
-export default function IntimacoesPage() {
+export default function TriagemPage() {
   return (
     <Suspense fallback={<SkeletonTable rows={6} />}>
-      <IntimacoesView />
+      <TriagemView />
     </Suspense>
   )
 }

@@ -1,5 +1,5 @@
 /**
- * Persistência da captura de intimações no Supabase (`0011_intimacoes.sql`).
+ * Persistência da captura de intimações no Supabase (`0011_intimacoes.sql` e `0012_triagem.sql`).
  *
  * Service role (o agendador não tem sessão): toda leitura e gravação filtra por
  * escritório explicitamente ou passa por funções do banco que fazem isso. Somente servidor.
@@ -96,7 +96,7 @@ export function supabaseCaptureRepository(admin: SupabaseClient): CaptureReposit
     },
 
     async relink() {
-      const { data, error } = await admin.rpc("relink_intimacoes")
+      const { data, error } = await admin.rpc("relink_triage_items")
       if (error) throw error
       return Number(data ?? 0)
     },

@@ -6,6 +6,7 @@ import { trf1Response } from "@/lib/integrations/legal/datajud/__fixtures__/resp
 import { LookupError } from "@/lib/integrations/legal/errors"
 import type { ExternalProcess, ProcessProvider } from "@/lib/integrations/legal/types"
 import { SYSTEM_ACTOR_ID } from "@/lib/system-actor"
+import type { TriageItemInput } from "@/lib/triagem/sources"
 import type { Activity, Process } from "@/types"
 import { cacheKey, MemoryLookupCache, type CachedLookup, type LookupStore } from "./lookup-cache"
 import { createLookupService, FRESH_FOR_MS } from "./lookup-service"
@@ -73,6 +74,7 @@ function memoryRepo(processes: Process[], options: { pausedUntil?: string | null
   const rows = new Map<string, ProcessRow>(processes.map((p) => [`${p.organizationId}:${p.id}`, { organizationId: p.organizationId, id: p.id, data: p, version: `v${version++}` }]))
   const states = new Map<string, MonitoringState>()
   const activities: Activity[] = []
+  const triage: TriageItemInput[] = []
   const runs: RunRecord[] = []
   const skipped: RunRecord[] = []
   const released: ClaimedProcess[] = []
@@ -107,6 +109,12 @@ function memoryRepo(processes: Process[], options: { pausedUntil?: string | null
       return { status: "saved" }
     },
     insertActivities: async (list) => void activities.push(...list),
+    saveTriageItems: async (list) => {
+      // Como o banco: a mesma fonte + chave entra uma vez.
+      const fresh = list.filter((item) => !triage.some((t) => t.organization_id === item.organization_id && t.source_key === item.source_key))
+      triage.push(...fresh)
+      return fresh.length
+    },
     saveStates: async (list) => list.forEach((state) => states.set(`${state.organizationId}:${state.processId}`, { ...states.get(`${state.organizationId}:${state.processId}`), ...state })),
     release: async (list) => void released.push(...list),
   }
@@ -116,6 +124,7 @@ function memoryRepo(processes: Process[], options: { pausedUntil?: string | null
     rows,
     states,
     activities,
+    triage,
     runs,
     skipped,
     released,
@@ -189,6 +198,38 @@ describe("monitoramento automático", () => {
     assert.equal(state.consecutiveFailures, 0)
     // Próxima consulta: só na virada do dia em São Paulo.
     assert.equal(state.nextCheckAt, "2026-09-30T03:00:00.000Z")
+  })
+
+  it("movimentações novas que pedem atenção entram na Triagem (uma vez, só as recentes)", async () => {
+    const recent = {
+      ...external,
+      movements: [
+        ...external.movements,
+        { name: "Julgado procedente o pedido", code: 219, occurredAt: "2026-09-25T14:00:00" },
+        { name: "Juntada de Petição", occurredAt: "2026-09-26T10:00:00" },
+      ],
+    }
+    reply = async () => recent
+    const db = memoryRepo([process("p1")])
+    await run(db.repo)
+
+    assert.equal(db.triage.length, 1)
+    const [item] = db.triage
+    assert.equal(item.kind, "movimentacao")
+    assert.equal(item.source, "datajud")
+    assert.equal(item.process_id, "p1")
+    assert.equal(item.client_id, "c1")
+    assert.equal(item.responsible_id, "u1")
+    assert.equal(item.event_date, "2026-09-25")
+    assert.equal(item.title, "Julgado procedente o pedido")
+    assert.equal(item.state, "pendente")
+    assert.equal(item.suggestion, undefined) // movimentação não tem teor: nenhum prazo sugerido
+    assert.match(item.source_key, /^p1:/)
+
+    // Mesma ficha de novo (outro dia): nada novo no processo, nada novo na Triagem.
+    clock = Date.parse("2026-09-30T11:00:00Z")
+    await run(db.repo)
+    assert.equal(db.triage.length, 1)
   })
 
   it("não consulta de novo no mesmo dia e não duplica movimentações", async () => {

@@ -7,12 +7,13 @@
  *       a mesma OAB em dois escritórios é UMA consulta
  *     → DJEN: comunicações da janela (desde a última lida, com 1 dia de sobra)
  *     → para cada escritório que tem a OAB: processo pelo CNJ, responsável, sugestão
- *       de prazo → `save_intimacoes` (nunca duplica)
- *     → vincula as que estavam "sem processo" se o número foi cadastrado depois
+ *       de prazo → `save_intimacoes`: a comunicação como veio (nunca duplica) e o
+ *       evento na Triagem, na mesma transação
+ *     → vincula os eventos "sem processo" se o número foi cadastrado depois
  *     → estado de cada OAB (próxima consulta) + registro da execução
  *
- * O Realtime entrega as novas intimações a quem está com a Íntegra aberta; o banco
- * registra a trilha de auditoria e a atividade no processo. Nenhum prazo é criado.
+ * O Realtime entrega os novos eventos da Triagem a quem está com a Íntegra aberta; o
+ * banco registra a trilha de auditoria e a atividade no processo. Nenhum prazo é criado.
  *
  * Mesmas regras de consumo da Etapa 5 (`monitoring-policy.ts`): 429 para a execução
  * e respeita o `Retry-After`; falhas seguidas de indisponibilidade param; a falha de
@@ -22,8 +23,10 @@
 import { LookupError, type LookupErrorCode } from "@/lib/integrations/legal/errors"
 import type { DjenItem, DjenQuery } from "@/lib/integrations/legal/djen/client"
 import { mapCommunication, type Communication } from "@/lib/integrations/legal/djen/mapper"
-import { suggestDeadline } from "@/lib/intimacoes/deadline"
+import { suggestDeadline, type DeadlineSuggestion } from "@/lib/intimacoes/deadline"
 import { addCalendarDays } from "@/lib/intimacoes/calendar"
+import { excerptOf } from "@/lib/triagem/model"
+import type { TriageItemInput } from "@/lib/triagem/sources"
 import { toLocalISOIn } from "@/lib/dates"
 import type { RunRecord, RunSummary } from "@/lib/services/processes/monitor"
 import {
@@ -35,7 +38,6 @@ import {
   startOfDayIn,
   type RunStop,
 } from "@/lib/services/processes/monitoring-policy"
-import type { TriageStatus } from "@/types"
 
 const DAY = 86_400_000
 
@@ -109,14 +111,16 @@ export interface OabState {
   nextCheckAt: string
 }
 
-/** Linha para `save_intimacoes` (nomes das colunas). */
+/** O evento da Triagem que acompanha a intimação nova (a fonte, a chave e o id o banco completa). */
+export type IntimacaoTriage = Omit<TriageItemInput, "id" | "organization_id" | "kind" | "source" | "source_key" | "intimacao_id">
+
+/** Linha para `save_intimacoes` (nomes das colunas) + o evento da Triagem. */
 export interface IntimacaoRow {
   organization_id: string
   source: "djen"
   external_id: string
   hash?: string
   oab_ids: string[]
-  responsible_id: string
   cnj?: string
   process_number?: string
   tribunal?: string
@@ -133,11 +137,7 @@ export interface IntimacaoRow {
   parties: Communication["parties"]
   lawyers: Communication["lawyers"]
   raw: unknown
-  process_id?: string
-  client_id?: string
-  link_method?: "cnj"
-  status: TriageStatus
-  suggestion: ReturnType<typeof suggestDeadline>
+  triage: IntimacaoTriage
 }
 
 export interface CaptureRepository {
@@ -154,7 +154,7 @@ export interface CaptureRepository {
   save(rows: IntimacaoRow[]): Promise<{ inserted: number; linked: number }>
   saveStates(states: OabState[]): Promise<void>
   release(claimed: ClaimedOab[], now: Date): Promise<void>
-  /** Vincula as "sem processo" cujo número foi cadastrado depois. */
+  /** Vincula os eventos "sem processo" cujo número foi cadastrado depois (todas as fontes). */
   relink(): Promise<number>
 }
 
@@ -189,10 +189,17 @@ export function pickResponsible(holders: OabHolder[], ownerId?: string) {
   return holders.find((h) => h.userId === ownerId)?.userId ?? holders[0].userId
 }
 
-/** Situação inicial na triagem. */
-export function initialStatus(match: ProcessMatch | undefined, confident: boolean, ambiguous: boolean): TriageStatus {
-  if (!match) return ambiguous ? "revisao" : "sem_processo"
-  return confident ? "pendente" : "revisao"
+const AMBIGUOUS = "Há mais de um processo com este número no escritório: vincule o correto."
+
+/**
+ * Estado inicial na Triagem: pendente só quando a sugestão é segura e o vínculo não
+ * é ambíguo; qualquer dúvida vai para revisão manual, com o motivo. Sem processo
+ * cadastrado, o evento aparece em "Sem processo" (nada é criado sozinho).
+ */
+export function initialState(suggestion: Pick<DeadlineSuggestion, "confidence" | "reasons">, ambiguous: boolean): Pick<IntimacaoTriage, "state" | "review_reason"> {
+  const reasons = [...(ambiguous ? [AMBIGUOUS] : []), ...suggestion.reasons]
+  if (!ambiguous && suggestion.confidence === "alta") return { state: "pendente" }
+  return { state: "em_revisao", review_reason: reasons.join(" ").slice(0, 1000) || undefined }
 }
 
 /** Comunicações de uma OAB → linhas por escritório titular. */
@@ -213,15 +220,12 @@ export async function buildRows(
       // Dois processos com o mesmo número no escritório: não escolhe sozinho.
       const match = found.length === 1 ? found[0] : undefined
       const suggestion = suggestDeadline({ availableAt: c.availableAt, text: c.content, tribunal: c.tribunal, classe: c.classe })
-      const ambiguous = found.length > 1
-      if (ambiguous) suggestion.reasons.unshift("Há mais de um processo com este número no escritório: vincule o correto.")
       rows.push({
         organization_id: organizationId,
         source: "djen",
         external_id: c.externalId,
         hash: c.hash,
         oab_ids: orgHolders.map((h) => h.oabId),
-        responsible_id: pickResponsible(orgHolders, match?.ownerId),
         cnj: c.cnj,
         process_number: c.processNumber,
         tribunal: c.tribunal,
@@ -238,11 +242,22 @@ export async function buildRows(
         parties: c.parties,
         lawyers: c.lawyers,
         raw: c.raw,
-        process_id: match?.processId,
-        client_id: match?.clientId,
-        link_method: match ? "cnj" : undefined,
-        status: initialStatus(match, suggestion.confidence === "alta", ambiguous),
-        suggestion,
+        triage: {
+          process_id: match?.processId,
+          client_id: match?.clientId,
+          link_method: match ? "cnj" : undefined,
+          cnj: c.cnj,
+          process_number: c.processNumber,
+          event_date: suggestion.publishedAt,
+          available_at: c.availableAt,
+          title: (c.tipoDocumento || c.tipoComunicacao || "Intimação").slice(0, 200),
+          excerpt: excerptOf(c.content) || undefined,
+          tribunal: c.tribunal,
+          orgao: c.orgao,
+          responsible_id: pickResponsible(orgHolders, match?.ownerId),
+          suggestion,
+          ...initialState(suggestion, found.length > 1),
+        },
       })
     }
   }

@@ -13,8 +13,8 @@ import { isOverdue } from "@/lib/selectors"
 import { PRAZO_ALERT_DAYS, isActiveProcess } from "@/lib/attention"
 import { daysToPrazo, isOpenPrazo, nextPrazo } from "@/lib/prazos"
 import { useSession } from "@/lib/auth/session"
-import { useIntimacoesOptional } from "@/components/intimacoes/intimacoes-provider"
-import { isOpenTriage } from "@/lib/intimacoes/rows"
+import { useTriagemOptional } from "@/components/triagem/triagem-provider"
+import { isOpen as isOpenTriage } from "@/lib/triagem/model"
 import { useDemoData } from "@/lib/store/demo-store"
 
 /**
@@ -26,7 +26,7 @@ import { useDemoData } from "@/lib/store/demo-store"
 export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | "auto" | "collapsed"; onNavigate?: () => void; layoutId: string }) {
   const pathname = usePathname()
   const data = useDemoData()
-  const intimacoes = useIntimacoesOptional()
+  const triagem = useTriagemOptional()
   const { can, user } = useSession()
   // Itens com telas internas abertos pela setinha (ex.: Tarefas › Prazos).
   const [open, setOpen] = React.useState<ReadonlySet<string>>(() => new Set())
@@ -52,10 +52,10 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
       urgent: true,
       label: `prazos abertos vencidos ou em até ${PRAZO_ALERT_DAYS.soon} dias`,
     },
-    intimacoes: {
-      count: (intimacoes?.items ?? []).filter((i) => isOpenTriage(i) && i.responsibleId === user.id).length,
+    triagem: {
+      count: (triagem?.items ?? []).filter((i) => isOpenTriage(i) && i.responsibleId === user.id).length,
       urgent: true,
-      label: "intimações suas aguardando triagem",
+      label: "eventos seus aguardando decisão na Triagem",
     },
   }
 

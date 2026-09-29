@@ -4,7 +4,6 @@ import { describe, it } from "node:test"
 import { addBusinessDays, addCalendarDeadline, easter, holidays, isBusinessDay, isSuspended, nextBusinessDay, subtractBusinessDays } from "./calendar"
 import { findTerms, suggestDeadline } from "./deadline"
 import { formatOab, parseOabText, validateOab } from "./oab"
-import { byTriageOrder, isOpenTriage, statusAfterLink, toIntimacao, upsertIntimacao } from "./rows"
 
 describe("calendário forense", () => {
   it("Páscoa e feriados móveis", () => {
@@ -92,6 +91,14 @@ describe("prazo no teor da intimação", () => {
     assert.equal(penal.confidence, "revisao")
   })
 
+  it("dias lidos pela IA: a data sai das regras, e o evento fica para revisão", () => {
+    const s = suggestDeadline({ availableAt: "2026-09-28", text: "Ciência.", days: 15, daysFrom: "ia", excerpt: "quinze dias" })
+    assert.equal(s.fatalDate, "2026-10-21")
+    assert.equal(s.daysSource, "ia")
+    assert.equal(s.excerpt, "quinze dias")
+    assert.equal(s.confidence, "revisao")
+  })
+
   it("dias informados pelo advogado", () => {
     const s = suggestDeadline({ availableAt: "2026-09-28", text: "Ciência.", days: 5 })
     assert.equal(s.fatalDate, "2026-10-06")
@@ -119,75 +126,8 @@ describe("OAB", () => {
   })
 })
 
-describe("caixa de triagem", () => {
-  const base = {
-    id: "i1",
-    organization_id: "org",
-    source: "djen" as const,
-    external_id: "1",
-    hash: null,
-    oab_ids: ["oab1"],
-    responsible_id: "ana",
-    cnj: "00008323520184013202",
-    process_number: null,
-    tribunal: "TJSC",
-    orgao: null,
-    tipo_comunicacao: "Intimação",
-    tipo_documento: null,
-    classe: null,
-    meio: null,
-    available_at: "2026-09-28",
-    published_at: "2026-09-29",
-    content: "Teor",
-    document_url: null,
-    official_url: null,
-    parties: null,
-    lawyers: null,
-    process_id: null,
-    client_id: null,
-    link_method: null,
-    status: "sem_processo" as const,
-    suggestion: null,
-    prazo_id: null,
-    decision_note: null,
-    created_at: "2026-09-29T10:00:00Z",
-    updated_at: "2026-09-29T10:00:00Z",
-  }
-
-  it("linha do banco → modelo da tela", () => {
-    const i = toIntimacao(base)
-    assert.equal(i.processId, undefined)
-    assert.deepEqual(i.parties, [])
-    assert.equal(i.responsibleId, "ana")
-  })
-
-  it("tempo real não duplica e não volta para uma versão antiga", () => {
-    const first = toIntimacao(base)
-    const newer = toIntimacao({ ...base, status: "revisao", updated_at: "2026-09-29T11:00:00Z" })
-    let list = upsertIntimacao([], first)
-    list = upsertIntimacao(list, newer)
-    list = upsertIntimacao(list, first) // evento atrasado
-    assert.equal(list.length, 1)
-    assert.equal(list[0].status, "revisao")
-  })
-
-  it("vincular: a confiança da sugestão decide a situação", () => {
-    assert.equal(statusAfterLink({ suggestion: suggestDeadline({ availableAt: "2026-09-28", text: "no prazo de 5 dias" }) }), "pendente")
-    assert.equal(statusAfterLink({ suggestion: suggestDeadline({ availableAt: "2026-09-28", text: "Ciência." }) }), "revisao")
-    assert.equal(statusAfterLink({}), "revisao")
-  })
-
-  it("abertas antes das decididas, mais novas primeiro", () => {
-    const decided = toIntimacao({ ...base, id: "a", status: "confirmada", available_at: "2026-09-30" })
-    const open = toIntimacao({ ...base, id: "b", available_at: "2026-09-01" })
-    assert.deepEqual(
-      [decided, open].sort(byTriageOrder).map((i) => i.id),
-      ["b", "a"],
-    )
-    assert.equal(isOpenTriage(open), true)
-  })
-
-  it("data interna sugerida: dias úteis antes da fatal", () => {
+describe("data interna sugerida", () => {
+  it("dias úteis antes da fatal", () => {
     assert.equal(subtractBusinessDays("2026-10-21", 2), "2026-10-19")
     assert.equal(subtractBusinessDays("2026-10-13", 1), "2026-10-09") // 12/10 feriado
   })

@@ -92,7 +92,7 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 | `/clientes`, `/clientes/[id]` | `components/clientes/…` |
 | `/atendimento` (`?c=<conversa>`) | `components/atendimento/atendimento-view.tsx` |
 | `/processos`, `/processos/[id]` | `components/processos/processes-view.tsx`, `process-profile.tsx` |
-| `/intimacoes` (`?id=<intimação>`) | `components/intimacoes/intimacoes-view.tsx` (caixa de triagem do DJEN) |
+| `/triagem` (`?id=<evento>`) | `components/triagem/triagem-view.tsx` (Triagem jurídica: DJEN, DataJud) |
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
 | `/login` · `/cadastro` · `/recuperar-senha` · `/redefinir-senha` | `components/auth/*-form.tsx` |
@@ -164,33 +164,32 @@ agendador → /api/cron/process-sync → monitor.ts (runProcessMonitor)
 
 Estado: `monitor-status.ts` — "Ativo" só com consulta ligada, `CRON_SECRET`, `DATAJUD_API_KEY`, migração 0009 e uma execução concluída nas últimas 26 h. Admin › Monitoramento mostra estado, fila e as execuções (avaliados, consultados, do cache, novidades, erros, 429, 503, duração); Configurações › Integrações mostra o cartão "Monitoramento processual" com o estado real.
 
-### Intimações do DJEN
+### Triagem jurídica (`/triagem`)
 
-A fonte é a API pública do Diário de Justiça Eletrônico Nacional (`comunicaapi.pje.jus.br`, CNJ): gratuita, sem chave, busca por OAB + UF e período de disponibilização. Limite por IP (429 → esperar 60 s), bloqueio geográfico fora do Brasil e teto de 10 mil resultados por busca. A captura fica desligada (`features.djen` em Admin › Configurações) até o escritório confirmar os termos de uso com o CNJ e hospedar a função no Brasil.
+Uma caixa única com os eventos que podem exigir ação do escritório: `evento → interpretação → atenção → decisão → ação`. Não é uma caixa de notificações: só entra o que pode pedir providência, e cada evento tem estado persistido.
 
 ```
-agendador → /api/cron/process-sync → (monitor de processos) → capture.ts (runIntimacoesCapture)
-  → claim_djen_oabs (OABs ativas, uma consulta por número+UF mesmo que dois escritórios a tenham)
-  → djen/client.ts (página de 100, 3 tentativas em 5xx/timeout, 429 para a execução)
-  → mapper.ts → buildRows (por escritório: vínculo pelo CNJ, responsável, sugestão de prazo)
-  → save_intimacoes (sem duplicar: organization_id + source + external_id; junta as OABs)
-  → triggers: auditoria (intimacao_events) + uma atividade na timeline do processo (id determinístico)
-  → djen_oab_state (próxima consulta: amanhã 06:00) + process_sync_runs (job = intimacoes)
-  → Realtime entrega à caixa de triagem (/intimacoes)
+DJEN (intimações por OAB) ─┐
+DataJud (movimentações)   ├→ save_triage_items → triage_items → Íntegra IA (uma vez) → Triagem (tempo real)
+próximas fontes           ─┘                                         → advogado decide → Prazo (Etapa 4) + tarefa
 ```
 
 | | |
 |---|---|
-| OAB | `lawyer_oabs` (número, UF, ativa, usuário) — várias por pessoa; obrigatória para advogado no convite e na troca de papel. A migração 0011 converte o texto antigo de `profiles.oab` e mantém esse campo como resumo |
-| Janela | primeira consulta: 7 dias para trás; depois, do fim da última janela menos 1 dia (sobreposição) até hoje |
-| Vínculo | pelo CNJ, só com processo existente do escritório. Sem processo → "Processo não cadastrado" (o advogado cadastra e vincula; nada é criado sozinho). Mais de um processo com o mesmo CNJ → "Revisar". Cadastrar o processo depois faz `relink_intimacoes` na execução seguinte |
-| Prazo | `lib/intimacoes/deadline.ts`: publicação = 1º dia útil após a disponibilização (Lei 11.419/2006, art. 4º, §3º); contagem a partir do dia útil seguinte (§4º; CPC 224, §3º); dias úteis (CPC 219) com recesso de 20/12 a 20/01 (CPC 220) e feriados nacionais (+ Lei 5.010/66 na Justiça Federal). O número de dias vem do teor, com o trecho citado; horas, mais de um prazo, "prazo legal", prazo em dobro, matéria penal ou nenhum prazo → "Revisar", sem data |
-| Confirmação | Intimação → sugestão → o advogado confere/ajusta → Prazo da Etapa 4 (`origin: intimacao`, `intimacaoId` único no banco) + tarefa opcional. Rejeitar não cria nada |
-| Banco garante | teor e dados da fonte imutáveis (`intimacoes_guard`); decididas travadas; "confirmada" exige prazo; auditoria só por trigger (visualizou, vinculou, confirmou, rejeitou, marcou revisão) |
-| Isolamento | RLS: ver com `processes.view`, decidir com `processes.edit`; `djen_oab_state` só service role; o worker grava por escritório |
-| Ritmo | 30 OABs por execução, 1 s entre idas à fonte, sem novas consultas depois de 90 s (`DJEN_*`). Falha de uma OAB não para as outras; 429 encerra a execução |
+| Modelo único | `triage_items` (`0012_triagem.sql`) + `lib/triagem/model.ts`. Toda fonte grava pelo mesmo caminho (`save_triage_items`): tipo (`intimacao`, `movimentacao`), origem (`djen`, `datajud`), chave na fonte (nunca duplica), data, processo, responsável, trecho do original. Nova fonte = nova função em `lib/triagem/sources.ts`, sem regra de triagem própria |
+| Estados | `pendente`, `em_revisao`, `decidido` (`prazo_criado` ou `sem_prazo`), `ignorado` — no banco. Quem decidiu e quando: o banco grava a pessoa logada (não dá para informar outra). Decidido com prazo não reabre; sem prazo e ignorado, sim |
+| Abas | A revisar (pendente com processo) · Sem processo · Revisar (em revisão) · Decididos. "Somente minhas" = responsável. Ordem: urgência (prazo sugerido em até 5 dias), exige ação, prazo, data |
+| DJEN | `lib/services/intimacoes/capture.ts`, no agendador da Etapa 5: OABs ativas, uma consulta por número+UF (mesmo em dois escritórios), janela com 1 dia de sobra, retry/backoff, 429 para a execução, falha de uma OAB não para as outras. `intimacoes` guarda a comunicação como veio (teor original, imutável); `save_intimacoes` cria o evento na mesma transação |
+| DataJud | `monitor.ts` (Etapa 5): das movimentações novas, as que pedem atenção (julgamento, audiência, prazo, citação, trânsito em julgado; não "conclusos", "mero expediente", juntadas) e dos últimos 30 dias entram como evento, no máximo 10 por processo |
+| Vínculo | pelo CNJ, só com UM processo do escritório com o número. Nenhum → "Sem processo" (cadastrar e vincular pela própria tela). Mais de um → revisão. Processo cadastrado depois → `relink_triage_items` na execução seguinte. Nada é criado sozinho |
+| Íntegra IA | `lib/triagem/interpret.ts` + `lib/services/triagem/interpret.ts`, no agendador, depois da captura: resumo em uma frase, "exige ação?" e o prazo **copiado** do teor. O trecho citado precisa existir no original e trazer o número — senão é descartado. A data nunca vem da IA (é calculada pelas regras). Divergência ou dúvida → `em_revisao` com o motivo. Guardado em `triage_items.ai`, gerado uma vez; abrir a tela não chama o modelo. Falhou: o evento continua com o original; nova tentativa em 15 min, 1 h, 4 h |
+| Prazo | `lib/intimacoes/deadline.ts`: publicação = 1º dia útil após a disponibilização (Lei 11.419/2006, art. 4º, §3º); contagem a partir do dia útil seguinte (§4º; CPC 224, §3º); dias úteis (CPC 219), recesso de 20/12 a 20/01 (CPC 220), feriados nacionais (+ Lei 5.010/66 na Justiça Federal). Horas, mais de um prazo, "prazo legal", prazo em dobro, matéria penal ou nenhum prazo → revisão, sem data. Confirmar cria o Prazo da Etapa 4 (origem `intimacao` ou `movimentacao`, `triageItemId` único no banco) e a tarefa; rejeitar não cria nada |
+| Timeline | vincular uma intimação registra UMA atividade no processo (id determinístico). Movimentações já estão na timeline. O perfil do processo tem o painel "Triagem" com tipo, origem, data, resumo e responsável |
+| Auditoria | `triage_events`, só por gatilho: registrou, visualizou (uma vez por pessoa), vinculou, atribuiu, marcou revisão, confirmou prazo, decidiu sem prazo, ignorou, reabriu, interpretou |
+| Isolamento | RLS: ver com `processes.view`, decidir com `processes.edit`; origem, sugestão e interpretação só o servidor grava (`triage_items_guard`). `djen_oab_state` e as funções de captura/IA só service role |
+| Ritmo | DJEN: 30 OABs por execução, 1 s entre consultas, sem consultas novas depois de 90 s (`DJEN_*`). IA: até 15 eventos por execução, sem pedidos novos depois de 240 s da chamada |
 
-Admin › Monitoramento tem a aba "Intimações (DJEN)" com estado, OABs e execuções. A IA não participa: nenhum prazo é inventado e o teor exibido é sempre o original.
+A fonte do DJEN é a API pública de Comunicações Processuais do CNJ (`comunicaapi.pje.jus.br`): gratuita, sem chave, limite por IP (429 → 60 s), bloqueio fora do Brasil e teto de 10 mil resultados. A captura fica desligada (`features.djen`) até o escritório confirmar os termos de uso com o CNJ e hospedar a função no Brasil. Admin › Monitoramento tem a aba "Intimações (DJEN)".
 
 ---
 
@@ -371,7 +370,7 @@ Envio de e-mail (os links de convite e de nova senha saem no log do servidor), n
 
 **Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
 
-Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), a captura de intimações do DJEN (desligada por padrão; depende da hospedagem no Brasil), o salvamento dos processos, os prazos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), a Triagem (intimações do DJEN — captura desligada por padrão; depende da hospedagem no Brasil — e movimentações relevantes), o salvamento dos processos, os prazos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 

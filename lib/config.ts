@@ -37,6 +37,7 @@ export const PRAZO_STATUS: Record<PrazoStatus, { label: string; tone: Tone }> = 
 export const PRAZO_ORIGIN: Record<PrazoOrigin, string> = {
   manual: "Manual",
   intimacao: "Intimação",
+  movimentacao: "Movimentação",
 }
 
 export const INVOICE_STATUS: Record<InvoiceStatus, { label: string; tone: Tone }> = {

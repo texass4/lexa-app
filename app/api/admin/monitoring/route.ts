@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { loadMonitorStatus, monitorSetup, type MonitoringOverview, type MonitoringRun } from "@/lib/services/processes/monitor-status"
 import { monitorConfig } from "@/lib/services/processes/monitoring-policy"
 import { hasJobColumn } from "@/lib/services/processes/monitor-store"
+import { hasTriage } from "@/lib/services/triagem/store"
 
 /** Execuções mostradas no painel. */
 const LIMIT = 120
@@ -76,9 +77,9 @@ export const GET = route(async (request) => {
     count((q) => q.select("process_id", { count: "exact", head: true }).gt("consecutive_failures", 0)),
   ])
 
-  // Captura de intimações: só com a migração 0011 aplicada. A fonte (DJEN) não tem chave.
+  // Captura de intimações: só com as migrações 0011 e 0012 (Triagem) aplicadas. A fonte (DJEN) não tem chave.
   let intimacoes: MonitoringOverview["intimacoes"] = null
-  if (await hasJobColumn(admin)) {
+  if ((await hasJobColumn(admin)) && (await hasTriage(admin))) {
     const djenSetup = { ...monitorSetup(settings.features.djen), sourceKey: true }
     const oabCount = (failing: boolean) => {
       const query = failing

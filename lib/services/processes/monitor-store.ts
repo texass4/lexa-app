@@ -7,6 +7,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { TriageItemInput } from "@/lib/triagem/sources"
 import type { Activity, Process } from "@/types"
 import type { ClaimedProcess, MonitoringState, MonitorRepository, ProcessRow, RunRecord, SaveOutcome } from "./monitor"
 import { CLAIM_LEASE_MS } from "./monitoring-policy"
@@ -55,6 +56,9 @@ const stateColumns = (state: MonitoringState) => ({
   next_check_at: state.nextCheckAt,
   updated_at: new Date().toISOString(),
 })
+
+/** Função do banco ausente (migração ainda não aplicada). */
+export const isMissingFunction = (error: { code?: string }) => error.code === "PGRST202" || error.code === "42883"
 
 /** Processo excluído entre a consulta e a gravação do estado (FK). */
 const isMissingProcess = (error: { code?: string }) => error.code === "23503"
@@ -188,6 +192,16 @@ export function supabaseMonitorRepository(admin: SupabaseClient): MonitorReposit
     async insertActivities(activities: Activity[]) {
       const { error } = await admin.from("activities").insert(activities.map((a) => ({ organization_id: a.organizationId, id: a.id, data: a })))
       if (error) throw error
+    },
+
+    async saveTriageItems(items: TriageItemInput[]) {
+      const { data, error } = await admin.rpc("save_triage_items", { p_items: items })
+      if (error) {
+        // Sem a migração 0012, a Triagem ainda não existe: o monitoramento segue igual.
+        if (isMissingFunction(error)) return 0
+        throw error
+      }
+      return Number(data ?? 0)
     },
 
     async saveStates(states) {
