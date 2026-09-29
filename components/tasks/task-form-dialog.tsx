@@ -16,7 +16,19 @@ const PRIORITIES = ["Alta", "Média", "Baixa"] as const
 const toPriority: Record<(typeof PRIORITIES)[number], Priority> = { Alta: "alta", Média: "media", Baixa: "baixa" }
 const fromPriority: Record<Priority, (typeof PRIORITIES)[number]> = { alta: "Alta", media: "Média", baixa: "Baixa" }
 
-type Defaults = { clientId?: string; processId?: string; columnId?: string; title?: string; description?: string; priority?: Priority }
+type Defaults = {
+  clientId?: string
+  processId?: string
+  columnId?: string
+  title?: string
+  description?: string
+  priority?: Priority
+  /** `YYYY-MM-DD` */
+  date?: string
+  assigneeId?: string
+  /** A tarefa criada fica vinculada a este prazo. */
+  prazoId?: string
+}
 
 function encodeRelated(r?: RelatedEntity) {
   return r ? `${r.type}:${r.id}` : ""
@@ -36,10 +48,10 @@ function initialState(task?: Task, defaults?: Defaults) {
   return {
     title: task?.title ?? defaults?.title ?? "",
     description: task?.description ?? defaults?.description ?? "",
-    date: task?.dueAt.slice(0, 10) ?? toLocalISO(getNow()).slice(0, 10),
+    date: task?.dueAt.slice(0, 10) ?? defaults?.date ?? toLocalISO(getNow()).slice(0, 10),
     time: task?.dueAt.slice(11, 16) ?? "18:00",
     priority: task ? fromPriority[task.priority] : defaults?.priority ? fromPriority[defaults.priority] : ("Média" as (typeof PRIORITIES)[number]),
-    assigneeId: task?.assigneeId ?? currentUserId(),
+    assigneeId: task?.assigneeId ?? defaults?.assigneeId ?? currentUserId(),
     related: encodeRelated(task?.related ?? related),
   }
 }
@@ -86,7 +98,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
       if (result.status === "saved") toast.success("Alterações salvas.")
     } else {
       const columnId = defaults?.columnId ?? data.taskColumns.find((c) => !c.isDone)?.id
-      addTask({ ...payload, columnId })
+      addTask({ ...payload, columnId }, { prazoId: defaults?.prazoId })
       toast.success("Tarefa criada.", {
         description: `${payload.title} — atribuída a ${getMembers().find((u) => u.id === payload.assigneeId)?.firstName}.`,
       })

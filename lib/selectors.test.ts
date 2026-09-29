@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import type { Activity, Client, Invoice, Process, Task } from "@/types"
+import type { Activity, Client, Invoice, Prazo, Process, Task } from "@/types"
 import type { PersistedState } from "@/lib/store/storage"
 import {
   clientFinance,
@@ -147,6 +147,7 @@ describe("hub do cliente", () => {
     processes: [],
     tasks: [],
     taskColumns: [],
+    deadlines: [],
     appointments: [],
     appointmentCategories: [],
     documents: [],
@@ -240,15 +241,30 @@ describe("hub do cliente", () => {
     assert.deepEqual([...delinquentClientIds(invoices, NOW)], ["c1"])
   })
 
-  it("próximo prazo ignora processos concluídos e mostra primeiro o que já venceu", () => {
-    const processes = [
-      process("p1", "c1", { nextDeadline: { date: "2026-09-20", title: "vencido" } }),
-      process("p2", "c1", { nextDeadline: { date: "2026-10-05", title: "depois" } }),
-      process("p3", "c1", { nextDeadline: { date: "2026-09-30", title: "antes" } }),
-      process("p4", "c1", { status: "concluido", nextDeadline: { date: "2026-09-25", title: "concluído" } }),
+  it("próximo prazo: só prazos abertos de processos ativos, o vencido primeiro", () => {
+    const processes = [process("p1", "c1"), process("p2", "c1"), process("p3", "c1"), process("p4", "c1", { status: "concluido" })]
+    const prazo = (id: string, processId: string, fatalDate: string, status: Prazo["status"] = "aberto"): Prazo => ({
+      id,
+      organizationId: "org",
+      createdAt: "2026-09-01T10:00:00",
+      processId,
+      description: id,
+      fatalDate,
+      internalDate: fatalDate,
+      responsibleId: "u1",
+      origin: "manual",
+      status,
+      createdById: "u1",
+    })
+    const prazos = [
+      prazo("vencido", "p1", "2026-09-20"),
+      prazo("depois", "p2", "2026-10-05"),
+      prazo("antes", "p3", "2026-09-30"),
+      prazo("concluido", "p4", "2026-09-25"),
+      prazo("cumprido", "p3", "2026-09-22", "cumprido"),
     ]
-    assert.equal(nextClientDeadline(processes)?.id, "p1")
-    assert.equal(nextClientDeadline(processes.slice(1))?.id, "p3")
-    assert.equal(nextClientDeadline([]), undefined)
+    assert.equal(nextClientDeadline(processes, prazos)?.prazo.id, "vencido")
+    assert.equal(nextClientDeadline(processes.slice(1), prazos)?.process.id, "p3")
+    assert.equal(nextClientDeadline(processes, []), undefined)
   })
 })

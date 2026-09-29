@@ -32,7 +32,15 @@ export function useSignalAction() {
   return (signal: AttentionSignal) => {
     const action = signal.action
     if (action?.type !== "create-task" || !can("tasks.edit")) return undefined
-    return () => openDialog("task", { processId: action.processId, clientId: action.processId ? undefined : action.clientId, title: action.title })
+    return () =>
+      openDialog("task", {
+        processId: action.processId,
+        clientId: action.processId ? undefined : action.clientId,
+        title: action.title,
+        date: action.date,
+        assigneeId: action.assigneeId,
+        prazoId: action.prazoId,
+      })
   }
 }
 

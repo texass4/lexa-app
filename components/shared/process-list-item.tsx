@@ -6,13 +6,16 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { PROCESS_STATUS } from "@/lib/config"
 import { getNow, diffInDays, fmtDayMonth, fmtDueIn, fmtNumericDate, parse } from "@/lib/dates"
 import { getUser } from "@/lib/account"
-import type { Process } from "@/types"
+import { PRAZO_ALERT_DAYS } from "@/lib/attention"
+import type { Prazo, Process } from "@/types"
 
-export function ProcessListItem({ process: p }: { process: Process }) {
+/** `nextPrazo`: o próximo prazo aberto do processo (calculado por quem lista, a partir dos prazos). */
+export function ProcessListItem({ process: p, nextPrazo }: { process: Process; nextPrazo?: Prazo }) {
   const status = PROCESS_STATUS[p.status]
   const owner = getUser(p.ownerId)
-  const due = p.nextDeadline ? diffInDays(parse(p.nextDeadline.date), getNow()) : undefined
-  const urgent = due !== undefined && due <= 3
+  const next = p.status === "concluido" ? undefined : nextPrazo
+  const due = next ? diffInDays(parse(next.fatalDate), getNow()) : undefined
+  const urgent = due !== undefined && due <= PRAZO_ALERT_DAYS.soon
   const lastMovement = p.movements.reduce<Process["movements"][number] | undefined>((last, m) => (!last || m.at > last.at ? m : last), undefined)
   const court = p.judicialUnit ?? p.court
 
@@ -47,13 +50,13 @@ export function ProcessListItem({ process: p }: { process: Process }) {
           {owner.firstName}
         </div>
         <div className="min-w-[128px]">
-          {p.nextDeadline ? (
+          {next ? (
             <>
               <p className={cn("flex items-center gap-1.5 text-[12.5px] font-medium", urgent ? "text-danger" : "text-foreground")}>
                 <Hourglass className="size-3.5" />
-                {fmtDayMonth(p.nextDeadline.date)} · {fmtDueIn(p.nextDeadline.date)}
+                {fmtDayMonth(next.fatalDate)} · {fmtDueIn(next.fatalDate)}
               </p>
-              <p className="mt-0.5 max-w-[180px] truncate text-[11.5px] text-muted-foreground">{p.nextDeadline.title}</p>
+              <p className="mt-0.5 max-w-[180px] truncate text-[11.5px] text-muted-foreground">{next.description}</p>
             </>
           ) : (
             <p className="text-[12.5px] text-subtle">Sem prazos</p>

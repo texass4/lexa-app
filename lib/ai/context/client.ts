@@ -7,7 +7,8 @@
 import { AIError } from "@/lib/ai/errors"
 import { CLIENT_STATUS, INVOICE_STATUS, PROCESS_STATUS } from "@/lib/config"
 import { formatCurrency } from "@/lib/format"
-import type { Activity, Appointment, Client, Invoice, LegalDocument, Task } from "@/types"
+import { isOpenPrazo, nextPrazo } from "@/lib/prazos"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Task } from "@/types"
 import type { AIRepository, Member, ProcessOverview } from "./repository"
 import {
   type BuiltContext,
@@ -15,6 +16,7 @@ import {
   daysSince,
   describeAppointment,
   describeDocument,
+  describePrazo,
   describeTask,
   fmtDate,
   fmtDateTime,
@@ -23,6 +25,7 @@ import {
   newestFirst,
   registerAppointment,
   registerDocument,
+  registerPrazo,
   registerTask,
   sortTasks,
   upcoming,
@@ -31,6 +34,7 @@ import {
 export const CLIENT_LIMITS = {
   processes: 20,
   tasks: 15,
+  prazos: 15,
   appointments: 8,
   documents: 12,
   invoices: 10,
@@ -41,6 +45,8 @@ export interface ClientData {
   client: Client
   processes: ProcessOverview[]
   tasks: Task[]
+  /** Prazos dos processos do cliente. */
+  prazos: Prazo[]
   appointments: Appointment[]
   documents: LegalDocument[]
   invoices: Invoice[]
@@ -54,9 +60,10 @@ export async function loadClientData(repo: AIRepository, clientId: string): Prom
   const client = await repo.getClient(clientId)
   if (!client) throw new AIError("NOT_FOUND")
 
-  const [processes, tasks, appointments, documents, invoices, activities, members] = await Promise.all([
+  const [processes, tasks, prazos, appointments, documents, invoices, activities, members] = await Promise.all([
     repo.listProcessOverviews({ clientId }),
     repo.listTasks(),
+    repo.listPrazos(),
     repo.listAppointments(),
     repo.listDocuments(),
     repo.listInvoices(),
@@ -79,6 +86,7 @@ export async function loadClientData(repo: AIRepository, clientId: string): Prom
     tasks: tasks.filter(
       (t) => (t.related?.type === "client" && t.related.id === clientId) || (t.related?.type === "process" && processIds.has(t.related.id)),
     ),
+    prazos: prazos.filter((p) => processIds.has(p.processId)),
     appointments: appointments.filter((a) => a.clientId === clientId || (a.processId !== undefined && processIds.has(a.processId))),
     documents: documents.filter((d) => d.clientId === clientId || (d.processId !== undefined && processIds.has(d.processId))),
     invoices: invoices.filter((i) => i.clientId === clientId),
@@ -99,8 +107,10 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
     .sort((a, b) => (a.status === "concluido" ? 1 : 0) - (b.status === "concluido" ? 1 : 0) || (b.lastMovementAt ?? "").localeCompare(a.lastMovementAt ?? ""))
     .slice(0, CLIENT_LIMITS.processes)
 
+  const openPrazos = data.prazos.filter(isOpenPrazo).sort((a, b) => a.fatalDate.localeCompare(b.fatalDate))
   const describedProcesses = processes.map((p) => {
     const ref = registry.add("process", { id: p.id, label: `Processo ${p.number}`, date: p.lastMovementAt, href: `/processos/${p.id}` })
+    const next = nextPrazo(data.prazos, p.id)
     return {
       ref,
       numero: p.number,
@@ -112,7 +122,7 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
       responsavel: memberName(members, p.ownerId),
       ultima_movimentacao: p.lastMovement ? { data: fmtDateTime(p.lastMovement.at), nome: p.lastMovement.title } : undefined,
       dias_desde_a_ultima_movimentacao: daysSince(p.lastMovementAt, now),
-      prazo_cadastrado_no_lexa: p.nextDeadline?.date ? { data: fmtDate(p.nextDeadline.date), descricao: p.nextDeadline.title } : undefined,
+      proximo_prazo_aberto: next ? { data_fatal: fmtDate(next.fatalDate), descricao: next.description } : "nenhum prazo aberto cadastrado",
     }
   })
 
@@ -154,6 +164,12 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
     },
     processos: describedProcesses,
     processos_omitidos: data.processes.length > processes.length ? data.processes.length - processes.length : undefined,
+    // Os únicos prazos que existem: os cadastrados pelo escritório.
+    prazos_abertos: data.hidden.includes("processos")
+      ? undefined
+      : openPrazos.length
+        ? openPrazos.slice(0, CLIENT_LIMITS.prazos).map((p) => describePrazo(p, registerPrazo(registry, p), members, now))
+        : "nenhum prazo aberto cadastrado na Íntegra para os processos do cliente",
     tarefas: sortTasks(data.tasks)
       .slice(0, CLIENT_LIMITS.tasks)
       .map((t) => describeTask(t, registerTask(registry, t), members, now)),

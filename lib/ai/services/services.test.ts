@@ -3,7 +3,8 @@ import assert from "node:assert/strict"
 import { RateLimiter, ResultCache } from "../guard"
 import { ROLE_DEFAULTS } from "@/lib/auth/permissions"
 import { createSupabaseRepository } from "../context/repository"
-import { buildProcessContext, loadProcessData } from "../context/process"
+import { NO_PRAZOS, buildProcessContext, loadProcessData } from "../context/process"
+import { createSupabaseRepository as repoFor } from "../context/repository"
 import { computeOfficeMetrics, loadOfficeData } from "../context/office"
 import { AIError } from "../errors"
 import { ORG_A, NOW, SECRET_B, fakeSupabase, makeDeps, processA, processB, promptText, seedTables, validSummary } from "../__fixtures__/data"
@@ -181,7 +182,58 @@ describe("prazos", () => {
     const { deps } = makeDeps(() => validSummary)
     const data = await loadProcessData(deps.repo, processA.id)
     const { context } = buildProcessContext(data, NOW)
-    assert.equal((context.processo as Record<string, unknown>).prazo_cadastrado_no_lexa, "nenhum prazo cadastrado")
+    assert.equal(context.prazos_do_processo, NO_PRAZOS)
+    assert.doesNotMatch(JSON.stringify(context), /prazo_cadastrado_no_lexa/)
+  })
+
+  it("com prazo cadastrado, a IA recebe o prazo real (e só os do próprio escritório e processo)", async () => {
+    const prazo = (organizationId: string, id: string, processId: string, patch: Record<string, unknown> = {}) => ({
+      organization_id: organizationId,
+      id,
+      data: {
+        id,
+        organizationId,
+        processId,
+        description: `Prazo ${id}`,
+        fatalDate: "2026-10-02",
+        internalDate: "2026-09-30",
+        responsibleId: "u_a1",
+        origin: "intimacao",
+        status: "aberto",
+        taskId: "t_a1",
+        createdById: "u_a1",
+        createdAt: "2026-09-20T10:00:00",
+        ...patch,
+      },
+    })
+    const { supabase } = fakeSupabase({
+      ...seedTables(),
+      deadlines: [
+        prazo(ORG_A, "pz_a1", processA.id),
+        prazo(ORG_A, "pz_a2", processA.id, { status: "cumprido", fatalDate: "2026-09-01", internalDate: "2026-08-30" }),
+        prazo(ORG_A, "pz_outro", "p_outro"),
+        prazo("org-b", "pz_b1", processA.id, { description: SECRET_B }),
+      ],
+    })
+    const repo = repoFor(supabase, ORG_A, () => true)
+    const data = await loadProcessData(repo, processA.id)
+    const { context, sources } = buildProcessContext(data, NOW)
+    const prazos = context.prazos_do_processo as Record<string, unknown>[]
+    assert.deepEqual(
+      prazos.map((p) => [p.descricao, p.situacao, p.data_fatal]),
+      [
+        ["Prazo pz_a1", "Aberto", "02/10/2026"],
+        ["Prazo pz_a2", "Cumprido", "01/09/2026"],
+      ],
+    )
+    assert.equal(prazos[0].dias_ate_a_data_fatal, 6)
+    assert.equal(prazos[0].origem, "Intimação")
+    assert.equal(prazos[0].responsavel, "Ana Advogada")
+    assert.equal(sources[prazos[0].ref as string].kind, "deadline")
+    assert.doesNotMatch(JSON.stringify(context), new RegExp(SECRET_B))
+
+    // Sem permissão de processos, nenhum prazo chega à IA.
+    assert.deepEqual(await repoFor(supabase, ORG_A, () => false).listPrazos(), [])
   })
 
   it("resposta com prazo inventado recebe aviso visível", async () => {

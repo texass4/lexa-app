@@ -15,14 +15,17 @@
  * Roda no navegador e no servidor. Não importa React.
  */
 
-import { addDays, diffInDays, getNow, parse, startOfDay } from "@/lib/dates"
+import { addDays, diffInDays, fmtNumericDate, getNow, parse, startOfDay } from "@/lib/dates"
 import { isOverdue } from "@/lib/selectors"
 import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } from "@/lib/services/processes/movement-interpreter"
 import type { Permission } from "@/lib/auth/permissions"
-import type { Activity, Appointment, Client, Invoice, LegalDocument, Process, Task } from "@/types"
+import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
 
 /** Sem movimentação há mais que isso = processo parado. Também usado pela Íntegra IA. */
 export const STALE_DAYS = 60
+/** Alertas de prazo: a partir de 5 dias da data fatal, sobe de nível com 2 dias e no dia. */
+export const PRAZO_ALERT_DAYS = { week: 5, soon: 2 } as const
 /** Janela de "movimentação recente" e "documento novo". */
 export const RECENT_DAYS = 7
 /** Acima disso, sinais do mesmo tipo viram um só ("5 tarefas atrasadas"). */
@@ -46,8 +49,10 @@ export type SignalKind =
   | "task-overdue"
   | "task-today"
   | "deadline-overdue"
+  | "deadline-today"
   | "deadline-soon"
   | "deadline-week"
+  | "deadline-no-task"
   | "process-moved"
   | "process-stale"
   | "appointment-today"
@@ -56,8 +61,20 @@ export type SignalKind =
 
 export type SignalAction =
   | { type: "open"; label: string; href: string }
-  /** Abre o formulário de tarefa já preenchido — nada é salvo sem confirmação. */
-  | { type: "create-task"; label: string; processId?: string; clientId?: string; title: string }
+  /**
+   * Abre o formulário de tarefa já preenchido — nada é salvo sem confirmação. Com
+   * `prazoId`, a tarefa criada fica vinculada ao prazo.
+   */
+  | {
+      type: "create-task"
+      label: string
+      processId?: string
+      clientId?: string
+      title: string
+      prazoId?: string
+      date?: string
+      assigneeId?: string
+    }
 
 export interface AttentionSignal {
   /** Estável entre renderizações: `${kind}:${id}`. */
@@ -80,6 +97,8 @@ export interface AttentionData {
   clients: Client[]
   processes: Process[]
   tasks: Task[]
+  /** Prazos (a fonte de verdade dos prazos — nunca um campo do processo). */
+  deadlines: Prazo[]
   appointments: Appointment[]
   documents: LegalDocument[]
   invoices: Invoice[]
@@ -98,9 +117,16 @@ const bySeverity = (a: AttentionSignal, b: AttentionSignal) => LEVEL_ORDER[a.lev
 
 export const isActiveProcess = (p: Process) => p.status !== "concluido"
 
-/** Dias até o prazo (negativo = vencido). */
-export const daysToDeadline = (p: Process, now: Date = getNow()) =>
-  p.nextDeadline && isActiveProcess(p) ? diffInDays(parse(p.nextDeadline.date), now) : undefined
+/** Nível e texto do alerta de um prazo aberto, ou `undefined` se ainda falta mais de 5 dias. */
+export function prazoAlert(prazo: Prazo, now: Date = getNow()): { kind: SignalKind; level: SignalLevel; days: number } | undefined {
+  if (!isOpenPrazo(prazo)) return undefined
+  const days = daysToPrazo(prazo, now)
+  if (days < 0) return { kind: "deadline-overdue", level: "critical", days }
+  if (days === 0) return { kind: "deadline-today", level: "critical", days }
+  if (days <= PRAZO_ALERT_DAYS.soon) return { kind: "deadline-soon", level: "critical", days }
+  if (days <= PRAZO_ALERT_DAYS.week) return { kind: "deadline-week", level: "warning", days }
+  return undefined
+}
 
 export const daysSinceMovement = (p: Process, now: Date = getNow()) => (p.lastMovementAt ? diffInDays(now, parse(p.lastMovementAt)) : undefined)
 
@@ -129,31 +155,58 @@ export function latestMovement(p: Process) {
 
 /* ------------------------------ por processo ------------------------------ */
 
-/** Sinais de um processo: prazo, movimentação, parado, tarefas atrasadas. */
-export function processSignals(data: AttentionData, p: Process, now: Date = getNow()): AttentionSignal[] {
-  if (!isActiveProcess(p)) return []
+/**
+ * Sinais dos prazos abertos de um processo: um alerta por prazo a 5 dias, 2 dias, no
+ * dia ou vencido, e "Prazo sem tarefa" para cada prazo aberto sem tarefa vinculada.
+ */
+export function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Process, now: Date = getNow()): AttentionSignal[] {
   const signals: AttentionSignal[] = []
   const base = { href: `/processos/${p.id}`, processId: p.id, clientId: p.clientId, count: 1 }
-  const days = daysToDeadline(p, now)
+  for (const prazo of data.deadlines) {
+    if (prazo.processId !== p.id || !isOpenPrazo(prazo)) continue
+    const alert = prazoAlert(prazo, now)
+    if (alert) {
+      signals.push({
+        ...base,
+        id: `${alert.kind}:${prazo.id}`,
+        kind: alert.kind,
+        level: alert.level,
+        title: `Prazo ${dueText(alert.days)}`,
+        detail: `${processLabel(p)} · ${prazo.description}`,
+        at: prazo.fatalDate,
+      })
+    }
+    if (!prazoTask(prazo, data.tasks)) {
+      signals.push({
+        ...base,
+        id: `deadline-no-task:${prazo.id}`,
+        kind: "deadline-no-task",
+        level: "warning",
+        title: "Prazo sem tarefa",
+        detail: `${processLabel(p)} · ${prazo.description} · fatal em ${fmtNumericDate(prazo.fatalDate)}`,
+        at: prazo.fatalDate,
+        action: {
+          type: "create-task",
+          label: "Criar tarefa",
+          processId: p.id,
+          title: prazo.description,
+          prazoId: prazo.id,
+          date: prazo.internalDate,
+          assigneeId: prazo.responsibleId,
+        },
+      })
+    }
+  }
+  return signals
+}
+
+/** Sinais de um processo: prazos, movimentação, parado, tarefas atrasadas. */
+export function processSignals(data: AttentionData, p: Process, now: Date = getNow()): AttentionSignal[] {
+  if (!isActiveProcess(p)) return []
+  const signals: AttentionSignal[] = prazoSignals(data, p, now)
+  const base = { href: `/processos/${p.id}`, processId: p.id, clientId: p.clientId, count: 1 }
   const linked = data.tasks.filter((t) => t.related?.type === "process" && t.related.id === p.id)
   const pending = linked.filter((t) => t.status === "pendente")
-
-  if (days !== undefined && p.nextDeadline && days <= 7) {
-    const deadline = p.nextDeadline
-    // Prazo sem nenhuma tarefa aberta no processo: fato verificável — e acionável.
-    const noTask = days >= 0 && pending.length === 0
-    const kind: SignalKind = days < 0 ? "deadline-overdue" : days <= 3 ? "deadline-soon" : "deadline-week"
-    signals.push({
-      ...base,
-      id: `${kind}:${p.id}`,
-      kind,
-      level: days <= 1 ? "critical" : "warning",
-      title: `Prazo ${dueText(days)}`,
-      detail: `${processLabel(p)} · ${deadline.title}${noTask ? " · sem tarefa vinculada" : ""}`,
-      at: deadline.date,
-      action: noTask ? { type: "create-task", label: "Criar tarefa", processId: p.id, title: deadline.title } : undefined,
-    })
-  }
 
   const overdueTasks = pending.filter((t) => isOverdue(t, now))
   if (overdueTasks.length) {
@@ -380,7 +433,8 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
   signals = group(signals, "task-today", (n) => plural(n, "tarefa para hoje", "tarefas para hoje"), "/tarefas?filtro=hoje")
   signals = group(signals, "process-stale", (n) => `${plural(n, "processo", "processos")} sem movimentação há +${STALE_DAYS} dias`, "/processos")
   signals = group(signals, "process-moved", (n) => plural(n, "processo com movimentação recente", "processos com movimentação recente"), "/processos")
-  signals = group(signals, "deadline-week", (n) => plural(n, "prazo nesta semana", "prazos nesta semana"), "/processos?filtro=prazos")
+  signals = group(signals, "deadline-week", (n) => plural(n, "prazo em até 5 dias", "prazos em até 5 dias"), "/processos?filtro=prazos")
+  signals = group(signals, "deadline-no-task", (n) => plural(n, "prazo sem tarefa", "prazos sem tarefa"), "/processos?filtro=prazos")
 
   return signals.sort(bySeverity)
 }

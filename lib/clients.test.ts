@@ -165,6 +165,7 @@ describe("exclusão", () => {
       appointments: [],
       invoices: [{ id: "i1", clientId: "c1" }],
       taskColumns: [],
+      deadlines: [],
       appointmentCategories: [],
       activities: [],
       notifications: [],

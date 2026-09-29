@@ -88,7 +88,7 @@ export interface ChatReply {
 
 /* --------------------------------- fontes --------------------------------- */
 
-export type SourceKind = "movement" | "process" | "task" | "appointment" | "document" | "client" | "invoice"
+export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice"
 
 /**
  * Registro real da Íntegra que o modelo recebeu com uma referência curta ("M3").

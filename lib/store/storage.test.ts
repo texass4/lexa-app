@@ -8,6 +8,7 @@ const empty = (): PersistedState => ({
   processes: [],
   tasks: [],
   taskColumns: [],
+  deadlines: [],
   appointments: [],
   appointmentCategories: [],
   documents: [],

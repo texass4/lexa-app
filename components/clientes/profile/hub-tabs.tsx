@@ -23,6 +23,7 @@ import { AppointmentDetail } from "@/components/agenda/appointment-detail"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { nextPrazo } from "@/lib/prazos"
 import { useUI } from "@/lib/store/ui-store"
 import { describeRelated, type ClientHub } from "@/lib/selectors"
 import { fmtDayLabel, fmtDayMonthParts, fmtTime, getNow, parse } from "@/lib/dates"
@@ -34,6 +35,7 @@ import { Can } from "@/lib/auth/session"
 
 export function ProcessesTab({ client, hub }: { client: Client; hub: ClientHub }) {
   const { openDialog } = useUI()
+  const { deadlines } = useDemoData()
   const { processes, activeProcesses } = hub
   const create = (
     <Can permission="processes.edit">
@@ -66,7 +68,7 @@ export function ProcessesTab({ client, hub }: { client: Client; hub: ClientHub }
         {create}
       </div>
       {processes.map((p) => (
-        <ProcessListItem key={p.id} process={p} />
+        <ProcessListItem key={p.id} process={p} nextPrazo={nextPrazo(deadlines, p.id)} />
       ))}
     </div>
   )
@@ -311,7 +313,7 @@ type TimelineFilter = "todos" | "cadastro" | "processos" | "tarefas" | "document
 
 const TIMELINE_GROUPS: Record<Exclude<TimelineFilter, "todos">, { label: string; types: ActivityType[] }> = {
   cadastro: { label: "Cadastro", types: ["client", "contract"] },
-  processos: { label: "Processos", types: ["petition", "movement", "hearing", "summons"] },
+  processos: { label: "Processos", types: ["petition", "movement", "hearing", "summons", "deadline"] },
   tarefas: { label: "Tarefas", types: ["task"] },
   documentos: { label: "Documentos", types: ["document"] },
   agenda: { label: "Agenda", types: ["appointment"] },

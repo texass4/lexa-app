@@ -154,6 +154,7 @@ const { addTask, importProcess } = useDemoActions()
   - *Revalidação*: ao (re)conectar o Realtime e ao voltar à aba depois de 3 min (`REVALIDATE_AFTER_HIDDEN_MS`), baixa só id + versão e busca apenas o que mudou.
   - *Código do processo* (`#103000`…): gerado pelo banco no INSERT (contador por escritório, migração `0007`); `addProcess`/`importProcess` esperam o banco para ter o código. Único por escritório.
   - Teste com Supabase real: `npm run test:integration` (ver o cabeçalho de `tests/integration/office-sync.integration.ts`).
+- **Prazos** (`types/index.ts › Prazo`, tabela `deadlines`, migração `0008`): a única fonte de prazos — `Process.nextDeadline` não existe mais. Próximo prazo = o aberto de menor data fatal (`lib/prazos.ts › nextPrazo`). Vínculos (processo, cliente, responsável, tarefa, quem criou) são colunas com chave estrangeira derivadas de `data` pelo banco; o cliente acompanha o do processo. Criar prazo (`addPrazo`) cria junto a tarefa vinculada por id (data interna, responsável do prazo); cumprir/perder (`setPrazoStatus`) registra atividade `deadline` nas timelines do processo e do cliente. Alertas em `lib/attention.ts` (5 dias, 2 dias, hoje, vencido e "Prazo sem tarefa").
 - `hydrated` fica `true` quando os dados do escritório terminam de carregar. As telas mostram esqueleto só até lá.
 - A carga começa junto com a sessão (`preloadOfficeData`), não depois dela: a RLS já decide o que volta.
 - Arquivos de documentos ficam no Storage (`documents/<organization_id>/…`); a pré-visualização usa URL assinada de 5 min (`lib/documents.ts`).

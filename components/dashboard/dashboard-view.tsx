@@ -5,6 +5,7 @@ import { KpiCards } from "./kpi-cards"
 import { TodayAgenda } from "./today-agenda"
 import { RecentActivity } from "./recent-activity"
 import { MyTasks } from "./my-tasks"
+import { WeekPrazos } from "./week-prazos"
 import { RevenuePanel } from "./revenue-panel"
 import { FadeIn } from "@/components/ui/motion"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
@@ -38,7 +39,7 @@ export function DashboardView() {
   const signals = officeSignals(data, { userId: user.id, can })
   const empty = data.processes.length === 0 && data.tasks.length === 0 && data.clients.length === 0
 
-  // Hierarquia: 1) o que merece atenção, 2) o que fazer hoje (agenda e tarefas),
+  // Hierarquia: 1) o que merece atenção, 2) o que fazer hoje e na semana (prazos, agenda e tarefas),
   // 3) perguntar à Íntegra, 4) contexto (atividade, receita).
   // No mobile as colunas viram "contents" para a ordem seguir essa hierarquia.
   return (
@@ -67,6 +68,11 @@ export function DashboardView() {
           </div>
         </div>
         <div className="contents lg:col-span-4 lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+          {can("processes.view") && (
+            <FadeIn delay={0.08} className="order-2 lg:order-none">
+              <WeekPrazos />
+            </FadeIn>
+          )}
           {can("agenda.view") && (
             <FadeIn delay={0.1} className="order-2 lg:order-none">
               <TodayAgenda />

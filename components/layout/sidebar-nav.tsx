@@ -8,7 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { isActive, visibleSections, type NavItem } from "./nav-config"
 import { diffInDays, getNow, parse } from "@/lib/dates"
 import { isOverdue } from "@/lib/selectors"
-import { daysToDeadline } from "@/lib/attention"
+import { PRAZO_ALERT_DAYS, isActiveProcess } from "@/lib/attention"
+import { daysToPrazo, nextPrazo } from "@/lib/prazos"
 import { useSession } from "@/lib/auth/session"
 import { useDemoData } from "@/lib/store/demo-store"
 
@@ -22,7 +23,7 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
   const pathname = usePathname()
   const data = useDemoData()
   const { can, user } = useSession()
-  // Badges só quando pedem ação: suas tarefas atrasadas ou de hoje; prazos em até 3 dias.
+  // Badges só quando pedem ação: suas tarefas atrasadas ou de hoje; prazos abertos em até 2 dias.
   const now = getNow()
   const myDue = data.tasks.filter((t) => t.assigneeId === user.id && t.status === "pendente" && diffInDays(parse(t.dueAt), now) <= 0)
   const badges: Record<NonNullable<NavItem["badgeKey"]>, { count: number; urgent: boolean; label: string }> = {
@@ -33,11 +34,11 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
     },
     processes: {
       count: data.processes.filter((p) => {
-        const days = daysToDeadline(p, now)
-        return days !== undefined && days <= 3
+        const next = isActiveProcess(p) ? nextPrazo(data.deadlines, p.id) : undefined
+        return next !== undefined && daysToPrazo(next, now) <= PRAZO_ALERT_DAYS.soon
       }).length,
       urgent: true,
-      label: "processos com prazo em até 3 dias",
+      label: `processos com prazo em até ${PRAZO_ALERT_DAYS.soon} dias`,
     },
   }
 

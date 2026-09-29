@@ -13,7 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Permission } from "@/lib/auth/permissions"
-import type { Activity, Appointment, Client, Invoice, LegalDocument, Process, ProcessMovement, Task } from "@/types"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, ProcessMovement, Task } from "@/types"
 
 /** Processo sem a lista de movimentações (só a mais recente) — para visões de vários processos. */
 export type ProcessOverview = Omit<Process, "movements"> & { lastMovement?: ProcessMovement }
@@ -31,6 +31,8 @@ export interface AIRepository {
   listProcessOverviews(filter?: { clientId?: string }): Promise<ProcessOverview[]>
   listClients(): Promise<Client[]>
   listTasks(): Promise<Task[]>
+  /** Prazos (módulo de processos), de um processo ou de um cliente quando pedido. */
+  listPrazos(filter?: { processId?: string; clientId?: string }): Promise<Prazo[]>
   listAppointments(): Promise<Appointment[]>
   listDocuments(): Promise<LegalDocument[]>
   listInvoices(): Promise<Invoice[]>
@@ -56,7 +58,6 @@ const OVERVIEW_FIELDS = [
   "claimValue",
   "distributedAt",
   "lastMovementAt",
-  "nextDeadline",
   "tribunal",
   "degree",
   "className",
@@ -112,6 +113,13 @@ export function createSupabaseRepository(
     },
     listClients: async () => (can("clients.view") ? listData<Client>("clients") : []),
     listTasks: async () => (can("tasks.view") ? listData<Task>("tasks") : []),
+    listPrazos: async (filter = {}) =>
+      can("processes.view")
+        ? listData<Prazo>("deadlines", {
+            ...(filter.processId ? { "data->>processId": filter.processId } : {}),
+            ...(filter.clientId ? { "data->>clientId": filter.clientId } : {}),
+          })
+        : [],
     listAppointments: async () => (can("agenda.view") ? listData<Appointment>("appointments") : []),
     listDocuments: async () => (can("documents.view") ? listData<LegalDocument>("documents") : []),
     listInvoices: async () => (can("finance.view") ? listData<Invoice>("invoices") : []),

@@ -89,6 +89,12 @@ type Deferred = { key: Collection; row: ServerRow } | { key: Collection; id: str
 
 const ref = (key: Collection, id: string) => `${key}:${id}`
 
+/** Campos que o banco preenche ao gravar (gatilhos das migrações 0007 e 0008). */
+const SERVER_FIELDS: Partial<Record<Collection, string[]>> = {
+  processes: ["code"],
+  deadlines: ["clientId", "createdById", "taskId", "responsibleId"],
+}
+
 const cloneVersions = (versions: Versions): Versions =>
   Object.fromEntries(COLLECTIONS.map((key) => [key, new Map(versions[key])])) as unknown as Versions
 
@@ -274,10 +280,11 @@ export class OfficeSync<S extends PersistedState> {
     for (const { key, sent, row } of result.saved) {
       this.versions[key].set(row.id, row.updated_at)
       this.touch(key, row.id)
-      // O banco pode completar o registro (código do processo): a cópia local adota.
-      if (key === "processes" && (row.data as { code?: string }).code !== (sent as { code?: string }).code) {
-        this.adopt(key, row.data, sent)
-      }
+      // O banco pode completar o registro (código do processo, cliente e autor do prazo): a cópia local adota.
+      const fields = SERVER_FIELDS[key] ?? []
+      const server = row.data as unknown as Record<string, unknown>
+      const local = sent as unknown as Record<string, unknown>
+      if (fields.some((field) => server[field] !== local[field])) this.adopt(key, row.data, sent)
     }
     for (const { key, id } of result.removed) this.forget(key, id)
 

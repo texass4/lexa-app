@@ -9,8 +9,9 @@ import { STALE_DAYS } from "@/lib/attention"
 import { addDays, parse, startOfDay, startOfWeek } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
 import { financeSummary, isOverdue } from "@/lib/selectors"
+import { isOpenPrazo, nextPrazo } from "@/lib/prazos"
 import type { OfficeMetrics } from "@/lib/ai/types"
-import type { Appointment, Client, Invoice, LegalDocument, Task } from "@/types"
+import type { Appointment, Client, Invoice, LegalDocument, Prazo, Task } from "@/types"
 import type { AIRepository, Member, ProcessOverview } from "./repository"
 import {
   type BuiltContext,
@@ -18,12 +19,14 @@ import {
   daysSince,
   daysUntil,
   describeAppointment,
+  describePrazo,
   describeTask,
   fmtDate,
   fmtDateTime,
   fmtToday,
   memberName,
   registerAppointment,
+  registerPrazo,
   registerTask,
   upcoming,
 } from "./shared"
@@ -41,6 +44,7 @@ export interface OfficeData {
   clients: Client[]
   processes: ProcessOverview[]
   tasks: Task[]
+  prazos: Prazo[]
   appointments: Appointment[]
   documents: LegalDocument[]
   invoices: Invoice[]
@@ -49,10 +53,11 @@ export interface OfficeData {
 }
 
 export async function loadOfficeData(repo: AIRepository): Promise<OfficeData> {
-  const [clients, processes, tasks, appointments, documents, invoices, members] = await Promise.all([
+  const [clients, processes, tasks, prazos, appointments, documents, invoices, members] = await Promise.all([
     repo.listClients(),
     repo.listProcessOverviews(),
     repo.listTasks(),
+    repo.listPrazos(),
     repo.listAppointments(),
     repo.listDocuments(),
     repo.listInvoices(),
@@ -62,6 +67,7 @@ export async function loadOfficeData(repo: AIRepository): Promise<OfficeData> {
     clients,
     processes,
     tasks,
+    prazos,
     appointments,
     documents,
     invoices,
@@ -78,6 +84,12 @@ export async function loadOfficeData(repo: AIRepository): Promise<OfficeData> {
 }
 
 const isActive = (p: ProcessOverview) => p.status !== "concluido"
+/** Prazos abertos com data fatal entre hoje e daqui a 7 dias. */
+const openPrazosNext7Days = (prazos: Prazo[], now: Date) =>
+  prazos.filter((p) => {
+    const days = isOpenPrazo(p) ? daysUntil(p.fatalDate, now) : undefined
+    return days !== undefined && days >= 0 && days <= 7
+  })
 const sum = (invoices: Invoice[]) => invoices.reduce((acc, i) => acc + (Number.isFinite(i.amount) ? i.amount : 0), 0)
 
 /** Números do escritório, direto dos dados — nunca do modelo. Só módulos permitidos. */
@@ -102,10 +114,10 @@ export function computeOfficeMetrics(data: OfficeData, now: Date): OfficeMetrics
       active: active.length,
       movedLast7Days: data.processes.filter((p) => (daysSince(p.lastMovementAt, now) ?? Infinity) <= 7).length,
       staleOver60Days: active.filter((p) => (daysSince(p.lastMovementAt, now) ?? 0) > STALE_DAYS).length,
-      withDeadlineNext7Days: active.filter((p) => {
-        const days = daysUntil(p.nextDeadline?.date, now)
-        return days !== undefined && days >= 0 && days <= 7
-      }).length,
+      withDeadlineNext7Days: (() => {
+        const ids = new Set(openPrazosNext7Days(data.prazos, now).map((p) => p.processId))
+        return active.filter((p) => ids.has(p.id)).length
+      })(),
       byArea,
     }
   }
@@ -163,19 +175,23 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
 
   const processRef = (p: ProcessOverview) =>
     registry.add("process", { id: p.id, label: `Processo ${p.number}`, date: p.lastMovementAt, href: `/processos/${p.id}` })
-  const describeProcess = (p: ProcessOverview) => ({
-    ref: processRef(p),
-    numero: p.number,
-    cliente: clientName.get(p.clientId),
-    area: p.area,
-    situacao: PROCESS_STATUS[p.status]?.label,
-    responsavel: memberName(data.members, p.ownerId),
-    ultima_movimentacao: p.lastMovement ? `${fmtDateTime(p.lastMovement.at)} — ${p.lastMovement.title}` : fmtDate(p.lastMovementAt),
-    dias_sem_movimentacao: daysSince(p.lastMovementAt, now),
-    prazo_cadastrado_no_lexa: p.nextDeadline?.date ? `${fmtDate(p.nextDeadline.date)} — ${p.nextDeadline.title}` : undefined,
-  })
+  const describeProcess = (p: ProcessOverview) => {
+    const next = nextPrazo(data.prazos, p.id)
+    return {
+      ref: processRef(p),
+      numero: p.number,
+      cliente: clientName.get(p.clientId),
+      area: p.area,
+      situacao: PROCESS_STATUS[p.status]?.label,
+      responsavel: memberName(data.members, p.ownerId),
+      ultima_movimentacao: p.lastMovement ? `${fmtDateTime(p.lastMovement.at)} — ${p.lastMovement.title}` : fmtDate(p.lastMovementAt),
+      dias_sem_movimentacao: daysSince(p.lastMovementAt, now),
+      proximo_prazo_aberto: next ? `${fmtDate(next.fatalDate)} — ${next.description}` : undefined,
+    }
+  }
 
   const active = data.processes.filter(isActive)
+  const processNumber = new Map(data.processes.map((p) => [p.id, p.number]))
   const byLastMovement = (a: ProcessOverview, b: ProcessOverview) => (b.lastMovementAt ?? "").localeCompare(a.lastMovementAt ?? "")
 
   const lists = data.can.processes
@@ -190,14 +206,16 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
           .sort((a, b) => (a.lastMovementAt ?? "").localeCompare(b.lastMovementAt ?? ""))
           .slice(0, OFFICE_LIMITS.list)
           .map(describeProcess),
-        processos_com_prazo_cadastrado_nos_proximos_7_dias: active
-          .filter((p) => {
-            const days = daysUntil(p.nextDeadline?.date, now)
-            return days !== undefined && days >= 0 && days <= 7
-          })
-          .sort((a, b) => (a.nextDeadline?.date ?? "").localeCompare(b.nextDeadline?.date ?? ""))
+        // Os únicos prazos que existem: os cadastrados pelo escritório (abertos).
+        prazos_abertos_nos_proximos_7_dias: openPrazosNext7Days(data.prazos, now)
+          .sort((a, b) => a.fatalDate.localeCompare(b.fatalDate))
           .slice(0, OFFICE_LIMITS.list)
-          .map(describeProcess),
+          .map((p) => ({ ...describePrazo(p, registerPrazo(registry, p), data.members, now), processo: processNumber.get(p.processId) })),
+        prazos_abertos_vencidos: data.prazos
+          .filter((p) => isOpenPrazo(p) && (daysUntil(p.fatalDate, now) ?? 0) < 0)
+          .sort((a, b) => a.fatalDate.localeCompare(b.fatalDate))
+          .slice(0, OFFICE_LIMITS.list)
+          .map((p) => ({ ...describePrazo(p, registerPrazo(registry, p), data.members, now), processo: processNumber.get(p.processId) })),
       }
     : {}
 

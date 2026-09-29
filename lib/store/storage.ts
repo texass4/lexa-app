@@ -17,13 +17,27 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Notification, Process, Task, TaskColumn } from "@/types"
+import type {
+  Activity,
+  Appointment,
+  AppointmentCategory,
+  Client,
+  Invoice,
+  LegalDocument,
+  Notification,
+  Prazo,
+  Process,
+  Task,
+  TaskColumn,
+} from "@/types"
 
 export interface PersistedState {
   clients: Client[]
   processes: Process[]
   tasks: Task[]
   taskColumns: TaskColumn[]
+  /** Prazos (tabela `deadlines`). Depois de tarefas: um prazo pode apontar para a tarefa criada junto. */
+  deadlines: Prazo[]
   appointments: Appointment[]
   appointmentCategories: AppointmentCategory[]
   documents: LegalDocument[]
@@ -39,6 +53,7 @@ export const TABLES: Record<Collection, string> = {
   processes: "processes",
   tasks: "tasks",
   taskColumns: "task_columns",
+  deadlines: "deadlines",
   appointments: "appointments",
   appointmentCategories: "appointment_categories",
   documents: "documents",
@@ -52,6 +67,7 @@ export const COLLECTION_LABELS: Record<Collection, string> = {
   processes: "processos",
   tasks: "tarefas",
   taskColumns: "colunas do quadro",
+  deadlines: "prazos",
   appointments: "compromissos",
   appointmentCategories: "categorias da agenda",
   documents: "documentos",

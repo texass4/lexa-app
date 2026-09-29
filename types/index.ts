@@ -209,7 +209,6 @@ export interface Process extends TenantEntity {
   claimValue: number
   distributedAt: string
   lastMovementAt: string
-  nextDeadline?: { date: string; title: string }
   movements: ProcessMovement[]
 
   /* ----- Campos preenchidos por consulta externa (todos opcionais) ----- */
@@ -257,6 +256,42 @@ export interface TaskColumn extends TenantEntity {
   order: number
   /** Tarefas nesta coluna contam como concluídas. */
   isDone?: boolean
+}
+
+/* --------------------------------- Prazos --------------------------------- */
+
+/** De onde veio o prazo: cadastrado à mão ou a partir de uma intimação. */
+export type PrazoOrigin = "manual" | "intimacao"
+
+/** Só prazos `aberto` contam como próximos/pendentes. */
+export type PrazoStatus = "aberto" | "cumprido" | "perdido"
+
+/**
+ * Prazo processual — a fonte de verdade dos prazos do escritório (tabela `deadlines`,
+ * `0008_prazos.sql`). O banco confere processo, cliente, responsável e tarefa por id.
+ */
+export interface Prazo extends TenantEntity {
+  processId: ID
+  /** Cliente do processo (o banco acompanha o processo; some se o cliente for excluído). */
+  clientId?: ID
+  description: string
+  /** `YYYY-MM-DD` — o último dia para cumprir. */
+  fatalDate: string
+  /** `YYYY-MM-DD` — até quando o escritório quer concluir (data da tarefa vinculada). */
+  internalDate: string
+  /** Obrigatória quando a data interna fica depois da data fatal. */
+  internalDateReason?: string
+  responsibleId: ID
+  origin: PrazoOrigin
+  status: PrazoStatus
+  /** Tarefa criada para o prazo (vínculo por id; some se a tarefa for excluída). */
+  taskId?: ID
+  /** Quem cadastrou (o banco grava a pessoa logada). */
+  createdById: ID
+  updatedAt?: string
+  /** Quando foi cumprido ou marcado como perdido, e por quem. */
+  closedAt?: string
+  closedById?: ID
 }
 
 /* --------------------------------- Agenda --------------------------------- */
@@ -317,7 +352,18 @@ export interface Invoice extends TenantEntity {
 
 /* ------------------------------- Atividade -------------------------------- */
 
-export type ActivityType = "document" | "contract" | "petition" | "appointment" | "payment" | "task" | "client" | "hearing" | "summons" | "movement"
+export type ActivityType =
+  | "document"
+  | "contract"
+  | "petition"
+  | "appointment"
+  | "payment"
+  | "task"
+  | "client"
+  | "hearing"
+  | "summons"
+  | "movement"
+  | "deadline"
 
 export interface Activity extends TenantEntity {
   type: ActivityType

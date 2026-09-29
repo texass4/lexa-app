@@ -27,6 +27,8 @@ import { MiniStat } from "@/components/shared/mini-stat"
 import { ActivityIcon } from "@/components/shared/activity-icon"
 import { TaskRow } from "@/components/tasks/task-row"
 import { useUI } from "@/lib/store/ui-store"
+import { useDemoData } from "@/lib/store/demo-store"
+import { PRAZO_ALERT_DAYS } from "@/lib/attention"
 import { clientFinance, nextClientDeadline, type ClientHub } from "@/lib/selectors"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import {
@@ -122,9 +124,10 @@ export function OverviewTab({
   const { openDialog } = useUI()
   const { can } = useSession()
   const lookup = useCategoryLookup()
+  const { deadlines } = useDemoData()
   const { processes, activeProcesses, activities } = hub
-  const nextDeadline = nextClientDeadline(processes)
-  const deadlineDays = nextDeadline ? diffInDays(parse(nextDeadline.nextDeadline!.date), getNow()) : undefined
+  const nextDeadline = nextClientDeadline(processes, deadlines)
+  const deadlineDays = nextDeadline ? diffInDays(parse(nextDeadline.prazo.fatalDate), getNow()) : undefined
   const tasks = hub.tasks.slice(0, 5)
   const pendingTasks = hub.tasks.filter((t) => t.status === "pendente").length
   const upcoming = hub.appointments.filter((a) => parse(a.end) > getNow()).slice(0, 4)
@@ -144,13 +147,13 @@ export function OverviewTab({
           />
         </StatLink>
         {nextDeadline ? (
-          <StatLink label={`Abrir processo ${nextDeadline.code}`} href={`/processos/${nextDeadline.id}`}>
+          <StatLink label={`Abrir processo ${nextDeadline.process.code}`} href={`/processos/${nextDeadline.process.id}`}>
             <MiniStat
               label="Próximo prazo"
-              value={fmtDayMonth(nextDeadline.nextDeadline!.date)}
-              hint={`${fmtDueIn(nextDeadline.nextDeadline!.date)} · ${nextDeadline.nextDeadline!.title}`}
+              value={fmtDayMonth(nextDeadline.prazo.fatalDate)}
+              hint={`${fmtDueIn(nextDeadline.prazo.fatalDate)} · ${nextDeadline.prazo.description}`}
               icon={<Hourglass />}
-              tone={deadlineDays !== undefined && deadlineDays <= 3 ? "danger" : undefined}
+              tone={deadlineDays !== undefined && deadlineDays <= PRAZO_ALERT_DAYS.soon ? "danger" : undefined}
             />
           </StatLink>
         ) : (

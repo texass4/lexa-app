@@ -298,7 +298,7 @@ describe("verificação das fontes", () => {
   })
 
   it("avisa sobre prazo em dias inventado", () => {
-    const context = JSON.stringify({ prazo_cadastrado_no_lexa: "nenhum prazo cadastrado" })
+    const context = JSON.stringify({ prazos_do_processo: "nenhum prazo cadastrado na Íntegra para este processo" })
     for (const text of ["Você tem 5 dias para responder.", "O prazo de 15 dias começa agora.", "Conte 10 dias úteis."]) {
       assert.equal(groundingWarnings([text], context).length, 1, text)
     }

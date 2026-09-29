@@ -2,7 +2,19 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Process, ProcessMovement, Task, TaskColumn } from "@/types"
+import type {
+  Activity,
+  Appointment,
+  AppointmentCategory,
+  Client,
+  Invoice,
+  LegalDocument,
+  Prazo,
+  Process,
+  ProcessMovement,
+  Task,
+  TaskColumn,
+} from "@/types"
 import * as account from "@/lib/account"
 import { CLIENT_STATUS } from "@/lib/config"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
@@ -38,6 +50,7 @@ const initialState = (): DemoState => ({
   processes: [],
   tasks: [],
   taskColumns: [],
+  deadlines: [],
   appointments: [],
   appointmentCategories: [],
   documents: [],
@@ -58,6 +71,10 @@ export type NewClientInput = Pick<Client, "name" | "kind" | "document" | "email"
   Partial<Pick<Client, "status" | "whatsapp" | "addressDetails" | "birthDate" | "tags" | "notes" | "contact" | "profession">>
 export type NewInvoiceInput = Pick<Invoice, "clientId" | "processId" | "description" | "amount" | "dueDate" | "status" | "paidAt" | "method">
 export type NewTaskInput = Pick<Task, "title" | "dueAt" | "priority" | "assigneeId" | "description" | "related" | "columnId">
+export type NewPrazoInput = Pick<
+  Prazo,
+  "processId" | "description" | "fatalDate" | "internalDate" | "internalDateReason" | "responsibleId" | "origin"
+>
 export type NewAppointmentInput = Pick<
   Appointment,
   "title" | "categoryId" | "start" | "end" | "ownerId" | "clientId" | "processId" | "notes" | "personName" | "area" | "location"
@@ -106,9 +123,19 @@ interface DemoActions {
    * é quando a fonte foi conferida — pode vir do cache do escritório.
    */
   applyProcessSync(processId: string, sheet: ProcessSheet, checkedAt?: string): SyncOutcome
+  /** Exclui o processo (o banco exclui junto os prazos dele). */
   deleteProcess(id: string): void
   toggleTask(id: string): Task | undefined
-  addTask(input: NewTaskInput): Task
+  /** Cria a tarefa. Com `prazoId`, a tarefa passa a ser a do prazo (vínculo por id). */
+  addTask(input: NewTaskInput, options?: { prazoId?: string }): Task
+  /**
+   * Cadastra um prazo (sempre `aberto`) e, com `createTask`, a tarefa vinculada a ele —
+   * na data interna, para o responsável do prazo. Espera o banco confirmar; `null` se não
+   * foi possível (aviso já mostrado).
+   */
+  addPrazo(input: NewPrazoInput, options: { createTask: boolean }): Promise<Prazo | null>
+  /** Cumpre ou marca como perdido um prazo aberto, registrando nas timelines do processo e do cliente. */
+  setPrazoStatus(id: string, status: "cumprido" | "perdido", options?: SaveOptions): Promise<SaveResult<Prazo>>
   updateTask(id: string, patch: Partial<Task>, options?: SaveOptions): Promise<SaveResult<Task>>
   deleteTask(id: string): void
   /** Move a tarefa para outra coluna do quadro, sincronizando o status de conclusão. */
@@ -501,6 +528,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         commit((s) => ({
           ...s,
           processes: s.processes.filter((p) => p.id !== id),
+          deadlines: s.deadlines.filter((d) => d.processId !== id),
           activities: [
             logActivity({
               type: "petition",
@@ -545,11 +573,13 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return updated
       },
 
-      addTask(input) {
+      addTask(input, options) {
         const task: Task = { ...base(), ...input, id: uid("t"), status: "pendente" }
+        const prazoId = options?.prazoId
         commit((s) => ({
           ...s,
           tasks: [task, ...s.tasks],
+          deadlines: prazoId ? s.deadlines.map((d) => (d.id === prazoId ? { ...d, taskId: task.id, updatedAt: nowISO() } : d)) : s.deadlines,
           activities: [
             logActivity({
               type: "task",
@@ -565,6 +595,89 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ],
         }))
         return task
+      },
+
+      async addPrazo(input, { createTask }) {
+        const s0 = stateRef.current
+        const process = s0.processes.find((p) => p.id === input.processId)
+        if (!process) return null
+        const actor = account.getUser(account.currentUserId()).name
+        const prazo: Prazo = {
+          ...base(),
+          ...input,
+          description: input.description.trim(),
+          internalDateReason: input.internalDateReason?.trim() || undefined,
+          id: uid("pz"),
+          clientId: process.clientId || undefined,
+          status: "aberto",
+          createdById: account.currentUserId(),
+        }
+        const task: Task | undefined = createTask
+          ? {
+              ...base(),
+              id: uid("t"),
+              title: prazo.description,
+              description: `Prazo fatal em ${fmtNumericDate(prazo.fatalDate)}.`,
+              dueAt: `${prazo.internalDate}T18:00:00`,
+              priority: "alta",
+              assigneeId: prazo.responsibleId,
+              status: "pendente",
+              related: { type: "process", id: process.id },
+            }
+          : undefined
+        if (task) prazo.taskId = task.id
+
+        commit((s) => ({
+          ...s,
+          tasks: task ? [task, ...s.tasks] : s.tasks,
+          deadlines: [prazo, ...s.deadlines],
+          activities: [
+            logActivity({
+              type: "deadline",
+              actor,
+              message: "cadastrou um prazo.",
+              detail: `${prazo.description} · fatal em ${fmtNumericDate(prazo.fatalDate)} · Processo ${process.code}`,
+              clientId: prazo.clientId,
+              processId: process.id,
+              actorUserId: account.currentUserId(),
+              href: `/processos/${process.id}`,
+            }),
+            ...s.activities,
+          ],
+        }))
+        const outcome = sync.outcomeFor<Prazo>(await sync.flush(), "deadlines", prazo.id)
+        if (outcome.status !== "saved") return null
+        return stateRef.current.deadlines.find((d) => d.id === prazo.id) ?? prazo
+      },
+
+      setPrazoStatus(id, status, options) {
+        return save<Prazo>("deadlines", id, options, () => {
+          const current = stateRef.current.deadlines.find((d) => d.id === id)
+          if (!current || current.status !== "aberto") return false
+          const at = nowISO()
+          const updated: Prazo = { ...current, status, updatedAt: at, closedAt: at, closedById: account.currentUserId() }
+          const process = stateRef.current.processes.find((p) => p.id === current.processId)
+          commit((s) => ({
+            ...s,
+            deadlines: s.deadlines.map((d) => (d.id === id ? updated : d)),
+            activities: [
+              logActivity({
+                type: "deadline",
+                actor: account.getUser(account.currentUserId()).name,
+                message: status === "cumprido" ? "cumpriu um prazo." : "marcou um prazo como perdido.",
+                detail: [current.description, `fatal em ${fmtNumericDate(current.fatalDate)}`, process && `Processo ${process.code}`]
+                  .filter(Boolean)
+                  .join(" · "),
+                clientId: current.clientId ?? process?.clientId,
+                processId: current.processId,
+                actorUserId: account.currentUserId(),
+                href: `/processos/${current.processId}`,
+              }),
+              ...s.activities,
+            ],
+          }))
+          return true
+        })
       },
 
       updateTask(id, patch, options) {
