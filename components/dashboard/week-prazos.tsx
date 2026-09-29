@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Hourglass, Plus } from "lucide-react"
+import { ArrowRight, Hourglass, Plus } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
@@ -28,11 +28,19 @@ export function WeekPrazos() {
         title="Prazos da semana"
         description={total ? `${total} ${total === 1 ? "prazo aberto" : "prazos abertos"} até domingo` : "Nenhum prazo aberto até domingo"}
         action={
-          <Can permission="processes.edit">
-            <Button variant="ghost" size="icon-sm" aria-label="Novo prazo" onClick={() => openDialog("prazo")}>
-              <Plus />
-            </Button>
-          </Can>
+          <>
+            <Can permission="processes.edit">
+              <Button variant="ghost" size="icon-sm" aria-label="Novo prazo" onClick={() => openDialog("prazo")}>
+                <Plus />
+              </Button>
+            </Can>
+            <Link
+              href="/tarefas/prazos"
+              className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              Ver todos <ArrowRight className="size-3.5" />
+            </Link>
+          </>
         }
       />
       {groups.length ? (

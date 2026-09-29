@@ -26,6 +26,7 @@ function useHeaderContext() {
     const c = data.clients.find((x) => x.id === id)
     return { title: c?.name ?? "Cliente", parent: { label: "Clientes", href: "/clientes" } }
   }
+  if (id === "prazos" && root === "tarefas") return { title: "Prazos", parent: { label: "Tarefas", href: "/tarefas" } }
   if (id && root === "processos") {
     const p = data.processes.find((x) => x.id === id)
     return { title: p ? `Processo ${p.code}` : "Processo", parent: { label: "Processos", href: "/processos" } }

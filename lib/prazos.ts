@@ -59,6 +59,28 @@ export function weekPrazos(prazos: readonly Prazo[], now: Date = getNow()): Week
   return [...groups].map(([responsibleId, list]) => ({ responsibleId, prazos: list }))
 }
 
+/** Período de um prazo aberto, para o panorama: vencido, hoje, até domingo, semana que vem ou depois. */
+export type PrazoPeriod = "vencido" | "hoje" | "semana" | "proxima" | "depois"
+
+export const PRAZO_PERIOD_LABEL: Record<PrazoPeriod, string> = {
+  vencido: "Vencidos",
+  hoje: "Hoje",
+  semana: "Até domingo",
+  proxima: "Semana que vem",
+  depois: "Mais adiante",
+}
+
+export function prazoPeriod(prazo: Prazo, now: Date = getNow()): PrazoPeriod {
+  const days = daysToPrazo(prazo, now)
+  if (days < 0) return "vencido"
+  if (days === 0) return "hoje"
+  const sunday = addDays(startOfWeek(now), 6)
+  const fatal = parse(prazo.fatalDate)
+  if (diffInDays(fatal, sunday) <= 0) return "semana"
+  if (diffInDays(fatal, addDays(sunday, 7)) <= 0) return "proxima"
+  return "depois"
+}
+
 /* -------------------------------- Validação -------------------------------- */
 
 export interface PrazoInput {

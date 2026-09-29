@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { CircleCheck, CircleX, Hourglass, ListChecks, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
@@ -63,7 +64,8 @@ export function PrazosPanel({ process }: { process: Process }) {
   )
 }
 
-function PrazoRow({ prazo }: { prazo: Prazo }) {
+/** Um prazo, com cumprir / marcar como perdido. `showProcess`: mostra processo e cliente (fora do perfil do processo). */
+export function PrazoRow({ prazo, showProcess = false }: { prazo: Prazo; showProcess?: boolean }) {
   const data = useDemoData()
   const { setPrazoStatus } = useDemoActions()
   const [confirmLost, setConfirmLost] = React.useState(false)
@@ -73,6 +75,8 @@ function PrazoRow({ prazo }: { prazo: Prazo }) {
   const urgent = isOpen && days <= PRAZO_ALERT_DAYS.soon
   const task = prazoTask(prazo, data.tasks)
   const status = PRAZO_STATUS[prazo.status]
+  const process = showProcess ? data.processes.find((p) => p.id === prazo.processId) : undefined
+  const client = process ? data.clients.find((c) => c.id === process.clientId) : undefined
 
   const close = async (next: "cumprido" | "perdido") => {
     setBusy(true)
@@ -94,6 +98,15 @@ function PrazoRow({ prazo }: { prazo: Prazo }) {
               {status.label}
             </StatusBadge>
           </div>
+          {process && (
+            <Link
+              href={`/processos/${process.id}`}
+              className="mt-0.5 block truncate rounded-sm text-[12px] text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              Processo {process.code}
+              {client ? ` · ${client.name}` : ""}
+            </Link>
+          )}
           <p className={cn("mt-0.5 text-[12px]", urgent ? "font-medium text-danger" : "text-muted-foreground")}>
             Fatal em {fmtNumericDate(prazo.fatalDate)}
             {isOpen && ` · ${fmtDueIn(prazo.fatalDate)}`} · interna {fmtNumericDate(prazo.internalDate)}

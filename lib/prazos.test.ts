@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import type { Prazo } from "@/types"
-import { nextPrazo, prazosOfProcess, validatePrazo, weekPrazos } from "./prazos"
+import { nextPrazo, prazoPeriod, prazosOfProcess, validatePrazo, weekPrazos } from "./prazos"
 
 const NOW = new Date(2026, 8, 24, 10, 0) // qui, 24/09/2026 — semana de 21 a 27/09
 
@@ -92,5 +92,24 @@ describe("validação do prazo", () => {
   it("data interna depois da fatal só com justificativa", () => {
     assert.ok(validatePrazo({ ...valid, internalDate: "2026-10-12" }).internalDateReason)
     assert.deepEqual(validatePrazo({ ...valid, internalDate: "2026-10-12", internalDateReason: "Protocolo combinado com o cliente" }), {})
+  })
+})
+
+describe("período do prazo (panorama)", () => {
+  it("vencido, hoje, até domingo, semana que vem e depois", () => {
+    const period = (fatalDate: string, now = NOW) => prazoPeriod(prazo("x", { fatalDate }), now)
+    assert.equal(period("2026-09-23"), "vencido")
+    assert.equal(period("2026-09-24"), "hoje")
+    assert.equal(period("2026-09-25"), "semana")
+    assert.equal(period("2026-09-27"), "semana")
+    assert.equal(period("2026-09-28"), "proxima")
+    assert.equal(period("2026-10-04"), "proxima")
+    assert.equal(period("2026-10-05"), "depois")
+  })
+
+  it("no domingo, o próprio domingo é hoje e segunda já é semana que vem", () => {
+    const sunday = new Date(2026, 8, 27, 20, 0)
+    assert.equal(prazoPeriod(prazo("x", { fatalDate: "2026-09-27" }), sunday), "hoje")
+    assert.equal(prazoPeriod(prazo("x", { fatalDate: "2026-09-28" }), sunday), "proxima")
   })
 })

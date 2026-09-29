@@ -433,8 +433,8 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
   signals = group(signals, "task-today", (n) => plural(n, "tarefa para hoje", "tarefas para hoje"), "/tarefas?filtro=hoje")
   signals = group(signals, "process-stale", (n) => `${plural(n, "processo", "processos")} sem movimentação há +${STALE_DAYS} dias`, "/processos")
   signals = group(signals, "process-moved", (n) => plural(n, "processo com movimentação recente", "processos com movimentação recente"), "/processos")
-  signals = group(signals, "deadline-week", (n) => plural(n, "prazo em até 5 dias", "prazos em até 5 dias"), "/processos?filtro=prazos")
-  signals = group(signals, "deadline-no-task", (n) => plural(n, "prazo sem tarefa", "prazos sem tarefa"), "/processos?filtro=prazos")
+  signals = group(signals, "deadline-week", (n) => plural(n, "prazo em até 5 dias", "prazos em até 5 dias"), "/tarefas/prazos?filtro=semana")
+  signals = group(signals, "deadline-no-task", (n) => plural(n, "prazo sem tarefa", "prazos sem tarefa"), "/tarefas/prazos?filtro=sem-tarefa")
 
   return signals.sort(bySeverity)
 }
