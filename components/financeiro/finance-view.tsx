@@ -176,7 +176,7 @@ export function FinanceView() {
                         current === "atrasado" ? "border-danger/25 bg-danger-soft" : "border-border bg-surface",
                       )}
                     >
-                      <span className={cn("text-[9.5px] font-semibold tracking-[0.1em]", current === "atrasado" ? "text-danger" : "text-gold-dark")}>
+                      <span className={cn("text-[9.5px] font-semibold tracking-[0.1em]", current === "atrasado" ? "text-danger" : "text-brand-strong")}>
                         {month}
                       </span>
                       <span className="tabular text-[15px] font-semibold leading-tight">{day}</span>
@@ -252,7 +252,7 @@ export function FinanceView() {
                         initial={{ width: 0 }}
                         animate={{ width: `${maxArea ? (a.amount / maxArea) * 100 : 0}%` }}
                         transition={{ duration: 0.6, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                        className={cn("h-full rounded-full", i === 0 ? "bg-gold" : "bg-foreground/75")}
+                        className={cn("h-full rounded-full", i === 0 ? "bg-brand" : "bg-foreground/75")}
                       />
                     </div>
                   </li>

@@ -15,7 +15,7 @@ export const SYSTEM_STATUSES: ConversationStatusOption[] = [
 
 export const STATUS_TONE: Record<ConversationStatusCategory, Tone> = {
   new: "info",
-  in_progress: "gold",
+  in_progress: "brand",
   waiting_client: "warning",
   resolved: "success",
 }
@@ -44,5 +44,5 @@ export const TYPE_PREVIEW: Record<MessageType, string> = {
   unsupported: "Mensagem não suportada",
 }
 
-/** Tamanho máximo de um anexo enviado pelo LEXA (o bucket aceita até 64 MB). */
+/** Tamanho máximo de um anexo enviado pela Íntegra (o bucket aceita até 64 MB). */
 export const MAX_ATTACHMENT_BYTES = 64 * 1024 * 1024

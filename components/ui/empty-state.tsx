@@ -21,7 +21,7 @@ export function EmptyState({
     <div className={cn("flex flex-col items-center justify-center text-center", compact ? "px-6 py-10" : "px-6 py-16", className)}>
       {icon && (
         <div className="relative mb-4">
-          <div className="absolute inset-0 -m-3 rounded-full bg-gold-soft/70 blur-md" aria-hidden />
+          <div className="absolute inset-0 -m-3 rounded-full bg-brand-soft/70 blur-md" aria-hidden />
           <div className="relative flex size-11 items-center justify-center rounded-xl border border-border bg-surface text-muted-foreground shadow-xs [&_svg]:size-5">
             {icon}
           </div>
@@ -36,7 +36,7 @@ export function EmptyState({
 
 export function ErrorState({
   title = "Não conseguimos carregar estas informações.",
-  description = "Verifique sua conexão e tente novamente. Se o problema persistir, fale com o suporte da LEXA.",
+  description = "Verifique sua conexão e tente novamente. Se o problema persistir, fale com o suporte da Íntegra.",
   onRetry,
   className,
 }: {

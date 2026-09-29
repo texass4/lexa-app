@@ -36,8 +36,8 @@ function GatewayBanner({ gateway }: { gateway: FinanceData["gateway"] }) {
   }
   return (
     <Panel className="overflow-hidden">
-      <div className="flex flex-col gap-4 bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklab,var(--gold)_10%,transparent),transparent_60%)] p-5 md:flex-row md:items-center">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] border border-gold/25 bg-gold-soft text-gold-dark">
+      <div className="flex flex-col gap-4 bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklab,var(--brand)_10%,transparent),transparent_60%)] p-5 md:flex-row md:items-center">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] border border-brand/25 bg-brand-soft text-brand-strong">
           <CreditCard className="size-5" />
         </span>
         <div className="min-w-0 flex-1">

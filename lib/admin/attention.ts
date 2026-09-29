@@ -77,7 +77,7 @@ export function attentionItems(orgs: AdminOrganization[], plans: AdminPlan[], no
   if (unpriced.length)
     items.push({
       kind: "unpriced",
-      tone: "gold",
+      tone: "brand",
       count: unpriced.length,
       title: `${unpriced.length} ${unpriced.length === 1 ? "plano sem preço" : "planos sem preço"} definido`,
       detail: `A receita recorrente fica subestimada: ${unpriced.map((p) => p.name).join(", ")}`,

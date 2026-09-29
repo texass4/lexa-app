@@ -1,6 +1,6 @@
 /**
  * Telefones do WhatsApp. No banco e no provedor, só dígitos com DDI
- * (`5511999998888`). Clientes do LEXA guardam o telefone com máscara e sem DDI
+ * (`5511999998888`). Clientes da Íntegra guardam o telefone com máscara e sem DDI
  * (`(11) 99999-8888`) — `phoneMatchKeys` produz as formas comparáveis dos dois lados.
  */
 

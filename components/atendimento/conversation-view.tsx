@@ -59,7 +59,7 @@ import { ContactAvatar, contactName, useContactClient } from "./parts"
 
 const TONE_DOT: Record<string, string> = {
   info: "bg-info",
-  gold: "bg-gold",
+  brand: "bg-brand",
   warning: "bg-warning",
   success: "bg-success",
 }
@@ -78,7 +78,7 @@ function StatusMenu({ conversation, onChanged, disabled }: { conversation: Whats
     <DropdownMenu>
       <DropdownMenuTrigger
         disabled={disabled}
-        className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface px-2 text-[12px] font-medium text-foreground shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40 disabled:cursor-default disabled:hover:border-border"
+        className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface px-2 text-[12px] font-medium text-foreground shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-default disabled:hover:border-border"
       >
         <span className={cn("size-1.5 rounded-full", TONE_DOT[STATUS_TONE[option.category]])} />
         {option.label}
@@ -273,7 +273,7 @@ export function ConversationView({
         <Button variant="ghost" size="icon-sm" aria-label="Voltar para as conversas" onClick={onBack} className="md:hidden">
           <ChevronLeft />
         </Button>
-        <button type="button" onClick={onShowContext} className="flex min-w-0 flex-1 items-center gap-3 rounded-[10px] text-left outline-none focus-visible:ring-2 focus-visible:ring-gold/40">
+        <button type="button" onClick={onShowContext} className="flex min-w-0 flex-1 items-center gap-3 rounded-[10px] text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
           <ContactAvatar contact={conversation.contact} client={client} size="lg" />
           <span className="min-w-0">
             <span className="flex items-center gap-2">
@@ -293,7 +293,7 @@ export function ConversationView({
           <button
             type="button"
             onClick={onAssign}
-            className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40"
+            className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             {assignee ? <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="xs" /> : <UserRoundCheck className="ml-1 size-3.5 text-subtle" />}
             <span className="max-w-[110px] truncate">{assignee ? assignee.firstName : "Atribuir"}</span>
@@ -310,14 +310,14 @@ export function ConversationView({
                 <Button
                   variant="ghost"
                   size="sm"
-                  aria-label="Lexa IA"
+                  aria-label="Íntegra IA"
                   aria-pressed={panel === "ai"}
                   onClick={onShowAi}
-                  className={cn("gap-1.5 px-2 text-gold-dark hover:text-gold-dark", panel === "ai" && "bg-gold-soft")}
+                  className={cn("gap-1.5 px-2 text-brand-strong hover:text-brand-strong", panel === "ai" && "bg-brand-soft")}
                 />
               }
             >
-              <Sparkles /> <span className="hidden sm:inline">Lexa IA</span>
+              <Sparkles /> <span className="hidden sm:inline">Íntegra IA</span>
             </TooltipTrigger>
             <TooltipContent>Resumir, sugerir resposta, identificar tarefas</TooltipContent>
           </Tooltip>
@@ -325,7 +325,7 @@ export function ConversationView({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="Ações rápidas"
-              className="flex size-8 items-center justify-center rounded-[8px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent aria-expanded:text-foreground"
+              className="flex size-8 items-center justify-center rounded-[8px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent aria-expanded:text-foreground"
             >
               <Ellipsis className="size-4" />
             </DropdownMenuTrigger>
@@ -479,7 +479,7 @@ export function ConversationView({
       />
 
       {dragging && (
-        <div className="pointer-events-none absolute inset-2 z-10 flex flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-gold/60 bg-gold-soft/80 text-gold-dark backdrop-blur-[2px]">
+        <div className="pointer-events-none absolute inset-2 z-10 flex flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-brand/60 bg-brand-soft/80 text-brand-strong backdrop-blur-[2px]">
           <Upload className="size-6" />
           <p className="text-[13.5px] font-medium">Solte para anexar à mensagem</p>
         </div>
@@ -492,19 +492,19 @@ export function EmptyConversation() {
   return (
     <div className="flex h-full flex-col items-center justify-center px-8 text-center">
       <div className="relative mb-5">
-        <div className="absolute inset-0 -m-6 rounded-full bg-gold-soft/80 blur-2xl" aria-hidden />
+        <div className="absolute inset-0 -m-6 rounded-full bg-brand-soft/80 blur-2xl" aria-hidden />
         <div className="relative flex size-16 items-center justify-center rounded-[18px] border border-border bg-surface shadow-card">
-          <svg viewBox="0 0 24 24" className="size-7 text-gold" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+          <svg viewBox="0 0 24 24" className="size-7 text-brand" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
             <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
             <path d="M8.5 8.5h7M8.5 11.5h4.5" strokeLinecap="round" />
           </svg>
         </div>
       </div>
-      <h2 className="font-serif text-[26px] leading-tight tracking-[-0.01em]">Central de atendimento</h2>
+      <h2 className="font-display text-[22px] leading-tight font-semibold tracking-[-0.02em]">Central de atendimento</h2>
       <p className="mt-2 max-w-sm text-[13.5px] leading-relaxed text-muted-foreground">
         Escolha uma conversa para responder, registrar notas internas e ver processos, tarefas e documentos do cliente — tudo no mesmo lugar.
       </p>
-      <Link href="/clientes" className="mt-5 text-[12.5px] font-medium text-gold-dark underline-offset-4 hover:underline">
+      <Link href="/clientes" className="mt-5 text-[12.5px] font-medium text-brand-strong underline-offset-4 hover:underline">
         Ver clientes do escritório
       </Link>
     </div>

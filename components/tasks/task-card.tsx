@@ -53,7 +53,7 @@ export function TaskCard({
       onKeyDown={(e) => {
         if (e.key === "Enter") onOpen()
       }}
-      className="group space-y-2 rounded-[10px] border border-border bg-card p-3 text-left shadow-card outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40 data-[draggable=true]:cursor-grab data-[draggable=true]:active:cursor-grabbing"
+      className="group space-y-2 rounded-[10px] border border-border bg-card p-3 text-left shadow-card outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40 data-[draggable=true]:cursor-grab data-[draggable=true]:active:cursor-grabbing"
       data-draggable={editable}
     >
       <div className="flex items-start justify-between gap-1.5">
@@ -65,7 +65,7 @@ export function TaskCard({
             <DropdownMenuTrigger
               aria-label={`Ações para ${task.title}`}
               onClick={(e) => e.stopPropagation()}
-              className="-mt-1 -mr-1 flex size-6 shrink-0 items-center justify-center rounded-[6px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 group-hover:opacity-100 aria-expanded:opacity-100"
+              className="-mt-1 -mr-1 flex size-6 shrink-0 items-center justify-center rounded-[6px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 group-hover:opacity-100 aria-expanded:opacity-100"
             >
               <Ellipsis className="size-3.5" />
             </DropdownMenuTrigger>

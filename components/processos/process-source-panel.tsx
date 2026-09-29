@@ -131,7 +131,7 @@ export function ProcessSyncPanel({
       />
       <div className="space-y-3 px-5 pb-5">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={auto ? "gold" : "neutral"} dot={auto}>
+          <StatusBadge tone={auto ? "brand" : "neutral"} dot={auto}>
             {ORIGIN_LABEL[origin]}
           </StatusBadge>
           {process.source?.sourceStatus && <StatusBadge tone="neutral">{process.source.sourceStatus}</StatusBadge>}
@@ -175,7 +175,7 @@ export function ProcessSyncPanel({
 
         {auto && (
           <p className="flex items-start gap-2 text-[11.5px] leading-relaxed text-subtle">
-            <ShieldCheck className="mt-px size-3.5 shrink-0" />O LEXA consulta automaticamente as informações do processo. Movimentações já conhecidas
+            <ShieldCheck className="mt-px size-3.5 shrink-0" />A Íntegra consulta automaticamente as informações do processo. Movimentações já conhecidas
             não são importadas de novo.
           </p>
         )}

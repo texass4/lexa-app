@@ -1,5 +1,5 @@
 /**
- * Acesso aos dados do escritório para a LEXA IA — somente leitura.
+ * Acesso aos dados do escritório para a Íntegra IA — somente leitura.
  *
  * Duas travas de isolamento, independentes:
  * 1. o cliente Supabase é o da sessão de quem chamou (`createSupabaseServer`),

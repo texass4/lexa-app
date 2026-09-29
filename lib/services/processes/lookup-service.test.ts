@@ -55,7 +55,7 @@ beforeEach(() => {
 })
 
 describe("serviço de consulta de processos", () => {
-  it("normaliza a resposta para o modelo interno do LEXA", async () => {
+  it("normaliza a resposta para o modelo interno da Íntegra", async () => {
     const result = await service().lookup({ organizationId: ORG_A, cnj: FORMATTED })
     assert.equal(result.sheet.number, FORMATTED)
     assert.equal(result.sheet.tribunal, "TRF1")

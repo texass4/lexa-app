@@ -90,7 +90,7 @@ export function AssignDialog({
                         </span>
                         <span className="block truncate text-[12px] text-muted-foreground">{userTitle(m)}</span>
                       </span>
-                      {current && <Check className="size-4 text-gold" />}
+                      {current && <Check className="size-4 text-brand" />}
                     </button>
                   </li>
                 )

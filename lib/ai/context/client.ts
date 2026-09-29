@@ -174,6 +174,6 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
   return {
     context,
     sources: registry.sources,
-    basis: `Baseado no cadastro do cliente e em ${data.processes.length} processo(s) registrados no LEXA.`,
+    basis: `Baseado no cadastro do cliente e em ${data.processes.length} processo(s) registrados na Íntegra.`,
   }
 }

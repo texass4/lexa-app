@@ -111,7 +111,7 @@ describe("GeminiProvider", () => {
     assert.equal(await rejects(gemini({ promptFeedback: { blockReason: "SAFETY" } }).provider.generateText(request)), "BLOCKED")
   })
 
-  it("erros da API viram códigos do LEXA, sem vazar a mensagem original", async () => {
+  it("erros da API viram códigos da Íntegra, sem vazar a mensagem original", async () => {
     const cases: [number, string][] = [
       [429, "PROVIDER_RATE_LIMITED"],
       [401, "INVALID_API_KEY"],

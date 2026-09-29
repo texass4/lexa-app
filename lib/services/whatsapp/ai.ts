@@ -1,5 +1,5 @@
 /**
- * Lexa IA na Central de Atendimento — servidor apenas (usa ANTHROPIC_API_KEY).
+ * Íntegra IA na Central de Atendimento — servidor apenas (usa ANTHROPIC_API_KEY).
  *
  * A IA só lê e sugere. Ela nunca envia mensagem nem cria nada: a tela mostra a
  * sugestão e cada ação (usar a resposta, criar a tarefa, salvar a nota) espera a
@@ -84,7 +84,7 @@ const INSTRUCTIONS: Record<AiAction, string> = {
   internal_summary: "Escreva uma nota interna curta para a equipe do escritório sobre este atendimento.",
 }
 
-const SYSTEM = `Você é a Lexa IA, assistente de um escritório de advocacia brasileiro dentro do CRM LEXA.
+const SYSTEM = `Você é a Íntegra IA, assistente de um escritório de advocacia brasileiro dentro do CRM Íntegra.
 Você recebe a transcrição de um atendimento pelo WhatsApp e ajuda a equipe do escritório.
 Regras:
 - Use só o que está na conversa e no contexto fornecido. Se algo não estiver claro, diga que não está claro.
@@ -94,7 +94,7 @@ Regras:
 
 let client: Anthropic | undefined
 function anthropic() {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) throw new HttpError(503, "A Lexa IA não está configurada no servidor (ANTHROPIC_API_KEY).")
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) throw new HttpError(503, "A Íntegra IA não está configurada no servidor (ANTHROPIC_API_KEY).")
   client ??= new Anthropic()
   return client
 }
@@ -233,17 +233,17 @@ export async function runAssistant(actor: Actor, conversationId: string, action:
       output_config: { format: betaZodOutputFormat(SCHEMAS[action]) },
     })
   } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) throw new HttpError(429, "A Lexa IA está sobrecarregada. Tente de novo em instantes.")
-    if (error instanceof Anthropic.AuthenticationError) throw new HttpError(503, "A chave da Lexa IA é inválida (ANTHROPIC_API_KEY).")
+    if (error instanceof Anthropic.RateLimitError) throw new HttpError(429, "A Íntegra IA está sobrecarregada. Tente de novo em instantes.")
+    if (error instanceof Anthropic.AuthenticationError) throw new HttpError(503, "A chave da Íntegra IA é inválida (ANTHROPIC_API_KEY).")
     if (error instanceof Anthropic.APIError) {
       console.error("[whatsapp/ai]", error.status, error.message)
-      throw new HttpError(502, "A Lexa IA não respondeu agora. Tente de novo.")
+      throw new HttpError(502, "A Íntegra IA não respondeu agora. Tente de novo.")
     }
     throw error
   }
 
-  if (response.stop_reason === "refusal") throw new HttpError(422, "A Lexa IA não pôde analisar este conteúdo.")
-  if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new HttpError(502, "A Lexa IA não concluiu a resposta. Tente de novo.")
+  if (response.stop_reason === "refusal") throw new HttpError(422, "A Íntegra IA não pôde analisar este conteúdo.")
+  if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new HttpError(502, "A Íntegra IA não concluiu a resposta. Tente de novo.")
 
   return { action, result: response.parsed_output, ...(action === "processes" ? { processes } : {}) } as AiResult & { processes?: { number: string }[] }
 }

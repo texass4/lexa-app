@@ -33,7 +33,7 @@ export const POST = route(async (request) => {
   if (officeName.length < 2) throw new HttpError(400, "Informe o nome do escritório.")
 
   const settings = await loadSettings()
-  if (!settings.general.publicSignup) throw new HttpError(403, "O cadastro de novos escritórios está fechado no momento. Fale com a equipe do LEXA.")
+  if (!settings.general.publicSignup) throw new HttpError(403, "O cadastro de novos escritórios está fechado no momento. Fale com a equipe da Íntegra.")
   const plan = await resolveDefaultPlan(settings.general.defaultPlan)
   const status = settings.general.requireApproval ? "pending" : "active"
 

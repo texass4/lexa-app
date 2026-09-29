@@ -21,7 +21,7 @@ import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } fr
 import type { Permission } from "@/lib/auth/permissions"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Process, Task } from "@/types"
 
-/** Sem movimentação há mais que isso = processo parado. Também usado pela LEXA IA. */
+/** Sem movimentação há mais que isso = processo parado. Também usado pela Íntegra IA. */
 export const STALE_DAYS = 60
 /** Janela de "movimentação recente" e "documento novo". */
 export const RECENT_DAYS = 7

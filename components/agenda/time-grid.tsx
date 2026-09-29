@@ -55,7 +55,7 @@ export function TimeGrid({
                 weekend && "bg-surface-muted/30",
               )}
             >
-              <span className={cn("text-[11px] font-medium uppercase tracking-[0.08em]", today ? "text-gold-dark" : "text-muted-foreground")}>
+              <span className={cn("text-[11px] font-medium uppercase tracking-[0.08em]", today ? "text-brand-strong" : "text-muted-foreground")}>
                 {weekdayShort(d.getDay())}
               </span>
               <span
@@ -104,10 +104,10 @@ export function TimeGrid({
                       x.setHours(h, 0, 0, 0)
                       onCreate?.(toLocalISO(x))
                     }}
-                    className="group absolute inset-x-0 border-t border-border/70 outline-none first:border-t-0 hover:bg-gold-soft/40 focus-visible:bg-gold-soft/50 disabled:cursor-default disabled:hover:bg-transparent"
+                    className="group absolute inset-x-0 border-t border-border/70 outline-none first:border-t-0 hover:bg-brand-soft/40 focus-visible:bg-brand-soft/50 disabled:cursor-default disabled:hover:bg-transparent"
                     style={{ top: i * HOUR_PX, height: HOUR_PX }}
                   >
-                    <span className="absolute top-1 left-2 text-[11px] font-medium text-gold-dark opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-disabled:hidden">
+                    <span className="absolute top-1 left-2 text-[11px] font-medium text-brand-strong opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-disabled:hidden">
                       + {String(h).padStart(2, "0")}:00
                     </span>
                   </button>
@@ -118,8 +118,8 @@ export function TimeGrid({
                     className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
                     style={{ top: ((nowMin - START_HOUR * 60) / 60) * HOUR_PX }}
                   >
-                    <span className="-ml-1 size-2 rounded-full bg-gold" />
-                    <span className="h-px flex-1 bg-gold" />
+                    <span className="-ml-1 size-2 rounded-full bg-brand" />
+                    <span className="h-px flex-1 bg-brand" />
                   </div>
                 )}
 
@@ -141,7 +141,7 @@ export function TimeGrid({
                       transition={{ duration: 0.18 }}
                       onClick={() => onSelect(a)}
                       className={cn(
-                        "absolute z-10 overflow-hidden rounded-[7px] border-l-[3px] px-2 text-left outline-none ring-1 ring-inset ring-black/[0.03] transition-[box-shadow,filter] hover:shadow-[0_6px_16px_-8px_rgb(23_23_23/0.35)] hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-gold/50",
+                        "absolute z-10 overflow-hidden rounded-[7px] border-l-[3px] px-2 text-left outline-none ring-1 ring-inset ring-black/[0.03] transition-[box-shadow,filter] hover:shadow-[0_6px_16px_-8px_rgb(15_23_42/0.35)] hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-brand/50",
                         past && "opacity-60",
                         compact ? "py-0.5" : "py-1.5",
                       )}

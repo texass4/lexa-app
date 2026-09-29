@@ -208,7 +208,7 @@ export function Composer({
   const kind = file ? attachmentKindFor(file.type) : undefined
 
   return (
-    <div className={cn("shrink-0 border-t px-3 pt-2.5 pb-3 transition-colors sm:px-4", note ? "border-gold/25 bg-gold-soft/45" : "border-border bg-card")}>
+    <div className={cn("shrink-0 border-t px-3 pt-2.5 pb-3 transition-colors sm:px-4", note ? "border-brand/25 bg-brand-soft/45" : "border-border bg-card")}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex rounded-[9px] border border-border bg-surface-muted/60 p-[2px]">
           {(["reply", "note"] as const).map((mode) => (
@@ -219,7 +219,7 @@ export function Composer({
               aria-selected={draft.mode === mode}
               onClick={() => setDraft({ mode })}
               className={cn(
-                "relative inline-flex h-6 items-center gap-1.5 rounded-[7px] px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
+                "relative inline-flex h-6 items-center gap-1.5 rounded-[7px] px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 draft.mode === mode ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -233,7 +233,7 @@ export function Composer({
             </button>
           ))}
         </div>
-        <span className={cn("text-[11.5px]", note ? "text-gold-dark" : "text-subtle")}>
+        <span className={cn("text-[11.5px]", note ? "text-brand-strong" : "text-subtle")}>
           {note ? "Só a equipe vê. Nunca vai para o WhatsApp." : blocked ? replyDisabledReason : "Enter envia · Shift+Enter quebra a linha"}
         </span>
       </div>
@@ -247,8 +247,8 @@ export function Composer({
             className="overflow-hidden"
           >
             <div className="mb-2 flex items-center gap-2.5 rounded-[10px] border border-border bg-surface-muted/60 py-1.5 pr-1.5 pl-2.5">
-              <Reply className="size-3.5 shrink-0 text-gold" />
-              <div className="min-w-0 flex-1 border-l-2 border-gold/60 pl-2">
+              <Reply className="size-3.5 shrink-0 text-brand" />
+              <div className="min-w-0 flex-1 border-l-2 border-brand/60 pl-2">
                 <p className="text-[11.5px] font-medium text-foreground">{replyTo.direction === "inbound" ? "Respondendo ao cliente" : "Respondendo à sua mensagem"}</p>
                 <p className="truncate text-[12px] text-muted-foreground">{replyTo.body || TYPE_PREVIEW[replyTo.type]}</p>
               </div>
@@ -301,7 +301,7 @@ export function Composer({
         <div
           className={cn(
             "flex items-end gap-1 rounded-[14px] border bg-surface p-1 shadow-xs transition-[border-color,box-shadow] focus-within:ring-3",
-            note ? "border-gold/35 focus-within:border-gold/60 focus-within:ring-gold/15" : "border-border focus-within:border-gold/50 focus-within:ring-gold/12",
+            note ? "border-brand/35 focus-within:border-brand/60 focus-within:ring-brand/15" : "border-border focus-within:border-brand/50 focus-within:ring-brand/12",
           )}
         >
           {!note && (
@@ -309,7 +309,7 @@ export function Composer({
               <DropdownMenuTrigger
                 aria-label="Anexar arquivo"
                 disabled={blocked}
-                className="flex size-9 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 disabled:opacity-50 aria-expanded:bg-accent"
+                className="flex size-9 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50 aria-expanded:bg-accent"
               >
                 <Plus className="size-[18px]" />
               </DropdownMenuTrigger>
@@ -358,7 +358,7 @@ export function Composer({
             </Button>
           ) : (
             <Button
-              variant={note ? "gold" : "default"}
+              variant={note ? "brand" : "default"}
               onClick={() => submit()}
               disabled={blocked || busy || (!draft.text.trim() && !file)}
               className="h-9 rounded-[10px] px-3.5"

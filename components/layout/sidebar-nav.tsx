@@ -67,7 +67,7 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                           aria-current={active ? "page" : undefined}
                           aria-label={badge ? `${item.label} — ${badge.count} ${badge.label}` : item.label}
                           className={cn(
-                            "group relative flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
+                            "group relative flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                             active ? "text-foreground" : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
                             compactCls,
                           )}
@@ -104,7 +104,7 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                         />
                       )}
                       {active && (
-                        <span aria-hidden className="absolute top-1/2 -left-3 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-gold max-md:hidden" />
+                        <span aria-hidden className="absolute top-1/2 -left-3 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-brand max-md:hidden" />
                       )}
                     </TooltipTrigger>
                     <TooltipContent side="right" sideOffset={10} className={tooltipCls}>

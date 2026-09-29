@@ -106,7 +106,7 @@ export function KpiCards() {
           <Link
             href={card.href}
             className={cn(
-              "group relative flex h-full flex-col rounded-[14px] border border-border bg-card p-4 shadow-card outline-none transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-border-strong hover:shadow-[0_6px_20px_-12px_rgb(23_23_23/0.18)] focus-visible:ring-2 focus-visible:ring-gold/40 sm:p-5",
+              "group relative flex h-full flex-col rounded-[14px] border border-border bg-card p-4 shadow-card outline-none transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-border-strong hover:shadow-[0_6px_20px_-12px_rgb(15_23_42/0.18)] focus-visible:ring-2 focus-visible:ring-brand/40 sm:p-5",
             )}
           >
             <div className="flex items-center justify-between gap-2">
@@ -120,7 +120,7 @@ export function KpiCards() {
                   card.label
                 )}
               </span>
-              <card.icon className="size-4 shrink-0 text-subtle transition-colors group-hover:text-gold" strokeWidth={1.8} />
+              <card.icon className="size-4 shrink-0 text-subtle transition-colors group-hover:text-brand" strokeWidth={1.8} />
             </div>
             <p className="tabular mt-3 truncate text-[21px] font-semibold leading-none tracking-[-0.03em] text-foreground min-[390px]:text-[25px] sm:mt-4 sm:text-[30px]">
               {card.value}

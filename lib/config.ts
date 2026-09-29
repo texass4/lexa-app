@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react"
 import type { ClientStatus, InvoiceStatus, PracticeArea, Priority, ProcessStatus } from "@/types"
 
-export type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "gold" | "violet"
+export type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "brand" | "violet"
 
 export const PRACTICE_AREAS: PracticeArea[] = ["Previdenciário", "Trabalhista", "Cível", "Família", "Empresarial", "Imobiliário"]
 
@@ -22,7 +22,7 @@ export const PROCESS_STATUS: Record<ProcessStatus, { label: string; tone: Tone }
   em_andamento: { label: "Em andamento", tone: "info" },
   audiencia: { label: "Audiência", tone: "violet" },
   aguardando_documento: { label: "Aguardando documento", tone: "warning" },
-  recurso: { label: "Em recurso", tone: "gold" },
+  recurso: { label: "Em recurso", tone: "brand" },
   suspenso: { label: "Suspenso", tone: "neutral" },
   concluido: { label: "Concluído", tone: "success" },
 }
@@ -33,7 +33,7 @@ export const INVOICE_STATUS: Record<InvoiceStatus, { label: string; tone: Tone }
   atrasado: { label: "Em atraso", tone: "danger" },
 }
 
-/** Paleta das categorias de compromisso (tons do Notion + o dourado do LEXA). */
+/** Paleta das categorias de compromisso e etiquetas (tons do Notion). Os valores ficam salvos nos dados: não mude nem reordene. */
 export const CATEGORY_COLORS: { name: string; value: string }[] = [
   { name: "Dourado", value: "#A88655" },
   { name: "Cinza", value: "#8A8580" },

@@ -1,5 +1,5 @@
 /**
- * GET  /api/whatsapp/ai — a Lexa IA está configurada?
+ * GET  /api/whatsapp/ai — a Íntegra IA está configurada?
  * POST /api/whatsapp/ai — { conversationId, action } → sugestão da IA (nunca executa nada).
  */
 

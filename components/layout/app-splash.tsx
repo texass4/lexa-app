@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from "react"
+import { Wordmark } from "@/components/brand/logo"
+import { BRAND, SYMBOL } from "@/lib/brand"
 
 /**
- * Intro do LEXA — aparece só enquanto o app realmente inicializa.
+ * Intro da Íntegra — aparece só enquanto o app realmente inicializa.
  *
  * Fica por cima de tudo desde o primeiro HTML (as animações são CSS, então
  * rodam antes da hidratação e não piscam) e sai quando:
@@ -65,22 +67,23 @@ export function useSplashReady(stage: Stage, when: boolean) {
 function Splash({ leaving }: { leaving: boolean }) {
   return (
     <div
-      className="lexa-splash fixed inset-0 z-[200] flex items-center justify-center bg-background"
+      className="brand-splash fixed inset-0 z-[200] flex items-center justify-center bg-background"
       data-leaving={leaving || undefined}
       role={leaving ? undefined : "status"}
-      aria-label={leaving ? undefined : "Carregando o LEXA"}
+      aria-label={leaving ? undefined : `Carregando a ${BRAND.name}`}
       aria-hidden={leaving || undefined}
     >
-      <div className="lexa-splash-content flex flex-col items-center">
-        <span className="lexa-splash-mark relative flex size-14 items-center justify-center overflow-hidden rounded-[15px] bg-[#171717] shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_12px_32px_-12px_rgb(23_23_23/0.35)] dark:bg-[#ECEBE8]">
-          <svg viewBox="0 0 32 32" className="size-full" aria-hidden>
-            <path className="lexa-splash-stroke" d="M11 8.5v15h10" fill="none" stroke="#C4A274" strokeWidth="2.4" strokeLinecap="square" />
-            <path className="lexa-splash-accent" d="M16 8.5h5" fill="none" stroke="#C4A274" strokeWidth="1.2" strokeLinecap="square" />
-          </svg>
+      <div className="brand-splash-content flex flex-col items-center">
+        <svg viewBox={SYMBOL.viewBox} className="brand-splash-mark size-14 drop-shadow-[0_12px_24px_rgb(15_36_70/0.18)]" aria-hidden>
+          <rect width="32" height="32" rx={SYMBOL.radius} fill="var(--logo-tile)" />
+          <path d={SYMBOL.beam} fill="var(--logo-glyph)" />
+          <path className="brand-splash-accent" d={SYMBOL.accent} fill="var(--logo-accent)" />
+        </svg>
+        <span className="brand-splash-word mt-5">
+          <Wordmark className="h-[22px]" />
         </span>
-        <span className="lexa-splash-word mt-5 pl-[0.32em] text-[13px] font-semibold tracking-[0.32em] text-foreground">LEXA</span>
-        <span className="lexa-splash-bar relative mt-6 block h-[2px] w-24 overflow-hidden rounded-full bg-border" aria-hidden>
-          <span className="absolute inset-y-0 left-0 w-2/5 rounded-full bg-gold" />
+        <span className="brand-splash-bar relative mt-6 block h-[2px] w-24 overflow-hidden rounded-full bg-border" aria-hidden>
+          <span className="absolute inset-y-0 left-0 w-2/5 rounded-full bg-brand" />
         </span>
       </div>
     </div>

@@ -1,5 +1,5 @@
 /**
- * Dados de teste da LEXA IA: dois escritórios no mesmo "banco", um Supabase
+ * Dados de teste da Íntegra IA: dois escritórios no mesmo "banco", um Supabase
  * falso que aplica os filtros de verdade (sem RLS — para provar que o
  * repositório isola sozinho) e um provedor de IA falso que registra o que recebeu.
  */

@@ -1,5 +1,5 @@
 /**
- * O que a LEXA IA oferece em cada tela. Quanto mais contexto a tela tem, mais
+ * O que a Íntegra IA oferece em cada tela. Quanto mais contexto a tela tem, mais
  * específica é a pergunta:
  *
  *   Painel     → "Como está meu escritório?"
@@ -15,7 +15,7 @@ import type { ChatScope } from "@/lib/ai/types"
 
 export interface AIContext {
   scope: ChatScope
-  /** Linha abaixo de "LEXA IA" no painel ("Processo 0001", "Ana Souza"). */
+  /** Linha abaixo de "Íntegra IA" no painel ("Processo 0001", "Ana Souza"). */
   subtitle: string
   /** Pergunta que resume a tela — o convite no painel vazio. */
   headline: string

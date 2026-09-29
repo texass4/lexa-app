@@ -37,7 +37,7 @@ export function LoginForm() {
   return (
     <AuthCard
       title="Entrar"
-      description="Acesse o LEXA do seu escritório."
+      description="Acesse a Íntegra do seu escritório."
       footer={
         <>
           Novo por aqui?{" "}

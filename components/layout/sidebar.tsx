@@ -3,11 +3,12 @@
 import Link from "next/link"
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { cn } from "cn"
-import { Logo } from "./logo"
+import { Logo } from "@/components/brand/logo"
 import { SidebarNav } from "./sidebar-nav"
 import { UserMenu } from "./user-menu"
 import { useUI } from "@/lib/store/ui-store"
 import { getOrganization } from "@/lib/account"
+import { BRAND } from "@/lib/brand"
 
 export function Sidebar() {
   const { sidebarCollapsed: collapsed, toggleSidebar } = useUI()
@@ -24,8 +25,8 @@ export function Sidebar() {
       <div className={cn("flex h-[60px] shrink-0 items-center px-4", collapsed ? "justify-center px-0" : "max-lg:justify-center max-lg:px-0")}>
         <Link
           href="/dashboard"
-          aria-label="LEXA — ir para o painel"
-          className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+          aria-label={`${BRAND.name} — ir para o painel`}
+          className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <Logo collapsed className={cn(!collapsed && "lg:hidden")} />
           {!collapsed && <Logo subtitle={getOrganization().name} className="max-lg:hidden" />}
@@ -43,7 +44,7 @@ export function Sidebar() {
           aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
           title={collapsed ? "Expandir (Ctrl B)" : "Recolher (Ctrl B)"}
           className={cn(
-            "hidden h-8 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-[12.5px] text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 lg:flex",
+            "hidden h-8 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-[12.5px] text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 lg:flex",
             collapsed && "justify-center px-0",
           )}
         >

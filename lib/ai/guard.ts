@@ -1,5 +1,5 @@
 /**
- * Proteções de custo da LEXA IA, em memória do servidor (sem Redis):
+ * Proteções de custo da Íntegra IA, em memória do servidor (sem Redis):
  *
  * - limite de uso por pessoa e por escritório (janela deslizante);
  * - cache curto de análises idênticas;

@@ -1,4 +1,4 @@
-# LEXA — mapa do código
+# Íntegra — mapa do código
 
 Guia para alterar o sistema sem adivinhar onde cada coisa mora. Alias `@/` aponta para a raiz de `lexa-app/`.
 
@@ -25,7 +25,7 @@ lib/services/processes/lookup-service.ts  cache (memória → Supabase), stale-w
     ↓
 integrations/legal/datajud/provider.ts    ProcessProvider: client.ts (timeout, retry, 429) + mapper.ts
     ↓
-sheet.ts → import.ts                       ficha normalizada → processo do LEXA
+sheet.ts → import.ts                       ficha normalizada → processo da Íntegra
 
 Central de Atendimento (WhatsApp)
     tela → /api/whatsapp/* → lib/services/whatsapp → Z-API → WhatsApp
@@ -46,27 +46,29 @@ lexa-app/
 │   ├── auth/confirm          troca o token dos links (recuperação/convite) por sessão
 │   └── api/                  processes/* (consulta), auth/* (cadastro, recuperação),
 │                             team/users (gestão do escritório), me/email, admin/*,
-│                             ai/* (LEXA IA), whatsapp/* (Central de Atendimento + webhook da Z-API)
+│                             ai/* (Íntegra IA), whatsapp/* (Central de Atendimento + webhook da Z-API)
 ├── components/
+│   ├── brand/                marca: símbolo, logotipo e composição (Logo, LogoMark, Wordmark)
 │   ├── layout/               intro, sidebar, topbar, busca Ctrl K, notificações, modais globais
 │   ├── ui/                   design system
 │   ├── shared/               peças usadas em mais de um módulo
 │   ├── processos/            lista, perfil, timeline, formulário com consulta CNJ
-│   ├── ai/                   painéis, chat e blocos visuais da LEXA IA
-│   ├── atendimento/          Central de Atendimento (WhatsApp): conversas, conversa, contexto, Lexa IA
+│   ├── ai/                   painéis, chat e blocos visuais da Íntegra IA
+│   ├── atendimento/          Central de Atendimento (WhatsApp): conversas, conversa, contexto, Íntegra IA
 │   └── clientes/ tasks/ agenda/ documentos/ financeiro/ dashboard/ configuracoes/
 ├── lib/
 │   ├── cnj.ts                máscara, normalização e dígito verificador
 │   ├── integrations/legal/   modelo neutro + ProcessProvider (types.ts), erros (errors.ts), DataJud (client, mapper, provider)
 │   ├── integrations/whatsapp/ contrato neutro do provedor + Z-API (cliente HTTP, webhooks)
 │   ├── services/processes/   serviço de consulta + cache, ficha, importação, deduplicação, interpretação
-│   ├── ai/                   LEXA IA: provedor (Gemini), contexto, prompts, schemas, serviços
-│   ├── services/whatsapp/    recebimento, envio, conversas, instância, Lexa IA (servidor)
+│   ├── ai/                   Íntegra IA: provedor (Gemini), contexto, prompts, schemas, serviços
+│   ├── services/whatsapp/    recebimento, envio, conversas, instância, Íntegra IA (servidor)
 │   ├── whatsapp/             telefone, status, mapeadores de linha, cliente do navegador
 │   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros
 │   ├── supabase/             clientes: navegador, servidor (cookie) e admin (service role)
 │   ├── store/                demo-store, ui-store, storage (persistência no Supabase)
 │   ├── account.ts            pessoa e escritório logados (preenchido pela sessão)
+│   ├── brand.ts              marca: nome, posicionamento e geometria do símbolo/logotipo
 │   ├── config.ts             labels, cores de status e paleta das categorias
 │   ├── selectors.ts          consultas derivadas (inclui o financeiro, calculado das faturas)
 │   ├── dates.ts              `getNow()` + formatadores
@@ -93,7 +95,7 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
 | `/login` · `/cadastro` · `/recuperar-senha` · `/redefinir-senha` | `components/auth/*-form.tsx` |
-| `/admin` … | Lexa Admin (Super Admin) — veja a seção 7 |
+| `/admin` … | Íntegra Admin (Super Admin) — veja a seção 7 |
 
 Menu lateral e título do header: `components/layout/nav-config.ts`. Barra inferior do mobile: `mobile-nav.tsx`.
 
@@ -103,7 +105,7 @@ Menu lateral e título do header: `components/layout/nav-config.ts`. Barra infer
 
 Não há processos fictícios. Todo processo vem da consulta automática ou de cadastro manual.
 
-**Regra de interface:** o usuário vê "LEXA → processos → informações". Nome da fonte (DataJud), status HTTP, códigos internos, JSON e mensagens de erro técnicas **nunca** aparecem na tela — ficam nos logs do servidor (`[process-lookup] …`). Rótulos neutros em `lib/services/processes/labels.ts` (ex.: origem `datajud` → "Consulta automática").
+**Regra de interface:** o usuário vê "Íntegra → processos → informações". Nome da fonte (DataJud), status HTTP, códigos internos, JSON e mensagens de erro técnicas **nunca** aparecem na tela — ficam nos logs do servidor (`[process-lookup] …`). Rótulos neutros em `lib/services/processes/labels.ts` (ex.: origem `datajud` → "Consulta automática").
 
 **Consultar** — "Novo processo" → digitar o CNJ → **Preencher** (ou Enter):
 
@@ -163,7 +165,7 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 ## 4b. Central de Atendimento (WhatsApp via Z-API)
 
-**Tela** — `/atendimento`, três áreas: conversas (`conversation-list.tsx`) → conversa (`conversation-view.tsx`: cabeçalho com ações rápidas, busca, `message-list.tsx`, `composer.tsx`) → contexto jurídico (`context-panel.tsx`) com a aba Lexa IA (`ai-panel.tsx`). Abaixo de 1280 px o contexto abre como painel lateral; no celular, lista e conversa se alternam. O `AppShell` dá altura total a essa rota.
+**Tela** — `/atendimento`, três áreas: conversas (`conversation-list.tsx`) → conversa (`conversation-view.tsx`: cabeçalho com ações rápidas, busca, `message-list.tsx`, `composer.tsx`) → contexto jurídico (`context-panel.tsx`) com a aba Íntegra IA (`ai-panel.tsx`). Abaixo de 1280 px o contexto abre como painel lateral; no celular, lista e conversa se alternam. O `AppShell` dá altura total a essa rota.
 
 **Dados** — tabelas próprias (não o padrão jsonb), em `supabase/migrations/0002_whatsapp.sql`:
 
@@ -189,7 +191,7 @@ Isolamento: RLS de leitura (`current_org_id()` + `whatsapp.view`) e **chaves est
 
 **Permissões** — `whatsapp.view` (ler), `whatsapp.edit` (responder, notas, tags, status, assumir conversa sem responsável), `whatsapp.assign` (distribuir e trocar responsável). Padrões por papel em `role_defaults` (0002) e `lib/auth/permissions.ts`.
 
-**Lexa IA** — `POST /api/whatsapp/ai` (`services/whatsapp/ai.ts`, Claude via `@anthropic-ai/sdk`, saída estruturada com zod). Resume, sugere resposta, identifica tarefas e processos, analisa imagens/PDFs recebidos e escreve resumo interno. **Nunca executa nada**: a resposta sugerida vai para o campo (só sai com "Enviar") e criar tarefa / salvar nota pedem confirmação.
+**Íntegra IA** — `POST /api/whatsapp/ai` (`services/whatsapp/ai.ts`, Claude via `@anthropic-ai/sdk`, saída estruturada com zod). Resume, sugere resposta, identifica tarefas e processos, analisa imagens/PDFs recebidos e escreve resumo interno. **Nunca executa nada**: a resposta sugerida vai para o campo (só sai com "Enviar") e criar tarefa / salvar nota pedem confirmação.
 
 Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZATION_ID`, `ZAPI_WEBHOOK_SECRET`, opcionais `ZAPI_WEBHOOK_BASE_URL` e `ANTHROPIC_API_KEY` (veja `.env.example`).
 
@@ -209,7 +211,7 @@ O cliente é a entidade central: processos (`clientId`), tarefas (`related`), do
 
 `app/layout.tsx` → `Providers` (tema, stores, toasts) → `app/(app)/layout.tsx` → `SplashGate` (intro) → `AppShell` (sidebar, topbar, busca, modais).
 
-**Intro** (`components/layout/app-splash.tsx`) — cobre a tela só enquanto o app inicializa de verdade: sai quando os dados do escritório carregam (ou 1,2 s depois da sessão pronta, deixando os esqueletos assumirem). Animação em CSS (`globals.css`, `.lexa-splash-*`), então roda antes da hidratação e não pisca. Sem tempo mínimo artificial; navegar entre páginas não a mostra de novo.
+**Intro** (`components/layout/app-splash.tsx`) — cobre a tela só enquanto o app inicializa de verdade: sai quando os dados do escritório carregam (ou 1,2 s depois da sessão pronta, deixando os esqueletos assumirem). Animação em CSS (`globals.css`, `.brand-splash-*`), então roda antes da hidratação e não pisca. Sem tempo mínimo artificial; navegar entre páginas não a mostra de novo.
 
 **Carregamento sob demanda** — os diálogos globais (`global-dialogs.tsx`) e o gráfico do painel (recharts) saem do pacote inicial; os diálogos são baixados quando o navegador fica ocioso.
 
@@ -219,6 +221,33 @@ openDialog("task", { processId })   // "client" | "task" | "appointment" | "docu
 ```
 
 Design system — reutilize, não invente: `page-header`, `panel`, `button`, `status-badge`, `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens de cor em `app/globals.css`.
+
+## 5b. Marca Íntegra
+
+**Posicionamento** — *Íntegra — Inteligência para a gestão jurídica.* Institucional, sóbria e atemporal; a IA é parte do produto, não a identidade inteira.
+
+**Símbolo** — um "I" estrutural (viga em I: solidez, estrutura, organização) com o acento agudo do "Í" como um bloco inclinado em azul — a camada de inteligência apoiada na estrutura. Grade de 32 × 32, cantos de 7,5. Funciona sozinho como ícone (favicon a partir de 16 px).
+
+**Logotipo** — "Íntegra" em Geist SemiBold convertida em curvas (licença OFL), com o acento redesenhado no mesmo ângulo do símbolo. Composição horizontal: símbolo + nome, com a altura das maiúsculas ≈ metade do símbolo.
+
+**Onde está** — tudo sai de `lib/brand.ts` (nome, posicionamento, `AI_NAME`, geometria). Na interface, use `components/brand/logo.tsx`: `<Logo />` (símbolo + nome; `collapsed`, `subtitle`, `size="sm|md|lg"`, `tone="inverse"` para superfícies sempre escuras), `<LogoMark />` e `<Wordmark />`. Não redesenhe a marca em outros arquivos. Arquivos estáticos em `public/brand/` (`integra-logo`, `integra-symbol`, `integra-wordmark`, cada um com versão `-inverse` para fundos escuros, e os PNG do manifest); `app/icon.svg`, `app/favicon.ico` e `app/apple-icon.png` são o ícone do navegador; `app/manifest.ts` é o manifest do app.
+
+**Cores** — tokens em `app/globals.css`, claro e escuro:
+
+| Token | Claro | Escuro | Uso |
+| --- | --- | --- | --- |
+| `primary` / `navy` | `#0F2446` | `#E6EAF0` | botões principais, cor institucional |
+| `brand` | `#2B57C4` | `#7FA3F5` | destaque: foco, seleção, item ativo, realces |
+| `brand-strong` | `#1F449E` | `#A9C2FA` | texto sobre `brand-soft` |
+| `brand-soft` | `#EEF3FD` | `#152241` | fundos de destaque |
+| `background` / `surface` | `#F6F7F9` / `#FFFFFF` | `#0A0F18` / `#111723` | superfícies |
+| `foreground` / `muted-foreground` | `#0E1726` / `#5F6B7D` | `#E6EAF0` / `#95A0B3` | texto |
+| `success` `warning` `danger` `info` `violet` | discretas | discretas | semânticas |
+| `--logo-*` | marinho | claro | cores da marca (trocam sozinhas no tema escuro) |
+
+A barra do Admin usa `admin-rail` (marinho) e `admin-rail-highlight` para o item ativo. Os tons de status usam `tone="brand"` (antes `gold`).
+
+**Tipografia** — Geist em toda a interface; títulos de página em `font-display` (Geist semibold, entrelinha e espaçamento negativos). A antiga DM Serif Display saiu.
 
 ### O que merece atenção (sem IA)
 
@@ -240,7 +269,7 @@ Transições: `app/(app)/template.tsx` (entrada de página em CSS, `.page-enter`
 
 **Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único; enquanto não há provedor de e-mail, o link sai no terminal (`lib/auth/mailer.ts`).
 
-## 7. Lexa Admin (`/admin`)
+## 7. Íntegra Admin (`/admin`)
 
 Centro de controle do Super Admin, com shell próprio (barra lateral escura, busca `Ctrl K`, pendências, perfil, botão para o CRM).
 
@@ -269,7 +298,7 @@ Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e 
 
 ## 8. O que ainda é simulado
 
-Envio de e-mail (links saem no terminal), integrações (agenda, assinatura digital, boletos), envio de cobrança e exportação de relatório na tela Financeiro e cobrança automática (a estrutura está pronta — seção 7). Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a LEXA IA e todo o painel Admin são reais.
+Envio de e-mail (links saem no terminal), integrações (agenda, assinatura digital, boletos), envio de cobrança e exportação de relatório na tela Financeiro e cobrança automática (a estrutura está pronta — seção 7). Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 
@@ -282,9 +311,9 @@ npm run lint
 npx tsc --noEmit
 ```
 
-## 10. LEXA IA
+## 10. Íntegra IA
 
-Inteligência sobre os dados que já estão no LEXA. O usuário pede, o servidor monta o contexto, o modelo interpreta, a tela mostra — e o usuário decide.
+Inteligência sobre os dados que já estão na Íntegra. O usuário pede, o servidor monta o contexto, o modelo interpreta, a tela mostra — e o usuário decide.
 
 ```
 Botão / chat (components/ai/*)            nunca chama a IA sem clique; nada de SDK no navegador
@@ -310,11 +339,11 @@ lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/
 
 **Custo** — modelo Flash (`GEMINI_MODEL`), temperatura baixa, contexto enxuto (até 20 movimentações, listas curtas, métricas agregadas no panorama), histórico do chat limitado a 10 mensagens, cache de 10 min para análises idênticas e limite de uso por pessoa (8/min, 60/h) e por escritório (200/h) em `guard.ts` — em memória, por instância do servidor.
 
-**Tarefas sugeridas** — nunca são gravadas pela IA: "Criar tarefa" abre `openDialog("task", { title, description, priority, processId })`, o mesmo formulário do LEXA.
+**Tarefas sugeridas** — nunca são gravadas pela IA: "Criar tarefa" abre `openDialog("task", { title, description, priority, processId })`, o mesmo formulário da Íntegra.
 
 **Chat** — sem estado no servidor: o navegador manda o escopo (`process`, `client` ou `office`) e o histórico curto; o contexto é remontado do banco a cada pergunta.
 
-**Camada na interface** — há um único painel de conversa, em `LexaAIProvider` (`components/ai/lexa-ai-provider.tsx`, montado no `AppShell`). O contexto vem da rota: `/processos/[id]` → processo, `/clientes/[id]` → cliente, o resto → escritório, com perguntas próprias de cada tela (`components/ai/ai-context.ts`). Abra com `useLexaAI().open()` ou envie uma pergunta com `ask(prompt, contexto?)` — sempre a partir de um clique. A conversa pertence ao contexto (`key` do escopo): trocar de processo começa outra. Uma tela que quer tratar as fontes citadas (ex.: abrir a movimentação ali mesmo) usa `useAISourceHandler`. Gatilhos: botão "LEXA" no topo, Ctrl K ("Perguntar à LEXA: …"), painéis de Painel/Cliente/Processo, detalhe da tarefa e Agenda.
+**Camada na interface** — há um único painel de conversa, em `LexaAIProvider` (`components/ai/lexa-ai-provider.tsx`, montado no `AppShell`). O contexto vem da rota: `/processos/[id]` → processo, `/clientes/[id]` → cliente, o resto → escritório, com perguntas próprias de cada tela (`components/ai/ai-context.ts`). Abra com `useLexaAI().open()` ou envie uma pergunta com `ask(prompt, contexto?)` — sempre a partir de um clique. A conversa pertence ao contexto (`key` do escopo): trocar de processo começa outra. Uma tela que quer tratar as fontes citadas (ex.: abrir a movimentação ali mesmo) usa `useAISourceHandler`. Gatilhos: botão "IA" no topo, Ctrl K ("Perguntar à Íntegra: …"), painéis de Painel/Cliente/Processo, detalhe da tarefa e Agenda.
 
 **Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
 

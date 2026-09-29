@@ -5,40 +5,30 @@ import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowLeftRight, Wrench } from "lucide-react"
 import { cn } from "cn"
+import { LogoMark, Wordmark } from "@/components/brand/logo"
+import { BRAND } from "@/lib/brand"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ADMIN_NAV, isAdminActive } from "./nav"
 import { useAdminShell } from "./admin-context"
 
 export function AdminMark({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[9px] border border-gold/35 bg-[#0e0e0d] shadow-[0_0_0_3px_rgb(196_162_116/0.08)]",
-        className,
-      )}
-    >
-      <svg viewBox="0 0 32 32" className="size-full">
-        <path d="M11 8.5v15h10" fill="none" stroke="#C4A274" strokeWidth="2.4" strokeLinecap="square" />
-        <path d="M16 8.5h5" fill="none" stroke="#C4A274" strokeWidth="1.2" strokeLinecap="square" opacity="0.55" />
-      </svg>
-    </span>
-  )
+  return <LogoMark tone="inverse" className={className} />
 }
 
 export function AdminBrand({ compact }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
       <AdminMark />
+      <span className="sr-only">{BRAND.name} Admin</span>
       {!compact && (
-        <span className="flex min-w-0 flex-col leading-none">
-          <span className="flex items-center gap-1.5">
-            <span className="text-[14px] font-semibold tracking-[0.2em] text-admin-rail-foreground">LEXA</span>
-            <span className="rounded-[5px] border border-gold/40 bg-gold/15 px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[#d8bb90]">
+        <span className="flex min-w-0 flex-col items-start">
+          <span className="flex items-center gap-2">
+            <Wordmark tone="inverse" />
+            <span className="rounded-[5px] border border-admin-rail-highlight/35 bg-admin-rail-highlight/12 px-1.5 py-[3px] text-[9.5px] leading-none font-semibold uppercase tracking-[0.14em] text-admin-rail-highlight">
               Admin
             </span>
           </span>
-          <span className="mt-1.5 text-[10.5px] tracking-[0.02em] text-admin-rail-muted">Centro de controle</span>
+          <span className="mt-0.5 text-[10.5px] tracking-[0.01em] text-admin-rail-muted">Centro de controle</span>
         </span>
       )}
     </span>
@@ -73,7 +63,7 @@ export function AdminNav({ variant, onNavigate }: { variant: "rail" | "full"; on
                   aria-current={active ? "page" : undefined}
                   aria-label={rail ? `${item.label}${badge ? ` (${badge})` : ""}` : undefined}
                   className={cn(
-                    "group relative flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/50",
+                    "group relative flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50",
                     rail && "justify-center px-0",
                     active ? "text-admin-rail-foreground" : "text-admin-rail-muted hover:bg-admin-rail-accent/70 hover:text-admin-rail-foreground",
                   )}
@@ -85,20 +75,20 @@ export function AdminNav({ variant, onNavigate }: { variant: "rail" | "full"; on
                       className="absolute inset-0 rounded-[9px] border border-admin-rail-border bg-admin-rail-accent"
                     />
                   )}
-                  {active && <span aria-hidden className="absolute top-1/2 -left-3 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-gold" />}
+                  {active && <span aria-hidden className="absolute top-1/2 -left-3 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-admin-rail-highlight" />}
                   <item.icon
-                    className={cn("relative size-[17px] shrink-0", active ? "text-gold" : "text-admin-rail-subtle group-hover:text-admin-rail-foreground")}
+                    className={cn("relative size-[17px] shrink-0", active ? "text-admin-rail-highlight" : "text-admin-rail-subtle group-hover:text-admin-rail-foreground")}
                     strokeWidth={1.8}
                   />
                   {!rail && <span className="relative flex-1 truncate">{item.label}</span>}
                   {badge > 0 &&
                     (rail ? (
-                      <span className="absolute top-1 right-1.5 size-2 rounded-full bg-gold ring-2 ring-admin-rail" aria-hidden />
+                      <span className="absolute top-1 right-1.5 size-2 rounded-full bg-admin-rail-highlight ring-2 ring-admin-rail" aria-hidden />
                     ) : (
                       <span
                         className={cn(
                           "relative tabular min-w-5 rounded-full px-1.5 py-px text-center text-[10.5px] font-semibold",
-                          item.badge === "pending" ? "bg-gold text-[#171717]" : "bg-danger/85 text-white",
+                          item.badge === "pending" ? "bg-admin-rail-highlight text-[#0b1322]" : "bg-danger/85 text-white",
                         )}
                       >
                         {badge}
@@ -135,7 +125,7 @@ export function MaintenanceNote({ compact }: { compact?: boolean }) {
     <Link
       href="/admin/configuracoes#manutencao"
       className={cn(
-        "flex items-center gap-2.5 rounded-[10px] border border-warning/30 bg-warning/10 text-[12px] text-[#e3bd78] outline-none transition-colors hover:bg-warning/15 focus-visible:ring-2 focus-visible:ring-gold/50",
+        "flex items-center gap-2.5 rounded-[10px] border border-warning/30 bg-warning/10 text-[12px] text-[#e3bd78] outline-none transition-colors hover:bg-warning/15 focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50",
         compact ? "size-9 justify-center" : "px-3 py-2.5",
       )}
       aria-label="Modo manutenção ligado"
@@ -158,7 +148,7 @@ export function BackToCrm({ compact, onNavigate }: { compact?: boolean; onNaviga
       onClick={onNavigate}
       aria-label="Voltar ao CRM"
       className={cn(
-        "flex h-9 items-center gap-2.5 rounded-[9px] text-[12.5px] font-medium text-admin-rail-muted outline-none transition-colors hover:bg-admin-rail-accent/70 hover:text-admin-rail-foreground focus-visible:ring-2 focus-visible:ring-gold/50",
+        "flex h-9 items-center gap-2.5 rounded-[9px] text-[12.5px] font-medium text-admin-rail-muted outline-none transition-colors hover:bg-admin-rail-accent/70 hover:text-admin-rail-foreground focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50",
         compact ? "w-9 justify-center" : "px-2.5",
       )}
     >
@@ -175,7 +165,7 @@ export function AdminSidebar() {
       className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col border-r border-admin-rail-border bg-admin-rail text-admin-rail-foreground md:flex lg:w-[256px]"
     >
       <div className="flex h-[64px] shrink-0 items-center justify-center px-4 lg:justify-start">
-        <Link href="/admin" aria-label="Lexa Admin — dashboard" className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-gold/50">
+        <Link href="/admin" aria-label={`${BRAND.name} Admin — dashboard`} className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50">
           <span className="lg:hidden">
             <AdminMark />
           </span>

@@ -36,7 +36,7 @@ export function zapiCredentialsFromEnv(): ZapiCredentials | null {
   return { instanceId, token, clientToken: process.env.ZAPI_CLIENT_TOKEN?.trim() || undefined }
 }
 
-/** Mensagem legível para quem está no LEXA; o detalhe técnico vai para o log. */
+/** Mensagem legível para quem está na Íntegra; o detalhe técnico vai para o log. */
 function userMessage(status: number, detail: string) {
   if (status === 401 || status === 403 || /client-token|not allowed/i.test(detail))
     return "A Z-API recusou as credenciais. Confira ZAPI_TOKEN e ZAPI_CLIENT_TOKEN."

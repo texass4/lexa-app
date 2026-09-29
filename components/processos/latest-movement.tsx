@@ -27,7 +27,7 @@ const REVIEW: MovementCategory[] = ["prazo", "julgamento", "comunicacao", "audie
 
 /**
  * "O que está acontecendo?" em uma linha: a última movimentação, legível, com
- * o convite para entendê-la. A análise da LEXA IA só roda se a pessoa pedir,
+ * o convite para entendê-la. A análise da Íntegra IA só roda se a pessoa pedir,
  * dentro do detalhe.
  */
 export function LatestMovement({ movement }: { movement?: LexaMovement }) {
@@ -52,14 +52,14 @@ export function LatestMovement({ movement }: { movement?: LexaMovement }) {
         aria-label="Última movimentação"
         className={cn(
           "relative flex flex-col gap-3 overflow-hidden rounded-[14px] border bg-card p-4 shadow-card sm:flex-row sm:items-center sm:gap-4",
-          recent ? "border-gold/30" : "border-border",
+          recent ? "border-brand/30" : "border-border",
         )}
       >
-        {recent && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-gold" />}
+        {recent && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-brand" />}
         <span
           className={cn(
             "flex size-10 shrink-0 items-center justify-center rounded-[11px] border [&_svg]:size-[18px]",
-            recent ? "border-gold/30 bg-gold-soft text-gold-dark" : "border-border bg-surface-muted/60 text-muted-foreground",
+            recent ? "border-brand/30 bg-brand-soft text-brand-strong" : "border-border bg-surface-muted/60 text-muted-foreground",
           )}
           aria-hidden
         >
@@ -73,7 +73,7 @@ export function LatestMovement({ movement }: { movement?: LexaMovement }) {
               {fmtDayLabel(movement.at)} ({fmtRelative(movement.at)})
             </span>
             <span className="rounded-[5px] border border-border bg-surface px-1.5 text-[11px]">{MOVEMENT_CATEGORY_LABEL[movement.category]}</span>
-            {recent && <span className="rounded-[5px] bg-gold-soft px-1.5 text-[11px] font-semibold text-gold-dark">Nova</span>}
+            {recent && <span className="rounded-[5px] bg-brand-soft px-1.5 text-[11px] font-semibold text-brand-strong">Nova</span>}
           </p>
           <p className="mt-1 text-[15px] font-medium leading-snug text-foreground">{movement.title}</p>
           {(movement.description || review) && (

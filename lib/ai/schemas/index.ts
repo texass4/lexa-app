@@ -1,5 +1,5 @@
 /**
- * Formato de cada resposta estruturada da LEXA IA. O mesmo objeto gera o JSON
+ * Formato de cada resposta estruturada da Íntegra IA. O mesmo objeto gera o JSON
  * Schema enviado ao modelo e valida o que volta antes de chegar à tela.
  */
 

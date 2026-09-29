@@ -25,7 +25,7 @@ export function SearchField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
-        className="h-9 w-full rounded-[9px] border border-border bg-surface pr-8 pl-9 text-[13px] text-foreground shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-subtle hover:border-border-strong focus:border-gold/50 focus:ring-3 focus:ring-gold/12 [&::-webkit-search-cancel-button]:hidden"
+        className="h-9 w-full rounded-[9px] border border-border bg-surface pr-8 pl-9 text-[13px] text-foreground shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-subtle hover:border-border-strong focus:border-brand/50 focus:ring-3 focus:ring-brand/12 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
         <button

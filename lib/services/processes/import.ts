@@ -1,5 +1,5 @@
 /**
- * Conversão da ficha externa para o modelo interno do LEXA.
+ * Conversão da ficha externa para o modelo interno da Íntegra.
  *
  * Fica separado do store porque é lógica pura: dá para testar sem React e
  * reaproveitar quando a persistência sair do browser.

@@ -41,7 +41,7 @@ function exportCsv(entries: AuditEntry[]) {
   const url = URL.createObjectURL(new Blob([`﻿${[head.map(esc).join(";"), ...rows].join("\n")}`], { type: "text/csv;charset=utf-8" }))
   const a = document.createElement("a")
   a.href = url
-  a.download = `lexa-auditoria-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `integra-auditoria-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -190,7 +190,7 @@ export function AuditView() {
             <button
               type="button"
               onClick={() => router.replace("/admin/atividade")}
-              className="col-span-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-gold/30 bg-gold-soft px-3 text-[12.5px] font-medium text-gold-dark hover:border-gold/50"
+              className="col-span-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-brand/30 bg-brand-soft px-3 text-[12.5px] font-medium text-brand-strong hover:border-brand/50"
             >
               Usuário: {actorName ?? "selecionado"} <X className="size-3.5" />
             </button>
@@ -309,7 +309,7 @@ export function AuditView() {
         title="Detalhes do registro"
         header={
           <div className="border-b border-border px-5 pt-5 pb-4 pr-14">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gold-dark">Registro de auditoria</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-brand-strong">Registro de auditoria</p>
             <h2 className="mt-1 text-[17px] font-semibold">{entry ? auditLabel(entry.action) : ""}</h2>
           </div>
         }

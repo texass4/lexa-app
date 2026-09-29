@@ -217,13 +217,13 @@ function PlanCard({ plan, isDefault, onEdit, onToggle }: { plan: AdminPlan; isDe
         inactive ? "border-dashed border-border opacity-70" : "border-border",
       )}
     >
-      <div className="bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--gold)_10%,transparent),transparent_55%)] p-5">
+      <div className="bg-[radial-gradient(120%_100%_at_100%_0%,color-mix(in_oklab,var(--brand)_10%,transparent),transparent_55%)] p-5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-[16px] font-semibold tracking-[-0.01em]">
               {plan.name}
               {isDefault && (
-                <span className="rounded-[5px] bg-gold-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-gold-dark">Padrão</span>
+                <span className="rounded-[5px] bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-brand-strong">Padrão</span>
               )}
             </h3>
             {plan.description && <p className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">{plan.description}</p>}
@@ -239,7 +239,7 @@ function PlanCard({ plan, isDefault, onEdit, onToggle }: { plan: AdminPlan; isDe
               <span className="text-[12.5px] text-muted-foreground">/{plan.interval === "year" ? "ano" : "mês"}</span>
             </>
           ) : (
-            <button type="button" onClick={onEdit} className="text-[13px] font-medium text-gold-dark underline-offset-4 hover:underline">
+            <button type="button" onClick={onEdit} className="text-[13px] font-medium text-brand-strong underline-offset-4 hover:underline">
               Definir preço →
             </button>
           )}

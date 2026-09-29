@@ -1,5 +1,5 @@
 /**
- * Papéis e permissões do LEXA. Os padrões por papel precisam ser iguais a
+ * Papéis e permissões da Íntegra. Os padrões por papel precisam ser iguais a
  * `role_defaults` na migração mais recente que a redefine (hoje
  * `supabase/migrations/0002_whatsapp.sql`) — o banco (RLS) é quem
  * garante; aqui é só para a interface esconder o que a pessoa não pode usar.

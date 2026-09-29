@@ -15,7 +15,7 @@ export const ORG_STATUSES: OrgStatus[] = ["pending", "active", "suspended", "ina
 
 export const ORG_STATUS: Record<OrgStatus, { label: string; tone: Tone; description: string }> = {
   pending: { label: "Aguardando aprovação", tone: "warning", description: "Cadastro recebido; ninguém entra até a aprovação." },
-  active: { label: "Ativo", tone: "success", description: "Equipe com acesso normal ao LEXA." },
+  active: { label: "Ativo", tone: "success", description: "Equipe com acesso normal à Íntegra." },
   suspended: { label: "Suspenso", tone: "danger", description: "Acesso bloqueado temporariamente (ex.: pagamento). Os dados ficam guardados." },
   inactive: { label: "Inativo", tone: "neutral", description: "Acesso encerrado. Os dados ficam guardados e o escritório pode ser reativado." },
 }

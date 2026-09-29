@@ -22,7 +22,7 @@ const FULL_HEIGHT = ["/atendimento"]
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed } = useUI()
   const { can, user } = useSession()
-  // "Desde sua última visita": marca presença enquanto o LEXA estiver aberto.
+  // "Desde sua última visita": marca presença enquanto a Íntegra estiver aberto.
   React.useEffect(() => trackVisit(user.id), [user.id])
   const pathname = usePathname()
   const permission = routePermission(pathname)

@@ -19,7 +19,7 @@ import { FRESH_FOR_MS, MIN_REFRESH_INTERVAL_MS } from "@/lib/services/processes/
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-/** Id interno do LEXA (`p_102938`, `p_abc123`). */
+/** Id interno da Íntegra (`p_102938`, `p_abc123`). */
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 export async function POST(request: Request, context: RouteContext<"/api/processes/[id]/sync">) {

@@ -41,7 +41,7 @@ function SinceLastVisit() {
   const shown = expanded ? changes : changes.slice(0, CHANGES_VISIBLE)
 
   return (
-    <section aria-label="Desde sua última visita" className="mx-3 mb-3 rounded-[12px] border border-gold/20 bg-gold-soft/40 px-3 pt-3 pb-2">
+    <section aria-label="Desde sua última visita" className="mx-3 mb-3 rounded-[12px] border border-brand/20 bg-brand-soft/40 px-3 pt-3 pb-2">
       <header className="flex items-center justify-between gap-3 px-1">
         <p className="text-[12.5px] text-muted-foreground">
           <span className="font-semibold text-foreground">{changes.length === 1 ? "1 coisa mudou" : `${changes.length} coisas mudaram`}</span> desde
@@ -83,7 +83,7 @@ function SinceLastVisit() {
                 {change.href ? (
                   <Link
                     href={change.href}
-                    className="flex items-start gap-3 rounded-[8px] px-1 py-1.5 outline-none transition-colors hover:bg-surface/70 focus-visible:ring-2 focus-visible:ring-gold/40"
+                    className="flex items-start gap-3 rounded-[8px] px-1 py-1.5 outline-none transition-colors hover:bg-surface/70 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     {body}
                   </Link>
@@ -100,7 +100,7 @@ function SinceLastVisit() {
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="mt-0.5 flex items-center gap-1 rounded-md px-1 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+          className="mt-0.5 flex items-center gap-1 rounded-md px-1 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           {expanded ? "Mostrar menos" : `Ver mais ${changes.length - CHANGES_VISIBLE}`}
           <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
@@ -148,7 +148,7 @@ export function AttentionPanel({
               type="button"
               onClick={() => setShowAll((v) => !v)}
               aria-expanded={showAll}
-              className="mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {showAll ? "Mostrar só o principal" : `Ver todos (${signals.length})`}
               <ChevronDown className={cn("size-3.5 transition-transform", showAll && "rotate-180")} />
@@ -158,7 +158,7 @@ export function AttentionPanel({
       ) : empty ? (
         <div className="px-5 pb-5">
           <p className="max-w-lg text-[13px] leading-relaxed text-muted-foreground">
-            Seu escritório ainda não tem processos nem tarefas. Quando você adicionar, a LEXA acompanha prazos e movimentações e destaca aqui o que
+            Seu escritório ainda não tem processos nem tarefas. Quando você adicionar, a Íntegra acompanha prazos e movimentações e destaca aqui o que
             merece atenção.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">

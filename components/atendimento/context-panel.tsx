@@ -135,7 +135,7 @@ function ContactCard({ conversation, client }: { conversation: WhatsAppConversat
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="Opções do vínculo"
-              className="flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="flex size-8 items-center justify-center rounded-[8px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <Ellipsis className="size-4" />
             </DropdownMenuTrigger>
@@ -297,7 +297,7 @@ function Tags({ conversation, onChanged }: { conversation: WhatsAppConversation;
           <Popover>
             <PopoverTrigger
               aria-label="Adicionar tag"
-              className="flex size-7 items-center justify-center rounded-[7px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="flex size-7 items-center justify-center rounded-[7px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <Plus className="size-3.5" />
             </PopoverTrigger>
@@ -310,7 +310,7 @@ function Tags({ conversation, onChanged }: { conversation: WhatsAppConversation;
                   if (e.key === "Enter" && query.trim() && !exact) create()
                 }}
                 placeholder="Buscar ou criar tag"
-                className="h-8 w-full rounded-[8px] border border-border bg-surface px-2.5 text-[13px] outline-none focus:border-gold/50"
+                className="h-8 w-full rounded-[8px] border border-border bg-surface px-2.5 text-[13px] outline-none focus:border-brand/50"
               />
               <ul className="max-h-48 overflow-y-auto thin-scrollbar">
                 {options.map((t) => {
@@ -324,7 +324,7 @@ function Tags({ conversation, onChanged }: { conversation: WhatsAppConversation;
                       >
                         <span className="size-2 shrink-0 rounded-full" style={categoryStyle(t.color).dot} />
                         <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                        {on && <span className="text-[11px] text-gold-dark">aplicada</span>}
+                        {on && <span className="text-[11px] text-brand-strong">aplicada</span>}
                       </button>
                     </li>
                   )
@@ -341,7 +341,7 @@ function Tags({ conversation, onChanged }: { conversation: WhatsAppConversation;
                         aria-checked={color === c.value}
                         aria-label={c.name}
                         onClick={() => setColor(c.value)}
-                        className={cn("size-5 rounded-full outline-none ring-offset-2 ring-offset-popover focus-visible:ring-2 focus-visible:ring-gold/50", color === c.value && "ring-2 ring-foreground/40")}
+                        className={cn("size-5 rounded-full outline-none ring-offset-2 ring-offset-popover focus-visible:ring-2 focus-visible:ring-brand/50", color === c.value && "ring-2 ring-foreground/40")}
                         style={{ backgroundColor: c.value }}
                       />
                     ))}

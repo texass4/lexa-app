@@ -283,7 +283,7 @@ export function ProfileSection() {
       </Panel>
 
       <Panel>
-        <PanelHeader title="Acesso" description="E-mail e senha usados para entrar no LEXA." />
+        <PanelHeader title="Acesso" description="E-mail e senha usados para entrar na Íntegra." />
         <div className="space-y-6 px-5 pb-5">
           <EmailForm />
           <div className="border-t border-border pt-5">
@@ -307,8 +307,8 @@ export function ProfileSection() {
         <div className="grid grid-cols-1 gap-3 px-5 pb-5 sm:grid-cols-2">
           {(
             [
-              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F8F8F6]", bar: "bg-white", line: "bg-[#E7E5E4]" },
-              { id: "dark", label: "Escuro", icon: Moon, preview: "bg-[#0E0E0D]", bar: "bg-[#161615]", line: "bg-[#292826]" },
+              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F6F7F9]", bar: "bg-white", line: "bg-[#E4E7EC]", accent: "bg-[#2B57C4]" },
+              { id: "dark", label: "Escuro", icon: Moon, preview: "bg-[#0A0F18]", bar: "bg-[#111723]", line: "bg-[#212A39]", accent: "bg-[#7FA3F5]" },
             ] as const
           ).map((t) => (
             <button
@@ -317,7 +317,7 @@ export function ProfileSection() {
               onClick={() => setTheme(t.id)}
               aria-pressed={theme === t.id}
               className={cn(
-                "group rounded-[12px] border p-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
+                "group rounded-[12px] border p-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 theme === t.id ? "border-foreground" : "border-border hover:border-border-strong",
               )}
             >
@@ -327,7 +327,7 @@ export function ProfileSection() {
                   <div className={cn("h-3 w-1/2 rounded-[3px]", t.bar)} />
                   <div className={cn("flex-1 rounded-[4px]", t.bar)}>
                     <div className={cn("m-1.5 h-1 w-2/3 rounded", t.line)} />
-                    <div className="m-1.5 h-1 w-1/4 rounded bg-[#A88655]" />
+                    <div className={cn("m-1.5 h-1 w-1/4 rounded", t.accent)} />
                   </div>
                 </div>
               </div>

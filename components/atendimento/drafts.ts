@@ -3,7 +3,7 @@
 import * as React from "react"
 
 /**
- * Rascunho de cada conversa, mantido ao trocar de conversa. A Lexa IA escreve aqui
+ * Rascunho de cada conversa, mantido ao trocar de conversa. A Íntegra IA escreve aqui
  * a resposta sugerida: ela aparece no campo, e só vai para o cliente se a pessoa
  * clicar em Enviar.
  */

@@ -101,7 +101,7 @@ function AttachmentMenu({ attachment, clientId, tone }: { attachment: WhatsAppAt
       <DropdownMenuTrigger
         aria-label="Ações do arquivo"
         className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-[7px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
+          "flex size-7 shrink-0 items-center justify-center rounded-[7px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
           tone === "dark" ? "text-primary-foreground/70 hover:bg-white/10 hover:text-primary-foreground" : "text-subtle hover:bg-accent hover:text-foreground",
         )}
       >
@@ -155,7 +155,7 @@ function ImageAttachment({ attachment, clientId }: { attachment: WhatsAppAttachm
   return (
     <>
       <div className="group/image relative">
-        <button type="button" onClick={() => setOpen(true)} className="block overflow-hidden rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-gold/50">
+        <button type="button" onClick={() => setOpen(true)} className="block overflow-hidden rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-brand/50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={url}
@@ -180,14 +180,14 @@ function ImageAttachment({ attachment, clientId }: { attachment: WhatsAppAttachm
               <button
                 type="button"
                 onClick={() => openAttachment(attachment, true)}
-                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-gold/50"
+                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
                 aria-label="Baixar imagem"
               >
                 <Download className="size-4" />
               </button>
               <DialogPrimitive.Close
                 aria-label="Fechar"
-                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-gold/50"
+                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
               >
                 <X className="size-4" />
               </DialogPrimitive.Close>
@@ -224,7 +224,7 @@ function AudioAttachment({ attachment, tone }: { attachment: WhatsAppAttachment;
         disabled={!url}
         aria-label={playing ? "Pausar áudio" : "Tocar áudio"}
         className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/50 disabled:opacity-50",
+          "flex size-9 shrink-0 items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/50 disabled:opacity-50",
           dark ? "bg-primary-foreground text-primary" : "bg-foreground text-background",
         )}
       >
@@ -246,7 +246,7 @@ function AudioAttachment({ attachment, tone }: { attachment: WhatsAppAttachment;
           }}
           className={cn("relative h-1.5 cursor-pointer rounded-full", dark ? "bg-primary-foreground/25" : "bg-border-strong/70")}
         >
-          <span className={cn("absolute inset-y-0 left-0 rounded-full", dark ? "bg-primary-foreground" : "bg-gold")} style={{ width: `${progress * 100}%` }} />
+          <span className={cn("absolute inset-y-0 left-0 rounded-full", dark ? "bg-primary-foreground" : "bg-brand")} style={{ width: `${progress * 100}%` }} />
         </div>
         <p className={cn("tabular mt-1 text-[11px]", dark ? "text-primary-foreground/70" : "text-muted-foreground")}>
           {attachment.voiceNote ? "Mensagem de voz" : (attachment.fileName ?? "Áudio")} · {fmtDuration(playing || progress ? progress * duration : duration)}

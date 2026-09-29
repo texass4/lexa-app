@@ -5,7 +5,7 @@ import { AdminSidebar } from "./admin-sidebar"
 import { AdminDrawer, AdminTopbar } from "./admin-topbar"
 import { AdminSearch } from "./admin-search"
 
-/** Moldura do Lexa Admin: barra lateral escura própria, topo com busca, pendências e perfil. */
+/** Moldura do Íntegra Admin: barra lateral escura própria, topo com busca, pendências e perfil. */
 export function AdminShell({ admin, children }: { admin: AdminIdentity; children: React.ReactNode }) {
   return (
     <AdminShellProvider admin={admin}>

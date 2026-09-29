@@ -171,7 +171,7 @@ async function processMessage(instance: Instance, event: MessageEvent, raw: unkn
   if (known) return { status: "ignored", reason: "mensagem já registrada", followUps: [] }
 
   if (event.fromMe) {
-    // Enviada pelo LEXA: o webhook pode chegar antes de a Z-API responder o envio.
+    // Enviada pela Íntegra: o webhook pode chegar antes de a Z-API responder o envio.
     // Adota a mensagem pendente em vez de duplicá-la como "enviada pelo celular".
     const since = new Date(Date.now() - 2 * 60_000).toISOString()
     let pending = db()

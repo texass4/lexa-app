@@ -30,7 +30,7 @@ export function TagInput({
 
   return (
     <div className="space-y-2">
-      <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-[9px] border border-input bg-surface px-2 py-1.5 shadow-xs transition-[border-color,box-shadow] focus-within:border-gold/55 focus-within:ring-3 focus-within:ring-gold/12 hover:border-border-strong">
+      <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-[9px] border border-input bg-surface px-2 py-1.5 shadow-xs transition-[border-color,box-shadow] focus-within:border-brand/55 focus-within:ring-3 focus-within:ring-brand/12 hover:border-border-strong">
         {value.map((tag) => (
           <span
             key={tag}
@@ -41,7 +41,7 @@ export function TagInput({
               type="button"
               aria-label={`Remover tag ${tag}`}
               onClick={() => onChange(value.filter((t) => t !== tag))}
-              className="flex size-4 items-center justify-center rounded text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="flex size-4 items-center justify-center rounded text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <X className="size-3" />
             </button>
@@ -81,7 +81,7 @@ export function TagInput({
               onClick={() => add(tag)}
               className={cn(
                 "inline-flex h-6 items-center gap-1 rounded-md border border-dashed border-border-strong px-1.5 text-[11.5px] font-medium text-muted-foreground outline-none",
-                "hover:border-solid hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 [&_svg]:size-3",
+                "hover:border-solid hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 [&_svg]:size-3",
               )}
             >
               <Plus /> {tag}

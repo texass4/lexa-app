@@ -103,7 +103,7 @@ export function AgendaView() {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="font-serif text-[30px] leading-[1.1] tracking-[-0.01em] sm:text-[34px]">Agenda</h1>
+          <h1 className="font-display text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] sm:text-[30px]">Agenda</h1>
           <p className="mt-2 text-[14px] text-muted-foreground">Compromissos e prazos do escritório.</p>
         </div>
         {editable && (
@@ -123,7 +123,7 @@ export function AgendaView() {
               type="button"
               aria-label="Período anterior"
               onClick={() => move(-1)}
-              className="flex size-8 items-center justify-center rounded-l-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="flex size-8 items-center justify-center rounded-l-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <ChevronLeft className="size-4" />
             </button>
@@ -132,7 +132,7 @@ export function AgendaView() {
               type="button"
               aria-label="Próximo período"
               onClick={() => move(1)}
-              className="flex size-8 items-center justify-center rounded-r-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+              className="flex size-8 items-center justify-center rounded-r-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <ChevronRight className="size-4" />
             </button>
@@ -159,7 +159,7 @@ export function AgendaView() {
             aria-checked={onlyMine}
             onClick={() => setOnlyMine((v) => !v)}
             className={cn(
-              "h-8 rounded-[9px] border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
+              "h-8 rounded-[9px] border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
               onlyMine ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-muted-foreground hover:text-foreground",
             )}
           >
@@ -194,7 +194,7 @@ export function AgendaView() {
               aria-pressed={!off}
               onClick={() => toggleType(item.key)}
               className={cn(
-                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-gold/40",
+                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-brand/40",
                 off ? "border-dashed border-border-strong text-subtle" : "border-border bg-surface text-foreground shadow-xs",
               )}
             >

@@ -1,5 +1,5 @@
 /**
- * Tradução do JSON bruto do DataJud para o modelo externo do LEXA.
+ * Tradução do JSON bruto do DataJud para o modelo externo da Íntegra.
  *
  * Todo detalhe do formato da fonte (`hits`, `_source`, `numeroProcesso`,
  * `orgaoJulgador`, `movimentos`…) morre neste arquivo. A UI e o restante da

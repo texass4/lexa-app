@@ -38,7 +38,7 @@ const SHORTCUTS = PROCESS_PROMPTS.filter((prompt) => !prompt.startsWith("Resuma"
 
 /**
  * Inteligência do processo: o que os dados já mostram (sinais) e, sob demanda,
- * a interpretação da LEXA IA. Montar com `key={process.id}`: cada processo tem
+ * a interpretação da Íntegra IA. Montar com `key={process.id}`: cada processo tem
  * suas próprias análises. Nada é chamado sem clique.
  */
 export function ProcessAIPanel({ process, client, signals }: { process: Process; client?: Client; signals: AttentionSignal[] }) {
@@ -121,7 +121,7 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
                 key={prompt}
                 type="button"
                 onClick={() => lexa.ask(prompt, context)}
-                className="h-7 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted-foreground outline-none transition-[border-color,color,transform] hover:border-gold/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 active:scale-[0.97]"
+                className="h-7 rounded-full border border-border bg-surface px-3 text-[12px] font-medium text-muted-foreground outline-none transition-[border-color,color,transform] hover:border-brand/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 active:scale-[0.97]"
               >
                 {prompt}
               </button>
@@ -133,7 +133,7 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
           <div className="space-y-5 border-t border-border px-5 pt-4 pb-5">
             {(summary.data || summary.loading) && (next.data || next.loading) && (
               <FilterTabs
-                ariaLabel="Análises da LEXA IA"
+                ariaLabel="Análises da Íntegra IA"
                 layoutId="process-ai-view"
                 value={view}
                 onChange={setView}
@@ -147,7 +147,7 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
             {active.error && <AIErrorNotice error={active.error} onRetry={view === "summary" ? runSummary : runNext} />}
             {active.loading && (
               <AIThinking
-                label={view === "summary" ? `LEXA está analisando o processo ${process.code}…` : "LEXA está verificando o que fazer agora…"}
+                label={view === "summary" ? `Íntegra IA está analisando o processo ${process.code}…` : "Íntegra IA está verificando o que fazer agora…"}
                 onCancel={active.cancel}
               />
             )}
@@ -239,7 +239,7 @@ function NextView({
         <AISection title="Pontos de atenção">
           <AttentionList points={n.pontos_atencao} sources={result.sources} onOpen={onOpen} />
         </AISection>
-        <AISection title="Sugestões da LEXA IA">
+        <AISection title="Sugestões da Íntegra IA">
           <SuggestionList suggestions={n.sugestoes} sources={result.sources} onOpen={onOpen} onCreate={onCreate} />
           {n.sugestoes.length > 0 && (
             <p className="mt-2 text-[11.5px] text-subtle">

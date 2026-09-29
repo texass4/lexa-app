@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 /**
  * Gráficos discretos do Admin. Uma série por gráfico (sem eixo duplo, sem paleta
  * categórica): o título diz o que é, o tooltip dá o valor exato e o traço/preenchimento
- * usa os tokens da marca (tinta e dourado), que já funcionam no claro e no escuro.
+ * usa os tokens da marca (marinho e azul), que já funcionam no claro e no escuro.
  */
 
 export interface ChartPoint {
@@ -48,7 +48,7 @@ export function TrendChart({
   height = 200,
   unit,
   label,
-  tone = "gold",
+  tone = "brand",
   id,
   format,
 }: {
@@ -56,11 +56,11 @@ export function TrendChart({
   height?: number
   unit: string
   label: string
-  tone?: "gold" | "ink"
+  tone?: "brand" | "ink"
   id: string
   format?: (v: number) => string
 }) {
-  const color = tone === "gold" ? "var(--gold)" : "var(--foreground)"
+  const color = tone === "brand" ? "var(--brand)" : "var(--foreground)"
   return (
     <Frame height={height} label={label}>
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 480, height }}>
@@ -134,7 +134,7 @@ export function BarList({
           </div>
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-muted">
             <div
-              className="h-full rounded-full bg-gold transition-[width] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              className="h-full rounded-full bg-brand transition-[width] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
               style={{ width: `${Math.max((item.value / max) * 100, item.value > 0 ? 3 : 0)}%` }}
             />
           </div>

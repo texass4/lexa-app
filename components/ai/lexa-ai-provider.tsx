@@ -11,7 +11,7 @@ import { clientContext, officeContext, processContext, scopeKey, type AIContext 
 import { useAIChat, useAIStatus } from "./use-ai"
 
 /**
- * A LEXA IA como camada do produto, não como página: um único painel lateral,
+ * A Íntegra IA como camada do produto, não como página: um único painel lateral,
  * disponível em qualquer tela, que já sabe onde a pessoa está (escritório,
  * processo ou cliente) e oferece as perguntas daquele contexto.
  *
@@ -192,7 +192,7 @@ export function useLexaAI() {
   return ctx
 }
 
-/** Registra, enquanto a tela estiver montada, quem abre as fontes citadas pela LEXA IA. */
+/** Registra, enquanto a tela estiver montada, quem abre as fontes citadas pela Íntegra IA. */
 export function useAISourceHandler(handler: SourceHandler) {
   const { registerSourceHandler } = useLexaAI()
   React.useEffect(() => registerSourceHandler(handler), [registerSourceHandler, handler])

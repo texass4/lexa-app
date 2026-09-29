@@ -4,7 +4,7 @@ import { HttpError, requireSuperAdmin } from "@/lib/auth/server"
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 
 /**
- * Pedidos que alteram algo precisam vir do próprio LEXA. Os cookies de sessão já são
+ * Pedidos que alteram algo precisam vir da própria Íntegra. Os cookies de sessão já são
  * SameSite=Lax; isto fecha a porta para formulários de outros sites (CSRF) mesmo
  * que essa configuração mude.
  */

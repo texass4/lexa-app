@@ -67,8 +67,8 @@ export function LookupProgress({ startedAt }: { startedAt: number }) {
     <Card className="border-border bg-surface">
       <p role="status" aria-live="polite" className="flex items-center gap-2 text-[12.5px] font-medium text-foreground">
         <span className="relative flex size-2" aria-hidden>
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-gold/50" />
-          <span className="relative inline-flex size-2 rounded-full bg-gold" />
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand/50" />
+          <span className="relative inline-flex size-2 rounded-full bg-brand" />
         </span>
         <span key={message} className="animate-in fade-in duration-300">
           {message}

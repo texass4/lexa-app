@@ -83,7 +83,7 @@ export async function inviteMember(request: NextRequest, organizationId: string,
   const { data: created, error } = await admin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { name } })
   if (error || !created.user) {
     if (error?.code === "email_exists" || /already/i.test(error?.message ?? "")) {
-      throw new HttpError(409, "Este e-mail já tem conta no LEXA. Cada pessoa pertence a um escritório.")
+      throw new HttpError(409, "Este e-mail já tem conta na Íntegra. Cada pessoa pertence a um escritório.")
     }
     throw error ?? new Error("Falha ao criar usuário.")
   }
@@ -178,7 +178,7 @@ export async function assertUserCapacity(organizationId: string) {
   const custom = org.custom_limits ? sanitizeLimits(org.custom_limits) : {}
   const limit = "users" in custom ? (custom.users ?? null) : (plan?.max_users ?? null)
   if (limit !== null && (count ?? 0) >= limit) {
-    throw new HttpError(403, `O plano ${org.plan} permite até ${limit} usuário(s). Fale com a equipe do LEXA para ampliar.`)
+    throw new HttpError(403, `O plano ${org.plan} permite até ${limit} usuário(s). Fale com a equipe da Íntegra para ampliar.`)
   }
 }
 

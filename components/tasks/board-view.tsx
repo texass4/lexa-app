@@ -50,7 +50,7 @@ function AddColumn() {
         if (next) setName("")
       }}
     >
-      <PopoverTrigger className="flex h-10 w-72 shrink-0 items-center justify-center gap-1.5 self-start rounded-[12px] border border-dashed border-border-strong text-[13px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40">
+      <PopoverTrigger className="flex h-10 w-72 shrink-0 items-center justify-center gap-1.5 self-start rounded-[12px] border border-dashed border-border-strong text-[13px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40">
         <Plus className="size-4" /> Nova coluna
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 gap-3 p-3">
@@ -123,7 +123,7 @@ function ColumnHeader({ column, count, canDelete, editable }: { column: TaskColu
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={`Ações da coluna ${column.name}`}
-              className="flex size-6 shrink-0 items-center justify-center rounded-[6px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40 aria-expanded:bg-accent"
+              className="flex size-6 shrink-0 items-center justify-center rounded-[6px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"
             >
               <Ellipsis className="size-3.5" />
             </DropdownMenuTrigger>
@@ -222,7 +222,7 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
             }}
             className={cn(
               "flex max-h-[calc(100vh-320px)] min-h-40 w-72 shrink-0 flex-col rounded-[14px] border p-2.5 transition-colors",
-              dragOver === column.id ? "border-gold bg-gold-soft/30" : "border-border bg-surface-muted/40",
+              dragOver === column.id ? "border-brand bg-brand-soft/30" : "border-border bg-surface-muted/40",
             )}
           >
             <ColumnHeader column={column} count={items.length} canDelete={columns.length > 1} editable={editable} />

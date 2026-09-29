@@ -113,7 +113,7 @@ export function ConversationList({
       <div className="shrink-0 px-4 pt-4 pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h1 className="font-serif text-[24px] leading-none tracking-[-0.01em] text-foreground">Conversas</h1>
+            <h1 className="font-display text-[20px] leading-none font-semibold tracking-[-0.02em] text-foreground">Conversas</h1>
             <ConnectionBadge className="mt-1.5" />
           </div>
           <Can permission="whatsapp.edit">
@@ -137,7 +137,7 @@ export function ConversationList({
                 aria-selected={active}
                 onClick={() => onFilterChange(f.value)}
                 className={cn(
-                  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/40",
+                  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                   active
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground",
@@ -236,7 +236,7 @@ function ConversationItem({
         selected ? "bg-surface-muted/80" : "hover:bg-accent/60",
       )}
     >
-      {selected && <motion.span layoutId="conversation-active" className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-gold" />}
+      {selected && <motion.span layoutId="conversation-active" className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-brand" />}
       <span className="relative">
         <ContactAvatar contact={c.contact} client={client} size="lg" />
         {!c.contact.clientId && (
@@ -248,16 +248,16 @@ function ConversationItem({
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
           <span className={cn("truncate text-[13.5px]", unread ? "font-semibold text-foreground" : "font-medium text-foreground")}>{name}</span>
-          <span className={cn("tabular shrink-0 text-[11.5px]", unread ? "font-semibold text-gold-dark" : "text-subtle")}>{listTime(c.lastMessageAt ?? c.createdAt)}</span>
+          <span className={cn("tabular shrink-0 text-[11.5px]", unread ? "font-semibold text-brand-strong" : "text-subtle")}>{listTime(c.lastMessageAt ?? c.createdAt)}</span>
         </span>
         <span className="mt-0.5 flex items-center gap-1.5">
           {c.lastMessageDirection === "outbound" && <DeliveryStatus status={c.lastMessageStatus} className="text-subtle" />}
-          {c.lastMessageDirection === "internal" && <StickyNote className="size-3.5 shrink-0 text-gold" />}
+          {c.lastMessageDirection === "internal" && <StickyNote className="size-3.5 shrink-0 text-brand" />}
           <span className={cn("min-w-0 flex-1 truncate text-[12.5px]", unread ? "text-foreground" : "text-muted-foreground")}>
             {c.lastMessagePreview ?? "Conversa iniciada"}
           </span>
           {unread && (
-            <span className="tabular flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-gold px-1 text-[10.5px] font-semibold text-white">
+            <span className="tabular flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-brand px-1 text-[10.5px] font-semibold text-brand-foreground">
               {c.unreadCount > 99 ? "99+" : c.unreadCount}
             </span>
           )}

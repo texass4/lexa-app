@@ -26,7 +26,7 @@ export interface DialogDefaults {
   columnId?: string
   /** Documento a pré-visualizar (`dialog "document-preview"`). */
   documentId?: string
-  /** Rascunho de tarefa (ex.: sugestão da LEXA IA) — só preenche o formulário; quem salva é a pessoa. */
+  /** Rascunho de tarefa (ex.: sugestão da Íntegra IA) — só preenche o formulário; quem salva é a pessoa. */
   title?: string
   description?: string
   priority?: Priority

@@ -189,7 +189,7 @@ function exportCsv(rows: AdminOrganization[]) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `lexa-escritorios-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `integra-escritorios-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -497,7 +497,7 @@ export function OrganizationsView() {
         className="sm:w-[min(960px,calc(100vw-1rem))]"
         header={
           <div className="border-b border-border px-5 pt-5 pb-4 pr-14">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-gold-dark">Usuários</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-brand-strong">Usuários</p>
             <h2 className="mt-1 text-[18px] font-semibold">{sheetOrg?.name}</h2>
           </div>
         }

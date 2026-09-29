@@ -82,7 +82,7 @@ function Overview({ d, goTab }: { d: Detail; goTab: (t: Tab) => void }) {
           <button
             type="button"
             onClick={() => goTab("uso")}
-            className="flex w-full items-center gap-3 rounded-[14px] border border-warning/25 bg-warning-soft px-4 py-3 text-left text-[13px] text-warning outline-none hover:border-warning/40 focus-visible:ring-2 focus-visible:ring-gold/45"
+            className="flex w-full items-center gap-3 rounded-[14px] border border-warning/25 bg-warning-soft px-4 py-3 text-left text-[13px] text-warning outline-none hover:border-warning/40 focus-visible:ring-2 focus-visible:ring-brand/45"
           >
             <TriangleAlert className="size-4 shrink-0" />
             <span className="flex-1">
@@ -171,8 +171,8 @@ function Overview({ d, goTab }: { d: Detail; goTab: (t: Tab) => void }) {
           </div>
         </Panel>
         <Panel className="overflow-hidden">
-          <div className="bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklab,var(--gold)_14%,transparent),transparent_60%)] px-5 pt-4.5 pb-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gold-dark">Plano atual</p>
+          <div className="bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklab,var(--brand)_14%,transparent),transparent_60%)] px-5 pt-4.5 pb-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-strong">Plano atual</p>
             <p className="mt-1 text-[20px] font-semibold tracking-[-0.02em]">{o.plan}</p>
             <p className="text-[12.5px] text-muted-foreground">
               {d.plan?.priceCents ? `${formatCents(d.plan.priceCents)} / ${d.plan.interval === "year" ? "ano" : "mês"}` : "Preço não definido"}

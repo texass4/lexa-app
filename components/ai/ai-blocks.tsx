@@ -20,7 +20,7 @@ export function AIMark({ className }: { className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-gold/25 bg-gold-soft text-gold-dark [&_svg]:size-4",
+        "flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-brand/25 bg-brand-soft text-brand-strong [&_svg]:size-4",
         className,
       )}
     >
@@ -29,9 +29,9 @@ export function AIMark({ className }: { className?: string }) {
   )
 }
 
-/** Moldura das áreas da LEXA IA: mesmo cartão das outras seções, com ações rápidas. */
+/** Moldura das áreas da Íntegra IA: mesmo cartão das outras seções, com ações rápidas. */
 export function AIPanel({
-  title = "LEXA IA",
+  title = "Íntegra IA",
   description,
   actions,
   children,
@@ -76,8 +76,8 @@ export function AIThinking({ label, onCancel, className }: { label: string; onCa
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-2.5 text-[13px] font-medium text-foreground">
           <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-gold/60" />
-            <span className="relative inline-flex size-2 rounded-full bg-gold" />
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand/60" />
+            <span className="relative inline-flex size-2 rounded-full bg-brand" />
           </span>
           {label}
         </p>
@@ -130,10 +130,10 @@ export function AIUnavailable({ status, className }: { status: AIStatus; classNa
     <div className={cn("flex items-start gap-3 rounded-[12px] border border-border bg-surface-muted/50 px-3.5 py-3", className)}>
       <Settings2 className="mt-0.5 size-4 shrink-0 text-subtle" />
       <div className="min-w-0 text-[13px] leading-snug">
-        <p className="font-medium text-foreground">{disabled ? "LEXA IA indisponível" : "LEXA IA não configurada"}</p>
+        <p className="font-medium text-foreground">{disabled ? "Íntegra IA indisponível" : "Íntegra IA não configurada"}</p>
         <p className="mt-0.5 text-muted-foreground">
           {disabled ? (
-            "A LEXA IA foi desativada neste ambiente (AI_ENABLED=false)."
+            "A Íntegra IA foi desativada neste ambiente (AI_ENABLED=false)."
           ) : (
             <>
               Configure <code className="rounded bg-surface px-1 font-mono text-[12px]">GEMINI_API_KEY</code> no ambiente do servidor.
@@ -155,10 +155,10 @@ export type SourceHandler = (source: AISource) => void
 export function SourceChip({ source, onOpen }: { source: AISource; onOpen?: SourceHandler }) {
   const label = source.date ? `${fmtNumericDate(source.date)} · ${source.label}` : source.label
   const className =
-    "inline-flex h-[22px] max-w-full items-center gap-1 rounded-md border border-border bg-surface px-1.5 align-middle text-[11.5px] font-medium text-muted-foreground outline-none transition-colors hover:border-border-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/40"
+    "inline-flex h-[22px] max-w-full items-center gap-1 rounded-md border border-border bg-surface px-1.5 align-middle text-[11.5px] font-medium text-muted-foreground outline-none transition-colors hover:border-border-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
   const content = (
     <>
-      <span className="font-mono text-[10.5px] text-gold-dark">{source.ref}</span>
+      <span className="font-mono text-[10.5px] text-brand-strong">{source.ref}</span>
       <span className="truncate">{label}</span>
     </>
   )
@@ -195,7 +195,7 @@ export function SourceChips({ refs, sources, onOpen, className }: { refs: string
 function RefMark({ source, onOpen }: { source: AISource; onOpen?: SourceHandler }) {
   const title = `Ver origem: ${source.date ? `${fmtNumericDate(source.date)} · ` : ""}${source.label}`
   const className =
-    "mx-0.5 inline-flex h-[18px] items-center rounded-[5px] border border-border bg-surface px-1 align-[1px] font-mono text-[10.5px] font-medium text-gold-dark outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-gold/40"
+    "mx-0.5 inline-flex h-[18px] items-center rounded-[5px] border border-border bg-surface px-1 align-[1px] font-mono text-[10.5px] font-medium text-brand-strong outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
   if (onOpen) {
     return (
       <button type="button" className={className} title={title} aria-label={title} onClick={() => onOpen(source)}>
@@ -282,7 +282,7 @@ export function AttentionList({ points, sources, onOpen }: { points: AttentionPo
   )
 }
 
-/** Notas presas a registros reais: a data e o nome exibidos vêm do LEXA, não do modelo. */
+/** Notas presas a registros reais: a data e o nome exibidos vêm da Íntegra, não do modelo. */
 export function NoteList({ notes, sources, onOpen }: { notes: ReferencedNote[]; sources: AISources; onOpen?: SourceHandler }) {
   const visible = notes.filter((note) => sources[note.ref])
   if (!visible.length) return null
@@ -368,7 +368,7 @@ export function ConfidenceBadge({ level }: { level: Confidence }) {
   )
 }
 
-/** Avisos da verificação do LEXA sobre a resposta (datas ou prazos sem origem nos dados). */
+/** Avisos da verificação da Íntegra sobre a resposta (datas ou prazos sem origem nos dados). */
 export function AIWarnings({ warnings }: { warnings: string[] }) {
   if (!warnings.length) return null
   return (

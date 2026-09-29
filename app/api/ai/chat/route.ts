@@ -1,5 +1,5 @@
 /**
- * POST /api/ai/chat — { scope, messages } → resposta da LEXA IA.
+ * POST /api/ai/chat — { scope, messages } → resposta da Íntegra IA.
  * A permissão depende do escopo e é conferida ao carregar os dados (processo, cliente ou escritório).
  */
 

@@ -1,7 +1,7 @@
 /**
  * Acesso do navegador às rotas de processo.
  *
- * Os componentes recebem a ficha (modelo interno do LEXA) ou um motivo com
+ * Os componentes recebem a ficha (modelo interno da Íntegra) ou um motivo com
  * mensagem pronta para a tela. Nada aqui conhece a fonte externa, status HTTP
  * ou detalhes de erro — isso fica no servidor.
  */

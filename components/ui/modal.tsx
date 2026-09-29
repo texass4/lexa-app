@@ -6,7 +6,7 @@ import { X } from "lucide-react"
 import { cn } from "cn"
 
 /**
- * Modal padrão da LEXA: centralizado no desktop, quase tela cheia (bottom sheet)
+ * Modal padrão da Íntegra: centralizado no desktop, quase tela cheia (bottom sheet)
  * no mobile. Fecha com ESC, clique no overlay ou botão de fechar.
  * O conteúdo é desmontado ao fechar, então formulários começam limpos a cada abertura.
  */
@@ -35,7 +35,7 @@ export function Modal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => onOpenChange(o)}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#171717]/25 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/55" />
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0e1726]/25 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/55" />
         <DialogPrimitive.Popup
           className={cn(
             "fixed z-50 flex flex-col overflow-hidden border border-border bg-popover text-popover-foreground shadow-float outline-none",
@@ -64,7 +64,7 @@ export function Modal({
             </div>
             <DialogPrimitive.Close
               aria-label="Fechar"
-              className="-mt-1 -mr-2 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold/45"
+              className="-mt-1 -mr-2 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

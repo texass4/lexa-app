@@ -1,7 +1,7 @@
 /**
- * LEXA IA no processo: resumo, análise de movimentação e próximos passos.
+ * Íntegra IA no processo: resumo, análise de movimentação e próximos passos.
  * Nenhuma função aqui grava dados — sugestões de tarefa só viram tarefa
- * quando o usuário confirma no formulário normal do LEXA.
+ * quando o usuário confirma no formulário normal da Íntegra.
  */
 
 import { AIError } from "@/lib/ai/errors"

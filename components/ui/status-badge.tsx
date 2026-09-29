@@ -7,7 +7,7 @@ const TONES: Record<Tone, string> = {
   warning: "bg-warning-soft text-warning border-warning/15",
   danger: "bg-danger-soft text-danger border-danger/15",
   info: "bg-info-soft text-info border-info/15",
-  gold: "bg-gold-soft text-gold-dark border-gold/20",
+  brand: "bg-brand-soft text-brand-strong border-brand/20",
   violet: "bg-violet-soft text-violet border-violet/15",
 }
 
@@ -17,7 +17,7 @@ const DOTS: Record<Tone, string> = {
   warning: "bg-warning",
   danger: "bg-danger",
   info: "bg-info",
-  gold: "bg-gold",
+  brand: "bg-brand",
   violet: "bg-violet",
 }
 
