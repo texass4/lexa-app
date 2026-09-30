@@ -29,14 +29,12 @@ export interface NavItem {
 export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Visão geral",
-    items: [
-      { href: "/dashboard", label: "Painel", icon: LayoutGrid },
-      { href: "/triagem", label: "Triagem", icon: Inbox, badgeKey: "triagem", permission: "processes.view" },
-    ],
+    items: [{ href: "/dashboard", label: "Painel", icon: LayoutGrid }],
   },
   {
     label: "Escritório",
     items: [
+      { href: "/triagem", label: "Triagem", icon: Inbox, badgeKey: "triagem", permission: "processes.view" },
       { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
       { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
       {
@@ -75,7 +73,7 @@ export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/clientes": { title: "Clientes", section: "Escritório" },
   "/atendimento": { title: "Central de atendimento", section: "WhatsApp" },
   "/processos": { title: "Processos", section: "Escritório" },
-  "/triagem": { title: "Triagem", section: "Visão geral" },
+  "/triagem": { title: "Triagem", section: "Escritório" },
   "/tarefas": { title: "Tarefas", section: "Escritório" },
   "/tarefas/prazos": { title: "Prazos", section: "Tarefas" },
   "/agenda": { title: "Agenda", section: "Escritório" },
