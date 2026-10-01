@@ -6,13 +6,23 @@ import { countByLevel, type AttentionSignal } from "@/lib/dashboard/attention"
 import { NewMenu } from "@/components/layout/new-menu"
 import { WeatherChip } from "./weather-chip"
 
-/** A frase de abertura responde "como está meu escritório?" com os sinais reais. */
+const piece = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/** A frase de abertura é uma leitura do escritório, não um contador. */
 function statusLine(signals: AttentionSignal[], empty: boolean) {
   if (empty) return "Seu escritório está pronto. Comece cadastrando um cliente ou consultando um processo."
   const { critical, warning } = countByLevel(signals)
-  if (critical) return `${critical === 1 ? "1 ponto precisa" : `${critical} pontos precisam`} da sua atenção hoje.`
-  if (warning) return `Nada urgente agora. ${warning === 1 ? "1 ponto" : `${warning} pontos`} para verificar.`
-  return "Tudo em dia no escritório."
+  const moved = signals.filter((s) => s.kind === "process-moved").reduce((acc, s) => acc + s.count, 0)
+  const review = signals.filter((s) => s.kind === "process-moved" && s.level === "warning").reduce((acc, s) => acc + s.count, 0)
+  const parts: string[] = []
+  if (critical) parts.push(piece(critical, "ponto precisa de atenção hoje", "pontos precisam de atenção hoje"))
+  else if (warning) parts.push(`Nada urgente · ${piece(warning, "ponto para verificar", "pontos para verificar")}`)
+  else parts.push("Tudo em dia no escritório")
+  if (moved) {
+    const movement = piece(moved, "movimentação recente", "movimentações recentes")
+    parts.push(review ? `${movement} · ${piece(review, "pode exigir atenção", "podem exigir atenção")}` : movement)
+  }
+  return parts.join(" · ")
 }
 
 export function Greeting({ signals, empty = false }: { signals: AttentionSignal[]; empty?: boolean }) {

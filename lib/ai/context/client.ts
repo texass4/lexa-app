@@ -8,6 +8,7 @@ import { AIError } from "@/lib/ai/errors"
 import { CLIENT_STATUS, INVOICE_STATUS, PROCESS_STATUS } from "@/lib/core/config"
 import { formatCurrency } from "@/lib/core/format"
 import { isOpenPrazo, nextPrazo } from "@/lib/prazos/prazos"
+import { invoiceStatus, isOpenInvoice } from "@/lib/store/selectors"
 import { toLocalISO } from "@/lib/core/dates"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Task } from "@/types"
 import type { AIRepository, Member, ProcessOverview } from "./repository"
@@ -132,17 +133,17 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
     }
   })
 
-  const invoices = data.invoices
-  const overdue = invoices.filter((i) => i.status === "atrasado")
+  const invoices = data.invoices.filter((i) => i.status !== "cancelado")
+  const overdue = data.invoices.filter((i) => invoiceStatus(i, now) === "atrasado")
   const finance = data.hidden.includes("financeiro")
     ? undefined
     : {
         total_faturado: formatCurrency(sum(invoices)),
         recebido: formatCurrency(sum(invoices.filter((i) => i.status === "pago"))),
-        em_aberto: formatCurrency(sum(invoices.filter((i) => i.status !== "pago"))),
+        em_aberto: formatCurrency(sum(invoices.filter(isOpenInvoice))),
         em_atraso: formatCurrency(sum(overdue)),
-        faturas_em_aberto: invoices
-          .filter((i) => i.status !== "pago")
+        faturas_em_aberto: data.invoices
+          .filter(isOpenInvoice)
           .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
           .slice(0, CLIENT_LIMITS.invoices)
           .map((i) => ({
@@ -150,7 +151,7 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
             descricao: i.description,
             valor: formatCurrency(i.amount),
             vencimento: fmtDate(i.dueDate),
-            situacao: INVOICE_STATUS[i.status]?.label,
+            situacao: INVOICE_STATUS[invoiceStatus(i, now)]?.label,
           })),
       }
 

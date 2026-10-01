@@ -16,7 +16,7 @@
  */
 
 import { addDays, diffInDays, fmtNumericDate, getNow, parse, startOfDay } from "@/lib/core/dates"
-import { isOverdue } from "@/lib/store/selectors"
+import { invoiceStatus, isOverdue } from "@/lib/store/selectors"
 import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } from "@/lib/services/processos/movement-interpreter"
 import type { Permission } from "@/lib/auth/permissions"
 import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos/prazos"
@@ -299,7 +299,7 @@ export function clientSignals(data: AttentionData, client: Client, now: Date = g
   }
 
   if (allowed("finance.view")) {
-    const late = data.invoices.filter((i) => i.clientId === client.id && i.status === "atrasado")
+    const late = data.invoices.filter((i) => i.clientId === client.id && invoiceStatus(i, now) === "atrasado")
     if (late.length) {
       const total = late.reduce((acc, i) => acc + i.amount, 0)
       signals.push({
@@ -414,7 +414,7 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
   }
 
   if (allowed("finance.view")) {
-    const late = data.invoices.filter((i) => i.status === "atrasado")
+    const late = data.invoices.filter((i) => invoiceStatus(i, now) === "atrasado")
     if (late.length) {
       const total = late.reduce((acc, i) => acc + i.amount, 0)
       const clients = new Set(late.map((i) => i.clientId)).size

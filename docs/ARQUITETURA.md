@@ -253,6 +253,15 @@ Base: o redesign com o fundo de colunas na barra lateral (`claude/keen-ride-8iew
 - `lib/store/demo-store.tsx` → `lib/store/office-store.tsx`, com `useDemoData`/`useDemoActions` → `useOfficeData`/`useOfficeActions` (o nome "demo" era de quando havia dados fictícios e confundia).
 - Documentação em `docs/`: este manual, a referência por módulo (`MODULOS.md`, o antigo `ARCHITECTURE.md` com os caminhos atualizados) e a auditoria do MVP.
 
+**Trazido do commit "Trabalho local" (`claude/eager-wright-ie9vfo`)**
+- Financeiro: categoria, observação e situação "Cancelado" nos lançamentos; abas A receber / Recebidos / Em atraso / Cancelados, busca, botão "Recebido", exclusão e "Novo lançamento" no topo; CSV com processo, categoria e observação. Cancelado não conta como aberto nem como inadimplência.
+- Atraso calculado pelo vencimento (`invoiceStatus`) também na Íntegra IA e nos sinais de atenção.
+- Triagem: cada item mostra por que entrou na fila ("Possível prazo em 3 dias", "Pode exigir uma providência") e a contagem da fila.
+- Linguagem: "Leitura", "Conversa" e "Perguntar" no lugar de "Íntegra IA" nas telas; frase de abertura do painel com as movimentações recentes.
+- Tema escuro mais claro e sombras próprias do escuro (agora aplicadas de verdade, via `--elevation-*`).
+- E-mail de cadastro recebido, refeito sobre o serviço SMTP atual (`sendSignupEmail`).
+- Não trazido: o envio por Brevo (substituído pelo SMTP genérico), os cartões de indicadores em texto (o painel segue a referência do redesign) e o `CRON_SECRET` preenchido no `.env.example`.
+
 **Mantido de propósito**
 - `public/brand/*.svg`: kit da marca para uso fora do app (e-mail, materiais). A interface desenha o logotipo em `components/brand/logo.tsx`.
 - `lib/core/utils.ts`: alvo do alias `utils` do shadcn em `components.json`, para o CLI continuar funcionando.

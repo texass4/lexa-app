@@ -175,7 +175,7 @@ const DAY = 86_400_000
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY)
 
 /** Dias corridos até a data fatal sugerida (negativo = já passou). */
-function daysLeft(item: Pick<TriageItem, "suggestion" | "ai">, today: string) {
+export function daysLeft(item: Pick<TriageItem, "suggestion" | "ai">, today: string) {
   const fatal = suggestedDeadline(item)?.fatalDate
   return fatal ? daysBetween(today, fatal) : undefined
 }

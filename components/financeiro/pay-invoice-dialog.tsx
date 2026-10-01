@@ -19,7 +19,7 @@ export function PayInvoiceDialog({ invoice, onOpenChange }: { invoice?: Invoice;
     <Modal
       open={!!invoice}
       onOpenChange={onOpenChange}
-      title="Dar baixa"
+      title="Marcar como recebido"
       description={invoice ? `${invoice.description} · ${formatCurrency(invoice.amount)}` : undefined}
       icon={<CircleCheck />}
       size="sm"

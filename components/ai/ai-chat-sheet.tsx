@@ -40,7 +40,7 @@ function AnswerActions({ entry, context }: { entry: ChatEntry; context: AIContex
             close()
             openDialog("task", {
               ...(scope.type === "process" ? { processId: scope.id } : { clientId: scope.id }),
-              description: `${entry.content.slice(0, 1500)}\n\nOrigem: resposta da Íntegra IA sobre ${context.subtitle}.`,
+              description: `${entry.content.slice(0, 1500)}\n\nOrigem: conversa sobre ${context.subtitle}.`,
             })
           }}
         >
@@ -106,13 +106,13 @@ export function AIChatSheet({
     <SideSheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Íntegra IA"
+      title="Conversa"
       className="sm:w-[520px]"
       header={
         <div className="flex items-center gap-3 border-b border-border px-5 py-4 pr-14">
           <AIMark />
           <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Íntegra IA</h2>
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Conversa</h2>
             <p className="flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
               <span className="size-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
               <span className="truncate">Contexto: {context.subtitle}</span>
@@ -135,7 +135,7 @@ export function AIChatSheet({
         >
           <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface px-3 py-2 focus-within:border-border-strong focus-within:ring-2 focus-within:ring-brand/25">
             <label htmlFor="lexa-ai-input" className="sr-only">
-              Pergunte à Íntegra IA
+              Pergunte à Íntegra
             </label>
             <textarea
               id="lexa-ai-input"
@@ -143,7 +143,7 @@ export function AIChatSheet({
               value={draft}
               maxLength={CHAT_LIMITS.messageChars}
               disabled={!ready}
-              placeholder={ready ? `Pergunte sobre ${TOPIC[context.scope.type]}…` : "Íntegra IA indisponível"}
+              placeholder={ready ? `Pergunte sobre ${TOPIC[context.scope.type]}…` : "Conversa indisponível"}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -157,7 +157,7 @@ export function AIChatSheet({
               <ArrowUp />
             </Button>
           </div>
-          <p className="text-[11px] text-subtle">A Íntegra IA responde só com os dados da Íntegra e pode errar. Confira antes de usar.</p>
+          <p className="text-[11px] text-subtle">A resposta usa só os dados da Íntegra e pode errar. Confira antes de usar.</p>
         </form>
       }
     >
@@ -168,8 +168,8 @@ export function AIChatSheet({
           <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
             <p className="font-display text-[18px] leading-snug font-semibold tracking-[-0.015em] text-foreground">{context.headline}</p>
             <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-              A Íntegra lê os dados registrados sobre {TOPIC[context.scope.type]} e pode {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
-              {CAPABILITIES.at(-1)} — citando de onde tirou cada informação. Respostas viram tarefas com um clique.
+              A partir do que está registrado sobre {TOPIC[context.scope.type]}, dá para {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
+              {CAPABILITIES.at(-1)} — citando de onde veio cada informação. A resposta vira tarefa com um clique.
             </p>
             <div className="mt-5 flex flex-col gap-1.5">
               {context.prompts.map((prompt) => (
@@ -209,7 +209,7 @@ export function AIChatSheet({
 
         {chat.pending && (
           <AIThinking
-            label={`Íntegra IA está analisando ${context.scope.type === "office" ? "os dados do escritório" : context.subtitle}…`}
+            label={`Lendo ${context.scope.type === "office" ? "os dados do escritório" : context.subtitle}…`}
             onCancel={chat.cancel}
             className="pl-10"
           />

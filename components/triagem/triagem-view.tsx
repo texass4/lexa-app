@@ -21,6 +21,7 @@ import {
   KIND_LABEL,
   SOURCE_LABEL,
   byPriority,
+  daysLeft,
   isOpen,
   requiresAction,
   stateBadge,
@@ -46,6 +47,34 @@ const TABS: { value: TriageTab; label: string }[] = [
 const URGENCY_DOT: Record<Urgency, string> = { alta: "bg-danger", media: "bg-warning", baixa: "bg-border" }
 const URGENCY_LABEL: Record<Urgency, string> = { alta: "Urgente", media: "Atenção", baixa: "Sem urgência" }
 
+/** Por que este item está na fila — só com o que o modelo já sabe. */
+function whyItMatters(item: TriageItem, today: string) {
+  if (item.reviewReason) return item.reviewReason
+  const left = daysLeft(item, today)
+  const action = requiresAction(item)
+  if (left !== undefined && left <= 5) {
+    if (left < 0) return "Prazo sugerido já passou"
+    if (left === 0) return "Possível prazo para hoje"
+    return left === 1 ? "Possível prazo amanhã" : `Possível prazo em ${left} dias`
+  }
+  if (action?.value === "sim") return "Pode exigir uma providência"
+  if (action?.value === "incerto") return "Ainda não ficou claro se exige providência"
+  if (!item.processId && isOpen(item)) return "Ainda sem processo vinculado no escritório"
+  if (item.kind === "movimentacao" && isOpen(item)) return "Movimentação que pode pedir leitura"
+  return undefined
+}
+
+/** No máximo dois sinais, do mais decisivo ao contexto. */
+function queueCues(item: TriageItem, today: string) {
+  if (!isOpen(item)) return []
+  const cues: string[] = []
+  if (urgencyOf(item, today) === "alta") cues.push("Alta prioridade")
+  if (suggestedDeadline(item)) cues.push("Possível prazo")
+  else if (item.kind === "movimentacao") cues.push("Movimentação relevante")
+  if (requiresAction(item)?.value === "sim") cues.push("Próximo passo sugerido")
+  return cues.slice(0, 2)
+}
+
 /**
  * Triagem jurídica: uma caixa única com os eventos que podem exigir ação — intimações
  * do DJEN, movimentações relevantes do DataJud e o que vier de outras fontes. Chegam
@@ -70,7 +99,17 @@ export function TriagemView() {
 
   const scoped = items.filter((i) => !mine || i.responsibleId === user.id)
   const rows = scoped.filter((i) => tabOf(i) === tab).sort(byPriority(today))
-  const attention = scoped.filter(isOpen).length
+  const openItems = scoped.filter(isOpen)
+  const attention = openItems.length
+  const high = openItems.filter((i) => urgencyOf(i, today) === "alta").length
+  const withDeadline = openItems.filter((i) => suggestedDeadline(i)).length
+  const queueReading = [
+    attention === 1 ? "1 na fila" : `${attention} na fila`,
+    high ? (high === 1 ? "1 em alta prioridade" : `${high} em alta prioridade`) : undefined,
+    withDeadline ? (withDeadline === 1 ? "1 com possível prazo" : `${withDeadline} com possível prazo`) : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ")
   const myOabs = oabs.filter((o) => o.userId === user.id && o.active)
   const noOab = user.role === "lawyer" && !loading && !unavailable && !myOabs.length
 
@@ -78,7 +117,7 @@ export function TriagemView() {
     <div className="space-y-6">
       <PageHeader
         title="Triagem"
-        description="O que precisa da sua atenção: intimações do DJEN e movimentações relevantes dos processos, interpretadas pela Íntegra. Nenhum prazo é criado sem a sua confirmação."
+        description="Fila do que pode pedir providência. Cada item mostra por que entrou e o que fazer em seguida. Nenhum prazo é criado sem a sua confirmação."
       />
 
       {noOab && (
@@ -116,8 +155,9 @@ export function TriagemView() {
       </div>
 
       {!loading && !unavailable && attention > 0 && (
-        <p className="text-[13.5px] font-medium">
-          {attention === 1 ? "1 evento precisa" : `${attention} eventos precisam`} {mine ? "da sua atenção" : "de atenção no escritório"}.
+        <p className="text-[13.5px] text-foreground">
+          <span className="font-medium">{queueReading}</span>
+          <span className="text-muted-foreground">{mine ? " · na sua fila" : " · no escritório"}</span>
         </p>
       )}
 
@@ -197,13 +237,15 @@ function TriageRow({
   const suggested = suggestedDeadline(i)
   const responsible = i.responsibleId ? getUser(i.responsibleId) : undefined
   const badge = stateBadge(i)
+  const cues = queueCues(i, today)
+  const why = open ? whyItMatters(i, today) : undefined
 
   return (
-    <li className="flex flex-col gap-2 px-4 py-3.5 sm:px-5">
+    <li className="group flex flex-col gap-2 px-4 py-3.5 transition-colors duration-200 hover:bg-accent/45 sm:px-5">
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full flex-col gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+        className="flex w-full flex-col gap-1.5 rounded-[8px] text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         <div className="flex flex-wrap items-center gap-2">
           {open && (
@@ -223,12 +265,18 @@ function TriageRow({
               Não cadastrado
             </StatusBadge>
           )}
+          {cues.map((cue) => (
+            <span key={cue} className="text-[11px] font-medium tracking-[0.01em] text-muted-foreground">
+              {cue}
+            </span>
+          ))}
         </div>
         <p className="text-[13.5px] font-medium">
           {processLabel}
           {clientName && <span className="font-normal text-muted-foreground"> · {clientName}</span>}
         </p>
         <p className="line-clamp-2 text-[12.5px] text-muted-foreground">{summaryOf(i)}</p>
+        {why && <p className="text-[12.5px] text-foreground/80">{why}</p>}
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-subtle">
           <span>
             {i.kind === "intimacao" ? "Publicada em" : "Em"} {fmtNumericDate(i.eventDate)}
@@ -242,10 +290,7 @@ function TriageRow({
           {open && action && (
             <>
               <span>·</span>
-              <span className={cn(action.value === "sim" && "font-medium text-foreground")}>
-                Exige ação: {ACTION_TEXT[action.value]}
-                {action.by === "ia" ? " (IA)" : ""}
-              </span>
+              <span className={cn(action.value === "sim" && "font-medium text-foreground")}>Exige ação: {ACTION_TEXT[action.value]}</span>
             </>
           )}
           {open && suggested && (

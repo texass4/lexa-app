@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { afterEach, beforeEach, describe, it } from "node:test"
 
-import { emailStatus, sendAuthLink } from "./mailer"
+import { emailStatus, sendAuthLink, sendSignupEmail } from "./mailer"
 import { setEmailTransportForTests } from "@/lib/services/email/email-service"
 import { fakeTransport, SMTP_ENV, smtpError } from "@/lib/services/email/testing"
 
@@ -60,6 +60,24 @@ describe("sendAuthLink", () => {
     const result = await sendAuthLink({ to: "x\n@y", kind: "recovery", createLink: async () => ((called = true), "u") })
     assert.equal(!result.ok && result.reason, "invalid_recipient")
     assert.equal(called, false)
+  })
+
+  it("aviso de cadastro: leva à tela de entrar e diz se aguarda aprovação", async () => {
+    const sent = fakeTransport()
+    const input = { name: "Ana", organizationName: "Silva <b>Advogados</b>", loginUrl: "https://app.test/login" }
+    assert.equal((await sendSignupEmail("ana@exemplo.com", { ...input, pending: true })).ok, true)
+    assert.equal(sent[0].subject, "Recebemos seu cadastro na Íntegra")
+    assert.match(sent[0].html, /https:\/\/app\.test\/login/)
+    assert.match(sent[0].html, /depois da aprova/)
+    assert.doesNotMatch(sent[0].html, /<b>Advogados/)
+    await sendSignupEmail("ana@exemplo.com", { ...input, pending: false })
+    assert.match(sent[1].text, /Já dá para entrar/)
+  })
+
+  it("aviso de cadastro com falha de envio vira resultado, sem lançar", async () => {
+    fakeTransport(() => smtpError({ code: "ETIMEDOUT" }))
+    const result = await sendSignupEmail("ana@exemplo.com", { pending: true, loginUrl: "https://app.test/login" })
+    assert.equal(!result.ok && result.reason, "timeout")
   })
 
   it("a API só repassa { sent, message } ao navegador", () => {

@@ -14,7 +14,7 @@ export function RecentActivity({ limit = 7 }: { limit?: number }) {
 
   return (
     <Panel>
-      <PanelHeader title="Atividade recente" description="Movimentações do escritório" />
+      <PanelHeader title="Atividade recente" description={items.length ? "O que se moveu no escritório" : "Movimentações do escritório"} />
       {items.length === 0 && <EmptyState compact title="Nenhuma atividade ainda." description="Cadastros, tarefas e consultas aparecem aqui." />}
       <ol className={items.length ? "relative px-5 pb-4" : "hidden"}>
         <span aria-hidden className="absolute top-3 bottom-7 left-[33px] w-px bg-border" />
@@ -23,8 +23,8 @@ export function RecentActivity({ limit = 7 }: { limit?: number }) {
             <motion.li
               key={a.id}
               layout
-              initial={{ opacity: 0, y: -6, backgroundColor: "rgba(168,134,85,0.14)" }}
-              animate={{ opacity: 1, y: 0, backgroundColor: "rgba(168,134,85,0)" }}
+              initial={{ opacity: 0, y: -6, backgroundColor: "rgba(43,87,196,0.08)" }}
+              animate={{ opacity: 1, y: 0, backgroundColor: "rgba(43,87,196,0)" }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], backgroundColor: { duration: 1.6 } }}
               className="-mx-2 rounded-[10px]"

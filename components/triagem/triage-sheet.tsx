@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, CircleAlert, ExternalLink, EyeOff, FilePlus2, Hourglass, Link2, RotateCcw, ShieldCheck, Sparkles, X } from "lucide-react"
+import { ArrowUpRight, CircleAlert, ExternalLink, EyeOff, FilePlus2, Hourglass, Link2, RotateCcw, ShieldCheck, X } from "lucide-react"
 import { toast } from "sonner"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ const ACTION_LABEL: Record<TriageEvent["action"], string> = {
   rejeitou_prazo: "decidiu que não há prazo",
   ignorou: "ignorou",
   reabriu: "reabriu",
-  interpretou: "interpretou (Íntegra IA)",
+  interpretou: "leu o evento",
 }
 
 export const ACTION_TEXT: Record<"sim" | "nao" | "incerto", string> = { sim: "Sim", nao: "Não", incerto: "Incerto" }
@@ -200,7 +200,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
           </div>
         )}
 
-        <Section title="Íntegra IA">
+        <Section title="Leitura">
           {i.ai ? (
             <div className="space-y-2 text-[13px]">
               <p className="font-medium leading-relaxed">{i.ai.summary}</p>
@@ -215,18 +215,16 @@ function SheetBody({ item: i }: { item: TriageItem }) {
                 </p>
               )}
               {i.ai.discarded && <p className="text-[12px] text-subtle">{i.ai.discarded}</p>}
-              <p className="flex items-center gap-1 text-[11.5px] text-subtle">
-                <Sparkles className="size-3" /> Interpretado uma vez em {fmtDateTime(i.ai.generatedAt)}. Confira no original antes de decidir.
-              </p>
+              <p className="text-[11.5px] text-subtle">Lido em {fmtDateTime(i.ai.generatedAt)}. Confira no original antes de decidir.</p>
               <AIPrivacyNote />
             </div>
           ) : (
             <p className="text-[12.5px] text-muted-foreground">
               {i.aiStatus === "falhou"
-                ? "A Íntegra IA não conseguiu interpretar este evento agora; uma nova tentativa é feita automaticamente. O original está abaixo."
+                ? "Ainda não foi possível ler este evento; uma nova tentativa é feita automaticamente. O original está abaixo."
                 : open
-                  ? "Interpretação da Íntegra IA ainda não disponível. O original está abaixo."
-                  : "Sem interpretação da Íntegra IA."}
+                  ? "A leitura ainda não está disponível. O original está abaixo."
+                  : "Este evento não tem leitura."}
               {action?.by === "teor" && " O teor traz prazo explícito: exige ação."}
             </p>
           )}
@@ -329,7 +327,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
                 Data fatal sugerida: {fmtNumericDate(suggested.fatalDate)}
                 <span className="ml-1.5 text-[12.5px] font-normal text-muted-foreground">
                   ({suggested.days} dias {suggested.unit === "corridos" ? "corridos" : "úteis"}
-                  {suggested.from === "ia" ? ", lidos pela Íntegra IA" : ""})
+                  {suggested.from === "ia" ? ", lidos no teor" : ""})
                 </span>
               </p>
             ) : (

@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { HttpError, readJson, route } from "@/lib/auth/server"
+import { HttpError, readJson, route, siteUrl } from "@/lib/auth/server"
+import { sendSignupEmail } from "@/lib/auth/mailer"
 import { isEmail, normalizeEmail, passwordProblem } from "@/lib/auth/validation"
 import { loadSettings } from "@/lib/admin/platform"
 import { resolveDefaultPlan } from "@/lib/admin/plans"
@@ -89,6 +90,10 @@ export const POST = route(async (request) => {
     summary: `${officeName} se cadastrou (${status === "pending" ? "aguardando aprovação" : "ativado automaticamente"}) no plano ${plan}`,
     metadata: { plan, status },
   })
+
+  // Depois da resposta: o cadastro não espera o SMTP e não falha por ele.
+  const loginUrl = `${siteUrl(request)}/login`
+  after(() => sendSignupEmail(email, { name, organizationName: officeName, pending: status === "pending", loginUrl }))
 
   return NextResponse.json({ ok: true, pending: status === "pending" }, { status: 201 })
 })

@@ -1,4 +1,14 @@
-import { EmailError, isEmailConfigured, maskEmail, renderAuthEmail, sendEmail, validRecipient, type EmailFailureReason } from "@/lib/services/email"
+import {
+  EmailError,
+  isEmailConfigured,
+  maskEmail,
+  renderAuthEmail,
+  renderSignupReceivedEmail,
+  sendEmail,
+  validRecipient,
+  type EmailFailureReason,
+  type SignupReceivedEmailInput,
+} from "@/lib/services/email"
 
 /**
  * E-mails de autenticação (convite e recuperação de senha) sobre o serviço de e-mail
@@ -110,4 +120,28 @@ export async function sendAuthLink({ to: raw, kind, createLink, name, organizati
       return fail("unexpected")
     }
   })
+}
+
+/**
+ * Aviso de cadastro recebido (cadastro público). Não é link de uso único: a conta já
+ * nasce confirmada e o botão leva à tela de entrar. Nunca lança — o cadastro não
+ * depende do e-mail. Sem SMTP, só registra no log.
+ */
+export async function sendSignupEmail(to: string, input: Omit<SignupReceivedEmailInput, "url"> & { loginUrl: string }): Promise<EmailResult> {
+  if (typeof window !== "undefined") throw new Error("sendSignupEmail só pode rodar no servidor.")
+  const recipient = validRecipient(to)
+  if (!recipient) return fail("invalid_recipient")
+  if (!isEmailConfigured()) {
+    console.info(`[LEXA · e-mail] SMTP não configurado: aviso de cadastro para ${maskEmail(recipient)} não enviado.`)
+    return fail("not_configured")
+  }
+  const { loginUrl, ...rest } = input
+  try {
+    const { messageId } = await sendEmail({ to: recipient, ...renderSignupReceivedEmail({ ...rest, url: loginUrl }) })
+    return { ok: true, messageId }
+  } catch (error) {
+    if (error instanceof EmailError) return fail(error.reason)
+    console.error("[LEXA · e-mail] Erro inesperado no aviso de cadastro", { to: maskEmail(recipient), error: (error as Error)?.message })
+    return fail("unexpected")
+  }
 }

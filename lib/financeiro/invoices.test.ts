@@ -42,4 +42,15 @@ describe("edição de lançamento", () => {
   it("sem mudança relevante, não registra", () => {
     assert.equal(describeInvoiceChange(invoice(), invoice()).changed, false)
   })
+
+  it("cancelar e reabrir um lançamento", () => {
+    assert.equal(describeInvoiceChange(invoice(), invoice({ status: "cancelado" })).message, "cancelou um lançamento.")
+    assert.equal(describeInvoiceChange(invoice({ status: "cancelado" }), invoice()).message, "reabriu um lançamento cancelado.")
+  })
+
+  it("categoria e observação entram na atividade", () => {
+    const change = describeInvoiceChange(invoice(), invoice({ category: "Êxito", notes: "Parcela combinada" }))
+    assert.equal(change.message, "atualizou um lançamento.")
+    assert.match(change.detail, /categoria, observação/)
+  })
 })

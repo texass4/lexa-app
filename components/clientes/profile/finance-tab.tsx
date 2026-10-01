@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { CircleCheck, CircleDollarSign, Clock3, Ellipsis, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react"
+import { Ban, CircleCheck, CircleDollarSign, Clock3, Ellipsis, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
@@ -22,11 +22,12 @@ import type { Client, Invoice } from "@/types"
 import { Can } from "@/lib/auth/session"
 import { NewInvoiceDialog } from "@/components/financeiro/new-invoice-dialog"
 
-const ICON: Record<Invoice["status"], React.ElementType> = { pago: CircleCheck, pendente: Clock3, atrasado: TriangleAlert }
+const ICON: Record<Invoice["status"], React.ElementType> = { pago: CircleCheck, pendente: Clock3, atrasado: TriangleAlert, cancelado: Ban }
 const ICON_CLS: Record<Invoice["status"], string> = {
   pago: "border-success/25 bg-success-soft text-success",
   pendente: "border-border bg-surface text-muted-foreground",
   atrasado: "border-danger/25 bg-danger-soft text-danger",
+  cancelado: "border-border bg-surface text-subtle",
 }
 
 export function FinanceTab({ client, finance: f }: { client: Client; finance: ReturnType<typeof clientFinance> }) {
@@ -170,10 +171,12 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
                     <p className="truncate text-[13.5px] font-medium">{inv.description}</p>
                     <p className="truncate text-[12px] text-muted-foreground">
                       {current === "pago"
-                        ? `Pago em ${inv.paidAt ? fmtNumericDate(inv.paidAt) : "data não informada"}${method}`
-                        : current === "atrasado"
-                          ? `${fmtDueIn(inv.dueDate).replace(/^v/, "V")}${method}`
-                          : `Vence ${fmtDueIn(inv.dueDate)}${method}`}
+                        ? `Recebido em ${inv.paidAt ? fmtNumericDate(inv.paidAt) : "data não informada"}${method}`
+                        : current === "cancelado"
+                          ? `Cancelado${inv.category ? ` · ${inv.category}` : ""}`
+                          : current === "atrasado"
+                            ? `${fmtDueIn(inv.dueDate).replace(/^v/, "V")}${method}`
+                            : `Vence ${fmtDueIn(inv.dueDate)}${method}`}
                       {process && (
                         <>
                           {" · "}
@@ -206,9 +209,9 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52 rounded-[10px] p-1">
                       <DropdownMenuGroup>
-                        {current !== "pago" && (
+                        {current !== "pago" && current !== "cancelado" && (
                           <DropdownMenuItem className="h-8 px-2" onClick={() => markPaid(inv)}>
-                            <CircleCheck /> Registrar pagamento hoje
+                            <CircleCheck /> Marcar como recebido
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem className="h-8 px-2" onClick={() => setEditing(inv)}>

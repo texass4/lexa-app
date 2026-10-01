@@ -77,7 +77,7 @@ export function ClientAIPanel({ client, signals }: { client: Client; signals: At
       {(summary.loading || summary.error || result) && (
         <div className="space-y-5 border-t border-border px-5 pt-4 pb-5">
           {summary.error && <AIErrorNotice error={summary.error} onRetry={run} />}
-          {summary.loading && <AIThinking label={`Íntegra IA está analisando ${client.name}…`} onCancel={summary.cancel} />}
+          {summary.loading && <AIThinking label={`Lendo a situação de ${client.name}…`} onCancel={summary.cancel} />}
           {result && !summary.loading && (
             <>
               <p className="text-[14px] leading-relaxed text-foreground">
