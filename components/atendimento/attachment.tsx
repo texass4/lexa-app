@@ -180,14 +180,14 @@ function ImageAttachment({ attachment, clientId }: { attachment: WhatsAppAttachm
               <button
                 type="button"
                 onClick={() => openAttachment(attachment, true)}
-                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
+                className="flex size-9 items-center justify-center rounded-control bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
                 aria-label="Baixar imagem"
               >
                 <Download className="size-4" />
               </button>
               <DialogPrimitive.Close
                 aria-label="Fechar"
-                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
+                className="flex size-9 items-center justify-center rounded-control bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
               >
                 <X className="size-4" />
               </DialogPrimitive.Close>

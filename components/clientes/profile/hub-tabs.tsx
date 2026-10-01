@@ -154,7 +154,7 @@ export function TasksTab({ client, hub }: { client: Client; hub: ClientHub }) {
       </div>
 
       {visible.length ? (
-        <ul className="overflow-hidden rounded-[14px] border border-border bg-card shadow-card">
+        <ul className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
           <AnimatePresence initial={false}>
             {visible.map((t) => (
               <TaskItem

@@ -210,7 +210,7 @@ export function Composer({
   return (
     <div className={cn("shrink-0 border-t px-3 pt-2.5 pb-3 transition-colors sm:px-4", note ? "border-brand/25 bg-brand-soft/45" : "border-border bg-card")}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex rounded-[9px] border border-border bg-surface-muted/60 p-[2px]">
+        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex rounded-control border border-border bg-surface-muted/60 p-[2px]">
           {(["reply", "note"] as const).map((mode) => (
             <button
               key={mode}

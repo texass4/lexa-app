@@ -6,6 +6,7 @@ import { ArrowUpRight, CircleDollarSign, Download, TrendingUp, TriangleAlert, Wa
 import { toast } from "sonner"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
+import { MetricCard } from "@/components/ui/metric-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -64,7 +65,7 @@ export function FinanceView() {
       }.`
 
   const kpis = [
-    { label: "Receita prevista", value: formatCurrency(summary.expected), hint: summary.month, icon: TrendingUp },
+    { label: "Receita prevista", value: formatCurrency(summary.expected), hint: summary.month, icon: TrendingUp, tone: "brand" as const },
     {
       label: "Receita recebida",
       value: formatCurrency(summary.received),
@@ -87,13 +88,15 @@ export function FinanceView() {
           </span>
         ),
       icon: Wallet,
+      tone: "success" as const,
     },
-    { label: "Em aberto", value: formatCurrency(open), hint: `${upcoming.length} parcelas a receber`, icon: CircleDollarSign },
+    { label: "Em aberto", value: formatCurrency(open), hint: `${upcoming.length} parcelas a receber`, icon: CircleDollarSign, tone: "warning" as const },
     {
       label: "Inadimplência",
       value: `${summary.defaultRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`,
       hint: <span className="text-danger">{formatCurrency(overdueTotal)} vencidos</span>,
       icon: Percent,
+      tone: "danger" as const,
     },
   ]
 
@@ -119,23 +122,15 @@ export function FinanceView() {
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
             {kpis.map((k, i) => (
               <motion.div
                 key={k.label}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, delay: i * 0.04 }}
-                className="rounded-[14px] border border-border bg-card p-4 shadow-card sm:p-5"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-[12.5px] font-medium text-muted-foreground">{k.label}</span>
-                  <k.icon className="size-4 shrink-0 text-subtle" />
-                </div>
-                <p className="tabular mt-3 truncate text-[21px] font-semibold leading-none tracking-[-0.03em] min-[390px]:text-[24px] sm:mt-4 sm:text-[28px]">
-                  {k.value}
-                </p>
-                <p className="mt-2.5 truncate text-[12px] text-muted-foreground">{k.hint}</p>
+                <MetricCard label={k.label} value={k.value} foot={k.hint} icon={k.icon} tone={k.tone} />
               </motion.div>
             ))}
           </div>

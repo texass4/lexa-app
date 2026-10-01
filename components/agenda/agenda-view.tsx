@@ -118,7 +118,7 @@ export function AgendaView() {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-[9px] border border-border bg-surface shadow-xs">
+          <div className="flex items-center rounded-control border border-border bg-surface shadow-xs">
             <button
               type="button"
               aria-label="Período anterior"
@@ -159,7 +159,7 @@ export function AgendaView() {
             aria-checked={onlyMine}
             onClick={() => setOnlyMine((v) => !v)}
             className={cn(
-              "h-8 rounded-[9px] border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+              "h-8 rounded-control border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
               onlyMine ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-muted-foreground hover:text-foreground",
             )}
           >

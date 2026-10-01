@@ -307,8 +307,8 @@ export function ProfileSection() {
         <div className="grid grid-cols-1 gap-3 px-5 pb-5 sm:grid-cols-2">
           {(
             [
-              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F6F7F9]", bar: "bg-white", line: "bg-[#E4E7EC]", accent: "bg-[#2B57C4]" },
-              { id: "dark", label: "Escuro", icon: Moon, preview: "bg-[#0A0F18]", bar: "bg-[#111723]", line: "bg-[#212A39]", accent: "bg-[#7FA3F5]" },
+              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F5F6F8]", rail: "bg-[#0D1B31]", bar: "bg-white", line: "bg-[#E5E8EE]", accent: "bg-[#2B57C4]" },
+              { id: "dark", label: "Escuro", icon: Moon, preview: "bg-[#0A0F18]", rail: "bg-[#08111F]", bar: "bg-[#111723]", line: "bg-[#212A39]", accent: "bg-[#7FA3F5]" },
             ] as const
           ).map((t) => (
             <button
@@ -317,12 +317,16 @@ export function ProfileSection() {
               onClick={() => setTheme(t.id)}
               aria-pressed={theme === t.id}
               className={cn(
-                "group rounded-[12px] border p-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                "group rounded-[14px] border p-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 theme === t.id ? "border-foreground" : "border-border hover:border-border-strong",
               )}
             >
               <div className={cn("flex h-20 gap-1.5 overflow-hidden rounded-[8px] p-2", t.preview)}>
-                <div className={cn("w-1/4 rounded-[4px]", t.bar)} />
+                <div className={cn("flex w-1/4 flex-col gap-1 rounded-[4px] p-1", t.rail)}>
+                  <div className="h-1 w-3/4 rounded bg-[#D6B97F]" />
+                  <div className="h-1 w-1/2 rounded bg-white/25" />
+                  <div className="h-1 w-2/3 rounded bg-white/25" />
+                </div>
                 <div className="flex flex-1 flex-col gap-1.5">
                   <div className={cn("h-3 w-1/2 rounded-[3px]", t.bar)} />
                   <div className={cn("flex-1 rounded-[4px]", t.bar)}>

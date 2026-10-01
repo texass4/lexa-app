@@ -211,7 +211,7 @@ export function ProcessProfile({ id }: { id: string }) {
             <p className="mt-2.5 text-[15px] font-medium text-subtle">Sem prazos</p>
           )}
         </div>
-        <div className="rounded-[14px] border border-border bg-card p-4 shadow-card">
+        <div className="rounded-card border border-border/90 bg-card p-4 shadow-card">
           <span className="text-[12px] font-medium text-muted-foreground">Responsável</span>
           <div className="mt-2.5 flex items-center gap-2.5">
             <UserAvatar name={owner.name} size="md" />
@@ -221,7 +221,7 @@ export function ProcessProfile({ id }: { id: string }) {
             </div>
           </div>
         </div>
-        <div className="rounded-[14px] border border-border bg-card p-4 shadow-card">
+        <div className="rounded-card border border-border/90 bg-card p-4 shadow-card">
           <span className="text-[12px] font-medium text-muted-foreground">Valor da causa</span>
           <p className="tabular mt-2.5 truncate text-[22px] font-semibold leading-none tracking-[-0.025em]">{formatCurrency(process.claimValue)}</p>
           <p className="mt-2 truncate text-[12px] text-muted-foreground">Distribuído em {fmtNumericDate(process.distributedAt)}</p>

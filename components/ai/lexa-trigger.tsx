@@ -18,7 +18,7 @@ export function LexaTrigger() {
             onClick={() => lexa.open()}
             aria-label={label}
             aria-expanded={lexa.isOpen}
-            className="group flex h-9 items-center gap-1.5 rounded-[9px] border border-brand/25 bg-brand-soft/70 px-2.5 text-[13px] font-medium text-brand-strong outline-none transition-[border-color,background-color,transform] hover:border-brand/50 hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/45 active:scale-[0.97]"
+            className="group flex h-10 items-center gap-1.5 rounded-control border border-brand/20 bg-brand-soft/80 px-3 text-[13px] font-medium text-brand-strong outline-none transition-[border-color,background-color,transform] hover:border-brand/50 hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/45 active:scale-[0.97]"
           />
         }
       >

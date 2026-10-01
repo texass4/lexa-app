@@ -417,7 +417,7 @@ export function ContextPanel({
                 <li key={p.id}>
                   <Link
                     href={`/processos/${p.id}`}
-                    className="group flex items-start gap-2.5 rounded-[9px] px-2 py-2 outline-none transition-colors hover:bg-accent/70 focus-visible:bg-accent"
+                    className="group flex items-start gap-2.5 rounded-control px-2 py-2 outline-none transition-colors hover:bg-accent/70 focus-visible:bg-accent"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="tabular truncate text-[12.5px] font-medium text-foreground">{p.number || p.code}</p>
@@ -473,7 +473,7 @@ export function ContextPanel({
                   <button
                     type="button"
                     onClick={() => openDialog("document-preview", { documentId: d.id })}
-                    className="flex w-full items-center gap-2.5 rounded-[9px] px-2 py-1.5 text-left outline-none transition-colors hover:bg-accent/70 focus-visible:bg-accent"
+                    className="flex w-full items-center gap-2.5 rounded-control px-2 py-1.5 text-left outline-none transition-colors hover:bg-accent/70 focus-visible:bg-accent"
                   >
                     <FileIcon extension={d.extension} className="h-9 w-7" />
                     <span className="min-w-0 flex-1">

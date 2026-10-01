@@ -42,20 +42,20 @@ export function DashboardView() {
   // 3) perguntar à Íntegra, 4) contexto (atividade, receita).
   // No mobile as colunas viram "contents" para a ordem seguir essa hierarquia.
   return (
-    <div className="space-y-6 lg:space-y-7">
+    <div className="space-y-6 lg:space-y-8">
       <FadeIn>
         <Greeting signals={signals} empty={empty} />
       </FadeIn>
       <KpiCards />
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-5">
-        <div className="contents lg:col-span-8 lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-6">
+        <div className="contents lg:col-span-8 lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
           <FadeIn delay={0.06} className="order-1 lg:order-none">
             <AttentionPanel signals={signals} empty={empty} />
           </FadeIn>
           <FadeIn delay={0.12} className="order-4 lg:order-none">
             <OfficeAIPanel />
           </FadeIn>
-          <div className="contents lg:grid lg:gap-5 xl:grid-cols-2">
+          <div className="contents lg:grid lg:gap-6 xl:grid-cols-2">
             {can("tasks.view") && (
               <FadeIn delay={0.16} className="order-3 lg:order-none">
                 <MyTasks />
@@ -66,7 +66,7 @@ export function DashboardView() {
             </FadeIn>
           </div>
         </div>
-        <div className="contents lg:col-span-4 lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
+        <div className="contents lg:col-span-4 lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
           {can("agenda.view") && (
             <FadeIn delay={0.1} className="order-2 lg:order-none">
               <TodayAgenda />

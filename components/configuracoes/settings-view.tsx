@@ -190,7 +190,7 @@ export function SettingsView() {
                     onClick={() => go(s.id)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative flex h-9 w-full items-center gap-2.5 whitespace-nowrap rounded-[9px] px-3 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                      "relative flex h-9 w-full items-center gap-2.5 whitespace-nowrap rounded-control px-3 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                       active ? "text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                     )}
                   >
@@ -198,7 +198,7 @@ export function SettingsView() {
                       <motion.span
                         layoutId="settings-nav"
                         transition={{ type: "spring", stiffness: 520, damping: 42 }}
-                        className="absolute inset-0 rounded-[9px] border border-border bg-card shadow-xs"
+                        className="absolute inset-0 rounded-control border border-border bg-card shadow-xs"
                       />
                     )}
                     <s.icon className="relative size-4 shrink-0" strokeWidth={1.8} />

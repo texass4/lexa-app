@@ -53,7 +53,7 @@ export function NewOfficeForm({ plans, onDone }: { plans: AdminPlan[]; onDone: (
       <ModalBody>
         <form id="new-office-form" onSubmit={submit} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {error && (
-            <p role="alert" className="rounded-[9px] bg-danger-soft px-3 py-2 text-[12.5px] text-danger sm:col-span-2">
+            <p role="alert" className="rounded-control bg-danger-soft px-3 py-2 text-[12.5px] text-danger sm:col-span-2">
               {error}
             </p>
           )}

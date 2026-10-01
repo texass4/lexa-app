@@ -145,7 +145,7 @@ export function TasksView() {
         }
         actions={
           <>
-            <div role="radiogroup" aria-label="Visualização" className="flex rounded-[9px] border border-border bg-surface p-0.5 shadow-xs">
+            <div role="radiogroup" aria-label="Visualização" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
               {(
                 [
                   { value: "board", label: "Quadro", icon: <Kanban className="size-3.5" /> },
@@ -167,7 +167,7 @@ export function TasksView() {
                 </button>
               ))}
             </div>
-            <div role="radiogroup" aria-label="Escopo" className="flex rounded-[9px] border border-border bg-surface p-0.5 shadow-xs">
+            <div role="radiogroup" aria-label="Escopo" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
               {(["minhas", "escritorio"] as Scope[]).map((s) => (
                 <button
                   key={s}
@@ -221,7 +221,7 @@ export function TasksView() {
           {[3, 2].map((n, i) => (
             <div key={i} className="space-y-2">
               <Skeleton className="h-3 w-24" />
-              <div className="rounded-[14px] border border-border bg-card">
+              <div className="rounded-card border border-border/90 bg-card">
                 {Array.from({ length: n }).map((_, j) => (
                   <div key={j} className="flex items-center gap-3.5 border-b border-border px-5 py-4 last:border-0">
                     <Skeleton className="size-[18px] rounded-[5px]" />

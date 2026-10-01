@@ -45,7 +45,7 @@ const USAGE_METRICS: { value: UsageMetric; label: string; unit: string }[] = [
 function MiniStat({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail?: string }) {
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-[12px] border border-border bg-card px-3.5 py-3 shadow-card">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-surface-muted text-muted-foreground [&_svg]:size-4">{icon}</span>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-surface-muted text-muted-foreground [&_svg]:size-4">{icon}</span>
       <div className="min-w-0">
         <p className="truncate text-[11.5px] text-muted-foreground">{label}</p>
         <p className="tabular truncate text-[15px] font-semibold tracking-[-0.01em]">

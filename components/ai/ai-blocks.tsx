@@ -20,7 +20,7 @@ export function AIMark({ className }: { className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-brand/25 bg-brand-soft text-brand-strong [&_svg]:size-4",
+        "flex size-10 shrink-0 items-center justify-center rounded-full bg-surface text-brand shadow-[0_2px_8px_-2px_rgb(43_87_196/0.3)] ring-1 ring-brand/15 [&_svg]:size-[18px]",
         className,
       )}
     >
@@ -44,13 +44,13 @@ export function AIPanel({
   className?: string
 }) {
   return (
-    <section className={cn("min-w-0 rounded-[14px] border border-border bg-card shadow-card", className)} aria-label={title}>
-      <header className="flex flex-col gap-3 px-5 pt-4.5 pb-4 lg:flex-row lg:items-center lg:justify-between">
+    <section className={cn("ai-surface min-w-0 rounded-card border border-border/90 shadow-card", className)} aria-label={title}>
+      <header className="flex flex-col gap-3 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <AIMark />
           <div className="min-w-0">
-            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-foreground">{title}</h2>
-            <p className="mt-0.5 text-[12.5px] text-muted-foreground">{description}</p>
+            <h2 className="text-[15px] font-semibold tracking-[-0.015em] text-foreground">{title}</h2>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{description}</p>
           </div>
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}

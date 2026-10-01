@@ -271,7 +271,7 @@ export function ClientsView() {
             aria-label="Filtrar por responsável"
             value={ownerId}
             onChange={(e) => setOwnerId(e.target.value)}
-            className="h-9 text-[13px] sm:w-44"
+            className="h-9 text-[13px] sm:w-48"
           >
             <option value="">Todos os responsáveis</option>
             {getMembers({ includeInactive: true })
@@ -424,7 +424,7 @@ export function ClientsView() {
                 <li key={c.id}>
                   <Link
                     href={`/clientes/${c.id}`}
-                    className="flex items-center gap-3 rounded-[14px] border border-border bg-card p-3.5 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="flex items-center gap-3 rounded-card border border-border/90 bg-card p-3.5 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <UserAvatar name={c.name} size="lg" />
                     <div className="min-w-0 flex-1">

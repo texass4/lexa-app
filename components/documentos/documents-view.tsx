@@ -201,7 +201,7 @@ export function DocumentsView() {
               </table>
             </div>
           </TableShell>
-          <div className="overflow-hidden rounded-[14px] border border-border bg-card shadow-card md:hidden">
+          <div className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card md:hidden">
             <DocumentList documents={rows} showClient />
           </div>
         </FadeIn>

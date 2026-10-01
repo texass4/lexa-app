@@ -6,8 +6,8 @@
  * `app/icon.svg` usam o mesmo desenho (gerados a partir destes valores).
  *
  * Símbolo: um "I" estrutural (viga em I) — solidez, estrutura, organização — com
- * o acento agudo do "Í" como um bloco inclinado em azul: a camada de inteligência
- * que se apoia sobre a estrutura. Desenhado numa grade de 32 × 32.
+ * o acento agudo do "Í" como um bloco inclinado: a camada de inteligência que se
+ * apoia sobre a estrutura. Dourado sobre marinho. Desenhado numa grade de 32 × 32.
  *
  * Logotipo: "Íntegra" em Geist SemiBold convertida em curvas (licença OFL), com o
  * acento redesenhado no mesmo ângulo do símbolo.
@@ -27,6 +27,10 @@ export const BRAND_COLORS = {
   blue: "#2B57C4",
   blueLight: "#7FA3F5",
   paper: "#F3F5F9",
+  /** Acento dourado da marca (símbolo, acento do "Í"). */
+  gold: "#D6B97F",
+  goldLight: "#EFDCB4",
+  goldDeep: "#B08A4C",
 } as const
 
 /** Símbolo, grade 32 × 32. */

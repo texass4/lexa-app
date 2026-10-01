@@ -46,12 +46,12 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
   const tooltipCls = mode === "expanded" ? "hidden" : mode === "auto" ? "lg:hidden" : ""
 
   return (
-    <nav aria-label="Navegação principal" className="flex flex-col gap-5">
+    <nav aria-label="Navegação principal" className="flex flex-col gap-6">
       {visibleSections(can).map((section) => (
         <div key={section.label}>
-          <p className={cn("mb-1.5 px-2.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-subtle", labelCls)}>{section.label}</p>
-          {mode !== "expanded" && <div className={cn("mx-auto mb-2 h-px w-6 bg-border", mode === "auto" ? "lg:hidden" : "")} aria-hidden />}
-          <ul className="flex flex-col gap-0.5">
+          <p className={cn("mb-2 px-3 text-[10.5px] font-medium uppercase tracking-[0.12em] text-sidebar-muted/70", labelCls)}>{section.label}</p>
+          {mode !== "expanded" && <div className={cn("mx-auto mb-2 h-px w-6 bg-sidebar-border", mode === "auto" ? "lg:hidden" : "")} aria-hidden />}
+          <ul className="flex flex-col gap-1">
             {section.items.map((item) => {
               const active = isActive(pathname, item.href)
               const Icon = item.icon
@@ -67,8 +67,8 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                           aria-current={active ? "page" : undefined}
                           aria-label={badge ? `${item.label} — ${badge.count} ${badge.label}` : item.label}
                           className={cn(
-                            "group relative flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                            active ? "text-foreground" : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
+                            "group relative flex h-10 items-center gap-3 rounded-control px-3 text-[13.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-sidebar-ring/60",
+                            active ? "text-sidebar-foreground" : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground",
                             compactCls,
                           )}
                         />
@@ -78,19 +78,19 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                         <motion.span
                           layoutId={layoutId}
                           transition={{ type: "spring", stiffness: 520, damping: 42 }}
-                          className="absolute inset-0 rounded-[9px] border border-border bg-sidebar-accent shadow-xs"
+                          className="absolute inset-0 rounded-control bg-white/[0.09] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]"
                         />
                       )}
                       <Icon
-                        className={cn("relative size-[17px] shrink-0", active ? "text-foreground" : "text-subtle group-hover:text-foreground")}
+                        className={cn("relative size-[18px] shrink-0 transition-colors", active ? "text-sidebar-highlight" : "text-sidebar-muted group-hover:text-sidebar-foreground")}
                         strokeWidth={1.8}
                       />
                       <span className={cn("relative flex-1 truncate", labelCls)}>{item.label}</span>
                       {badge && (
                         <span
                           className={cn(
-                            "relative tabular flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-semibold",
-                            badge.urgent ? "bg-danger-soft text-danger" : "bg-surface-muted text-muted-foreground",
+                            "relative tabular flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold",
+                            badge.urgent ? "bg-[#e5484d]/20 text-[#ffb3ad]" : "bg-white/10 text-sidebar-foreground/85",
                             labelCls,
                           )}
                         >
@@ -100,11 +100,11 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                       {badge?.urgent && mode !== "expanded" && (
                         <span
                           aria-hidden
-                          className={cn("absolute top-1.5 right-1.5 size-1.5 rounded-full bg-danger", mode === "auto" && "lg:hidden")}
+                          className={cn("absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[#ff8a80]", mode === "auto" && "lg:hidden")}
                         />
                       )}
                       {active && (
-                        <span aria-hidden className="absolute top-1/2 -left-3 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-brand max-md:hidden" />
+                        <span aria-hidden className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-highlight" />
                       )}
                     </TooltipTrigger>
                     <TooltipContent side="right" sideOffset={10} className={tooltipCls}>

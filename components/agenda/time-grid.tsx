@@ -39,7 +39,7 @@ export function TimeGrid({
   const columns = `56px ${days.map((d) => (!single && (d.getDay() === 0 || d.getDay() === 6) ? "minmax(0, 0.55fr)" : "minmax(0, 1fr)")).join(" ")}`
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-border bg-card shadow-card">
+    <div className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
       {/* Cabeçalho dos dias */}
       <div className="grid border-b border-border" style={{ gridTemplateColumns: columns }}>
         <div />
@@ -141,7 +141,7 @@ export function TimeGrid({
                       transition={{ duration: 0.18 }}
                       onClick={() => onSelect(a)}
                       className={cn(
-                        "absolute z-10 overflow-hidden rounded-[7px] border-l-[3px] px-2 text-left outline-none ring-1 ring-inset ring-black/[0.03] transition-[box-shadow,filter] hover:shadow-[0_6px_16px_-8px_rgb(15_23_42/0.35)] hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-brand/50",
+                        "absolute z-10 overflow-hidden rounded-[7px] border-l-[3px] px-2 text-left outline-none ring-1 ring-inset ring-black/[0.03] transition-[box-shadow,filter] hover:shadow-raised hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-brand/50",
                         past && "opacity-60",
                         compact ? "py-0.5" : "py-1.5",
                       )}

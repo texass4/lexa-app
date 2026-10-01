@@ -253,7 +253,7 @@ export function ProcessesView() {
                 <li key={p.id}>
                   <Link
                     href={`/processos/${p.id}`}
-                    className="block rounded-[14px] border border-border bg-card p-4 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="block rounded-card border border-border/90 bg-card p-4 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">

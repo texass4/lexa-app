@@ -44,7 +44,7 @@ export function AdminNav({ variant, onNavigate }: { variant: "rail" | "full"; on
   const rail = variant === "rail"
 
   return (
-    <nav aria-label="Navegação do Admin" className="flex flex-col gap-5">
+    <nav aria-label="Navegação do Admin" className="flex flex-col gap-6">
       {ADMIN_NAV.map((section) => (
         <div key={section.label}>
           {rail ? (
@@ -52,7 +52,7 @@ export function AdminNav({ variant, onNavigate }: { variant: "rail" | "full"; on
           ) : (
             <p className="mb-1.5 px-2.5 text-[10px] font-medium uppercase tracking-[0.14em] text-admin-rail-subtle">{section.label}</p>
           )}
-          <ul className="flex flex-col gap-0.5">
+          <ul className="flex flex-col gap-1">
             {section.items.map((item) => {
               const active = isAdminActive(pathname, item.href)
               const badge = item.badge ? badges[item.badge] : 0
@@ -63,7 +63,7 @@ export function AdminNav({ variant, onNavigate }: { variant: "rail" | "full"; on
                   aria-current={active ? "page" : undefined}
                   aria-label={rail ? `${item.label}${badge ? ` (${badge})` : ""}` : undefined}
                   className={cn(
-                    "group relative flex h-9 items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50",
+                    "group relative flex h-10 items-center gap-3 rounded-control px-3 text-[13.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50",
                     rail && "justify-center px-0",
                     active ? "text-admin-rail-foreground" : "text-admin-rail-muted hover:bg-admin-rail-accent/70 hover:text-admin-rail-foreground",
                   )}
@@ -72,12 +72,12 @@ export function AdminNav({ variant, onNavigate }: { variant: "rail" | "full"; on
                     <motion.span
                       layoutId={`admin-nav-${variant}${onNavigate ? "-drawer" : ""}`}
                       transition={{ type: "spring", stiffness: 520, damping: 42 }}
-                      className="absolute inset-0 rounded-[9px] border border-admin-rail-border bg-admin-rail-accent"
+                      className="absolute inset-0 rounded-control bg-white/[0.09] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]"
                     />
                   )}
-                  {active && <span aria-hidden className="absolute top-1/2 -left-3 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-admin-rail-highlight" />}
+                  {active && <span aria-hidden className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-admin-rail-highlight" />}
                   <item.icon
-                    className={cn("relative size-[17px] shrink-0", active ? "text-admin-rail-highlight" : "text-admin-rail-subtle group-hover:text-admin-rail-foreground")}
+                    className={cn("relative size-[18px] shrink-0", active ? "text-admin-rail-highlight" : "text-admin-rail-subtle group-hover:text-admin-rail-foreground")}
                     strokeWidth={1.8}
                   />
                   {!rail && <span className="relative flex-1 truncate">{item.label}</span>}
@@ -148,7 +148,7 @@ export function BackToCrm({ compact, onNavigate }: { compact?: boolean; onNaviga
       onClick={onNavigate}
       aria-label="Voltar ao CRM"
       className={cn(
-        "flex h-9 items-center gap-2.5 rounded-[9px] text-[12.5px] font-medium text-admin-rail-muted outline-none transition-colors hover:bg-admin-rail-accent/70 hover:text-admin-rail-foreground focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50",
+        "flex h-9 items-center gap-2.5 rounded-control text-[12.5px] font-medium text-admin-rail-muted outline-none transition-colors hover:bg-admin-rail-accent/70 hover:text-admin-rail-foreground focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50",
         compact ? "w-9 justify-center" : "px-2.5",
       )}
     >
@@ -162,9 +162,9 @@ export function AdminSidebar() {
   return (
     <aside
       aria-label="Barra lateral do Admin"
-      className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col border-r border-admin-rail-border bg-admin-rail text-admin-rail-foreground md:flex lg:w-[256px]"
+      className="sidebar-surface fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col text-admin-rail-foreground md:flex lg:w-[256px]"
     >
-      <div className="flex h-[64px] shrink-0 items-center justify-center px-4 lg:justify-start">
+      <div className="flex h-[76px] shrink-0 items-center justify-center px-4 lg:justify-start lg:px-5">
         <Link href="/admin" aria-label={`${BRAND.name} Admin — dashboard`} className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50">
           <span className="lg:hidden">
             <AdminMark />

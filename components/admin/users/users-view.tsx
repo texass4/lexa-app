@@ -49,7 +49,7 @@ function statusOf(u: AdminUser) {
 function FormError({ children }: { children?: string }) {
   if (!children) return null
   return (
-    <p role="alert" className="rounded-[9px] bg-danger-soft px-3 py-2 text-[12.5px] text-danger sm:col-span-2">
+    <p role="alert" className="rounded-control bg-danger-soft px-3 py-2 text-[12.5px] text-danger sm:col-span-2">
       {children}
     </p>
   )
@@ -494,7 +494,7 @@ export function UsersView() {
           {rows.map((u) => {
             const s = statusOf(u)
             return (
-              <li key={u.id} className={cn("rounded-[14px] border border-border bg-card p-4 shadow-card", !u.active && "opacity-60")}>
+              <li key={u.id} className={cn("rounded-card border border-border/90 bg-card p-4 shadow-card", !u.active && "opacity-60")}>
                 <div className="flex items-start gap-3">
                   <UserAvatar name={u.name} src={u.avatarUrl} />
                   <div className="min-w-0 flex-1">

@@ -5,11 +5,16 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { cn } from "cn"
 import { Logo } from "@/components/brand/logo"
 import { SidebarNav } from "./sidebar-nav"
+import { SidebarAICard } from "./sidebar-ai-card"
 import { UserMenu } from "./user-menu"
 import { useUI } from "@/lib/store/ui-store"
 import { getOrganization } from "@/lib/account"
 import { BRAND } from "@/lib/brand"
 
+/**
+ * Barra lateral marinho (desktop e tablet). Entre 768 e 1023 px fica compacta (só
+ * ícones); a partir de 1024 px, expandida — a menos que a pessoa recolha (Ctrl B).
+ */
 export function Sidebar() {
   const { sidebarCollapsed: collapsed, toggleSidebar } = useUI()
   const mode = collapsed ? "collapsed" : "auto"
@@ -18,47 +23,54 @@ export function Sidebar() {
     <aside
       aria-label="Barra lateral"
       className={cn(
-        "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex",
-        collapsed ? "w-[72px]" : "w-[72px] lg:w-[240px]",
+        "sidebar-surface fixed inset-y-0 left-0 z-30 hidden flex-col text-sidebar-foreground transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex",
+        collapsed ? "w-[76px]" : "w-[76px] lg:w-[256px]",
       )}
     >
-      <div className={cn("flex h-[60px] shrink-0 items-center px-4", collapsed ? "justify-center px-0" : "max-lg:justify-center max-lg:px-0")}>
+      <div className={cn("flex h-[76px] shrink-0 items-center px-5", collapsed ? "justify-center px-0" : "max-lg:justify-center max-lg:px-0")}>
         <Link
           href="/dashboard"
           aria-label={`${BRAND.name} — ir para o painel`}
-          className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
         >
-          <Logo collapsed className={cn(!collapsed && "lg:hidden")} />
-          {!collapsed && <Logo subtitle={getOrganization().name} className="max-lg:hidden" />}
+          <Logo collapsed tone="inverse" className={cn(!collapsed && "lg:hidden")} />
+          {!collapsed && <Logo tone="inverse" size="lg" subtitle={getOrganization().name} className="max-lg:hidden" />}
         </Link>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pt-4 pb-3 no-scrollbar">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pt-3 pb-4 no-scrollbar">
         <SidebarNav mode={mode} layoutId="sidebar-active" />
       </div>
 
-      <div className="shrink-0 space-y-1 border-t border-sidebar-border p-3">
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
-          title={collapsed ? "Expandir (Ctrl B)" : "Recolher (Ctrl B)"}
-          className={cn(
-            "hidden h-8 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-[12.5px] text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 lg:flex",
-            collapsed && "justify-center px-0",
-          )}
-        >
-          {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-          {!collapsed && <span>Recolher menu</span>}
-        </button>
-        <div className={cn(collapsed ? "" : "lg:hidden")}>
-          <UserMenu variant="sidebar" compact />
-        </div>
+      <div className="shrink-0 space-y-2 px-3 pb-3">
         {!collapsed && (
-          <div className="max-lg:hidden">
-            <UserMenu variant="sidebar" />
+          <div className="max-lg:hidden [@media(max-height:939px)]:hidden">
+            <SidebarAICard />
           </div>
         )}
+        <div className="border-t border-sidebar-border pt-2">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+            title={collapsed ? "Expandir (Ctrl B)" : "Recolher (Ctrl B)"}
+            className={cn(
+              "hidden h-9 w-full items-center gap-2.5 rounded-control px-3 text-[12.5px] text-sidebar-muted outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/60 lg:flex",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+            {!collapsed && <span>Recolher menu</span>}
+          </button>
+          <div className={cn(collapsed ? "" : "lg:hidden")}>
+            <UserMenu variant="sidebar" compact />
+          </div>
+          {!collapsed && (
+            <div className="max-lg:hidden">
+              <UserMenu variant="sidebar" />
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   )

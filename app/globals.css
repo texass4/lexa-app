@@ -23,6 +23,9 @@
   --color-brand-soft: var(--brand-soft);
   --color-brand-foreground: var(--brand-foreground);
   --color-navy: var(--navy);
+  --color-gold: var(--gold);
+  --color-gold-strong: var(--gold-strong);
+  --color-gold-soft: var(--gold-soft);
 
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
@@ -51,6 +54,8 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-highlight: var(--sidebar-highlight);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -80,44 +85,55 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 1px -0.5px rgb(15 23 42 / 0.02);
-  --shadow-float: 0 12px 32px -12px rgb(15 23 42 / 0.2), 0 2px 6px -2px rgb(15 23 42 / 0.06);
+  /* Superfícies: cartões, controles e pílulas. */
+  --radius-card: 16px;
+  --radius-control: 10px;
+
+  --shadow-xs: 0 1px 2px 0 rgb(16 24 40 / 0.04);
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.035), 0 6px 18px -10px rgb(16 24 40 / 0.07);
+  --shadow-raised: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 14px 32px -16px rgb(16 24 40 / 0.16);
+  --shadow-float: 0 18px 44px -18px rgb(16 24 40 / 0.26), 0 3px 8px -3px rgb(16 24 40 / 0.07);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /*
  * Identidade Íntegra.
- * Marinho profundo como cor institucional (primária), azul como destaque
- * (`brand`: foco, seleção, realces) e neutros frios para superfícies e texto.
- * As cores semânticas ficam discretas para não competir com a marca.
+ * Marinho profundo como cor estrutural (barra lateral, títulos, botão principal),
+ * conteúdo em off-white com cartões brancos, azul para ação e foco, dourado só em
+ * pequenos acentos (marca, saudação, item ativo). Verde = positivo, vermelho =
+ * alerta. As cores semânticas ficam discretas para não competir com a marca.
  */
 :root {
   --radius: 0.625rem;
 
   --navy: #0f2446;
+  --gold: #b08a4c;
+  --gold-strong: #8a6a32;
+  --gold-soft: #f7f1e6;
 
-  --background: #f6f7f9;
-  --foreground: #0e1726;
+  --background: #f5f6f8;
+  --foreground: #0f1b2d;
   --surface: #ffffff;
-  --surface-muted: #f0f2f5;
-  --subtle: #98a2b3;
-  --border-strong: #d0d5dd;
+  --surface-muted: #f1f3f6;
+  --subtle: #8e98a8;
+  --border-strong: #d3d8e0;
 
   --card: #ffffff;
-  --card-foreground: #0e1726;
+  --card-foreground: #0f1b2d;
   --popover: #ffffff;
-  --popover-foreground: #0e1726;
+  --popover-foreground: #0f1b2d;
   --primary: #0f2446;
   --primary-foreground: #ffffff;
-  --secondary: #f0f2f5;
-  --secondary-foreground: #0e1726;
-  --muted: #f0f2f5;
-  --muted-foreground: #5f6b7d;
-  --accent: #edf0f4;
-  --accent-foreground: #0e1726;
-  --destructive: #b93a32;
-  --border: #e4e7ec;
-  --input: #dce0e6;
+  --secondary: #f1f3f6;
+  --secondary-foreground: #0f1b2d;
+  --muted: #f1f3f6;
+  --muted-foreground: #5d6879;
+  --accent: #eef1f5;
+  --accent-foreground: #0f1b2d;
+  --destructive: #c0392f;
+  --border: #e5e8ee;
+  --input: #dde2e9;
   --ring: #2b57c4;
 
   --brand: #2b57c4;
@@ -125,60 +141,65 @@
   --brand-soft: #eef3fd;
   --brand-foreground: #ffffff;
 
-  --success: #2f7a55;
-  --success-soft: #ecf6f0;
-  --warning: #9a6412;
-  --warning-soft: #fbf4e4;
-  --danger: #b93a32;
-  --danger-soft: #fcefed;
-  --info: #1f6b85;
-  --info-soft: #ebf4f7;
+  --success: #19805a;
+  --success-soft: #e9f6ef;
+  --warning: #a8661c;
+  --warning-soft: #fbf2e4;
+  --danger: #c0392f;
+  --danger-soft: #fcecea;
+  --info: #127184;
+  --info-soft: #e7f4f6;
   --violet: #6553a6;
   --violet-soft: #f2f0f9;
 
   --chart-1: #0f2446;
   --chart-2: #2b57c4;
-  --chart-3: #d0d5dd;
+  --chart-3: #d3d8e0;
   --chart-4: #667085;
-  --chart-5: #e4e7ec;
+  --chart-5: #e5e8ee;
 
-  --sidebar: #f6f7f9;
-  --sidebar-foreground: #0e1726;
-  --sidebar-primary: #0f2446;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ffffff;
-  --sidebar-accent-foreground: #0e1726;
-  --sidebar-border: #e4e7ec;
-  --sidebar-ring: #2b57c4;
+  /* Barra lateral: marinho nos dois temas, como na identidade da Íntegra. */
+  --sidebar: #0d1b31;
+  --sidebar-foreground: #eef1f6;
+  --sidebar-muted: #a3aec0;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #0d1b31;
+  --sidebar-accent: rgb(255 255 255 / 0.07);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.08);
+  --sidebar-ring: #d6b97f;
+  --sidebar-highlight: #d6b97f;
 
   /* Marca (components/brand/logo.tsx): versão escura para fundos claros. */
   --logo-tile: #0f2446;
-  --logo-glyph: #ffffff;
-  --logo-accent: #7fa3f5;
+  --logo-glyph: #d6b97f;
+  --logo-accent: #efdcb4;
   --logo-text: #0f2446;
-  --logo-text-accent: #2b57c4;
+  --logo-text-accent: #b08a4c;
 
-  /* Íntegra Admin: barra lateral em marinho institucional — distingue o centro
-     de controle do CRM sem sair da identidade. */
-  --admin-rail: #0c1b35;
-  --admin-rail-foreground: #e6ebf3;
-  --admin-rail-muted: #8d9ab0;
-  --admin-rail-subtle: #7483a0;
-  --admin-rail-accent: #15284a;
-  --admin-rail-border: #1b2e50;
-  --admin-rail-highlight: #7fa3f5;
+  /* Íntegra Admin: mesma barra marinho do CRM, para os dois parecerem um produto só. */
+  --admin-rail: #0d1b31;
+  --admin-rail-foreground: #eef1f6;
+  --admin-rail-muted: #a3aec0;
+  --admin-rail-subtle: #7f8ba0;
+  --admin-rail-accent: rgb(255 255 255 / 0.07);
+  --admin-rail-border: rgb(255 255 255 / 0.08);
+  --admin-rail-highlight: #d6b97f;
 }
 
 .dark {
-  --admin-rail: #070d19;
+  --admin-rail: #08111f;
   --admin-rail-foreground: #e6ebf3;
-  --admin-rail-muted: #8d9ab0;
+  --admin-rail-muted: #96a2b6;
   --admin-rail-subtle: #6f7d95;
-  --admin-rail-accent: #111b2e;
-  --admin-rail-border: #17223a;
-  --admin-rail-highlight: #7fa3f5;
+  --admin-rail-accent: rgb(255 255 255 / 0.06);
+  --admin-rail-border: rgb(255 255 255 / 0.07);
+  --admin-rail-highlight: #d6b97f;
 
   --navy: #0f2446;
+  --gold: #d6b97f;
+  --gold-strong: #e4cc9c;
+  --gold-soft: #2a2316;
 
   --background: #0a0f18;
   --foreground: #e6eaf0;
@@ -226,24 +247,26 @@
   --chart-4: #95a0b3;
   --chart-5: #212a39;
 
-  --sidebar: #0a0f18;
-  --sidebar-foreground: #e6eaf0;
-  --sidebar-primary: #e6eaf0;
-  --sidebar-primary-foreground: #0b1322;
-  --sidebar-accent: #141b28;
-  --sidebar-accent-foreground: #e6eaf0;
-  --sidebar-border: #1b2331;
-  --sidebar-ring: #7fa3f5;
+  --sidebar: #08111f;
+  --sidebar-foreground: #e6ebf3;
+  --sidebar-muted: #96a2b6;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #08111f;
+  --sidebar-accent: rgb(255 255 255 / 0.06);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.07);
+  --sidebar-ring: #d6b97f;
+  --sidebar-highlight: #d6b97f;
 }
 
-/* Versão clara da marca: fundos escuros no tema escuro e superfícies sempre escuras. */
+/* Versão clara da marca: tema escuro e superfícies sempre escuras (barra lateral). */
 .dark,
 .brand-inverse {
-  --logo-tile: #f3f5f9;
-  --logo-glyph: #0f2446;
-  --logo-accent: #2b57c4;
-  --logo-text: #e6eaf0;
-  --logo-text-accent: #7fa3f5;
+  --logo-tile: rgb(255 255 255 / 0.06);
+  --logo-glyph: #d6b97f;
+  --logo-accent: #efdcb4;
+  --logo-text: #ffffff;
+  --logo-text-accent: #d6b97f;
 }
 
 @layer base {
@@ -379,6 +402,19 @@
 }
 
 @layer utilities {
+  /* Barra lateral marinho, com um leve brilho dourado no rodapé. */
+  .sidebar-surface {
+    background:
+      radial-gradient(140% 45% at 0% 100%, rgb(214 185 127 / 0.07), transparent 70%),
+      linear-gradient(180deg, color-mix(in oklab, var(--sidebar) 88%, #24406b) 0%, var(--sidebar) 42%);
+    box-shadow: inset -1px 0 0 var(--sidebar-border);
+  }
+  /* Áreas da Íntegra IA: cartão com um véu azul suave, como um painel de vidro. */
+  .ai-surface {
+    background:
+      radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, var(--brand) 9%, transparent), transparent 55%),
+      linear-gradient(120deg, var(--card) 40%, color-mix(in oklab, var(--brand-soft) 70%, var(--card)) 100%);
+  }
   .page-enter {
     animation: page-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }

@@ -76,7 +76,7 @@ export function ClientHeader({
   const create = CREATE.filter((item) => can(DIALOG_PERMISSION[item.kind]))
 
   return (
-    <div className="relative overflow-hidden rounded-[18px] border border-border bg-card shadow-card">
+    <div className="relative overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(120%_100%_at_0%_0%,color-mix(in_oklab,var(--brand)_10%,transparent),transparent_60%)]"

@@ -225,32 +225,40 @@ const { openDialog } = useUI()
 openDialog("task", { processId })   // "client" | "task" | "appointment" | "document" | "process" | "invoice"
 ```
 
-Design system — reutilize, não invente: `page-header`, `panel`, `button`, `status-badge`, `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens de cor em `app/globals.css`.
+**Layout** — barra lateral marinho fixa (`sidebar.tsx`: 256 px, 76 px recolhida ou entre 768 e 1023 px; no mobile vira o drawer de `mobile-nav.tsx`, com a barra inferior de atalhos), topo limpo (`topbar.tsx`: trilha nas telas de detalhe, busca `Ctrl K`, Íntegra IA, notificações, perfil e "Novo") e conteúdo em off-white, com cartões brancos. O card da Íntegra IA na barra lateral (`sidebar-ai-card.tsx`) só abre a mesma conversa do botão "IA".
+
+Design system — reutilize, não invente: `page-header`, `panel`, `metric-card` (indicador com selo colorido e linha de cor), `button`, `status-badge` (pílulas), `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens em `app/globals.css`:
+
+- **Superfícies**: `rounded-card` (16 px) e `shadow-card` em cartões; `shadow-raised` no hover de cartões clicáveis; `shadow-float` em menus e diálogos; `rounded-control` (10 px) em botões e campos (altura 36–40 px).
+- **Utilitários**: `.sidebar-surface` (marinho com brilho dourado; barra lateral, drawer, painel do login, Admin) e `.ai-surface` (véu azul das áreas da Íntegra IA).
+- **Hierarquia**: título de página 26–30 px semibold; título de seção 15 px semibold; rótulos 12,5–13 px; valores de indicador 30 px semibold tabular.
 
 ## 5b. Marca Íntegra
 
 **Posicionamento** — *Íntegra — Inteligência para a gestão jurídica.* Institucional, sóbria e atemporal; a IA é parte do produto, não a identidade inteira.
 
-**Símbolo** — um "I" estrutural (viga em I: solidez, estrutura, organização) com o acento agudo do "Í" como um bloco inclinado em azul — a camada de inteligência apoiada na estrutura. Grade de 32 × 32, cantos de 7,5. Funciona sozinho como ícone (favicon a partir de 16 px).
+**Símbolo** — um "I" estrutural (viga em I: solidez, estrutura, organização) com o acento agudo do "Í" como um bloco inclinado — a camada de inteligência apoiada na estrutura. Dourado sobre marinho. Grade de 32 × 32, cantos de 7,5. Funciona sozinho como ícone (favicon a partir de 16 px).
 
 **Logotipo** — "Íntegra" em Geist SemiBold convertida em curvas (licença OFL), com o acento redesenhado no mesmo ângulo do símbolo. Composição horizontal: símbolo + nome, com a altura das maiúsculas ≈ metade do símbolo.
 
 **Onde está** — tudo sai de `lib/brand.ts` (nome, posicionamento, `AI_NAME`, geometria). Na interface, use `components/brand/logo.tsx`: `<Logo />` (símbolo + nome; `collapsed`, `subtitle`, `size="sm|md|lg"`, `tone="inverse"` para superfícies sempre escuras), `<LogoMark />` e `<Wordmark />`. Não redesenhe a marca em outros arquivos. Arquivos estáticos em `public/brand/` (`integra-logo`, `integra-symbol`, `integra-wordmark`, cada um com versão `-inverse` para fundos escuros, e os PNG do manifest); `app/icon.svg`, `app/favicon.ico` e `app/apple-icon.png` são o ícone do navegador; `app/manifest.ts` é o manifest do app.
 
-**Cores** — tokens em `app/globals.css`, claro e escuro:
+**Cores** — tokens em `app/globals.css`, claro e escuro. Marinho estrutural, conteúdo em off-white, azul para ação e dourado só em acentos:
 
 | Token | Claro | Escuro | Uso |
 | --- | --- | --- | --- |
-| `primary` / `navy` | `#0F2446` | `#E6EAF0` | botões principais, cor institucional |
-| `brand` | `#2B57C4` | `#7FA3F5` | destaque: foco, seleção, item ativo, realces |
-| `brand-strong` | `#1F449E` | `#A9C2FA` | texto sobre `brand-soft` |
+| `primary` / `navy` | `#0F2446` | `#E6EAF0` | botões principais, títulos, cor institucional |
+| `sidebar` | `#0D1B31` | `#08111F` | barra lateral (marinho nos dois temas) |
+| `sidebar-highlight` / `gold` | `#D6B97F` / `#B08A4C` | `#D6B97F` | acentos: item ativo, marca, nome na saudação |
+| `brand` | `#2B57C4` | `#7FA3F5` | ação: foco, links, seleção, abas |
 | `brand-soft` | `#EEF3FD` | `#152241` | fundos de destaque |
-| `background` / `surface` | `#F6F7F9` / `#FFFFFF` | `#0A0F18` / `#111723` | superfícies |
-| `foreground` / `muted-foreground` | `#0E1726` / `#5F6B7D` | `#E6EAF0` / `#95A0B3` | texto |
-| `success` `warning` `danger` `info` `violet` | discretas | discretas | semânticas |
-| `--logo-*` | marinho | claro | cores da marca (trocam sozinhas no tema escuro) |
+| `background` / `surface` | `#F5F6F8` / `#FFFFFF` | `#0A0F18` / `#111723` | superfícies |
+| `foreground` / `muted-foreground` | `#0F1B2D` / `#5D6879` | `#E6EAF0` / `#95A0B3` | texto |
+| `success` / `danger` | `#19805A` / `#C0392F` | `#6FC093` / `#EC8A80` | positivo / alerta e ações destrutivas |
+| `warning` `info` `violet` | discretas | discretas | semânticas |
+| `--logo-*` | marinho + dourado | claro + dourado | cores da marca (trocam sozinhas no tema escuro) |
 
-A barra do Admin usa `admin-rail` (marinho) e `admin-rail-highlight` para o item ativo. Os tons de status usam `tone="brand"` (antes `gold`).
+A barra do Admin usa os mesmos valores (`admin-rail`, `admin-rail-highlight`), para os dois parecerem um produto só.
 
 **Tipografia** — Geist em toda a interface; títulos de página em `font-display` (Geist semibold, entrelinha e espaçamento negativos). A antiga DM Serif Display saiu.
 

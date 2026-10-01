@@ -429,7 +429,7 @@ export function OrganizationsView() {
           {/* Cartões: celular */}
           <ul className="space-y-2.5 md:hidden">
             {rows.map((o) => (
-              <li key={o.id} className="rounded-[14px] border border-border bg-card p-4 shadow-card">
+              <li key={o.id} className="rounded-card border border-border/90 bg-card p-4 shadow-card">
                 <div className="flex items-start justify-between gap-3">
                   <Link href={`/admin/escritorios/${o.id}`} className="min-w-0 flex-1 outline-none">
                     <p className="flex items-center gap-2 truncate font-medium">

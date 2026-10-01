@@ -15,7 +15,7 @@ import { ADMIN_ITEMS } from "./nav"
 import { useAdminShell } from "./admin-context"
 
 const itemCls =
-  "group flex cursor-pointer items-center gap-3 rounded-[9px] px-2.5 py-2 text-[13px] text-foreground outline-none data-[selected=true]:bg-accent"
+  "group flex cursor-pointer items-center gap-3 rounded-control px-2.5 py-2 text-[13px] text-foreground outline-none data-[selected=true]:bg-accent"
 const groupCls =
   "px-1.5 pb-1 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-[10.5px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.1em] [&_[cmdk-group-heading]]:text-subtle"
 

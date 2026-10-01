@@ -25,7 +25,7 @@ export function MonthGrid({
   const weeks = days[35].getMonth() !== anchor.getMonth() ? 5 : 6
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-border bg-card shadow-card">
+    <div className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
       <div className="grid grid-cols-7 border-b border-border bg-surface-muted/30">
         {WEEK_LABELS.map((w) => (
           <div

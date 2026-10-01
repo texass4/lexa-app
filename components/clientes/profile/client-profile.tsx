@@ -41,7 +41,7 @@ const TAB_PERMISSION: Partial<Record<ProfileTab, Permission>> = {
 function ProfileSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Carregando cliente">
-      <div className="rounded-[18px] border border-border bg-card p-7">
+      <div className="rounded-card border border-border/90 bg-card p-7">
         <div className="flex items-center gap-5">
           <Skeleton className="size-16 rounded-full" />
           <div className="space-y-2.5">

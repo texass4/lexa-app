@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ChevronsUpDown, Keyboard, LogOut, Moon, Settings, Sun, UserRound } from "lucide-react"
+import { ChevronDown, ChevronsUpDown, Keyboard, LogOut, Moon, Settings, Sun, UserRound } from "lucide-react"
 import { cn } from "cn"
 import {
   DropdownMenu,
@@ -31,23 +31,28 @@ export function UserMenu({ variant, compact }: { variant: "sidebar" | "header"; 
         <DropdownMenuTrigger
           aria-label="Menu do usuário"
           className={cn(
-            "group flex w-full items-center gap-2.5 rounded-[10px] p-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-sidebar-accent",
+            "group flex w-full items-center gap-2.5 rounded-[12px] p-2 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring/60 aria-expanded:bg-sidebar-accent",
             compact && "justify-center",
           )}
         >
-          <UserAvatar name={user.name} src={user.avatarUrl} size="md" tone="dark" />
+          <UserAvatar name={user.name} src={user.avatarUrl} size="md" tone="gold" />
           <span className={cn("min-w-0 flex-1", compact && "sr-only")}>
-            <span className="block truncate text-[13px] font-medium text-foreground">{user.name}</span>
-            <span className="block truncate text-[11.5px] text-muted-foreground">{userTitle(user)}</span>
+            <span className="block truncate text-[13px] font-medium text-sidebar-foreground">{user.name}</span>
+            <span className="block truncate text-[11.5px] text-sidebar-muted">{userTitle(user)}</span>
           </span>
-          {!compact && <ChevronsUpDown className="size-3.5 text-subtle" />}
+          {!compact && <ChevronsUpDown className="size-3.5 text-sidebar-muted" />}
         </DropdownMenuTrigger>
       ) : (
         <DropdownMenuTrigger
           aria-label="Menu do usuário"
-          className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="group flex items-center gap-2.5 rounded-[12px] p-1 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/45 aria-expanded:bg-accent xl:pr-2.5"
         >
-          <UserAvatar name={user.name} src={user.avatarUrl} size="md" tone="dark" />
+          <UserAvatar name={user.name} src={user.avatarUrl} size="lg" tone="dark" />
+          <span className="hidden min-w-0 max-w-[160px] xl:block">
+            <span className="block truncate text-[13px] font-semibold leading-tight text-foreground">{user.name}</span>
+            <span className="block truncate text-[11.5px] leading-tight text-muted-foreground">{userTitle(user)}</span>
+          </span>
+          <ChevronDown className="hidden size-4 text-subtle transition-transform group-aria-expanded:rotate-180 xl:block" />
         </DropdownMenuTrigger>
       )}
       <DropdownMenuContent
