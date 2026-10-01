@@ -13,7 +13,6 @@ import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
 import { useMounted } from "@/lib/hooks"
 import { getOrganization } from "@/lib/account"
-import { SidebarAICard } from "./sidebar-ai-card"
 
 export function MobileDrawer() {
   const { mobileNavOpen, setMobileNavOpen } = useUI()
@@ -34,9 +33,6 @@ export function MobileDrawer() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-4">
             <SidebarNav mode="expanded" layoutId="drawer-active" onNavigate={() => setMobileNavOpen(false)} />
-            <div className="mt-6">
-              <SidebarAICard onOpen={() => setMobileNavOpen(false)} />
-            </div>
           </div>
           <div className="px-3 pb-[max(env(safe-area-inset-bottom),12px)]">
             <div className="border-t border-sidebar-border pt-2">

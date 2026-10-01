@@ -5,7 +5,6 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { cn } from "cn"
 import { Logo } from "@/components/brand/logo"
 import { SidebarNav } from "./sidebar-nav"
-import { SidebarAICard } from "./sidebar-ai-card"
 import { useUI } from "@/lib/store/ui-store"
 import { getOrganization } from "@/lib/account"
 import { BRAND } from "@/lib/brand"
@@ -43,12 +42,7 @@ export function Sidebar() {
       </div>
 
       <div className="relative shrink-0 px-3 pb-4 lg:pb-9">
-        {!collapsed && (
-          <div className="max-lg:hidden [@media(max-height:939px)]:hidden">
-            <SidebarAICard />
-          </div>
-        )}
-        <div className={cn("flex items-end gap-2 pt-5", collapsed ? "justify-center" : "max-lg:justify-center lg:justify-between lg:pt-28 lg:pl-3 lg:[@media(min-height:940px)]:pt-[200px]")}>
+        <div className={cn("flex items-end gap-2 pt-5", collapsed ? "justify-center" : "max-lg:justify-center lg:justify-between lg:pt-40 lg:pl-3")}>
           {!collapsed && (
             <p className="text-[13.5px] leading-relaxed text-white/90 max-lg:hidden">
               Mais organização.
