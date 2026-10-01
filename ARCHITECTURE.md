@@ -292,6 +292,8 @@ const { openDialog } = useUI()
 openDialog("task", { processId })   // "client" | "task" | "appointment" | "document" | "process" | "invoice"
 ```
 
+**Painel** (`components/dashboard/`) — cabeçalho (data, saudação, clima da cidade do escritório via Open-Meteo, sem chave; some sem cidade ou sem resposta, e "Novo"), faixa de resumo (`insight-banner.tsx`: contagens reais; "Ver insights" abre "O que merece sua atenção"), indicadores (Clientes, Processos, Tarefas, Financeiro), Processos recentes + Agenda de hoje, Tarefas em aberto + Financeiro, Prazos da semana + Atividade recente e o Panorama da IA. A partir de 1536 px, o assistente da Íntegra IA fica fixo à direita (`ai-dock.tsx`, mesma conversa do botão "IA"). Os números saem de `lib/dashboard.ts` (testado).
+
 **Layout** — barra lateral marinho fixa (`sidebar.tsx`: 256 px, 76 px recolhida ou entre 768 e 1023 px; no mobile vira o drawer de `mobile-nav.tsx`, com a barra inferior de atalhos), topo limpo (`topbar.tsx`: trilha nas telas de detalhe, busca `Ctrl K`, Íntegra IA, notificações, perfil e "Novo") e conteúdo em off-white, com cartões brancos. O card da Íntegra IA na barra lateral (`sidebar-ai-card.tsx`) só abre a mesma conversa do botão "IA".
 
 Design system — reutilize, não invente: `page-header`, `panel`, `metric-card` (indicador com selo colorido e linha de cor), `button`, `status-badge` (pílulas), `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens em `app/globals.css`:

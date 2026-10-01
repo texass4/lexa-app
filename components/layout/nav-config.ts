@@ -19,7 +19,7 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   /** Contador que só aparece quando pede ação (ver `SidebarNav`). */
-  badgeKey?: "tasks" | "processes" | "prazos" | "triagem"
+  badgeKey?: "tasks" | "processes" | "prazos" | "triagem" | "agenda"
   /** Sem ela, o item some do menu e a rota mostra "sem acesso". */
   permission?: Permission
   /** Telas dentro deste item (abrem pela setinha ao lado dele). */
@@ -29,7 +29,7 @@ export interface NavItem {
 export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Visão geral",
-    items: [{ href: "/dashboard", label: "Painel", icon: LayoutGrid }],
+    items: [{ href: "/dashboard", label: "Início", icon: LayoutGrid }],
   },
   {
     label: "Escritório",
@@ -52,7 +52,7 @@ export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         permission: "tasks.view",
         children: [{ href: "/tarefas/prazos", label: "Prazos", icon: Hourglass, badgeKey: "prazos", permission: "processes.view" }],
       },
-      { href: "/agenda", label: "Agenda", icon: CalendarDays, permission: "agenda.view" },
+      { href: "/agenda", label: "Agenda", icon: CalendarDays, badgeKey: "agenda", permission: "agenda.view" },
     ],
   },
   {

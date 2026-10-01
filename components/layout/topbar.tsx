@@ -35,11 +35,13 @@ function useBreadcrumb() {
 export function Topbar() {
   const { setCommandOpen, setMobileNavOpen } = useUI()
   const crumb = useBreadcrumb()
+  // O Painel tem o próprio botão "Novo" no cabeçalho da página.
+  const onDashboard = usePathname() === "/dashboard"
   const isMac = useIsMac()
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
-      <div className="mx-auto flex h-16 w-full max-w-[1480px] items-center gap-3 px-4 sm:px-6 md:h-[72px] lg:gap-5 lg:px-8 xl:px-10">
+      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 md:h-[72px] lg:gap-5 lg:px-8 xl:px-10">
         {/* Mobile: menu + logo */}
         <button
           type="button"
@@ -97,12 +99,16 @@ export function Topbar() {
           <div className="hidden md:block">
             <UserMenu variant="header" />
           </div>
-          <div className="hidden sm:block">
-            <NewMenu />
-          </div>
-          <div className="sm:hidden">
-            <NewMenu compact />
-          </div>
+          {!onDashboard && (
+            <>
+              <div className="hidden sm:block">
+                <NewMenu />
+              </div>
+              <div className="sm:hidden">
+                <NewMenu compact />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>

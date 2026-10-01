@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 "mx-auto w-full flex-1",
                 fullHeight
                   ? "flex h-[calc(100dvh-64px)] min-h-0 flex-col px-2 pt-2 pb-[calc(68px+env(safe-area-inset-bottom))] sm:px-3 sm:pt-3 md:h-[calc(100dvh-72px)] md:pb-3 lg:px-4 lg:pb-4"
-                  : "max-w-[1480px] px-4 pt-6 pb-28 sm:px-6 md:pb-16 lg:px-8 lg:pt-9 xl:px-10",
+                  : "max-w-[1680px] px-4 pt-6 pb-28 sm:px-6 md:pb-16 lg:px-8 lg:pt-9 xl:px-10",
               )}
             >
               {allowed ? (

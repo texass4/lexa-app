@@ -8,7 +8,7 @@ import { ChevronDown } from "lucide-react"
 import { cn } from "cn"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { isActive, visibleSections, type NavItem } from "./nav-config"
-import { diffInDays, getNow, parse } from "@/lib/dates"
+import { diffInDays, getNow, isSameDay, parse } from "@/lib/dates"
 import { isOverdue } from "@/lib/selectors"
 import { PRAZO_ALERT_DAYS, isActiveProcess } from "@/lib/attention"
 import { daysToPrazo, isOpenPrazo, nextPrazo } from "@/lib/prazos"
@@ -56,6 +56,11 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
       count: (triagem?.items ?? []).filter((i) => isOpenTriage(i) && i.responsibleId === user.id).length,
       urgent: true,
       label: "eventos seus aguardando decisão na Triagem",
+    },
+    agenda: {
+      count: data.appointments.filter((a) => isSameDay(parse(a.start), now) && parse(a.end) > now).length,
+      urgent: false,
+      label: "compromissos restantes hoje",
     },
   }
 
@@ -126,11 +131,12 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
   }
 
   return (
-    <nav aria-label="Navegação principal" className="flex flex-col gap-6">
+    <nav aria-label="Navegação principal" className="flex flex-col gap-1">
       {visibleSections(can).map((section) => (
         <div key={section.label}>
-          <p className={cn("mb-2 px-3 text-[10.5px] font-medium uppercase tracking-[0.12em] text-sidebar-muted/70", labelCls)}>{section.label}</p>
-          {mode !== "expanded" && <div className={cn("mx-auto mb-2 h-px w-6 bg-sidebar-border", mode === "auto" ? "lg:hidden" : "")} aria-hidden />}
+          {/* Grupos sem título, como na identidade: só uma divisória antes de Configurações. */}
+          <h2 className="sr-only">{section.label}</h2>
+          {section.label === "Sistema" && <div aria-hidden className="mx-3 mb-4 h-px bg-sidebar-border" />}
           <ul className="flex flex-col gap-1">
             {section.items.map((item) => {
               const children = item.children ?? []
