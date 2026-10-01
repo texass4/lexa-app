@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { HttpError, siteUrl } from "./server"
-import { sendAuthLink } from "./mailer"
+import { claimSend, releaseSend, sendAuthLink } from "./mailer"
 import { MEMBER_ROLES, sanitizePermissions, type MemberRole } from "./permissions"
 import { toUser, type MemberAccess, type ProfileRow } from "./profile"
 import { isEmail, normalizeEmail } from "./validation"
@@ -58,11 +58,19 @@ export async function listMembers(organizationId: string): Promise<MemberAccess[
  * já existe e só precisa de senha. `kind` muda o texto do e-mail e da tela.
  */
 async function sendPasswordLink(request: NextRequest, email: string, kind: "invite" | "recovery") {
-  const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({ type: "recovery", email })
-  if (error || !data.properties?.hashed_token) throw error ?? new Error("Falha ao gerar o link.")
-  const next = kind === "invite" ? "/redefinir-senha?convite=1" : "/redefinir-senha"
-  const link = `${siteUrl(request)}/auth/confirm?token_hash=${data.properties.hashed_token}&type=recovery&next=${encodeURIComponent(next)}`
-  await sendAuthLink(email, kind, link)
+  if (!claimSend(email, kind)) return true
+  try {
+    const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({ type: "recovery", email })
+    if (error || !data.properties?.hashed_token) throw error ?? new Error("Falha ao gerar o link.")
+    const next = kind === "invite" ? "/redefinir-senha?convite=1" : "/redefinir-senha"
+    const link = `${siteUrl(request)}/auth/confirm?token_hash=${data.properties.hashed_token}&type=recovery&next=${encodeURIComponent(next)}`
+    const sent = await sendAuthLink(email, kind, link)
+    if (!sent.ok) releaseSend(email, kind)
+    return sent.ok
+  } catch (error) {
+    releaseSend(email, kind)
+    throw error
+  }
 }
 
 export interface InviteInput {
@@ -135,8 +143,8 @@ export async function inviteMember(request: NextRequest, organizationId: string,
     }
   }
 
-  await sendPasswordLink(request, email, "invite")
-  return { ...toUser(profile), invitePending: true } satisfies MemberAccess
+  const emailSent = await sendPasswordLink(request, email, "invite")
+  return { ...toUser(profile), invitePending: true, emailSent }
 }
 
 /** Reenvia o convite (quem nunca entrou) ou manda um link de nova senha (quem já entrou). */
@@ -144,7 +152,7 @@ export async function resendInvite(request: NextRequest, organizationId: string,
   const target = await targetIn(organizationId, userId)
   if (!target.active) throw new HttpError(400, "Reative o usuário antes de enviar o link.")
   const { data } = await getSupabaseAdmin().auth.admin.getUserById(userId)
-  await sendPasswordLink(request, target.email, data.user?.last_sign_in_at ? "recovery" : "invite")
+  return sendPasswordLink(request, target.email, data.user?.last_sign_in_at ? "recovery" : "invite")
 }
 
 export interface MemberPatch {

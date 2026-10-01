@@ -130,7 +130,7 @@ function ConfirmForm({ item, onClose }: { item: TriageItem; onClose: () => void 
             </p>
             <p className="mt-0.5 text-muted-foreground">
               {suggested?.excerpt
-                ? `${suggested.from === "ia" ? "Lido pela Íntegra IA no teor" : "No teor"}: “${suggested.excerpt}”`
+                ? `No teor: “${suggested.excerpt}”`
                 : countable
                   ? "O número de dias não veio do teor: informe abaixo."
                   : "Movimentação sem publicação: informe a data fatal."}

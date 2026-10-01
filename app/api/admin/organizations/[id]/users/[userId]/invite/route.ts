@@ -10,7 +10,7 @@ type Context = { params: Promise<{ id: string; userId: string }> }
 export const POST = route<Context>(async (request, { params }) => {
   const { profile } = await requireAdmin(request)
   const { id, userId } = await params
-  await resendInvite(request, id, userId)
+  const emailSent = await resendInvite(request, id, userId)
   await recordAudit(request, {
     action: "user.access_reset",
     severity: "warning",
@@ -19,5 +19,5 @@ export const POST = route<Context>(async (request, { params }) => {
     target: { type: "user", id: userId },
     summary: "Link de acesso (convite ou nova senha) enviado pelo Super Admin",
   })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, emailSent })
 })

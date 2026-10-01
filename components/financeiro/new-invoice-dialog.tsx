@@ -6,15 +6,28 @@ import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { ChoiceChips } from "@/components/ui/choice-chips"
-import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/field"
+import { CurrencyInput, Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { INVOICE_CATEGORIES } from "@/lib/config"
 import { getNow, toLocalISO } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
 import { documentRequiredIssue } from "@/lib/clients"
-import type { Invoice, Process } from "@/types"
+import type { Invoice, InvoiceCategory, Process } from "@/types"
 
-const SITUATIONS = ["A receber", "Já recebido"] as const
+const SITUATIONS = ["Previsto", "Recebido", "Cancelado"] as const
 const METHODS: NonNullable<Invoice["method"]>[] = ["Pix", "Boleto", "Transferência", "Cartão"]
+
+function situationOf(status: Invoice["status"]): (typeof SITUATIONS)[number] {
+  if (status === "pago") return "Recebido"
+  if (status === "cancelado") return "Cancelado"
+  return "Previsto"
+}
+
+function statusOf(situation: (typeof SITUATIONS)[number]): Invoice["status"] {
+  if (situation === "Recebido") return "pago"
+  if (situation === "Cancelado") return "cancelado"
+  return "pendente"
+}
 
 type Defaults = { clientId?: string; processId?: string }
 
@@ -38,7 +51,7 @@ export function NewInvoiceDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={invoice ? "Editar lançamento" : "Novo lançamento"}
-      description={invoice ? "Altere valores, datas ou a situação do lançamento." : "Honorários a receber ou um pagamento já recebido."}
+      description={invoice ? "Altere valores, datas ou a situação do lançamento." : "Receita prevista, já recebida ou cancelada."}
       icon={invoice ? <Pencil /> : <CircleDollarSign />}
       bare
     >
@@ -53,22 +66,26 @@ function initialState(invoice: Invoice | undefined, defaults: Defaults | undefin
       clientId: invoice.clientId,
       processId: invoice.processId ?? "",
       description: invoice.description,
+      category: (invoice.category ?? "") as InvoiceCategory | "",
       amount: invoice.amount,
       dueDate: invoice.dueDate,
-      situation: (invoice.status === "pago" ? "Já recebido" : "A receber") as (typeof SITUATIONS)[number],
+      situation: situationOf(invoice.status),
       paidAt: invoice.paidAt ?? today,
       method: (invoice.method ?? "") as Invoice["method"] | "",
+      notes: invoice.notes ?? "",
     }
   }
   return {
     clientId: defaults?.clientId ?? (defaults?.processId ? (processes.find((p) => p.id === defaults.processId)?.clientId ?? "") : ""),
     processId: defaults?.processId ?? "",
     description: "",
+    category: "Honorários" as InvoiceCategory | "",
     amount: 0,
     dueDate: today,
-    situation: "A receber" as (typeof SITUATIONS)[number],
+    situation: "Previsto" as (typeof SITUATIONS)[number],
     paidAt: today,
     method: "" as Invoice["method"] | "",
+    notes: "",
   }
 }
 
@@ -87,7 +104,7 @@ function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaul
     setErrors((e) => ({ ...e, [k]: "" }))
   }
 
-  const paid = form.situation === "Já recebido"
+  const paid = form.situation === "Recebido"
   const processes = data.processes.filter((p) => p.clientId === form.clientId)
 
   const submit = async (e: React.FormEvent) => {
@@ -103,6 +120,7 @@ function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaul
       )
       if (issue) next.clientId = issue
     }
+    if (!form.category) next.category = "Escolha a categoria."
     if (form.description.trim().length < 3) next.description = "Descreva o lançamento (ex.: Honorários iniciais — parcela 1/3)."
     if (form.amount <= 0) next.amount = "Informe um valor maior que zero."
     if (!form.dueDate) next.dueDate = "Informe o vencimento."
@@ -115,11 +133,13 @@ function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaul
       clientId: form.clientId,
       processId: form.processId || undefined,
       description: form.description.trim(),
+      category: form.category || undefined,
       amount: form.amount,
       dueDate: form.dueDate,
-      status: (paid ? "pago" : "pendente") as Invoice["status"],
+      status: statusOf(form.situation),
       paidAt: paid ? form.paidAt : undefined,
       method: form.method || undefined,
+      notes: form.notes.trim() || undefined,
     }
 
     if (invoice) {
@@ -175,7 +195,22 @@ function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaul
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Descrição" htmlFor="inv-description" error={errors.description} className="sm:col-span-2">
+          <Field label="Categoria" htmlFor="inv-category" error={errors.category}>
+            <NativeSelect
+              id="inv-category"
+              value={form.category}
+              aria-invalid={!!errors.category}
+              onChange={(e) => set("category", e.target.value as InvoiceCategory | "")}
+            >
+              <option value="">Selecione…</option>
+              {INVOICE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Descrição" htmlFor="inv-description" error={errors.description}>
             <TextInput
               id="inv-description"
               autoFocus
@@ -219,6 +254,9 @@ function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaul
                 <option key={m}>{m}</option>
               ))}
             </NativeSelect>
+          </Field>
+          <Field label="Observação" htmlFor="inv-notes" optional className="sm:col-span-2">
+            <TextArea id="inv-notes" rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
           </Field>
         </form>
       </ModalBody>

@@ -61,7 +61,10 @@ function mergeById<T extends { id: string }>(current: T[], saved: T[] = []): T[]
 
 export type NewClientInput = Pick<Client, "name" | "kind" | "document" | "email" | "phone" | "area" | "ownerId" | "address"> &
   Partial<Pick<Client, "status" | "whatsapp" | "addressDetails" | "birthDate" | "tags" | "notes" | "contact" | "profession">>
-export type NewInvoiceInput = Pick<Invoice, "clientId" | "processId" | "description" | "amount" | "dueDate" | "status" | "paidAt" | "method">
+export type NewInvoiceInput = Pick<
+  Invoice,
+  "clientId" | "processId" | "description" | "category" | "amount" | "dueDate" | "status" | "paidAt" | "method" | "notes"
+>
 export type NewTaskInput = Pick<Task, "title" | "dueAt" | "priority" | "assigneeId" | "description" | "related" | "columnId">
 export type NewPrazoInput = Pick<
   Prazo,
@@ -1023,7 +1026,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             logActivity({
               type: "payment",
               actor: account.getUser(account.currentUserId()).name,
-              message: invoice.status === "pago" ? "registrou um pagamento recebido." : "lançou uma cobrança de honorários.",
+              message:
+                invoice.status === "pago"
+                  ? "registrou um pagamento recebido."
+                  : invoice.status === "cancelado"
+                    ? "registrou um lançamento cancelado."
+                    : "lançou uma cobrança de honorários.",
               detail: `${invoice.description} · ${formatCurrency(invoice.amount)} · ${
                 invoice.status === "pago" && invoice.paidAt ? `pago em ${fmtNumericDate(invoice.paidAt)}` : `vence ${fmtNumericDate(invoice.dueDate)}`
               }`,
@@ -1040,7 +1048,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
 
       markInvoicePaid(id, paidAt, method) {
         const invoice = stateRef.current.invoices.find((i) => i.id === id)
-        if (!invoice || invoice.status === "pago") return
+        if (!invoice || invoice.status === "pago" || invoice.status === "cancelado") return
         const updated: Invoice = { ...invoice, status: "pago", paidAt, method: method ?? invoice.method }
         commit((s) => ({
           ...s,

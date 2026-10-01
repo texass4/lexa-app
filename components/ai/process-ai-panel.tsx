@@ -133,7 +133,7 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
           <div className="space-y-5 border-t border-border px-5 pt-4 pb-5">
             {(summary.data || summary.loading) && (next.data || next.loading) && (
               <FilterTabs
-                ariaLabel="Análises da Íntegra IA"
+                ariaLabel="Leituras do processo"
                 layoutId="process-ai-view"
                 value={view}
                 onChange={setView}
@@ -148,7 +148,7 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
             {active.loading && (
               <AIThinking
                 label={
-                  view === "summary" ? `Íntegra IA está analisando o processo ${process.code}…` : "Íntegra IA está verificando o que fazer agora…"
+                  view === "summary" ? `Lendo o processo ${process.code}…` : "Verificando o que fazer agora…"
                 }
                 onCancel={active.cancel}
               />
@@ -241,7 +241,7 @@ function NextView({
         <AISection title="Pontos de atenção">
           <AttentionList points={n.pontos_atencao} sources={result.sources} onOpen={onOpen} />
         </AISection>
-        <AISection title="Sugestões da Íntegra IA">
+        <AISection title="Próximos passos sugeridos">
           <SuggestionList suggestions={n.sugestoes} sources={result.sources} onOpen={onOpen} onCreate={onCreate} />
           {n.sugestoes.length > 0 && (
             <p className="mt-2 text-[11.5px] text-subtle">

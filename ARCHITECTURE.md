@@ -334,7 +334,7 @@ Transições: `app/(app)/template.tsx` (entrada de página em CSS, `.page-enter`
 
 **Na interface** — `useSession().can("x.edit")` ou `<Can permission="x.edit">` para esconder ações; `nav-config.ts` diz a permissão de cada rota (menu, busca e "sem acesso" no `AppShell`); `DIALOG_PERMISSION` (`ui-store.tsx`) diz a de cada diálogo global.
 
-**Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único; enquanto não há provedor de e-mail, o link sai no terminal (`lib/auth/mailer.ts`).
+**Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`) e envia a confirmação de cadastro. Convite e recuperação geram link de uso único e saem pelo SMTP da Brevo (`lib/auth/mailer.ts`). Sem as variáveis `BREVO_SMTP_*`, o envio não acontece; em desenvolvimento o link ainda aparece no terminal.
 
 ## 7. Íntegra Admin (`/admin`)
 

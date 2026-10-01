@@ -10,6 +10,34 @@ npm run dev
 
 Abre em [http://localhost:3000](http://localhost:3000). Sem sessão, vai para o login; depois de entrar, para o painel (`/dashboard`). Antes da primeira vez, copie `.env.example` para `.env.local` e rode as migrações de `supabase/migrations/` em ordem.
 
+## E-mail (Brevo SMTP)
+
+Convite, recuperação de senha e confirmação de cadastro saem do servidor por SMTP (`lib/auth/mailer.ts`). As variáveis estão no `.env.example` (`BREVO_SMTP_*` e `BREVO_SENDER_*`). Sem elas, a conta é criada mesmo assim e o envio falha em silêncio no log `[mail]`.
+
+O domínio do remetente não está no código. Na Brevo, em **Senders, Domains & Dedicated IPs › Domains**, autentique o domínio do `BREVO_SENDER_EMAIL` e publique os registros que a própria Brevo mostrar:
+
+- **SPF** — TXT no domínio, com o `include` que a tela da Brevo exibir.
+- **DKIM** — CNAMEs (host e valor) que a tela da Brevo exibir. Não copie de outro projeto.
+- **DMARC** — TXT em `_dmarc`, com a política que a Brevo sugerir para esse domínio.
+
+O remetente só passa a sair com o domínio autenticado depois que a Brevo marcar o domínio como verificado.
+
+### Supabase Auth
+
+O aplicativo gera o link (`generateLink`) e envia pelo próprio SMTP. O Auth do Supabase não lê o `.env.local`. Para os e-mails que o painel do Supabase disparar sozinho, configure o mesmo SMTP em **Authentication › Emails › SMTP Settings**:
+
+- Enable custom SMTP
+- Host: `smtp-relay.brevo.com`
+- Port: `587`
+- Username: o valor de `BREVO_SMTP_USER`
+- Password: o valor de `BREVO_SMTP_PASSWORD`
+- Sender email: o valor de `BREVO_SENDER_EMAIL`
+- Sender name: `Íntegra`
+
+Em **Authentication › URL Configuration**, o Site URL é o endereço público do app e os Redirect URLs incluem `https://SEU-APP/auth/confirm`.
+
+O cadastro público e o convite criam o usuário já confirmado no Auth (`email_confirm: true`) e mandam o e-mail pela Íntegra. Deixe **Confirm email** como está hoje, a menos que queira que o Supabase também envie a confirmação nativa — nesse caso os dois podem sair juntos.
+
 ## Onde os dados ficam
 
 Os dados do escritório ficam no **Supabase**: clientes, processos, tarefas, agenda, documentos, financeiro, atividades e WhatsApp em tabelas por escritório, isoladas pela RLS; os arquivos (documentos e anexos do WhatsApp) no Supabase Storage; contas e sessões no Supabase Auth. A Íntegra começa vazia — não há dados de demonstração. Ao entrar, o que a pessoa pode ver é carregado no navegador, e cada alteração é gravada no Supabase logo em seguida (`lib/store/storage.ts`).

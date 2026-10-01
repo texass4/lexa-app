@@ -44,9 +44,21 @@ export function useSignalAction() {
   }
 }
 
+/** Sinal discreto: a leitura do dado, sem anunciar que existe um modelo por trás. */
+function signalCue(signal: AttentionSignal): string | undefined {
+  if (signal.level === "critical") return "Alta prioridade"
+  if (signal.kind.startsWith("deadline")) return "Possível prazo"
+  if (signal.kind === "process-moved") return signal.level === "warning" ? "Movimentação relevante" : "Movimentação recente"
+  if (signal.action) return "Próximo passo sugerido"
+  if (signal.kind === "process-stale") return "Parado"
+  return undefined
+}
+
 function SignalText({ signal }: { signal: AttentionSignal }) {
+  const cue = signalCue(signal)
   return (
     <>
+      {cue && <span className="mb-0.5 block text-[11px] font-medium tracking-[0.01em] text-subtle">{cue}</span>}
       <span className="block truncate text-[13.5px] font-medium text-foreground">{signal.title}</span>
       {signal.detail && <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">{signal.detail}</span>}
     </>

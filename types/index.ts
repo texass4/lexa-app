@@ -469,17 +469,23 @@ export interface LegalDocument extends TenantEntity {
 
 /* ------------------------------- Financeiro ------------------------------- */
 
-export type InvoiceStatus = "pago" | "pendente" | "atrasado"
+/** `pendente` é o previsto; `atrasado` é calculado pelo vencimento e também pode estar salvo. */
+export type InvoiceStatus = "pago" | "pendente" | "atrasado" | "cancelado"
+
+export type InvoiceCategory = "Honorários" | "Êxito" | "Custas" | "Consulta" | "Outros"
 
 export interface Invoice extends TenantEntity {
   clientId: ID
   processId?: ID
   description: string
+  /** Ausente em lançamentos anteriores à categoria. */
+  category?: InvoiceCategory
   amount: number
   dueDate: string
   paidAt?: string
   status: InvoiceStatus
   method?: "Pix" | "Boleto" | "Transferência" | "Cartão"
+  notes?: string
 }
 
 /* ------------------------------- Atividade -------------------------------- */

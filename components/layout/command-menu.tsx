@@ -127,7 +127,7 @@ function CommandContent() {
         </Command.Empty>
 
         {hasQuery && (
-          <Command.Group heading="Íntegra IA" className={groupCls} forceMount>
+          <Command.Group heading="Conversa" className={groupCls} forceMount>
             <Command.Item
               value={`perguntar integra ${query}`}
               forceMount
@@ -185,7 +185,7 @@ function CommandContent() {
                 </Command.Item>
               ))}
             <Command.Item
-              value="acao perguntar a integra ia"
+              value="acao perguntar a integra ia conversa"
               onSelect={() => {
                 setCommandOpen(false)
                 lexa.open()
@@ -195,7 +195,7 @@ function CommandContent() {
               <span className="flex size-7 items-center justify-center rounded-[8px] border border-brand/25 bg-brand-soft text-brand-strong">
                 <Sparkles className="size-3.5" />
               </span>
-              Perguntar à Íntegra IA
+              Perguntar à Íntegra
               <span className="ml-auto hidden text-[11.5px] text-subtle sm:inline">{lexa.context.subtitle}</span>
             </Command.Item>
           </Command.Group>

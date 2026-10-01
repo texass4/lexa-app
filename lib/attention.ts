@@ -16,7 +16,7 @@
  */
 
 import { addDays, diffInDays, fmtNumericDate, getNow, parse, startOfDay } from "@/lib/dates"
-import { isOverdue } from "@/lib/selectors"
+import { invoiceStatus, isOverdue } from "@/lib/selectors"
 import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } from "@/lib/services/processes/movement-interpreter"
 import type { Permission } from "@/lib/auth/permissions"
 import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos"
@@ -175,6 +175,13 @@ export function latestMovement(p: Process) {
   return interpretMovements(p.movements, p.id)[0]
 }
 
+/** Movimentação recente cuja categoria costuma pedir leitura do advogado. */
+export function recentMovementNeedsReview(p: Process, now: Date = getNow()) {
+  if (!movedRecently(p, now)) return false
+  const last = latestMovement(p)
+  return !!last && REVIEW_CATEGORIES.includes(last.category)
+}
+
 /* ------------------------------ por processo ------------------------------ */
 
 /**
@@ -299,7 +306,7 @@ export function clientSignals(data: AttentionData, client: Client, now: Date = g
   }
 
   if (allowed("finance.view")) {
-    const late = data.invoices.filter((i) => i.clientId === client.id && i.status === "atrasado")
+    const late = data.invoices.filter((i) => i.clientId === client.id && invoiceStatus(i, now) === "atrasado")
     if (late.length) {
       const total = late.reduce((acc, i) => acc + i.amount, 0)
       signals.push({
@@ -414,7 +421,7 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
   }
 
   if (allowed("finance.view")) {
-    const late = data.invoices.filter((i) => i.status === "atrasado")
+    const late = data.invoices.filter((i) => invoiceStatus(i, now) === "atrasado")
     if (late.length) {
       const total = late.reduce((acc, i) => acc + i.amount, 0)
       const clients = new Set(late.map((i) => i.clientId)).size

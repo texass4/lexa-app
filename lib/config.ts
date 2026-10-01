@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react"
-import type { ClientStatus, InvoiceStatus, PracticeArea, PrazoOrigin, PrazoStatus, Priority, ProcessStatus } from "@/types"
+import type { ClientStatus, InvoiceCategory, InvoiceStatus, PracticeArea, PrazoOrigin, PrazoStatus, Priority, ProcessStatus } from "@/types"
 
 export type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "brand" | "violet"
 
@@ -40,10 +40,13 @@ export const PRAZO_ORIGIN: Record<PrazoOrigin, string> = {
   movimentacao: "Movimentação",
 }
 
+export const INVOICE_CATEGORIES: InvoiceCategory[] = ["Honorários", "Êxito", "Custas", "Consulta", "Outros"]
+
 export const INVOICE_STATUS: Record<InvoiceStatus, { label: string; tone: Tone }> = {
-  pago: { label: "Pago", tone: "success" },
-  pendente: { label: "A vencer", tone: "neutral" },
+  pago: { label: "Recebido", tone: "success" },
+  pendente: { label: "Previsto", tone: "neutral" },
   atrasado: { label: "Em atraso", tone: "danger" },
+  cancelado: { label: "Cancelado", tone: "neutral" },
 }
 
 /** Paleta das categorias de compromisso e etiquetas (tons do Notion). Os valores ficam salvos nos dados: não mude nem reordene. */

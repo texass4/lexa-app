@@ -12,7 +12,7 @@ import { PROCESS_STATUS } from "@/lib/config"
 import { STALE_DAYS } from "@/lib/attention"
 import { addDays, parse, startOfDay, startOfWeek, toLocalISO } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
-import { financeSummary, isOverdue } from "@/lib/selectors"
+import { financeSummary, invoiceStatus, isOpenInvoice, isOverdue } from "@/lib/selectors"
 import { isOpenPrazo, nextPrazo } from "@/lib/prazos"
 import type { OfficeMetrics } from "@/lib/ai/types"
 import type { Appointment, Invoice, Prazo, Task } from "@/types"
@@ -156,10 +156,10 @@ export function computeOfficeMetrics(data: OfficeData, now: Date): OfficeMetrics
   if (data.can.documents && data.documentStats) metrics.documents = { ...data.documentStats }
 
   if (data.can.finance) {
-    const overdue = data.invoices.filter((i) => i.status === "atrasado")
+    const overdue = data.invoices.filter((i) => invoiceStatus(i, now) === "atrasado")
     const summary = financeSummary(data.invoices, now)
     metrics.finance = {
-      openAmount: sum(data.invoices.filter((i) => i.status !== "pago")),
+      openAmount: sum(data.invoices.filter(isOpenInvoice)),
       overdueAmount: sum(overdue),
       overdueInvoices: overdue.length,
       clientsWithOverdue: new Set(overdue.map((i) => i.clientId)).size,
@@ -231,7 +231,7 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
   }
 
   const overdueTasks = data.tasks.filter((t) => isOverdue(t, now)).sort((a, b) => a.dueAt.localeCompare(b.dueAt))
-  const overdueInvoices = data.invoices.filter((i) => i.status === "atrasado")
+  const overdueInvoices = data.invoices.filter((i) => invoiceStatus(i, now) === "atrasado")
   const overdueByClient = new Map<string, number>()
   for (const i of overdueInvoices) overdueByClient.set(i.clientId, (overdueByClient.get(i.clientId) ?? 0) + i.amount)
 

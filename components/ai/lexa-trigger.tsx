@@ -3,12 +3,12 @@
 import { Sparkles } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useLexaAI } from "./lexa-ai-provider"
-import { AI_NAME } from "@/lib/brand"
+import { BRAND } from "@/lib/brand"
 
 /** Presença discreta da Íntegra IA no topo de todas as telas — abre a conversa no contexto atual. */
 export function LexaTrigger() {
   const lexa = useLexaAI()
-  const label = `Perguntar à ${AI_NAME} — ${lexa.context.subtitle}`
+  const label = `Perguntar à ${BRAND.name} — ${lexa.context.subtitle}`
   return (
     <Tooltip>
       <TooltipTrigger
@@ -23,7 +23,7 @@ export function LexaTrigger() {
         }
       >
         <Sparkles className="size-4 transition-transform duration-300 group-hover:rotate-12" strokeWidth={1.8} />
-        <span className="max-sm:hidden">IA</span>
+        <span className="max-sm:hidden">Perguntar</span>
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>
         {label}

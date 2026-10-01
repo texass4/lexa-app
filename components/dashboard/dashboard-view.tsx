@@ -53,19 +53,19 @@ export function DashboardView() {
           <FadeIn delay={0.06} className="order-1 lg:order-none">
             <AttentionPanel signals={signals} empty={empty} />
           </FadeIn>
-          <FadeIn delay={0.12} className="order-4 lg:order-none">
-            <OfficeAIPanel />
-          </FadeIn>
           <div className="contents lg:grid lg:gap-5 xl:grid-cols-2">
             {can("tasks.view") && (
-              <FadeIn delay={0.16} className="order-3 lg:order-none">
+              <FadeIn delay={0.12} className="order-3 lg:order-none">
                 <MyTasks />
               </FadeIn>
             )}
-            <FadeIn delay={0.2} className="order-5 lg:order-none">
+            <FadeIn delay={0.16} className="order-5 lg:order-none">
               <RecentActivity />
             </FadeIn>
           </div>
+          <FadeIn delay={0.2} className="order-7 lg:order-none">
+            <OfficeAIPanel />
+          </FadeIn>
         </div>
         <div className="contents lg:col-span-4 lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
           {can("processes.view") && (

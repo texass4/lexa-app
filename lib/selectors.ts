@@ -26,19 +26,34 @@ export function describeRelated(s: DemoState, related?: RelatedEntity) {
  * em atraso, mesmo que ninguém tenha mudado o status salvo.
  */
 export function invoiceStatus(invoice: Invoice, now: Date = getNow()): InvoiceStatus {
-  if (invoice.status === "pago") return "pago"
+  if (invoice.status === "pago" || invoice.status === "cancelado") return invoice.status
   if (invoice.status === "atrasado") return "atrasado"
   return invoice.dueDate < toLocalISO(now).slice(0, 10) ? "atrasado" : "pendente"
 }
 
+/** Ainda entra em aberto, previsto e inadimplência. Cancelado fica fora. */
+export const isOpenInvoice = (invoice: Invoice) => invoice.status !== "pago" && invoice.status !== "cancelado"
+
+export type InvoiceListTab = "receber" | "recebidos" | "atraso" | "cancelados"
+
+/** Aba da lista do Financeiro a partir da situação real (atraso calculado pelo vencimento). */
+export function invoiceListTab(invoice: Invoice, now: Date = getNow()): InvoiceListTab {
+  const status = invoiceStatus(invoice, now)
+  if (status === "pago") return "recebidos"
+  if (status === "cancelado") return "cancelados"
+  if (status === "atrasado") return "atraso"
+  return "receber"
+}
+
 export function clientFinance(s: Pick<DemoState, "invoices">, clientId: string, now: Date = getNow()) {
   const invoices = s.invoices.filter((i) => i.clientId === clientId)
-  const paid = sum(invoices.filter((i) => i.status === "pago"))
-  const open = sum(invoices.filter((i) => i.status !== "pago"))
+  const live = invoices.filter((i) => i.status !== "cancelado")
+  const paid = sum(live.filter((i) => i.status === "pago"))
+  const open = sum(live.filter(isOpenInvoice))
   const overdueItems = invoices.filter((i) => invoiceStatus(i, now) === "atrasado")
   const overdue = sum(overdueItems)
   const upcoming = invoices.filter((i) => invoiceStatus(i, now) === "pendente").sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-  // Contratado = tudo o que foi faturado para o cliente (pago + em aberto).
+  // Contratado = o que ainda vale para o cliente (recebido + em aberto). Cancelado não entra.
   return { invoices, contracted: paid + open, paid, open, overdue, overdueCount: overdueItems.length, upcoming }
 }
 
@@ -117,7 +132,7 @@ export function nextClientDeadline(processes: Process[], prazos: readonly Prazo[
 export const sum = (items: Invoice[]) => items.reduce((acc, i) => acc + i.amount, 0)
 
 export function openReceivables(s: DemoState) {
-  return sum(s.invoices.filter((i) => i.status !== "pago"))
+  return sum(s.invoices.filter(isOpenInvoice))
 }
 
 /* ------------------------------- Financeiro ------------------------------- */
@@ -147,7 +162,7 @@ export function monthlyRevenue(invoices: Invoice[], now: Date = getNow(), months
       key,
       month: cap(monthShort(date.getMonth())),
       label: `${cap(monthName(date.getMonth()))} de ${date.getFullYear()}`,
-      prevista: sum(invoices.filter((inv) => inv.dueDate.slice(0, 7) === key)),
+      prevista: sum(invoices.filter((inv) => inv.status !== "cancelado" && inv.dueDate.slice(0, 7) === key)),
       recebida: sum(invoices.filter((inv) => inv.status === "pago" && receivedIn(inv) === key)),
     }
   })
@@ -156,7 +171,7 @@ export function monthlyRevenue(invoices: Invoice[], now: Date = getNow(), months
 /** Números do mês atual. `growth` é `undefined` quando não há mês anterior para comparar. */
 export function financeSummary(invoices: Invoice[], now: Date = getNow()) {
   const [previous, current] = monthlyRevenue(invoices, now, 2)
-  const billed = sum(invoices)
+  const billed = sum(invoices.filter((i) => i.status !== "cancelado"))
   const overdue = sum(invoices.filter((i) => invoiceStatus(i, now) === "atrasado"))
   return {
     month: current.label,

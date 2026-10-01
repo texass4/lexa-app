@@ -49,8 +49,7 @@ function statusOf(m: MemberAccess) {
 
 /* ------------------------------- Convidar -------------------------------- */
 
-/** Sem provedor de e-mail (`lib/auth/mailer.ts`), o convite é criado, mas o link não chega sozinho à pessoa. */
-const EMAIL_PENDING = "O envio por e-mail ainda não está ativo — por enquanto, o link de acesso é entregue pelo suporte da Íntegra."
+const EMAIL_FAILED = "A pessoa foi cadastrada, mas o e-mail não saiu. Reenvie o convite em instantes."
 
 function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }) {
   const [form, setForm] = React.useState({ name: "", email: "", role: "lawyer" as MemberRole, jobTitle: "", oabNumber: "", oabUf: "" })
@@ -70,8 +69,13 @@ function InviteForm({ apiBase, onDone }: { apiBase: string; onDone: () => void }
     setBusy(true)
     try {
       const { oabNumber, oabUf, ...rest } = form
-      await call(apiBase, "POST", { ...rest, ...(lawyer ? { oab: { number: oabNumber, uf: oabUf } } : {}) })
-      toast.success("Convite criado.", { description: EMAIL_PENDING })
+      const created = await call<{ member?: { emailSent?: boolean } }>(apiBase, "POST", {
+        ...rest,
+        ...(lawyer ? { oab: { number: oabNumber, uf: oabUf } } : {}),
+      })
+      toast.success("Convite criado.", {
+        description: created.member?.emailSent === false ? EMAIL_FAILED : "O convite foi enviado para o e-mail informado.",
+      })
       onDone()
     } catch (err) {
       setError((err as Error).message)
@@ -400,8 +404,10 @@ export function MembersManager({
         toast.success(member.active ? "Usuário desativado." : "Usuário reativado.", { description: member.name })
         changed()
       } else {
-        await call(`${apiBase}/${member.id}/invite`, "POST")
-        toast.success(member.invitePending ? "Novo convite gerado." : "Link de nova senha gerado.", { description: EMAIL_PENDING })
+        const sent = await call<{ emailSent?: boolean }>(`${apiBase}/${member.id}/invite`, "POST")
+        toast.success(member.invitePending ? "Novo convite gerado." : "Link de nova senha gerado.", {
+          description: sent.emailSent === false ? EMAIL_FAILED : member.email,
+        })
       }
     } catch (err) {
       toast.error((err as Error).message)

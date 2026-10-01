@@ -333,7 +333,11 @@ export function UsersView() {
         : `Um link de uso único para definir uma nova senha vai para ${u.email}. A senha atual continua valendo até ser trocada.`,
       confirmLabel: u.invitePending ? "Reenviar convite" : "Enviar link",
       tone: "default",
-      onConfirm: () => run(() => adminFetch(`${userUrl(u)}/invite`, "POST"), u.invitePending ? "Convite reenviado." : "Link de nova senha enviado.", u.email),
+      onConfirm: () =>
+        run(async () => {
+          const sent = await adminFetch<{ emailSent?: boolean }>(`${userUrl(u)}/invite`, "POST")
+          if (sent.emailSent === false) throw new Error("Não foi possível enviar o e-mail. Tente de novo em instantes.")
+        }, u.invitePending ? "Convite reenviado." : "Link de nova senha enviado.", u.email),
     })
   const remove = (u: AdminUser) =>
     setConfirm({

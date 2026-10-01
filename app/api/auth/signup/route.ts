@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { HttpError, readJson, route } from "@/lib/auth/server"
+import { HttpError, readJson, route, siteUrl } from "@/lib/auth/server"
+import { claimSend, releaseSend, sendAuthLink } from "@/lib/auth/mailer"
 import { isEmail, normalizeEmail, passwordProblem } from "@/lib/auth/validation"
 import { loadSettings } from "@/lib/admin/platform"
 import { resolveDefaultPlan } from "@/lib/admin/plans"
@@ -56,7 +57,7 @@ export const POST = route(async (request) => {
   const { data: created, error: userError } = await admin.auth.admin.createUser({
     email,
     password,
-    // A aprovação do escritório é a porta de entrada; o e-mail será verificado quando houver provedor.
+    // A aprovação do escritório é a porta de entrada. O e-mail de confirmação sai em seguida e não bloqueia o cadastro.
     email_confirm: true,
     user_metadata: { name },
   })
@@ -79,6 +80,11 @@ export const POST = route(async (request) => {
     await admin.auth.admin.deleteUser(created.user.id)
     await admin.from("organizations").delete().eq("id", org.id)
     throw profileError
+  }
+
+  if (claimSend(email, "confirm")) {
+    const sent = await sendAuthLink(email, "confirm", `${siteUrl(request)}/login`)
+    if (!sent.ok) releaseSend(email, "confirm")
   }
 
   await recordAudit(request, {

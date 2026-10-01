@@ -30,11 +30,11 @@ export function MovementAISection({
     <section className="rounded-[12px] border border-border">
       <div className="flex flex-col gap-3 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-foreground">Íntegra IA</p>
+          <p className="text-[13px] font-medium text-foreground">Leitura da movimentação</p>
           <p className="text-[12px] text-muted-foreground">Explica o registro sem ir além do que ele informa.</p>
         </div>
         <Button variant="secondary" size="sm" onClick={run} disabled={!ready || analysis.loading} className="shrink-0 self-start sm:self-auto">
-          <Sparkles /> {result ? "Analisar de novo" : "Analisar com Íntegra IA"}
+          <Sparkles /> {result ? "Ler de novo" : "Ler esta movimentação"}
         </Button>
       </div>
 
@@ -42,7 +42,7 @@ export function MovementAISection({
         <div className="space-y-4 border-t border-border px-3.5 pt-3.5 pb-4">
           {status && !ready && <AIUnavailable status={status} />}
           {analysis.error && <AIErrorNotice error={analysis.error} onRetry={run} />}
-          {analysis.loading && <AIThinking label="Íntegra IA está analisando a movimentação…" onCancel={analysis.cancel} />}
+          {analysis.loading && <AIThinking label="Lendo a movimentação…" onCancel={analysis.cancel} />}
           {result && !analysis.loading && (
             <>
               <p className="text-[13.5px] leading-relaxed text-foreground">

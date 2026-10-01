@@ -22,16 +22,26 @@ export function describeInvoiceChange(before: Invoice, after: Invoice): InvoiceC
   if (before.amount !== after.amount) parts.push(`valor de ${formatCurrency(before.amount)} para ${formatCurrency(after.amount)}`)
   if (before.dueDate !== after.dueDate) parts.push(`vencimento de ${fmtNumericDate(before.dueDate)} para ${fmtNumericDate(after.dueDate)}`)
   if (before.description !== after.description) parts.push("descrição")
+  if (!same(before.category, after.category)) parts.push("categoria")
+  if (!same(before.notes, after.notes)) parts.push("observação")
   if (!same(before.method, after.method) && after.status !== "pago") parts.push("forma de pagamento")
   if (before.clientId !== after.clientId) parts.push("cliente")
   if (!same(before.processId, after.processId)) parts.push("processo")
 
   const paidNow = before.status !== "pago" && after.status === "pago"
-  const reopened = before.status === "pago" && after.status !== "pago"
+  const cancelledNow = before.status !== "cancelado" && after.status === "cancelado"
+  const reopened = before.status === "pago" && after.status !== "pago" && after.status !== "cancelado"
+  const restored = before.status === "cancelado" && after.status !== "cancelado" && after.status !== "pago"
   const paidDateChanged = before.status === "pago" && after.status === "pago" && !same(before.paidAt, after.paidAt)
   if (paidDateChanged) parts.push(`data do pagamento para ${after.paidAt ? fmtNumericDate(after.paidAt) : "não informada"}`)
 
   const summary = [after.description, formatCurrency(after.amount)]
+  if (cancelledNow) {
+    return { changed: true, message: "cancelou um lançamento.", detail: summary.join(" · ") }
+  }
+  if (restored) {
+    return { changed: true, message: "reabriu um lançamento cancelado.", detail: [...summary, `vence ${fmtNumericDate(after.dueDate)}`].join(" · ") }
+  }
   if (paidNow) {
     return {
       changed: true,

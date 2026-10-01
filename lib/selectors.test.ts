@@ -239,6 +239,11 @@ describe("hub do cliente", () => {
       ["b"],
     )
     assert.deepEqual([...delinquentClientIds(invoices, NOW)], ["c1"])
+    const cancelled = invoice("x", { dueDate: "2026-09-01", amount: 50, status: "cancelado" })
+    assert.equal(invoiceStatus(cancelled, NOW), "cancelado")
+    const withCancelled = clientFinance({ invoices: [...invoices, cancelled] }, "c1", NOW)
+    assert.equal(withCancelled.contracted, 600)
+    assert.equal(withCancelled.open, 500)
   })
 
   it("próximo prazo: só prazos abertos de processos ativos, o vencido primeiro", () => {
