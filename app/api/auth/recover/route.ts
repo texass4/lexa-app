@@ -1,7 +1,8 @@
 import { after, NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { HttpError, readJson, route, siteUrl } from "@/lib/auth/server"
-import { isMailerConfigured, sendAuthLink } from "@/lib/auth/mailer"
+import { sendAuthLink } from "@/lib/auth/mailer"
+import { isEmailConfigured } from "@/lib/services/email"
 import { isEmail, normalizeEmail } from "@/lib/auth/validation"
 
 /**
@@ -16,7 +17,7 @@ export const POST = route(async (request) => {
   const email = normalizeEmail(raw ?? "")
 
   // Vale para qualquer e-mail (não revela nada): em produção, sem SMTP, avisa em vez de fingir que enviou.
-  if (!isMailerConfigured() && process.env.NODE_ENV === "production") {
+  if (!isEmailConfigured() && process.env.NODE_ENV === "production") {
     throw new HttpError(503, "A recuperação de senha por e-mail está indisponível no momento. Fale com o suporte da Íntegra.")
   }
 

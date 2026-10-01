@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { HttpError, siteUrl } from "./server"
-import { EMAIL_FAILURE_STATUS, sendAuthLink, type EmailResult } from "./mailer"
+import { sendAuthLink, type EmailResult } from "./mailer"
 import { MEMBER_ROLES, sanitizePermissions, type MemberRole } from "./permissions"
 import { toUser, type MemberAccess, type ProfileRow } from "./profile"
 import { isEmail, normalizeEmail } from "./validation"
@@ -134,7 +134,7 @@ export async function resendInvite(request: NextRequest, organizationId: string,
     { email: target.email, name: target.name, organizationId },
     data.user?.last_sign_in_at ? "recovery" : "invite",
   )
-  if (!result.ok) throw new HttpError(EMAIL_FAILURE_STATUS[result.reason], result.message)
+  if (!result.ok) throw new HttpError(result.status, result.message)
 }
 
 export interface MemberPatch {

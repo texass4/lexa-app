@@ -1,8 +1,8 @@
-import { renderAuthEmail, type AuthEmailKind } from "./email-templates"
+import { renderAuthEmail, type AuthEmailKind } from "./index"
 
 /**
  * Templates do Supabase Auth (painel › Authentication › Emails), gerados a partir de
- * `email-templates.ts` para terem o mesmo desenho dos e-mails enviados pela Íntegra.
+ * `lib/services/email/templates/` para terem o mesmo desenho dos e-mails enviados pela Íntegra.
  * Os links usam o `token_hash` e passam por `/auth/confirm`, que cria a sessão no
  * servidor — `{{ .SiteURL }}` e `{{ .TokenHash }}` são preenchidos pelo Supabase.
  *

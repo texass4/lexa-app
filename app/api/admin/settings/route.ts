@@ -5,7 +5,7 @@ import { recordAudit } from "@/lib/admin/audit"
 import { loadSettings, saveSettings } from "@/lib/admin/platform"
 import { sanitizeSettings } from "@/lib/admin/settings"
 import { loadPlans } from "@/lib/admin/data"
-import { isMailerConfigured } from "@/lib/auth/mailer"
+import { isEmailConfigured } from "@/lib/services/email"
 
 export const GET = route(async (request) => {
   await requireAdmin(request)
@@ -18,7 +18,7 @@ export const GET = route(async (request) => {
       ai: !!(process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY),
       whatsapp: !!(process.env.ZAPI_TOKEN || process.env.WHATSAPP_API_TOKEN),
       datajud: !!process.env.DATAJUD_API_KEY,
-      email: isMailerConfigured(),
+      email: isEmailConfigured(),
     },
   })
 })

@@ -1,24 +1,10 @@
 import { BRAND, BRAND_COLORS } from "@/lib/brand"
 
 /**
- * Templates dos e-mails transacionais da Íntegra. Funções puras (sem envio): o
- * `lib/auth/mailer.ts` envia, e `scripts/supabase-email-templates.ts` gera com elas
- * os templates do Supabase Auth em `supabase/templates/` — o mesmo desenho nos dois.
- *
- * HTML para clientes de e-mail: tabelas, estilos inline, largura máxima de 560 px,
- * sem imagens nem fontes externas (muitos clientes bloqueiam) e com versão em texto.
+ * Moldura comum dos e-mails da Íntegra. HTML para clientes de e-mail: tabelas, estilos
+ * inline, largura máxima de 560 px, sem imagens nem fontes externas (muitos clientes
+ * bloqueiam) e sempre com versão em texto.
  */
-
-export type AuthEmailKind = "invite" | "recovery" | "confirmation"
-
-export interface AuthEmailInput {
-  /** Link de uso único. Também aceita os marcadores do Supabase (`{{ .TokenHash }}`). */
-  url: string
-  /** Nome de quem recebe, quando conhecido. */
-  name?: string
-  /** Escritório do convite, quando conhecido. */
-  organizationName?: string
-}
 
 export interface RenderedEmail {
   subject: string
@@ -44,7 +30,7 @@ export function escapeHtml(value: string) {
 }
 
 /** Texto curto de uma linha (nome, escritório): sem quebras e com tamanho limitado. */
-function oneLine(value: string | undefined, max = 120) {
+export function oneLine(value: string | undefined, max = 120) {
   const clean = value?.replace(/\s+/g, " ").trim() ?? ""
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean
 }
@@ -61,7 +47,7 @@ interface Layout {
   note: string
 }
 
-function layout({ subject, preheader, heading, paragraphs, button, note }: Layout) {
+export function layout({ subject, preheader, heading, paragraphs, button, note }: Layout) {
   const url = escapeHtml(button.url)
   const p = (html: string) => `<p style="margin:0 0 16px;font-size:15px;line-height:24px;color:${COLORS.body};">${html}</p>`
   return `<!doctype html>
@@ -120,82 +106,8 @@ function layout({ subject, preheader, heading, paragraphs, button, note }: Layou
 `
 }
 
-function plainText(lines: string[]) {
+export function plainText(lines: string[]) {
   return `${lines.join("\n\n")}\n\n— ${BRAND.name} · ${BRAND.tagline}\nEste é um e-mail automático; não é preciso respondê-lo.\n`
 }
 
-const greeting = (name: string) => (name ? `Olá, ${name}.` : "Olá.")
-
-export function renderAuthEmail(kind: AuthEmailKind, input: AuthEmailInput): RenderedEmail {
-  const name = oneLine(input.name, 80)
-  const office = oneLine(input.organizationName)
-  const { url } = input
-
-  if (kind === "invite") {
-    const subject = office ? `Convite para ${office} na ${BRAND.name}` : `Você foi convidado para a ${BRAND.name}`
-    const invitation = office
-      ? `Você foi convidado para fazer parte do escritório <strong>${escapeHtml(office)}</strong> na ${BRAND.name}, a plataforma de gestão jurídica da equipe.`
-      : `Você foi convidado para fazer parte de um escritório na ${BRAND.name}, a plataforma de gestão jurídica da equipe.`
-    const note =
-      "Por segurança, o link é de uso único e expira em pouco tempo. Se ele expirar, peça um novo convite a quem convidou você. Se você não esperava este convite, ignore este e-mail."
-    return {
-      subject,
-      html: layout({
-        subject,
-        preheader: "Crie sua senha para acessar o escritório.",
-        heading: `Boas-vindas à ${BRAND.name}`,
-        paragraphs: [escapeHtml(greeting(name)), invitation, "Para começar, crie a sua senha de acesso:"],
-        button: { label: "Criar minha senha", url },
-        note,
-      }),
-      text: plainText([
-        greeting(name),
-        office
-          ? `Você foi convidado para fazer parte do escritório ${office} na ${BRAND.name}.`
-          : `Você foi convidado para fazer parte de um escritório na ${BRAND.name}.`,
-        `Para começar, crie a sua senha de acesso:\n${url}`,
-        note,
-      ]),
-    }
-  }
-
-  if (kind === "recovery") {
-    const subject = `Redefinir sua senha na ${BRAND.name}`
-    const note =
-      "O link é de uso único e expira em pouco tempo. Se você não pediu a redefinição, ignore este e-mail — sua senha atual continua valendo."
-    return {
-      subject,
-      html: layout({
-        subject,
-        preheader: "Use o link para criar uma nova senha.",
-        heading: "Redefinição de senha",
-        paragraphs: [
-          escapeHtml(greeting(name)),
-          `Recebemos um pedido para redefinir a senha da sua conta na ${BRAND.name}. Para criar uma nova senha, use o botão abaixo:`,
-        ],
-        button: { label: "Criar nova senha", url },
-        note,
-      }),
-      text: plainText([
-        greeting(name),
-        `Recebemos um pedido para redefinir a senha da sua conta na ${BRAND.name}. Para criar uma nova senha, acesse:\n${url}`,
-        note,
-      ]),
-    }
-  }
-
-  const subject = `Confirme seu e-mail na ${BRAND.name}`
-  const note = `O link é de uso único e expira em pouco tempo. Se você não criou uma conta na ${BRAND.name}, ignore este e-mail.`
-  return {
-    subject,
-    html: layout({
-      subject,
-      preheader: "Confirme seu endereço para concluir o acesso.",
-      heading: "Confirme seu e-mail",
-      paragraphs: [escapeHtml(greeting(name)), `Falta pouco. Confirme que este endereço é seu para concluir o acesso à ${BRAND.name}:`],
-      button: { label: "Confirmar e-mail", url },
-      note,
-    }),
-    text: plainText([greeting(name), `Falta pouco. Confirme que este endereço é seu para concluir o acesso à ${BRAND.name}:\n${url}`, note]),
-  }
-}
+export const greeting = (name: string) => (name ? `Olá, ${name}.` : "Olá.")

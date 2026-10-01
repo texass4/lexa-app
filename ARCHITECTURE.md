@@ -30,6 +30,9 @@ sheet.ts → import.ts                       ficha normalizada → processo da �
 Central de Atendimento (WhatsApp)
     tela → /api/whatsapp/* → lib/services/whatsapp → Z-API → WhatsApp
     WhatsApp → Z-API → /api/whatsapp/webhook → banco → Realtime → tela
+
+E-mail (convite, recuperação de senha)
+    tela → Route Handler → lib/auth/mailer.ts → lib/services/email → Nodemailer → SMTP
 ```
 
 ---
@@ -63,8 +66,9 @@ lexa-app/
 │   ├── services/processes/   serviço de consulta + cache, ficha, importação, deduplicação, interpretação
 │   ├── ai/                   Íntegra IA: provedor (Gemini), contexto, prompts, schemas, serviços
 │   ├── services/whatsapp/    recebimento, envio, conversas, instância, Íntegra IA (servidor)
+│   ├── services/email/       serviço de e-mail (SMTP/Nodemailer, só servidor) e templates
 │   ├── whatsapp/             telefone, status, mapeadores de linha, cliente do navegador
-│   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros, e-mail (mailer + templates)
+│   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros, e-mails de autenticação (`mailer.ts`)
 │   ├── supabase/             clientes: navegador, servidor (cookie) e admin (service role)
 │   ├── store/                demo-store, ui-store, storage (persistência no Supabase)
 │   ├── account.ts            pessoa e escritório logados (preenchido pela sessão)
@@ -268,9 +272,9 @@ Transições: `app/(app)/template.tsx` (entrada de página em CSS, `.page-enter`
 
 **Na interface** — `useSession().can("x.edit")` ou `<Can permission="x.edit">` para esconder ações; `nav-config.ts` diz a permissão de cada rota (menu, busca e "sem acesso" no `AppShell`); `DIALOG_PERMISSION` (`ui-store.tsx`) diz a de cada diálogo global.
 
-**Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único (`generateLink` do Supabase, que não envia nada) e a Íntegra envia o e-mail pelo SMTP da Brevo.
+**Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único (`generateLink` do Supabase, que não envia nada) e a Íntegra envia o e-mail por SMTP.
 
-**E-mail** — `lib/auth/mailer.ts` é o único ponto que fala com o SMTP: `sendEmail({ to, subject, html, text? })` para qualquer e-mail transacional e `sendAuthLink` para convite e recuperação. Nunca lança por falha de envio: devolve `EmailResult` (`not_configured`, `invalid_recipient`, `rejected`, `auth`, `timeout`, `unavailable`, `unexpected`) e a API repassa ao navegador só `{ sent, message }` (`emailStatus`). Convite criado com e-mail que falhou continua pendente (o toast avisa; dá para reenviar); no reenvio, a falha vira erro. Pedidos repetidos para a mesma pessoa em 60 s não geram outro link (um link novo invalida o anterior). Templates em `lib/auth/email-templates.ts`; os do Supabase Auth (`supabase/templates/`) são gerados deles com `npm run email:templates` e um teste falha se divergirem. Sem `BREVO_SMTP_*`: em desenvolvimento o link sai no terminal; em produção, nada é gerado. Configuração da Brevo e do Supabase: [README › E-mail](./README.md#e-mail-brevo-smtp).
+**E-mail** — `lib/services/email` é o serviço genérico de SMTP e o único ponto que conhece o Nodemailer: `sendEmail({ to, subject, html, text? })` (lança `EmailError` com mensagem amigável; detalhe técnico só no log), `verifyEmailConnection()` (usado por `npm run email:verify`), configuração `SMTP_*` (`config.ts`) e templates (`templates/`: convite, redefinição de senha, confirmação). `lib/auth/mailer.ts` fica com a regra de autenticação: `sendAuthLink` gera o link só quando vai enviar, não gera dois em 60 s para a mesma pessoa (um link novo invalida o anterior) e nunca lança — devolve `EmailResult`, e a API repassa ao navegador só `{ sent, message }` (`emailStatus`). Convite com e-mail que falhou continua pendente (o toast avisa; dá para reenviar); no reenvio, a falha vira erro. Os templates do Supabase Auth (`supabase/templates/`) são gerados dos mesmos templates com `npm run email:templates` e um teste falha se divergirem. Sem `SMTP_*`: em desenvolvimento o link sai no terminal; em produção, nada é gerado. Configuração: [README › E-mail](./README.md#e-mail-smtp).
 
 ## 7. Íntegra Admin (`/admin`)
 
@@ -301,11 +305,11 @@ Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e 
 
 ## 8. O que ainda não existe
 
-Notificações (o envio de e-mail já existe — `sendEmail` em `lib/auth/mailer.ts` —, mas nenhum aviso automático o usa ainda), monitoramento automático de processos, cadastro de prazos, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
+Notificações (o envio de e-mail já existe — `sendEmail` em `lib/services/email` —, mas nenhum aviso automático o usa ainda), monitoramento automático de processos, cadastro de prazos, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
 
 **Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
 
-Autenticação, e-mail transacional (Brevo SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Autenticação, e-mail transacional (SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 
@@ -316,7 +320,8 @@ npm run dev      # http://localhost:3000
 npm test         # CNJ, consulta (cliente HTTP, cache, SWR, isolamento, erros), mapper, interpretador, timeline, permissões, financeiro, WhatsApp
 npm run lint
 npm run typecheck   # next typegen + tsc --noEmit
-npm run email:templates   # regenera supabase/templates/ depois de mudar lib/auth/email-templates.ts
+npm run email:templates   # regenera supabase/templates/ depois de mudar lib/services/email/templates/
+npm run email:verify      # testa a configuração SMTP do .env.local (conexão e login)
 ```
 
 ## 10. Íntegra IA

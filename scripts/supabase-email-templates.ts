@@ -4,7 +4,7 @@
  */
 import { writeFileSync } from "node:fs"
 import path from "node:path"
-import { renderSupabaseTemplate, SUPABASE_TEMPLATES } from "../lib/auth/supabase-templates"
+import { renderSupabaseTemplate, SUPABASE_TEMPLATES } from "../lib/services/email/templates/supabase"
 
 const dir = path.join(process.cwd(), "supabase", "templates")
 const subjects: Record<string, string> = {}

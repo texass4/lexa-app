@@ -41,76 +41,77 @@ Camada de inteligência sobre os dados reais do escritório: resumo e próximos 
 
 Sem `GEMINI_API_KEY`, as áreas da IA mostram *"Íntegra IA não configurada"*. Detalhes de arquitetura, segurança e custo: [ARCHITECTURE.md › Íntegra IA](./ARCHITECTURE.md#10-íntegra-ia).
 
-## E-mail (Brevo SMTP)
+## E-mail (SMTP)
 
-Todo e-mail transacional sai pelo SMTP da Brevo, por dois caminhos:
+Todo e-mail transacional sai por SMTP, por dois caminhos:
 
 | Quem envia | E-mails | Configuração |
 |---|---|---|
-| **A Íntegra** (`lib/auth/mailer.ts`) | Convite para o escritório, reenvio do convite, link de nova senha (Configurações › Usuários e Admin) e "Esqueci minha senha" | Variáveis `BREVO_*` no servidor |
+| **A Íntegra** (`lib/services/email`) | Convite para o escritório, reenvio do convite, link de nova senha (Configurações › Usuários e Admin) e "Esqueci minha senha" | Variáveis `SMTP_*` no servidor |
 | **O Supabase Auth** | E-mails nativos do Auth (confirmação de e-mail, convite e redefinição disparados pelo próprio Supabase, troca de e-mail, magic link, reautenticação) | Painel do Supabase › SMTP |
 
-A Íntegra só pede o link ao Supabase (`auth.admin.generateLink`, que não envia nada) e manda o e-mail com o próprio template. Assim o convite sai com o nome do escritório, e uma falha de envio não desfaz o convite: ele fica pendente e pode ser reenviado.
+A implementação é genérica: funciona com qualquer provedor SMTP (Google Workspace, Microsoft 365, Zoho, Amazon SES, servidor próprio etc.). Trocar de provedor é só trocar as variáveis. A Íntegra pede o link ao Supabase (`auth.admin.generateLink`, que não envia nada) e manda o e-mail com o próprio template. Uma falha de envio não desfaz o convite: ele fica pendente e pode ser reenviado.
+
+Arquitetura: `tela → Route Handler → lib/auth/mailer.ts (regra do convite/recuperação) → lib/services/email (sendEmail) → Nodemailer → SMTP`. Só `lib/services/email/email-service.ts` conhece o Nodemailer.
 
 ### 1. Variáveis de ambiente (só no servidor)
 
+| Variável | Obrigatória | O que é |
+|---|---|---|
+| `SMTP_HOST` | sim | Servidor SMTP do provedor |
+| `SMTP_PORT` | não (padrão `587`) | Porta SMTP do provedor |
+| `SMTP_SECURE` | não | `true` = TLS desde a conexão (normalmente porta 465); `false` = STARTTLS (normalmente 587). Sem valor, só a porta 465 usa TLS direto |
+| `SMTP_USER` | sim | Usuário de autenticação SMTP |
+| `SMTP_PASSWORD` | sim | Senha ou chave SMTP (em contas com 2FA, normalmente uma "senha de app") |
+| `SMTP_FROM_EMAIL` | sim | Remetente; precisa estar autorizado no provedor para o `SMTP_USER` |
+| `SMTP_FROM_NAME` | não (padrão `Íntegra`) | Nome exibido do remetente |
+
+Os valores vêm do painel do seu provedor SMTP. Nenhuma dessas variáveis usa o prefixo `NEXT_PUBLIC_`: são lidas só no servidor e nunca chegam ao navegador. O Admin (`/api/admin/settings`) informa só se o e-mail está configurado, nunca os valores. Em produção sem TLS direto, a conexão exige STARTTLS (credenciais nunca trafegam em texto puro).
+
+- **Desenvolvimento local:** copie `.env.example` para `.env.local` (fica fora do git), preencha e reinicie o `npm run dev`.
+- **Vercel (produção e preview):** em *Project › Settings › Environment Variables*, cadastre as mesmas variáveis para os ambientes desejados e faça um novo deploy (variáveis novas só valem a partir do próximo deploy). Defina também `NEXT_PUBLIC_SITE_URL` com o endereço público do app, usado nos links. Para trazê-las para a máquina: `vercel env pull .env.local`.
+
+Sem SMTP configurado, em desenvolvimento o link aparece no terminal do servidor. Em produção, o convite é criado com o aviso "o e-mail não foi enviado" e a tela de recuperação de senha mostra um erro, em vez de fingir que enviou.
+
+### 2. Testar a configuração
+
 ```bash
-BREVO_SMTP_HOST=smtp-relay.brevo.com   # Brevo › SMTP & API › SMTP: "SMTP Server" (confira lá)
-BREVO_SMTP_PORT=587      # 587 (STARTTLS, padrão) ou 465 (TLS direto)
-BREVO_SMTP_USER=         # Brevo › SMTP & API › SMTP: "Login"
-BREVO_SMTP_PASSWORD=     # uma SMTP key gerada nessa aba (não é a API key)
-BREVO_SENDER_EMAIL=      # remetente validado na Brevo, no domínio autenticado da Íntegra
-BREVO_SENDER_NAME=Íntegra
-NEXT_PUBLIC_SITE_URL=    # endereço público do app, usado nos links (não é segredo)
+npm run email:verify                           # configurado? conecta? autentica?
+npm run email:verify -- --send-to=voce@x.com   # e manda um e-mail de teste
 ```
 
-Nada disso usa o prefixo `NEXT_PUBLIC_` (exceto o endereço do site, que é público). Em produção, configure as variáveis no provedor de hospedagem, nunca no repositório. O Admin (`/api/admin/settings`) informa só se o e-mail está configurado, nunca os valores.
+O script lê o `.env.local`, mostra host, porta e remetente (nunca a senha) e diz em qual etapa falhou. É só de terminal: não existe rota pública para enviar ou testar e-mail.
 
-Sem as variáveis `BREVO_*`, em desenvolvimento o link aparece no terminal do servidor. Em produção, o convite é criado com o aviso "o e-mail não foi enviado" e a tela de recuperação de senha mostra um erro, em vez de fingir que enviou.
+### 3. No provedor SMTP e no DNS (manual)
 
-### 2. Na Brevo (manual)
+1. Use um remetente de um domínio da Íntegra (não um endereço gratuito como Gmail/Hotmail), autorizado no provedor para o usuário SMTP.
+2. Configure no DNS do domínio os registros que o **seu provedor** indicar, copiando exatamente os valores mostrados por ele:
+   - **SPF** (TXT `v=spf1 …`): autoriza o provedor a enviar pelo domínio. Só pode haver **um** registro `v=spf1`: junte os `include:` em vez de criar outro.
+   - **DKIM**: assinatura dos e-mails (nome e valor fornecidos pelo provedor).
+   - **DMARC** (TXT em `_dmarc.<seu-domínio>`): comece com política de monitoramento (`p=none`) e endureça (`quarantine`/`reject`) depois de conferir os relatórios.
+3. Se o provedor restringir o SMTP por IP, lembre que a Vercel e o Supabase não têm IP fixo: libere o acesso (ou desative a restrição), ou o envio falha com login recusado.
+4. Se o provedor reescrever links para rastrear cliques, desative isso para estes e-mails (são links de uso único).
 
-1. **Autentique o domínio da Íntegra:** em *Senders, Domains & Dedicated IPs › Domains*, clique em *Add a domain* e informe o domínio do remetente. A Brevo mostra os registros DNS que precisam ser criados; copie **exatamente** os valores exibidos por ela para o DNS do domínio:
-   - **Código de verificação da Brevo** (TXT): prova que o domínio é seu.
-   - **DKIM** (o registro e o nome de host que a Brevo indicar): assina os e-mails.
-   - **DMARC** (TXT em `_dmarc.<seu-domínio>`): se o domínio ainda não tiver um, crie com o valor sugerido pela Brevo. Comece com uma política de monitoramento (`p=none`) e endureça (`quarantine`/`reject`) depois de conferir os relatórios.
-   - **SPF** (TXT `v=spf1 …`): se a Brevo indicar um `include` para o seu domínio, acrescente ao SPF existente. O domínio só pode ter **um** registro `v=spf1`: junte os `include:` em vez de criar um segundo.
+### 4. No Supabase (manual)
 
-   Volte à Brevo e clique em *Authenticate*/*Verify* até todos os registros aparecerem como válidos (a propagação do DNS pode demorar).
-2. **Cadastre o remetente:** em *Senders*, adicione `BREVO_SENDER_EMAIL` (no domínio autenticado) com o nome `Íntegra`.
-3. **Gere a SMTP key:** em *SMTP & API › SMTP*, use *Generate a new SMTP key*. O *Login* exibido vai para `BREVO_SMTP_USER`, a chave para `BREVO_SMTP_PASSWORD`, e o servidor e a porta para `BREVO_SMTP_HOST`/`BREVO_SMTP_PORT`. A chave só aparece uma vez; se perder, gere outra e revogue a antiga.
-4. **IPs autorizados:** a Brevo pode bloquear o SMTP vindo de IPs não cadastrados (aviso "Os endereços IP não autorizados estão bloqueados para as suas chaves SMTP"). Com o bloqueio ligado, cadastre em *Segurança › IPs autorizados* o IP do seu computador (desenvolvimento) e os IPs de saída do servidor. Hospedagens serverless e o próprio Supabase não têm IP fixo; nesse caso, desative o bloqueio por IP nessa mesma tela, ou o envio falha com login recusado. A SMTP key continua sendo a proteção principal.
-5. **(Recomendado)** Se o rastreamento de cliques estiver ativo na conta, os links passam por um redirecionamento da Brevo. Para e-mails de acesso (links de uso único), prefira desativá-lo.
-6. Para acompanhar entregas, rejeições e bloqueios, use *Transactional › Logs*.
-
-Não use marketing, campanhas nem automações da Brevo para esses e-mails: eles são só transacionais.
-
-### 3. No Supabase (manual)
-
-1. **SMTP próprio:** em *Authentication › Emails › SMTP Settings* (em versões antigas do painel, *Project Settings › Authentication*), ative *Enable Custom SMTP* e preencha:
-   - *Sender email*: o mesmo `BREVO_SENDER_EMAIL`. *Sender name*: `Íntegra`.
-   - *Host*, *Port*, *Username* e *Password*: os mesmos `BREVO_SMTP_HOST`, `BREVO_SMTP_PORT`, `BREVO_SMTP_USER` e `BREVO_SMTP_PASSWORD`.
-
-   As credenciais ficam no painel do Supabase, não no código.
-2. **Limite de envio:** com SMTP próprio, o Supabase aplica um limite de e-mails por hora. Ajuste em *Authentication › Rate Limits* para o volume esperado. Esse limite vale só para os e-mails que o Supabase envia; os da Íntegra seguem os limites do plano da Brevo.
+1. **SMTP próprio:** em *Authentication › Emails › SMTP Settings* (em versões antigas do painel, *Project Settings › Authentication*), ative *Enable Custom SMTP* e preencha *Sender email* (`SMTP_FROM_EMAIL`), *Sender name* (`Íntegra`), *Host*, *Port*, *Username* e *Password* com os mesmos valores das variáveis `SMTP_*`. As credenciais ficam no painel do Supabase, não no código.
+2. **Limite de envio:** com SMTP próprio, o Supabase aplica um limite de e-mails por hora; ajuste em *Authentication › Rate Limits*. Vale só para os e-mails que o Supabase envia.
 3. **Templates:** em *Authentication › Emails › Templates*, cole o assunto (`supabase/templates/subjects.json`) e o corpo:
    - *Confirm signup* → `supabase/templates/confirmation.html`
    - *Invite user* → `supabase/templates/invite.html`
    - *Reset password* → `supabase/templates/recovery.html`
 
-   Eles usam o `token_hash` e passam por `/auth/confirm`, que cria a sessão no servidor, e têm o mesmo visual dos e-mails da Íntegra. Os demais templates (*Magic Link*, *Change Email Address*, *Reauthentication*) não são usados pelos fluxos da Íntegra: podem ficar no padrão e, mesmo assim, saem pela Brevo. Depois de mudar `lib/auth/email-templates.ts`, rode `npm run email:templates` e cole de novo (um teste falha se os arquivos ficarem desatualizados).
-4. **URLs:** em *Authentication › URL Configuration*, coloque em *Site URL* o mesmo endereço de `NEXT_PUBLIC_SITE_URL` e adicione `<endereço>/auth/confirm` em *Redirect URLs*. Os templates do Supabase usam `{{ .SiteURL }}`.
-5. **Validade do link:** é o *Email OTP Expiration* do provedor de e-mail (*Authentication › Providers › Email*, ou *Sign In / Providers* nas versões novas). A tela "Recuperar senha" diz que o link vale por 1 hora, que é o padrão (3600 s); se mudar o valor, ajuste esse texto.
+   Eles usam o `token_hash` e passam por `/auth/confirm`, que cria a sessão no servidor, com o mesmo visual dos e-mails da Íntegra. Os demais templates (*Magic Link*, *Change Email Address*, *Reauthentication*) não são usados pelos fluxos da Íntegra. Depois de mudar `lib/services/email/templates/`, rode `npm run email:templates` e cole de novo (um teste falha se os arquivos ficarem desatualizados).
+4. **URLs:** em *Authentication › URL Configuration*, *Site URL* = o mesmo endereço de `NEXT_PUBLIC_SITE_URL`, e adicione `<endereço>/auth/confirm` em *Redirect URLs*.
+5. **Validade do link:** é o *Email OTP Expiration* do provedor de e-mail do Auth (padrão 1 hora, que é o que a tela "Recuperar senha" informa; se mudar, ajuste o texto).
 
-Hoje o cadastro de escritório (`/api/auth/signup`) e os convites criam a conta com o e-mail já confirmado, porque a aprovação do escritório é a porta de entrada. Por isso o template *Confirm signup* só é usado se alguém criar uma conta direto pelo Supabase Auth.
+Hoje o cadastro de escritório e os convites criam a conta com o e-mail já confirmado (a aprovação do escritório é a porta de entrada), então o *Confirm signup* só é usado se alguém criar conta direto pelo Supabase Auth.
 
-### 4. Como testar
+### 5. Como testar os fluxos
 
-Com as variáveis no `.env.local` e o servidor reiniciado (`npm run dev`):
+- **Convite:** em *Configurações › Usuários › Convidar*, convide um e-mail seu. "Convite enviado." confirma o envio e o e-mail chega com o nome do escritório. O botão leva a */redefinir-senha?convite=1*; crie a senha e você entra. No menu do usuário pendente, *Reenviar convite*. Pelo Admin: *Escritórios › Novo escritório* e *Usuários › Criar usuário*.
+- **Recuperação de senha:** em */recuperar-senha*, informe o e-mail de uma conta. A tela responde igual para e-mails que existem ou não; o link abre "Nova senha". Link usado ou vencido volta ao login com aviso.
+- **E-mails nativos do Supabase:** em *Authentication › Users*, *Send password recovery* num usuário de teste ou *Invite user* com um e-mail de teste (apague esse usuário depois: ele não tem escritório).
+- **Falhas:** com `SMTP_PASSWORD` errada, o convite avisa que o e-mail não foi enviado, o reenvio mostra erro e o log do servidor traz `[LEXA · e-mail] O SMTP recusou o login…` (sem a senha).
 
-- **Convite:** em *Configurações › Usuários › Convidar*, convide um e-mail seu. O aviso "Convite enviado." confirma o envio, e o e-mail chega com o nome do escritório. O botão leva a */redefinir-senha?convite=1* ("Boas-vindas à Íntegra"); crie a senha e você entra no painel. No menu do usuário (ainda pendente), *Reenviar convite* manda um link novo. Pelo Admin: *Escritórios › Novo escritório* convida o Sócio, e *Usuários › Criar usuário* convida uma pessoa.
-- **Recuperação de senha:** em */recuperar-senha*, informe o e-mail de uma conta. A tela responde igual para e-mails que existem e que não existem; o e-mail chega para quem tem conta. O link abre "Nova senha"; depois de salvar, entre com a senha nova. Um link usado ou vencido volta ao login com o aviso de link inválido.
-- **Confirmação de e-mail e e-mails nativos do Supabase:** em *Authentication › Users*, use *Send password recovery* em um usuário de teste (template *Reset password*) ou *Invite user* com um e-mail de teste (template *Invite user*) e confira se o e-mail chega pela Brevo com o visual da Íntegra. Um convite feito pelo painel do Supabase cria só a conta, sem escritório, então apague esse usuário depois. Para ver o *Confirm signup*, crie uma conta de teste pela API do Supabase Auth (`signUp`) com a confirmação de e-mail ativa e apague depois.
-- **Falhas:** com uma `BREVO_SMTP_PASSWORD` errada, o convite é criado com o aviso "o e-mail não foi enviado", o reenvio mostra um erro, e o log do servidor traz `[LEXA · e-mail] O SMTP recusou o login…` (sem a senha). Os envios aparecem em *Transactional › Logs* na Brevo.
-
-Os testes automáticos (`npm test`) cobrem configuração, validação de destinatário, deduplicação, nova tentativa, classificação de erros e templates, sem precisar de SMTP.
+Os testes automáticos (`npm test`) cobrem configuração, validação de destinatários, deduplicação, nova tentativa, classificação de erros, teste de conexão e templates, sem precisar de SMTP.
