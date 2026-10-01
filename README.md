@@ -55,8 +55,8 @@ A Íntegra só pede o link ao Supabase (`auth.admin.generateLink`, que não envi
 ### 1. Variáveis de ambiente (só no servidor)
 
 ```bash
-BREVO_SMTP_HOST=         # Brevo › SMTP & API › SMTP: "SMTP Server"
-BREVO_SMTP_PORT=         # 587 (STARTTLS, padrão) ou 465 (TLS direto)
+BREVO_SMTP_HOST=smtp-relay.brevo.com   # Brevo › SMTP & API › SMTP: "SMTP Server" (confira lá)
+BREVO_SMTP_PORT=587      # 587 (STARTTLS, padrão) ou 465 (TLS direto)
 BREVO_SMTP_USER=         # Brevo › SMTP & API › SMTP: "Login"
 BREVO_SMTP_PASSWORD=     # uma SMTP key gerada nessa aba (não é a API key)
 BREVO_SENDER_EMAIL=      # remetente validado na Brevo, no domínio autenticado da Íntegra
