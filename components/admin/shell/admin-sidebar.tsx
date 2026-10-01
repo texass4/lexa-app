@@ -6,12 +6,12 @@ import { motion } from "framer-motion"
 import { ArrowLeftRight, Wrench } from "lucide-react"
 import { cn } from "cn"
 import { LogoMark, Wordmark } from "@/components/brand/logo"
-import { BRAND } from "@/lib/brand"
+import { BRAND } from "@/lib/core/brand"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ADMIN_NAV, isAdminActive } from "./nav"
 import { useAdminShell } from "./admin-context"
 
-export function AdminMark({ className }: { className?: string }) {
+function AdminMark({ className }: { className?: string }) {
   return <LogoMark tone="inverse" className={className} />
 }
 

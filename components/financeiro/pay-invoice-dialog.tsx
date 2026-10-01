@@ -6,9 +6,9 @@ import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
-import { useDemoActions } from "@/lib/store/demo-store"
-import { fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
+import { useOfficeActions } from "@/lib/store/office-store"
+import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
 import type { Invoice } from "@/types"
 
 const METHODS: NonNullable<Invoice["method"]>[] = ["Pix", "Boleto", "Transferência", "Cartão"]
@@ -31,7 +31,7 @@ export function PayInvoiceDialog({ invoice, onOpenChange }: { invoice?: Invoice;
 }
 
 function PayForm({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
-  const { updateInvoice, versionOf } = useDemoActions()
+  const { updateInvoice, versionOf } = useOfficeActions()
   const today = toLocalISO(getNow()).slice(0, 10)
   const [paidAt, setPaidAt] = React.useState(today)
   const [method, setMethod] = React.useState<Invoice["method"] | "">(invoice.method ?? "")

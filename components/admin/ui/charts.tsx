@@ -1,7 +1,7 @@
 "use client"
 
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { useMounted } from "@/lib/hooks"
+import { useMounted } from "@/lib/core/hooks"
 import { Skeleton } from "@/components/ui/skeleton"
 
 /**

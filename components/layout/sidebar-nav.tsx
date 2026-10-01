@@ -8,14 +8,14 @@ import { ChevronDown } from "lucide-react"
 import { cn } from "cn"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { isActive, visibleSections, type NavItem } from "./nav-config"
-import { diffInDays, getNow, isSameDay, parse } from "@/lib/dates"
-import { isOverdue } from "@/lib/selectors"
-import { PRAZO_ALERT_DAYS, isActiveProcess } from "@/lib/attention"
-import { daysToPrazo, isOpenPrazo, nextPrazo } from "@/lib/prazos"
+import { diffInDays, getNow, isSameDay, parse } from "@/lib/core/dates"
+import { isOverdue } from "@/lib/store/selectors"
+import { PRAZO_ALERT_DAYS, isActiveProcess } from "@/lib/dashboard/attention"
+import { daysToPrazo, isOpenPrazo, nextPrazo } from "@/lib/prazos/prazos"
 import { useSession } from "@/lib/auth/session"
 import { useTriagemOptional } from "@/components/triagem/triagem-provider"
 import { isOpen as isOpenTriage } from "@/lib/triagem/model"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 
 /**
  * mode:
@@ -25,7 +25,7 @@ import { useDemoData } from "@/lib/store/demo-store"
  */
 export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | "auto" | "collapsed"; onNavigate?: () => void; layoutId: string }) {
   const pathname = usePathname()
-  const data = useDemoData()
+  const data = useOfficeData()
   const triagem = useTriagemOptional()
   const { can, user } = useSession()
   // Itens com telas internas abertos pela setinha (ex.: Tarefas › Prazos).

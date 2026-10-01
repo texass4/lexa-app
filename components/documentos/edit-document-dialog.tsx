@@ -6,9 +6,9 @@ import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { documentRequiredIssue } from "@/lib/clients"
-import { ensureExtension } from "@/lib/format"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { documentRequiredIssue } from "@/lib/clientes/clients"
+import { ensureExtension } from "@/lib/core/format"
 import type { DocumentKind, LegalDocument } from "@/types"
 import { DOCUMENT_KINDS } from "./new-document-dialog"
 
@@ -24,8 +24,8 @@ export function EditDocumentDialog({ doc, onOpenChange }: { doc?: LegalDocument;
 const initialState = (doc: LegalDocument) => ({ name: doc.name, kind: doc.kind, clientId: doc.clientId ?? "", processId: doc.processId ?? "" })
 
 function EditDocumentForm({ doc, onClose }: { doc: LegalDocument; onClose: () => void }) {
-  const data = useDemoData()
-  const { updateDocument, versionOf } = useDemoActions()
+  const data = useOfficeData()
+  const { updateDocument, versionOf } = useOfficeActions()
   const [form, setForm] = React.useState(() => initialState(doc))
   const [errors, setErrors] = React.useState<{ name?: string; clientId?: string }>({})
   // Versão quando o formulário abriu: se alguém alterou o documento antes, a edição é recusada.

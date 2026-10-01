@@ -18,13 +18,11 @@ import type { AIStatus } from "./types"
 export const DEFAULT_AI_MODEL = "gemini-2.5-flash"
 /** Modelo padrão das operações simples. Troque por `AI_MODEL_LIGHT`. */
 export const DEFAULT_AI_LIGHT_MODEL = "gemini-2.5-flash-lite"
-/** @deprecated nome antigo de `DEFAULT_AI_MODEL`. */
-export const DEFAULT_GEMINI_MODEL = DEFAULT_AI_MODEL
 
 /** Tempo máximo de uma chamada ao modelo. */
-export const DEFAULT_AI_TIMEOUT_MS = 45_000
+const DEFAULT_AI_TIMEOUT_MS = 45_000
 
-export const AI_PROVIDER = { id: "gemini", label: "Google Gemini" } as const
+const AI_PROVIDER = { id: "gemini", label: "Google Gemini" } as const
 
 /** Operações simples: modelo leve (mais barato e rápido). O resto usa o modelo principal. */
 export type AITier = "standard" | "light"
@@ -49,7 +47,7 @@ function assertServer() {
 }
 
 /** `AI_ENABLED` ausente = ligada; só "false", "0" ou "off" desligam. */
-export function isAIEnabled(env: Env = process.env) {
+function isAIEnabled(env: Env = process.env) {
   const flag = env.AI_ENABLED?.trim().toLowerCase()
   return !(flag === "false" || flag === "0" || flag === "off")
 }

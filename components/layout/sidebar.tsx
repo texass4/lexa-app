@@ -6,8 +6,8 @@ import { cn } from "cn"
 import { Logo } from "@/components/brand/logo"
 import { SidebarNav } from "./sidebar-nav"
 import { useUI } from "@/lib/store/ui-store"
-import { getOrganization } from "@/lib/account"
-import { BRAND } from "@/lib/brand"
+import { getOrganization } from "@/lib/auth/account"
+import { BRAND } from "@/lib/core/brand"
 
 /**
  * Barra lateral marinho (desktop e tablet). Entre 768 e 1023 px fica compacta (só

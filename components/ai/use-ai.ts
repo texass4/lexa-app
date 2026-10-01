@@ -3,7 +3,7 @@
 import * as React from "react"
 import { AIRequestError, aiApi, fetchAIStatus } from "@/lib/ai/client"
 import { CHAT_LIMITS, type ActionSuggestion, type AIMessage, type AISources, type AIStatus, type ChatScope } from "@/lib/ai/types"
-import { uid } from "@/lib/format"
+import { uid } from "@/lib/core/format"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
 

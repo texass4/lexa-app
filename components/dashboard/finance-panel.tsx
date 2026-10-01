@@ -4,10 +4,10 @@ import Link from "next/link"
 import { ArrowDownRight, ArrowUpRight, Landmark } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
-import { useDemoData } from "@/lib/store/demo-store"
-import { financeSummary, monthlyRevenue, openReceivables } from "@/lib/selectors"
-import { overdueInvoices } from "@/lib/dashboard"
-import { formatCurrency } from "@/lib/format"
+import { useOfficeData } from "@/lib/store/office-store"
+import { financeSummary, monthlyRevenue, openReceivables } from "@/lib/store/selectors"
+import { overdueInvoices } from "@/lib/dashboard/dashboard"
+import { formatCurrency } from "@/lib/core/format"
 import { PanelLink } from "./panel-link"
 
 /** Linha da receita recebida nos últimos 6 meses (SVG leve, sem a biblioteca de gráficos). */
@@ -52,7 +52,7 @@ function Sparkline({ values, labels }: { values: number[]; labels: string[] }) {
 
 /** Receita do mês, tendência e cobranças em atraso. */
 export function FinancePanel() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const summary = financeSummary(data.invoices)
   const series = monthlyRevenue(data.invoices)
   const late = overdueInvoices(data.invoices)

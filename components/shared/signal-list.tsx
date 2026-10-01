@@ -7,7 +7,7 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { LEVEL_LABEL, type AttentionSignal, type SignalLevel } from "@/lib/attention"
+import { LEVEL_LABEL, type AttentionSignal, type SignalLevel } from "@/lib/dashboard/attention"
 
 const DOT: Record<SignalLevel, string> = {
   critical: "bg-danger",
@@ -26,7 +26,7 @@ export function SignalDot({ level, className }: { level: SignalLevel; className?
 }
 
 /** Abre o formulário de tarefa preenchido a partir do sinal — nada é salvo sem confirmação. */
-export function useSignalAction() {
+function useSignalAction() {
   const { openDialog } = useUI()
   const { can } = useSession()
   return (signal: AttentionSignal) => {

@@ -17,12 +17,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useTheme } from "@/lib/theme"
-import { useIsMac } from "@/lib/hooks"
-import { fmtRelative } from "@/lib/dates"
+import { useTheme } from "@/lib/core/theme"
+import { useIsMac } from "@/lib/core/hooks"
+import { fmtRelative } from "@/lib/core/dates"
 import { signOutAndLeave } from "@/lib/auth/sign-out"
 import { hardNavigate } from "@/lib/auth/navigate"
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 import { adminRouteMeta } from "./nav"
 import { useAdminShell } from "./admin-context"
 import { AdminBrand, AdminNav, BackToCrm, MaintenanceNote } from "./admin-sidebar"

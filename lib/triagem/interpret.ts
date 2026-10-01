@@ -13,14 +13,11 @@
  */
 
 import { object, oneOf, string, type Infer } from "@/lib/ai/schema"
-import { fold } from "@/lib/format"
+import { fold } from "@/lib/core/format"
 import { findTerms, suggestDeadline, type DeadlineSuggestion } from "@/lib/intimacoes/deadline"
 import { readableContent } from "@/lib/integrations/legal/djen/mapper"
 import { maskSensitiveText } from "@/lib/ai/context/sanitize"
 import type { TriageAI, TriageKind } from "@/types"
-
-/** Mudou o pedido? Suba a versão (fica registrada em cada interpretação). */
-export const INTERPRET_VERSION = "2026-09-29.1"
 
 /** Texto enviado ao modelo: o suficiente para uma intimação longa, sem estourar o pedido. */
 const MAX_TEXT = 12_000

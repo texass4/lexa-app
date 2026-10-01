@@ -6,10 +6,10 @@ import { ArrowRight, ArrowUp, ChevronRight, History, ListChecks, PauseCircle, Sh
 import { cn } from "cn"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { OFFICE_PROMPTS } from "@/components/ai/ai-context"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
-import { officeDigest } from "@/lib/dashboard"
-import { AI_NAME, BRAND } from "@/lib/brand"
+import { officeDigest } from "@/lib/dashboard/dashboard"
+import { AI_NAME, BRAND } from "@/lib/core/brand"
 
 /** Ícone de cada pergunta sugerida (as perguntas vêm de `OFFICE_PROMPTS`). */
 const PROMPT_ICONS: LucideIcon[] = [ShieldAlert, History, PauseCircle, ListChecks]
@@ -21,7 +21,7 @@ const PROMPT_ICONS: LucideIcon[] = [ShieldAlert, History, PauseCircle, ListCheck
  */
 export function AIDock() {
   const lexa = useLexaAI()
-  const data = useDemoData()
+  const data = useOfficeData()
   const { user } = useSession()
   const [message, setMessage] = React.useState("")
   const digest = officeDigest(data)

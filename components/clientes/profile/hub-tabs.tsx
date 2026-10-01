@@ -15,19 +15,19 @@ import { ProcessListItem } from "@/components/shared/process-list-item"
 import { DocumentList } from "@/components/shared/document-list"
 import { GroupedTimeline } from "@/components/shared/grouped-timeline"
 import { activityToEntry } from "@/components/shared/activity-timeline"
-import { TaskItem } from "@/components/tasks/task-item"
-import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet"
-import { TaskFormDialog } from "@/components/tasks/task-form-dialog"
-import { useToggleTask } from "@/components/tasks/task-row"
+import { TaskItem } from "@/components/tarefas/task-item"
+import { TaskDetailSheet } from "@/components/tarefas/task-detail-sheet"
+import { TaskFormDialog } from "@/components/tarefas/task-form-dialog"
+import { useToggleTask } from "@/components/tarefas/task-row"
 import { AppointmentDetail } from "@/components/agenda/appointment-detail"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { nextPrazo } from "@/lib/prazos"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { nextPrazo } from "@/lib/prazos/prazos"
 import { useUI } from "@/lib/store/ui-store"
-import { describeRelated, type ClientHub } from "@/lib/selectors"
-import { fmtDayLabel, fmtDayMonthParts, fmtTime, getNow, parse } from "@/lib/dates"
-import { getUser } from "@/lib/account"
+import { describeRelated, type ClientHub } from "@/lib/store/selectors"
+import { fmtDayLabel, fmtDayMonthParts, fmtTime, getNow, parse } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
 import type { Activity, ActivityType, Appointment, Client, Task } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -35,7 +35,7 @@ import { Can } from "@/lib/auth/session"
 
 export function ProcessesTab({ client, hub }: { client: Client; hub: ClientHub }) {
   const { openDialog } = useUI()
-  const { deadlines } = useDemoData()
+  const { deadlines } = useOfficeData()
   const { processes, activeProcesses } = hub
   const create = (
     <Can permission="processes.edit">
@@ -113,8 +113,8 @@ export function DocumentsTab({ client, hub }: { client: Client; hub: ClientHub }
 type TaskFilter = "pendentes" | "concluidas" | "todas"
 
 export function TasksTab({ client, hub }: { client: Client; hub: ClientHub }) {
-  const data = useDemoData()
-  const { deleteTask } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteTask } = useOfficeActions()
   const { openDialog } = useUI()
   const toggle = useToggleTask()
   const [filter, setFilter] = React.useState<TaskFilter>("pendentes")
@@ -214,7 +214,7 @@ export function TasksTab({ client, hub }: { client: Client; hub: ClientHub }) {
 /* ------------------------------ Compromissos ------------------------------ */
 
 export function AppointmentsTab({ client, hub }: { client: Client; hub: ClientHub }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
   const lookup = useCategoryLookup()
   const [selectedId, setSelectedId] = React.useState<string>()

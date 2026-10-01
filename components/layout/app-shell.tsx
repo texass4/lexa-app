@@ -15,7 +15,7 @@ import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { LexaAIProvider } from "@/components/ai/lexa-ai-provider"
 import { TriagemProvider } from "@/components/triagem/triagem-provider"
-import { trackVisit } from "@/lib/visits"
+import { trackVisit } from "@/lib/dashboard/visits"
 import * as React from "react"
 
 const FULL_HEIGHT = ["/atendimento"]

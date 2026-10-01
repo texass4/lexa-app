@@ -3,7 +3,7 @@
 import { Sparkles } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useLexaAI } from "./lexa-ai-provider"
-import { AI_NAME } from "@/lib/brand"
+import { AI_NAME } from "@/lib/core/brand"
 
 /** Presença discreta da Íntegra IA no topo de todas as telas — abre a conversa no contexto atual. */
 export function LexaTrigger() {

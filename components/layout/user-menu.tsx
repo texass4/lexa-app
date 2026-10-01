@@ -14,8 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { useTheme } from "@/lib/theme"
-import { userTitle } from "@/lib/account"
+import { useTheme } from "@/lib/core/theme"
+import { userTitle } from "@/lib/auth/account"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
 

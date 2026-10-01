@@ -9,7 +9,7 @@
  * caminho (`save_triage_items`, `0012_triagem.sql`) e a tela só conhece este modelo.
  */
 
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 import { readableContent } from "@/lib/integrations/legal/djen/mapper"
 import type { DeadlineSuggestion } from "@/lib/intimacoes/deadline"
 import type { TriageAI, TriageItem, TriageKind, TriageRequiresAction, TriageSource, TriageState } from "@/types"
@@ -175,7 +175,7 @@ const DAY = 86_400_000
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY)
 
 /** Dias corridos até a data fatal sugerida (negativo = já passou). */
-export function daysLeft(item: Pick<TriageItem, "suggestion" | "ai">, today: string) {
+function daysLeft(item: Pick<TriageItem, "suggestion" | "ai">, today: string) {
   const fatal = suggestedDeadline(item)?.fatalDate
   return fatal ? daysBetween(today, fatal) : undefined
 }

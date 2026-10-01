@@ -6,7 +6,7 @@
  * contrato, a resposta é descartada com INVALID_RESPONSE.
  */
 
-import { fold } from "@/lib/format"
+import { fold } from "@/lib/core/format"
 
 export type JsonSchema = Record<string, unknown>
 

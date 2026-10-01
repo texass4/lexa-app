@@ -48,19 +48,11 @@
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-highlight: var(--sidebar-highlight);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -82,8 +74,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 
   /* Superfícies: cartões, controles e pílulas. */
   --radius-card: 16px;
@@ -93,8 +83,6 @@
   --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.035), 0 6px 18px -10px rgb(16 24 40 / 0.07);
   --shadow-raised: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 14px 32px -16px rgb(16 24 40 / 0.16);
   --shadow-float: 0 18px 44px -18px rgb(16 24 40 / 0.26), 0 3px 8px -3px rgb(16 24 40 / 0.07);
-
-  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /*
@@ -152,20 +140,11 @@
   --violet: #6553a6;
   --violet-soft: #f2f0f9;
 
-  --chart-1: #0f2446;
-  --chart-2: #2b57c4;
-  --chart-3: #d3d8e0;
-  --chart-4: #667085;
-  --chart-5: #e5e8ee;
-
   /* Barra lateral: marinho nos dois temas, como na identidade da Íntegra. */
   --sidebar: #0b1526;
   --sidebar-foreground: #eef1f6;
   --sidebar-muted: #a3aec0;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #0b1526;
   --sidebar-accent: rgb(255 255 255 / 0.07);
-  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 0.08);
   --sidebar-ring: #d6b97f;
   --sidebar-highlight: #d6b97f;
@@ -241,19 +220,10 @@
   --violet: #aa9de0;
   --violet-soft: #1e1a30;
 
-  --chart-1: #e6eaf0;
-  --chart-2: #7fa3f5;
-  --chart-3: #2f3a4d;
-  --chart-4: #95a0b3;
-  --chart-5: #212a39;
-
   --sidebar: #08111f;
   --sidebar-foreground: #e6ebf3;
   --sidebar-muted: #96a2b6;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #08111f;
   --sidebar-accent: rgb(255 255 255 / 0.06);
-  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 0.07);
   --sidebar-ring: #d6b97f;
   --sidebar-highlight: #d6b97f;

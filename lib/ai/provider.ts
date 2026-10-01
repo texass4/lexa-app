@@ -53,7 +53,7 @@ export interface AIProvider {
 
 let cached: { key: string; provider: AIProvider } | undefined
 
-export function createAIProvider(config: AIConfig): AIProvider {
+function createAIProvider(config: AIConfig): AIProvider {
   switch (config.provider) {
     case "gemini":
       return new GeminiProvider({

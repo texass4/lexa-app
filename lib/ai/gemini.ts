@@ -171,7 +171,7 @@ function usage(response: GeminiResponseLike, model: string): AIUsage {
 }
 
 /** Erro do SDK → código da Íntegra. A mensagem original fica só em `cause`. */
-export function mapGeminiError(error: unknown): AIError {
+function mapGeminiError(error: unknown): AIError {
   if (error instanceof AIError) return error
   const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : undefined
   const message = error instanceof Error ? error.message : ""

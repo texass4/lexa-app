@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { route } from "@/lib/auth/server"
 import { requireAdmin } from "@/lib/admin/guard"
-import { matches } from "@/lib/format"
+import { matches } from "@/lib/core/format"
 import type { OrgStatus } from "@/lib/admin/catalog"
 
 /** Busca global do Admin: escritórios e usuários por nome, e-mail ou CNPJ. */

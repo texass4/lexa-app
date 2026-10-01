@@ -7,10 +7,10 @@ import * as React from "react"
 import Link from "next/link"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SignalList } from "@/components/shared/signal-list"
-import { officeSignals } from "@/lib/attention"
+import { officeSignals } from "@/lib/dashboard/attention"
 import { useSession } from "@/lib/auth/session"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { fmtRelative } from "@/lib/dates"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { fmtRelative } from "@/lib/core/dates"
 import type { Notification } from "@/types"
 
 const ICONS: Record<Notification["type"], { icon: React.ElementType; cls: string }> = {
@@ -21,9 +21,9 @@ const ICONS: Record<Notification["type"], { icon: React.ElementType; cls: string
 }
 
 export function NotificationsMenu() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { notifications } = data
-  const { markAllNotificationsRead, markNotificationRead } = useDemoActions()
+  const { markAllNotificationsRead, markNotificationRead } = useOfficeActions()
   const { can, user } = useSession()
   const router = useRouter()
   const [open, setOpen] = React.useState(false)

@@ -3,9 +3,9 @@
 import { ArrowRight, ChevronDown, Sparkles } from "lucide-react"
 import { cn } from "cn"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
-import { useDemoData } from "@/lib/store/demo-store"
-import { officeDigest } from "@/lib/dashboard"
-import { BRAND } from "@/lib/brand"
+import { useOfficeData } from "@/lib/store/office-store"
+import { officeDigest } from "@/lib/dashboard/dashboard"
+import { BRAND } from "@/lib/core/brand"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
@@ -15,7 +15,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * da direita abre a conversa com a Íntegra IA.
  */
 export function InsightBanner({ expanded, onToggle, critical }: { expanded: boolean; onToggle: () => void; critical: number }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const lexa = useLexaAI()
   const digest = officeDigest(data)
   const found = [

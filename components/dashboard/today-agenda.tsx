@@ -5,13 +5,13 @@ import Link from "next/link"
 import { CalendarDays } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
-import { useDemoData } from "@/lib/store/demo-store"
-import { todaysAppointments } from "@/lib/selectors"
+import { useOfficeData } from "@/lib/store/office-store"
+import { todaysAppointments } from "@/lib/store/selectors"
 import { EmptyState } from "@/components/ui/empty-state"
 import { PanelLink } from "./panel-link"
 import { useCategoryLookup } from "@/components/agenda/use-category"
-import { getNow, fmtTime, parse, toLocalISO } from "@/lib/dates"
-import { getUser } from "@/lib/account"
+import { getNow, fmtTime, parse, toLocalISO } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 
 function hrefFor(a: Appointment) {
@@ -21,7 +21,7 @@ function hrefFor(a: Appointment) {
 }
 
 export function TodayAgenda() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const lookup = useCategoryLookup()
   const items = todaysAppointments(data)
   const nowIndex = items.findIndex((a) => parse(a.start) > getNow())

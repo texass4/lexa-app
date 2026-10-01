@@ -7,14 +7,14 @@ import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/field"
-import { hasValidCheckDigits, maskCNJ, onlyDigits } from "@/lib/cnj"
-import { documentRequiredIssue } from "@/lib/clients"
-import { PRACTICE_AREAS, PROCESS_STATUS } from "@/lib/config"
-import { getMembers, currentUserId } from "@/lib/account"
-import { getNow, parse } from "@/lib/dates"
-import { lookupProcess, type LookupFailure } from "@/lib/services/processes/client"
-import { isAutoTracked } from "@/lib/services/processes/labels"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { hasValidCheckDigits, maskCNJ, onlyDigits } from "@/lib/processos/cnj"
+import { documentRequiredIssue } from "@/lib/clientes/clients"
+import { PRACTICE_AREAS, PROCESS_STATUS } from "@/lib/core/config"
+import { getMembers, currentUserId } from "@/lib/auth/account"
+import { getNow, parse } from "@/lib/core/dates"
+import { lookupProcess, type LookupFailure } from "@/lib/services/processos/client"
+import { isAutoTracked } from "@/lib/services/processos/labels"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import type { PracticeArea, Process, ProcessStatus } from "@/types"
 import { LookupFailed, LookupFound, LookupProgress, summaryFromProcess, summaryFromSheet, type LookupSummary } from "./process-lookup-status"
 import { AUTO_REFRESH_AFTER_MS } from "./use-process-refresh"
@@ -83,8 +83,8 @@ const pickForm = (existing: Process) => ({
 const isRecent = (process: Process) => !!process.lastSyncedAt && getNow().getTime() - parse(process.lastSyncedAt).getTime() < AUTO_REFRESH_AFTER_MS
 
 function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?: string; onClose: () => void }) {
-  const data = useDemoData()
-  const { addProcess, importProcess, updateProcess, applyProcessSync, versionOf } = useDemoActions()
+  const data = useOfficeData()
+  const { addProcess, importProcess, updateProcess, applyProcessSync, versionOf } = useOfficeActions()
   const router = useRouter()
   const initial = () => ({
     number: number ? maskCNJ(number) : "",

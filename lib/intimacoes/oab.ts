@@ -4,7 +4,7 @@
  * SP). A captura de intimações consulta cada inscrição ativa. Lógica pura.
  */
 
-import { UFS } from "@/lib/clients"
+import { UFS } from "@/lib/clientes/clients"
 
 export interface OabInput {
   number: string

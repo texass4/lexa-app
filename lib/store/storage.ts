@@ -83,8 +83,6 @@ const NEWEST_FIRST = new Set<Collection>(["clients", "processes", "tasks", "docu
 const APPEND_ONLY = new Set<Collection>(["activities"])
 
 export const COLLECTIONS = Object.keys(TABLES) as Collection[]
-/** Coleção de cada tabela (eventos do Realtime chegam pelo nome da tabela). */
-export const COLLECTION_OF_TABLE = Object.fromEntries(COLLECTIONS.map((key) => [TABLES[key], key])) as Record<string, Collection>
 
 /** Atividades por último: se outra gravação do mesmo lote for recusada, o registro dela não entra. */
 const WRITE_ORDER: Collection[] = [...COLLECTIONS.filter((key) => key !== "activities"), "activities"]
@@ -258,7 +256,7 @@ export async function fetchRecords(supabase: SupabaseClient, key: Collection, id
   return rows
 }
 
-export async function fetchRecord(supabase: SupabaseClient, key: Collection, id: string): Promise<ServerRow | null> {
+async function fetchRecord(supabase: SupabaseClient, key: Collection, id: string): Promise<ServerRow | null> {
   const { data, error } = await supabase.from(TABLES[key]).select("id, data, updated_at").eq("id", id).maybeSingle()
   if (error) throw error
   return (data as ServerRow | null) ?? null

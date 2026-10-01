@@ -3,10 +3,10 @@
  *
  * Usada no "Novo processo". Responde com cache fresco na hora; com cache
  * vencido, responde com ele e atualiza em segundo plano (stale-while-revalidate).
- * Toda a conversa com a fonte externa fica em `lib/services/processes/lookup-service.ts`.
+ * Toda a conversa com a fonte externa fica em `lib/services/processos/lookup-service.ts`.
  */
 
-import { handleLookup } from "@/lib/services/processes/lookup-http"
+import { handleLookup } from "@/lib/services/processos/lookup-http"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

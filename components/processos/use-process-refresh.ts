@@ -2,13 +2,13 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import { hasValidCheckDigits, onlyDigits } from "@/lib/cnj"
-import { getNow, parse } from "@/lib/dates"
+import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
+import { getNow, parse } from "@/lib/core/dates"
 import { useSession } from "@/lib/auth/session"
-import { refreshProcess } from "@/lib/services/processes/client"
-import { isAutoTracked } from "@/lib/services/processes/labels"
-import { isCheckDue } from "@/lib/services/processes/monitoring-policy"
-import { useDemoActions } from "@/lib/store/demo-store"
+import { refreshProcess } from "@/lib/services/processos/client"
+import { isAutoTracked } from "@/lib/services/processos/labels"
+import { isCheckDue } from "@/lib/services/processos/monitoring-policy"
+import { useOfficeActions } from "@/lib/store/office-store"
 import type { Process } from "@/types"
 
 /** Mesmo prazo do cache do servidor: antes disso, o que está salvo já é o mais recente. */
@@ -34,7 +34,7 @@ const isStale = (lastSyncedAt?: string) => isCheckDue(lastSyncedAt ? parse(lastS
  * da página — o resultado é aplicado no store do escritório.
  */
 export function useProcessRefresh(process: Process | undefined) {
-  const { applyProcessSync } = useDemoActions()
+  const { applyProcessSync } = useOfficeActions()
   const { can } = useSession()
   // Estado atrelado ao processo: ao trocar de processo na mesma tela, não herda o anterior.
   const [current, setCurrent] = React.useState<{ id?: string; state: RefreshState }>({ state: IDLE })

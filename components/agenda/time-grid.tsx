@@ -4,9 +4,9 @@ import * as React from "react"
 import { motion } from "framer-motion"
 import { cn } from "cn"
 import { layoutDay } from "./layout-events"
-import { atMinutes, durationMinutes, moveAppointment, snapMinutes } from "@/lib/agenda"
+import { atMinutes, durationMinutes, moveAppointment, snapMinutes } from "@/lib/agenda/agenda"
 import { useCategoryLookup } from "./use-category"
-import { getNow, fmtTime, isSameDay, parse, toLocalISO, weekdayShort } from "@/lib/dates"
+import { getNow, fmtTime, isSameDay, parse, toLocalISO, weekdayShort } from "@/lib/core/dates"
 import type { Appointment } from "@/types"
 
 const START_HOUR = 7

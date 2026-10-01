@@ -19,14 +19,14 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeadlineLabel } from "./deadline-label"
 import { SignalDot } from "@/components/shared/signal-list"
-import { processSignals, type AttentionSignal } from "@/lib/attention"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { processSignals, type AttentionSignal } from "@/lib/dashboard/attention"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { PROCESS_STATUS } from "@/lib/config"
-import { getNow, diffInDays, parse } from "@/lib/dates"
-import { matches } from "@/lib/format"
-import { getUser } from "@/lib/account"
-import { nextPrazo } from "@/lib/prazos"
+import { PROCESS_STATUS } from "@/lib/core/config"
+import { getNow, diffInDays, parse } from "@/lib/core/dates"
+import { matches } from "@/lib/core/format"
+import { getUser } from "@/lib/auth/account"
+import { nextPrazo } from "@/lib/prazos/prazos"
 import type { Process, ProcessStatus } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -54,8 +54,8 @@ function SignalHint({ signal }: { signal?: AttentionSignal }) {
 }
 
 export function ProcessesView() {
-  const data = useDemoData()
-  const { deleteProcess } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteProcess } = useOfficeActions()
   const { openDialog } = useUI()
   const router = useRouter()
   // Os dados vêm do armazenamento do navegador depois da hidratação.

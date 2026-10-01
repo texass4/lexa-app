@@ -7,11 +7,11 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { AnimatedCheckbox } from "@/components/ui/animated-checkbox"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
-import { currentUserId, getMembers } from "@/lib/account"
-import { fmtNumericDate } from "@/lib/dates"
-import { validatePrazo, type PrazoErrors } from "@/lib/prazos"
+import { currentUserId, getMembers } from "@/lib/auth/account"
+import { fmtNumericDate } from "@/lib/core/dates"
+import { validatePrazo, type PrazoErrors } from "@/lib/prazos/prazos"
 import { suggestDeadline } from "@/lib/intimacoes/deadline"
 import { subtractBusinessDays } from "@/lib/intimacoes/calendar"
 import { KIND_LABEL, SOURCE_LABEL, suggestedDeadline } from "@/lib/triagem/model"
@@ -39,8 +39,8 @@ export function ConfirmPrazoDialog({ item, onOpenChange }: { item?: TriageItem; 
 }
 
 function ConfirmForm({ item, onClose }: { item: TriageItem; onClose: () => void }) {
-  const data = useDemoData()
-  const { addPrazo } = useDemoActions()
+  const data = useOfficeData()
+  const { addPrazo } = useOfficeActions()
   const { markConfirmed } = useTriagem()
   const { can } = useSession()
   const canTask = can("tasks.edit")

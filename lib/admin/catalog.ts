@@ -3,7 +3,7 @@
  * Nada aqui importa código de servidor; os dados chegam pelas rotas `/api/admin/*`.
  */
 
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 import type { Organization } from "@/types"
 import type { MemberAccess } from "@/lib/auth/profile"
 
@@ -59,7 +59,7 @@ export const LIMIT_META: Record<LimitKey, { label: string; short: string; unit: 
   ai: { label: "Uso de IA", short: "IA", unit: "/mês", column: "max_ai_requests", monthly: true },
 }
 
-export const UNLIMITED: PlanLimits = { users: null, processes: null, clients: null, storage: null, whatsapp: null, ai: null }
+const UNLIMITED: PlanLimits = { users: null, processes: null, clients: null, storage: null, whatsapp: null, ai: null }
 
 /** Limites efetivos: os do plano, sobrepostos pelos personalizados do escritório. */
 export function effectiveLimits(plan: PlanLimits | undefined, custom?: Partial<PlanLimits> | null): PlanLimits {

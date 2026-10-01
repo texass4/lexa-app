@@ -1,4 +1,4 @@
-import { BRAND } from "@/lib/brand"
+import { BRAND } from "@/lib/core/brand"
 import { isEmail, normalizeEmail } from "@/lib/auth/validation"
 
 /**

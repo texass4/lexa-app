@@ -2,8 +2,8 @@
 
 import { cn } from "cn"
 import { useCategoryLookup } from "./use-category"
-import { getNow, fmtTime, isSameDay, parse, weekdayName } from "@/lib/dates"
-import { getUser } from "@/lib/account"
+import { getNow, fmtTime, isSameDay, parse, weekdayName } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 
 /** Lista por dia usada na visão semanal em telas pequenas. */

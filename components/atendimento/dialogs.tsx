@@ -11,12 +11,12 @@ import { ChoiceChips } from "@/components/ui/choice-chips"
 import { SearchField } from "@/components/ui/search-field"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { useSession } from "@/lib/auth/session"
-import { userTitle } from "@/lib/account"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { PRACTICE_AREAS } from "@/lib/config"
-import { matches } from "@/lib/format"
-import { findDuplicateClient, validateDocument } from "@/lib/clients"
-import { isEmail, maskDocument, maskPhone } from "@/lib/masks"
+import { userTitle } from "@/lib/auth/account"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { PRACTICE_AREAS } from "@/lib/core/config"
+import { matches } from "@/lib/core/format"
+import { findDuplicateClient, validateDocument } from "@/lib/clientes/clients"
+import { isEmail, maskDocument, maskPhone } from "@/lib/core/masks"
 import { formatPhone, normalizeWhatsAppPhone } from "@/lib/whatsapp/phone"
 import { whatsappApi } from "@/lib/whatsapp/client"
 import type { PracticeArea, WhatsAppContact, WhatsAppConversation } from "@/types"
@@ -130,7 +130,7 @@ export function NewConversationDialog({
 }
 
 function NewConversationForm({ onClose, onCreated }: { onClose: () => void; onCreated: (c: WhatsAppConversation) => void }) {
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   const [clientId, setClientId] = React.useState("")
   const [phone, setPhone] = React.useState("")
   const [error, setError] = React.useState("")
@@ -230,8 +230,8 @@ export function ConvertToClientDialog({ open, onOpenChange, contact }: { open: b
 
 function ConvertForm({ contact, onClose }: { contact: WhatsAppContact; onClose: () => void }) {
   const { user, members } = useSession()
-  const { clients } = useDemoData()
-  const { addClient } = useDemoActions()
+  const { clients } = useOfficeData()
+  const { addClient } = useOfficeActions()
   const national = contact.phone.startsWith("55") ? contact.phone.slice(2) : contact.phone
   const [form, setForm] = React.useState({
     kind: "Pessoa física" as (typeof KINDS)[number],
@@ -359,7 +359,7 @@ async function linkWithRetry(contactId: string, clientId: string) {
 /* --------------------------- Vincular a cliente --------------------------- */
 
 export function LinkClientDialog({ open, onOpenChange, contact }: { open: boolean; onOpenChange: (open: boolean) => void; contact: WhatsAppContact }) {
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   const [query, setQuery] = React.useState("")
   const [saving, setSaving] = React.useState<string | null>(null)
   const list = clients.filter((c) => matches(query, c.name, c.document, c.phone, c.email)).slice(0, 50)

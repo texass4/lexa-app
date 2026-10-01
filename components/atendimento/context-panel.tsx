@@ -29,15 +29,15 @@ import { Eyebrow } from "@/components/ui/panel"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { FileIcon } from "@/components/shared/file-icon"
-import { TaskRow } from "@/components/tasks/task-row"
+import { TaskRow } from "@/components/tarefas/task-row"
 import { useCategoryLookup } from "@/components/agenda/use-category"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
-import { getUser } from "@/lib/account"
-import { CATEGORY_COLORS, categoryStyle, CLIENT_STATUS, PROCESS_STATUS } from "@/lib/config"
-import { fmtDayLabel, fmtNumericDate, fmtTime, getNow, parse } from "@/lib/dates"
-import { normalize } from "@/lib/format"
+import { getUser } from "@/lib/auth/account"
+import { CATEGORY_COLORS, categoryStyle, CLIENT_STATUS, PROCESS_STATUS } from "@/lib/core/config"
+import { fmtDayLabel, fmtNumericDate, fmtTime, getNow, parse } from "@/lib/core/dates"
+import { normalize } from "@/lib/core/format"
 import { formatPhone, phoneMatchKeys } from "@/lib/whatsapp/phone"
 import { whatsappApi } from "@/lib/whatsapp/client"
 import type { Client, WhatsAppConversation } from "@/types"
@@ -73,7 +73,7 @@ function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
 
 /** Clientes cujo telefone bate com o do contato (sugestão de vínculo, sem vincular sozinho). */
 function useSuggestedClient(conversation: WhatsAppConversation) {
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   return React.useMemo(() => {
     if (conversation.contact.clientId) return undefined
     const keys = new Set(phoneMatchKeys(conversation.contact.phone))
@@ -378,7 +378,7 @@ export function ContextPanel({
   onChanged: (c: WhatsAppConversation) => void
   onChangeAssignee: () => void
 }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can } = useSession()
   const { openDialog } = useUI()
   const lookup = useCategoryLookup()

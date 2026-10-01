@@ -7,11 +7,11 @@
  */
 
 import { AIError } from "@/lib/ai/errors"
-import { PROCESS_STATUS } from "@/lib/config"
-import { formatCurrency } from "@/lib/format"
-import { isAutoTracked } from "@/lib/services/processes/labels"
-import { prazosOfProcess } from "@/lib/prazos"
-import { toLocalISO } from "@/lib/dates"
+import { PROCESS_STATUS } from "@/lib/core/config"
+import { formatCurrency } from "@/lib/core/format"
+import { isAutoTracked } from "@/lib/services/processos/labels"
+import { prazosOfProcess } from "@/lib/prazos/prazos"
+import { toLocalISO } from "@/lib/core/dates"
 import type { Appointment, Client, LegalDocument, Prazo, Process, ProcessParty, Task } from "@/types"
 import type { AIRepository, Member } from "./repository"
 import {
@@ -38,7 +38,7 @@ import {
 } from "./shared"
 
 /** Limites de volume — cada item a mais é token pago. */
-export const PROCESS_LIMITS = {
+const PROCESS_LIMITS = {
   movements: 20,
   tasks: 15,
   prazos: 15,

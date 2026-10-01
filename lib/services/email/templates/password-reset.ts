@@ -1,4 +1,4 @@
-import { BRAND } from "@/lib/brand"
+import { BRAND } from "@/lib/core/brand"
 import { escapeHtml, greeting, layout, oneLine, plainText, type RenderedEmail } from "./layout"
 
 export interface PasswordResetEmailInput {

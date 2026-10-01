@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button"
 import { AnimatedCheckbox } from "@/components/ui/animated-checkbox"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
-import { currentUserId, getMembers } from "@/lib/account"
+import { currentUserId, getMembers } from "@/lib/auth/account"
 import { useSession } from "@/lib/auth/session"
-import { PRAZO_ORIGIN } from "@/lib/config"
-import { fmtNumericDate } from "@/lib/dates"
-import { internalAfterFatal, validatePrazo, type PrazoErrors } from "@/lib/prazos"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { PRAZO_ORIGIN } from "@/lib/core/config"
+import { fmtNumericDate } from "@/lib/core/dates"
+import { internalAfterFatal, validatePrazo, type PrazoErrors } from "@/lib/prazos/prazos"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import type { PrazoOrigin } from "@/types"
 
 type Defaults = { processId?: string }
@@ -22,8 +22,8 @@ const ORIGIN_LABELS = [PRAZO_ORIGIN.manual, PRAZO_ORIGIN.intimacao] as const
 const toOrigin: Record<(typeof ORIGIN_LABELS)[number], PrazoOrigin> = { [PRAZO_ORIGIN.manual]: "manual", [PRAZO_ORIGIN.intimacao]: "intimacao" }
 
 function PrazoForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => void }) {
-  const data = useDemoData()
-  const { addPrazo } = useDemoActions()
+  const data = useOfficeData()
+  const { addPrazo } = useOfficeActions()
   const { can } = useSession()
   const canTask = can("tasks.edit")
   // Aberto pelo processo: processo (e cliente) já vêm definidos.

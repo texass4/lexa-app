@@ -18,7 +18,7 @@ No navegador ficam só preferências e marcadores locais, nunca dados do escrit�
 
 Os processos são reais: consulte pelo número CNJ em **Novo processo** e ele fica salvo em **Processos**. A consulta roda no próprio servidor do Next (TypeScript) — não precisa de Python.
 
-**Mapa do código e como alterar:** [ARCHITECTURE.md](./ARCHITECTURE.md) · **Marca e identidade visual:** [ARCHITECTURE.md › Marca](./ARCHITECTURE.md#5b-marca-íntegra)
+**Mapa do código e como alterar:** [docs/ARQUITETURA.md](./docs/ARQUITETURA.md) (manual: pastas, padrões, como alterar) · **Referência por módulo:** [docs/MODULOS.md](./docs/MODULOS.md) · **Marca:** [MODULOS › Marca](./docs/MODULOS.md#5b-marca-íntegra)
 
 > O produto se chamava LEXA. Identificadores internos (pasta `lexa-app`, variáveis `LEXA_*`, chaves `lexa:*` do navegador, cabeçalho `x-lexa-webhook-token`, nomes de migração, `LexaAIProvider` etc.) continuam com o nome antigo por compatibilidade.
 
@@ -39,7 +39,7 @@ Camada de inteligência sobre os dados reais do escritório: resumo e próximos 
 5. **Abra um processo** em **Processos** (de preferência um consultado pelo DataJud, com movimentações).
 6. **Use a Íntegra IA**: no card *Íntegra IA* do processo, clique em **Resumir processo**, **Verificar próximos passos** ou **Perguntar à Íntegra**; em uma movimentação da timeline, use **Analisar com Íntegra IA**. No cliente, **Resumo do cliente**; no Painel, **Panorama do escritório**.
 
-Sem `GEMINI_API_KEY`, as áreas da IA mostram *"Íntegra IA não configurada"*. Detalhes de arquitetura, segurança e custo: [ARCHITECTURE.md › Íntegra IA](./ARCHITECTURE.md#10-íntegra-ia).
+Sem `GEMINI_API_KEY`, as áreas da IA mostram *"Íntegra IA não configurada"*. Detalhes de arquitetura, segurança e custo: [MODULOS › Íntegra IA](./docs/MODULOS.md#10-íntegra-ia).
 
 ## E-mail (SMTP)
 

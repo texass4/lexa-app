@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { initials } from "@/lib/format"
+import { initials } from "@/lib/core/format"
 
 const PALETTE = [
   "bg-[#E8EEFB] text-[#274690] dark:bg-[#16213A] dark:text-[#A9C2FA]",

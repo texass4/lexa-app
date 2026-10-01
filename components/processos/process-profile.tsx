@@ -16,24 +16,24 @@ import { FadeIn } from "@/components/ui/motion"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DocumentList } from "@/components/shared/document-list"
-import { TaskRow } from "@/components/tasks/task-row"
+import { TaskRow } from "@/components/tarefas/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
 import { useProcessRefresh } from "./use-process-refresh"
 import { ProcessTriagePanel } from "@/components/triagem/process-triage"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { PROCESS_STATUS } from "@/lib/config"
+import { PROCESS_STATUS } from "@/lib/core/config"
 import { useCategoryLookup } from "@/components/agenda/use-category"
-import { getNow, diffInDays, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtNumericDate, fmtTime, parse } from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
-import { getUser, userTitle } from "@/lib/account"
-import { interpretMovements } from "@/lib/services/processes/movement-interpreter"
+import { getNow, diffInDays, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtNumericDate, fmtTime, parse } from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
+import { getUser, userTitle } from "@/lib/auth/account"
+import { interpretMovements } from "@/lib/services/processos/movement-interpreter"
 import { Can } from "@/lib/auth/session"
-import { PRAZO_ALERT_DAYS, processSignals } from "@/lib/attention"
-import { nextPrazo } from "@/lib/prazos"
+import { PRAZO_ALERT_DAYS, processSignals } from "@/lib/dashboard/attention"
+import { nextPrazo } from "@/lib/prazos/prazos"
 import { PrazosPanel } from "@/components/prazos/prazos-panel"
 import { ActivityTimeline } from "@/components/shared/activity-timeline"
 
@@ -47,8 +47,8 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 }
 
 export function ProcessProfile({ id }: { id: string }) {
-  const data = useDemoData()
-  const { deleteProcess } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteProcess } = useOfficeActions()
   const { openDialog } = useUI()
   const router = useRouter()
   const lookup = useCategoryLookup()

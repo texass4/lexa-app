@@ -25,11 +25,11 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { MiniStat } from "@/components/shared/mini-stat"
 import { ActivityIcon } from "@/components/shared/activity-icon"
-import { TaskRow } from "@/components/tasks/task-row"
+import { TaskRow } from "@/components/tarefas/task-row"
 import { useUI } from "@/lib/store/ui-store"
-import { useDemoData } from "@/lib/store/demo-store"
-import { PRAZO_ALERT_DAYS } from "@/lib/attention"
-import { clientFinance, nextClientDeadline, type ClientHub } from "@/lib/selectors"
+import { useOfficeData } from "@/lib/store/office-store"
+import { PRAZO_ALERT_DAYS } from "@/lib/dashboard/attention"
+import { clientFinance, nextClientDeadline, type ClientHub } from "@/lib/store/selectors"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import {
   getNow,
@@ -43,11 +43,11 @@ import {
   fmtRelative,
   fmtTime,
   parse,
-} from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
-import { getUser } from "@/lib/account"
-import { whatsappLink, whatsappNumber } from "@/lib/clients"
-import { maskPhone } from "@/lib/masks"
+} from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
+import { getUser } from "@/lib/auth/account"
+import { whatsappLink, whatsappNumber } from "@/lib/clientes/clients"
+import { maskPhone } from "@/lib/core/masks"
 import type { Client, ClientWhatsAppSummary } from "@/types"
 import { Can, useSession } from "@/lib/auth/session"
 import type { ProfileTab } from "./client-profile"
@@ -124,7 +124,7 @@ export function OverviewTab({
   const { openDialog } = useUI()
   const { can } = useSession()
   const lookup = useCategoryLookup()
-  const { deadlines } = useDemoData()
+  const { deadlines } = useOfficeData()
   const { processes, activeProcesses, activities } = hub
   const nextDeadline = nextClientDeadline(processes, deadlines)
   const deadlineDays = nextDeadline ? diffInDays(parse(nextDeadline.prazo.fatalDate), getNow()) : undefined

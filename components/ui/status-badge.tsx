@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 
 const TONES: Record<Tone, string> = {
   neutral: "bg-surface-muted text-muted-foreground border-border/70",

@@ -11,18 +11,18 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Can } from "@/lib/auth/session"
-import { getUser } from "@/lib/account"
-import { PRAZO_ORIGIN, PRAZO_STATUS } from "@/lib/config"
-import { fmtDueIn, fmtNumericDate } from "@/lib/dates"
-import { PRAZO_ALERT_DAYS } from "@/lib/attention"
-import { daysToPrazo, prazoTask, prazosOfProcess } from "@/lib/prazos"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { getUser } from "@/lib/auth/account"
+import { PRAZO_ORIGIN, PRAZO_STATUS } from "@/lib/core/config"
+import { fmtDueIn, fmtNumericDate } from "@/lib/core/dates"
+import { PRAZO_ALERT_DAYS } from "@/lib/dashboard/attention"
+import { daysToPrazo, prazoTask, prazosOfProcess } from "@/lib/prazos/prazos"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import type { Prazo, Process } from "@/types"
 
 /** Prazos do processo: abertos primeiro, com cumprir / marcar como perdido. */
 export function PrazosPanel({ process }: { process: Process }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
   const prazos = prazosOfProcess(data.deadlines, process.id)
   const open = prazos.filter((p) => p.status === "aberto").length
@@ -66,8 +66,8 @@ export function PrazosPanel({ process }: { process: Process }) {
 
 /** Um prazo, com cumprir / marcar como perdido. `showProcess`: mostra processo e cliente (fora do perfil do processo). */
 export function PrazoRow({ prazo, showProcess = false }: { prazo: Prazo; showProcess?: boolean }) {
-  const data = useDemoData()
-  const { setPrazoStatus } = useDemoActions()
+  const data = useOfficeData()
+  const { setPrazoStatus } = useOfficeActions()
   const [confirmLost, setConfirmLost] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const isOpen = prazo.status === "aberto"

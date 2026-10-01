@@ -8,19 +8,19 @@ import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { SignalDot, SignalList } from "@/components/shared/signal-list"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
-import { changesSince, countByLevel, type AttentionSignal } from "@/lib/attention"
-import { acknowledgeVisit, readVisitBaseline } from "@/lib/visits"
-import { fmtActivityTime, fmtRelative, getNow, toLocalISO } from "@/lib/dates"
+import { changesSince, countByLevel, type AttentionSignal } from "@/lib/dashboard/attention"
+import { acknowledgeVisit, readVisitBaseline } from "@/lib/dashboard/visits"
+import { fmtActivityTime, fmtRelative, getNow, toLocalISO } from "@/lib/core/dates"
 
 /** Quantos sinais aparecem antes de "Ver todos" — pouca coisa competindo pela atenção. */
 const VISIBLE = 5
 const CHANGES_VISIBLE = 3
 
 function SinceLastVisit() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { user, can } = useSession()
   // Lida uma vez: a base da sessão não muda enquanto a tela está aberta.
   const [baseline, setBaseline] = React.useState(() => readVisitBaseline(user.id))

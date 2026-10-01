@@ -19,17 +19,17 @@ import { TableShell, Td, Th } from "@/components/ui/data-table"
 import { FadeIn } from "@/components/ui/motion"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useClientActions } from "./client-actions"
 import { ImportClientsDialog } from "./import-clients-dialog"
 import { useUI } from "@/lib/store/ui-store"
-import { CLIENT_STATUS, PRACTICE_AREAS } from "@/lib/config"
-import { fmtNumericDate, fmtRelative } from "@/lib/dates"
-import { matches } from "@/lib/format"
-import { getMembers, getUser } from "@/lib/account"
-import { onlyDigits } from "@/lib/clients"
-import { delinquentClientIds, isOverdue, lastActivityByClient, relatedClientId } from "@/lib/selectors"
-import { downloadFile, toCsv } from "@/lib/export"
+import { CLIENT_STATUS, PRACTICE_AREAS } from "@/lib/core/config"
+import { fmtNumericDate, fmtRelative } from "@/lib/core/dates"
+import { matches } from "@/lib/core/format"
+import { getMembers, getUser } from "@/lib/auth/account"
+import { onlyDigits } from "@/lib/clientes/clients"
+import { delinquentClientIds, isOverdue, lastActivityByClient, relatedClientId } from "@/lib/store/selectors"
+import { downloadFile, toCsv } from "@/lib/core/export"
 import type { Client, ClientStatus, PracticeArea } from "@/types"
 import { Can, useSession } from "@/lib/auth/session"
 
@@ -66,8 +66,8 @@ interface Row {
 }
 
 export function ClientsView() {
-  const data = useDemoData()
-  const { deleteClient, retryLoad } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteClient, retryLoad } = useOfficeActions()
   const { toggleActive, deleteDescription } = useClientActions()
   const { openDialog } = useUI()
   const { can } = useSession()

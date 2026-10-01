@@ -23,11 +23,11 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { visibleSections } from "./nav-config"
 import { DIALOG_PERMISSION, useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { useDemoData } from "@/lib/store/demo-store"
-import { normalize } from "@/lib/format"
-import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/config"
-import { fmtShortDate, fmtTime, getNow, parse } from "@/lib/dates"
-import { officeSignals } from "@/lib/attention"
+import { useOfficeData } from "@/lib/store/office-store"
+import { normalize } from "@/lib/core/format"
+import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/core/config"
+import { fmtShortDate, fmtTime, getNow, parse } from "@/lib/core/dates"
+import { officeSignals } from "@/lib/dashboard/attention"
 import { SignalDot } from "@/components/shared/signal-list"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 
@@ -70,7 +70,7 @@ export function CommandMenu() {
 
 function CommandContent() {
   const { setCommandOpen, openDialog } = useUI()
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can, user } = useSession()
   const lexa = useLexaAI()
   const router = useRouter()

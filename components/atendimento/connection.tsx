@@ -61,7 +61,7 @@ export function ConnectionNotice() {
   )
 }
 
-export function ConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function ConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Conexão com o WhatsApp" description="Z-API · número do escritório" icon={<Smartphone />}>
       <ConnectionSetup />
@@ -70,7 +70,7 @@ export function ConnectionDialog({ open, onOpenChange }: { open: boolean; onOpen
 }
 
 /** Diagnóstico e passos de conexão. Só quem administra o escritório vê os detalhes. */
-export function ConnectionSetup() {
+function ConnectionSetup() {
   const { instance: info, reloadInstance, instanceLoading } = useInbox()
   const health = useConnectionHealth()
   const [qr, setQr] = React.useState<{ image?: string; needsPasskey?: boolean } | null>(null)

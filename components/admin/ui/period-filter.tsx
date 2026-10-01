@@ -4,7 +4,7 @@ import * as React from "react"
 import { CalendarRange } from "lucide-react"
 import { cn } from "cn"
 import { FilterTabs } from "@/components/ui/filter-tabs"
-import { getNow } from "@/lib/dates"
+import { getNow } from "@/lib/core/dates"
 import { PERIODS, resolvePeriod, type PeriodKey } from "@/lib/admin/catalog"
 
 export interface PeriodState {

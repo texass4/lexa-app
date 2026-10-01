@@ -8,12 +8,12 @@ import { SideSheet } from "@/components/ui/side-sheet"
 import { Button } from "@/components/ui/button"
 import { NativeSelect, TextArea } from "@/components/ui/field"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
-import { getMembers, getUser } from "@/lib/account"
-import { fmtNumericDate } from "@/lib/dates"
-import { formatCNJ, onlyDigits } from "@/lib/cnj"
+import { getMembers, getUser } from "@/lib/auth/account"
+import { fmtNumericDate } from "@/lib/core/dates"
+import { formatCNJ, onlyDigits } from "@/lib/processos/cnj"
 import { formatOab } from "@/lib/intimacoes/oab"
 import { readableContent } from "@/lib/integrations/legal/djen/mapper"
 import { KIND_LABEL, SOURCE_LABEL, isOpen, requiresAction, stateBadge, suggestedDeadline } from "@/lib/triagem/model"
@@ -84,7 +84,7 @@ const PENDING_COPY: Record<Exclude<Pending, null>, { placeholder: string; button
 }
 
 function SheetBody({ item: i }: { item: TriageItem }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
   const { can } = useSession()
   const { oabs, link, assign, rejectPrazo, markReview, ignore, reopen, markViewed, events, intimacao } = useTriagem()

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { cn } from "cn"
 import { useCategoryLookup } from "./use-category"
-import { addDays, getNow, fmtTime, isSameDay, parse, startOfWeek, toLocalISO } from "@/lib/dates"
+import { addDays, getNow, fmtTime, isSameDay, parse, startOfWeek, toLocalISO } from "@/lib/core/dates"
 import type { Appointment } from "@/types"
 
 const WEEK_LABELS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]

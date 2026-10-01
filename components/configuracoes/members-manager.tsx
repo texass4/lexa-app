@@ -25,10 +25,10 @@ import {
 import { ADMIN_PERMISSIONS, effectivePermissions, MEMBER_ROLES, MODULES, ROLE_LABELS, type MemberRole, type Permission } from "@/lib/auth/permissions"
 import type { MemberAccess } from "@/lib/auth/profile"
 import { isEmail } from "@/lib/auth/validation"
-import { UFS } from "@/lib/clients"
+import { UFS } from "@/lib/clientes/clients"
 import { validateOab } from "@/lib/intimacoes/oab"
 import { OabManager } from "./oab-manager"
-import { fmtNumericDate, fmtRelative } from "@/lib/dates"
+import { fmtNumericDate, fmtRelative } from "@/lib/core/dates"
 
 async function call<T>(url: string, method: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {

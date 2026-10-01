@@ -8,12 +8,12 @@
  * aberto e as do mês atual e do anterior; processos sem o histórico de movimentações.
  */
 
-import { PROCESS_STATUS } from "@/lib/config"
-import { STALE_DAYS } from "@/lib/attention"
-import { addDays, parse, startOfDay, startOfWeek, toLocalISO } from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
-import { financeSummary, isOverdue } from "@/lib/selectors"
-import { isOpenPrazo, nextPrazo } from "@/lib/prazos"
+import { PROCESS_STATUS } from "@/lib/core/config"
+import { STALE_DAYS } from "@/lib/dashboard/attention"
+import { addDays, parse, startOfDay, startOfWeek, toLocalISO } from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
+import { financeSummary, isOverdue } from "@/lib/store/selectors"
+import { isOpenPrazo, nextPrazo } from "@/lib/prazos/prazos"
 import type { OfficeMetrics } from "@/lib/ai/types"
 import type { Appointment, Invoice, Prazo, Task } from "@/types"
 import type { AIRepository, Member, ProcessOverview } from "./repository"
@@ -35,10 +35,7 @@ import {
   upcoming,
 } from "./shared"
 
-/** Sem movimentação há mais que isso = processo parado — a mesma regra dos sinais de atenção da interface. */
-export { STALE_DAYS }
-
-export const OFFICE_LIMITS = {
+const OFFICE_LIMITS = {
   list: 10,
   /** Lista compacta de processos ativos, só para o chat responder "quais…". */
   activeProcesses: 60,

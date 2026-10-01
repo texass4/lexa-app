@@ -11,9 +11,9 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useCategoryLookup } from "./use-category"
 import { NewAppointmentDialog } from "./new-appointment-dialog"
-import { fmtFullDate, fmtTime, parse } from "@/lib/dates"
-import { getUser } from "@/lib/account"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { fmtFullDate, fmtTime, parse } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import type { Appointment } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -27,8 +27,8 @@ function Row({ icon, children }: { icon: React.ReactNode; children: React.ReactN
 }
 
 export function AppointmentDetail({ appointment, onClose }: { appointment?: Appointment; onClose: () => void }) {
-  const data = useDemoData()
-  const { deleteAppointment } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteAppointment } = useOfficeActions()
   const lookup = useCategoryLookup()
   const [shown, setShown] = React.useState(appointment)
   const [deleting, setDeleting] = React.useState(false)

@@ -20,7 +20,7 @@ import { meteredCall, type AIMeter } from "@/lib/ai/metering"
 import { buildSystemPrompt, dataMessage } from "@/lib/ai/prompts/system"
 import { SchemaError } from "@/lib/ai/schema"
 import type { AIProvider } from "@/lib/ai/provider"
-import { SYSTEM_ACTOR_ID } from "@/lib/system-actor"
+import { SYSTEM_ACTOR_ID } from "@/lib/auth/system-actor"
 import {
   finalizeInterpretation,
   INTERPRET_REQUEST,
@@ -32,14 +32,14 @@ import {
 import type { TriageAI } from "@/types"
 
 /** Eventos por execução. */
-export const INTERPRET_BATCH = 15
+const INTERPRET_BATCH = 15
 /** Reserva: duas execuções não interpretam o mesmo evento. */
-export const INTERPRET_LEASE_MS = 10 * 60_000
+const INTERPRET_LEASE_MS = 10 * 60_000
 /** Nova tentativa depois de uma falha: 15 min, 1 h, 4 h. */
 export const retryAfterFailure = (attempts: number) => 15 * 60_000 * 4 ** Math.min(attempts, 2)
 
 /** Cada interpretação tem o próprio teto de tempo (o provedor também tem o seu). */
-export const INTERPRET_TIMEOUT_MS = 30_000
+const INTERPRET_TIMEOUT_MS = 30_000
 
 /** `countAttempt: false` = esperou por limite (não é falha do evento). */
 export type InterpretOutcome = { ok: true; ai: TriageAI; reviewReason?: string } | { ok: false; retryAfterMs: number; countAttempt?: boolean }

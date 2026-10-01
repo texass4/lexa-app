@@ -6,7 +6,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { runLog } from "@/lib/services/processes/monitor-store"
+import { runLog } from "@/lib/services/processos/monitor-store"
 import type { CaptureRepository, ClaimedOab, OabHolder, OabState, ProcessMatch } from "./capture"
 
 const STATES = "djen_oab_state"

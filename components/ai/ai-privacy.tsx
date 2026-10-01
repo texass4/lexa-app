@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
  * acompanha cada análise e aponta para ele.
  */
 
-export const AI_PRIVACY_HREF = "/configuracoes?secao=integracoes#ia"
+const AI_PRIVACY_HREF = "/configuracoes?secao=integracoes#ia"
 
 /** Uma linha, no rodapé das análises. */
 export function AIPrivacyNote({ className }: { className?: string }) {

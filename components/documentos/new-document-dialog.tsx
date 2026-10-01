@@ -8,10 +8,10 @@ import { cn } from "cn"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect } from "@/components/ui/field"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { formatFileSize, uid } from "@/lib/format"
-import { currentOrgId } from "@/lib/account"
-import { documentRequiredIssue } from "@/lib/clients"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { formatFileSize, uid } from "@/lib/core/format"
+import { currentOrgId } from "@/lib/auth/account"
+import { documentRequiredIssue } from "@/lib/clientes/clients"
 import { getSupabase } from "@/lib/supabase/client"
 import type { DocumentKind } from "@/types"
 
@@ -46,8 +46,8 @@ export function NewDocumentDialog({ open, onOpenChange, defaults }: { open: bool
 }
 
 function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => void }) {
-  const data = useDemoData()
-  const { addDocument } = useDemoActions()
+  const data = useOfficeData()
+  const { addDocument } = useOfficeActions()
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [file, setFile] = React.useState<{ name: string; size: number; source: File } | null>(null)
   const [dragging, setDragging] = React.useState(false)

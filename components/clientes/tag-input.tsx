@@ -3,8 +3,8 @@
 import * as React from "react"
 import { Plus, X } from "lucide-react"
 import { cn } from "cn"
-import { normalize } from "@/lib/format"
-import { normalizeTags } from "@/lib/clients"
+import { normalize } from "@/lib/core/format"
+import { normalizeTags } from "@/lib/clientes/clients"
 
 /** Campo de tags: Enter ou vírgula adiciona; sugere as tags já usadas no escritório. */
 export function TagInput({

@@ -33,7 +33,7 @@ const referencedNote: Schema<ReferencedNote> = object({
   comentario: text(undefined, 400),
 })
 
-export const actionSuggestionSchema: Schema<ActionSuggestion> = object({
+const actionSuggestionSchema: Schema<ActionSuggestion> = object({
   titulo: string({ max: 90, min: 3 }),
   descricao: text(undefined, 600),
   prioridade: oneOf(["alta", "media", "baixa"] as const),

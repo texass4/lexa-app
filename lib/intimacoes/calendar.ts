@@ -92,7 +92,7 @@ export function isSuspended(iso: string) {
   return md >= "12-20" || md <= "01-20"
 }
 
-export function isWeekend(iso: string) {
+function isWeekend(iso: string) {
   const day = toDate(iso).getUTCDay()
   return day === 0 || day === 6
 }

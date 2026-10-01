@@ -5,11 +5,11 @@ import { AnimatePresence, motion } from "framer-motion"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { ActivityIcon } from "@/components/shared/activity-icon"
 import { EmptyState } from "@/components/ui/empty-state"
-import { useDemoData } from "@/lib/store/demo-store"
-import { fmtActivityTime } from "@/lib/dates"
+import { useOfficeData } from "@/lib/store/office-store"
+import { fmtActivityTime } from "@/lib/core/dates"
 
 export function RecentActivity({ limit = 7 }: { limit?: number }) {
-  const { activities } = useDemoData()
+  const { activities } = useOfficeData()
   const items = activities.slice(0, limit)
 
   return (

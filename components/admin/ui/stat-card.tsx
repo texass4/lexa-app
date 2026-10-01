@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react"
 import { cn } from "cn"
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 
 const HINT_TONE: Partial<Record<Tone, string>> = {
   warning: "text-warning",

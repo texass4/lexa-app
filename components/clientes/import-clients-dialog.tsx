@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button"
 import { NativeSelect } from "@/components/ui/field"
 import { FilterTabs } from "@/components/ui/filter-tabs"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { currentUserId, getMembers } from "@/lib/account"
-import { decodeCSV, parseCSV } from "@/lib/csv"
-import { downloadFile, toCsv } from "@/lib/export"
-import { getNow, toLocalISO } from "@/lib/dates"
-import { CLIENT_STATUS } from "@/lib/config"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { currentUserId, getMembers } from "@/lib/auth/account"
+import { decodeCSV, parseCSV } from "@/lib/core/csv"
+import { downloadFile, toCsv } from "@/lib/core/export"
+import { getNow, toLocalISO } from "@/lib/core/dates"
+import { CLIENT_STATUS } from "@/lib/core/config"
 import {
   IMPORT_FIELDS,
   buildImportRows,
@@ -23,7 +23,7 @@ import {
   type ColumnMapping,
   type ImportField,
   type ImportRow,
-} from "@/lib/client-import"
+} from "@/lib/clientes/client-import"
 
 /** Limite por arquivo: acima disso, dividir a planilha (a gravação é em lotes de 100). */
 const MAX_ROWS = 2000
@@ -237,7 +237,7 @@ function FileStep({ onClose, onParsed }: { onClose: () => void; onParsed: (parse
 /* --------------------------------- 2. colunas -------------------------------- */
 
 function MapStep({ parsed, onBack, onReady }: { parsed: Parsed; onBack: () => void; onReady: (rows: ImportRow[]) => void }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const [mapping, setMapping] = React.useState<ColumnMapping>(() => detectColumns(parsed.header))
   const [error, setError] = React.useState("")
   const preview = parsed.records.slice(0, 4)
@@ -379,7 +379,7 @@ function RowList({ rows }: { rows: ImportRow[] }) {
 }
 
 function ReviewStep({ rows, onBack, onDone }: { rows: ImportRow[]; onBack: () => void; onDone: (report: Report) => void }) {
-  const { importClients } = useDemoActions()
+  const { importClients } = useOfficeActions()
   const summary = summarizeImport(rows)
   const [tab, setTab] = React.useState<"ok" | "duplicate" | "invalid">(summary.ok ? "ok" : summary.invalid ? "invalid" : "duplicate")
   const [importing, setImporting] = React.useState(false)

@@ -1,6 +1,6 @@
 import { cn } from "cn"
 import { Logo } from "@/components/brand/logo"
-import { BRAND } from "@/lib/brand"
+import { BRAND } from "@/lib/core/brand"
 
 /** Moldura das telas de entrada (login, cadastro, senha) e de status da conta. */
 export function AuthCard({

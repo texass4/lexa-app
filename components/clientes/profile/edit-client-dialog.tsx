@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react"
 import { toast } from "sonner"
 import { Modal } from "@/components/ui/modal"
 import { ClientForm } from "@/components/clientes/client-form"
-import { useDemoActions, type SaveOptions, type SaveResult } from "@/lib/store/demo-store"
+import { useOfficeActions, type SaveOptions, type SaveResult } from "@/lib/store/office-store"
 import type { Client } from "@/types"
 
 export function EditClientDialog({
@@ -36,7 +36,7 @@ function EditClientBody({
   onClose: () => void
   onSave: (patch: Partial<Client>, options: SaveOptions) => Promise<SaveResult<Client>>
 }) {
-  const { versionOf } = useDemoActions()
+  const { versionOf } = useOfficeActions()
   const [editing, setEditing] = React.useState(() => ({ client, baseVersion: versionOf("clients", client.id), revision: 0 }))
   const saving = React.useRef(false)
 

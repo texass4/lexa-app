@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { createLocalStore } from "@/lib/hooks"
+import { createLocalStore } from "@/lib/core/hooks"
 import type { Permission } from "@/lib/auth/permissions"
 import type { Priority } from "@/types"
 

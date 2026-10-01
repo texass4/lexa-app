@@ -6,17 +6,17 @@ import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { getUser } from "@/lib/account"
-import { fmtDayMonth, fmtDueIn, getNow } from "@/lib/dates"
-import { PRAZO_ALERT_DAYS } from "@/lib/attention"
-import { daysToPrazo, prazoTask, weekPrazos } from "@/lib/prazos"
+import { getUser } from "@/lib/auth/account"
+import { fmtDayMonth, fmtDueIn, getNow } from "@/lib/core/dates"
+import { PRAZO_ALERT_DAYS } from "@/lib/dashboard/attention"
+import { daysToPrazo, prazoTask, weekPrazos } from "@/lib/prazos/prazos"
 import { Can } from "@/lib/auth/session"
 
 /** Prazos abertos que vencem até domingo (e os já vencidos), por responsável. */
 export function WeekPrazos() {
-  const { deadlines, processes, tasks } = useDemoData()
+  const { deadlines, processes, tasks } = useOfficeData()
   const { openDialog } = useUI()
   const now = getNow()
   const groups = weekPrazos(deadlines, now)

@@ -10,7 +10,7 @@ import { useSession } from "@/lib/auth/session"
 // montados, para a animação de fechar funcionar.
 const loaders = {
   client: () => import("@/components/clientes/new-client-dialog"),
-  task: () => import("@/components/tasks/task-form-dialog"),
+  task: () => import("@/components/tarefas/task-form-dialog"),
   prazo: () => import("@/components/prazos/new-prazo-dialog"),
   appointment: () => import("@/components/agenda/new-appointment-dialog"),
   document: () => import("@/components/documentos/new-document-dialog"),

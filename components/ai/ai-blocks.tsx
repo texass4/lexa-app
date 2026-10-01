@@ -7,8 +7,8 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { PRIORITY_CONFIG } from "@/lib/config"
-import { fmtNumericDate, fmtRelative, toLocalISO } from "@/lib/dates"
+import { PRIORITY_CONFIG } from "@/lib/core/config"
+import { fmtNumericDate, fmtRelative, toLocalISO } from "@/lib/core/dates"
 import type { AIRequestError } from "@/lib/ai/client"
 import { CONFIG_ERROR_CODES } from "@/lib/ai/errors"
 import type { ActionSuggestion, AIResult, AISource, AISources, AIStatus, AttentionPoint, Confidence, Nature, ReferencedNote } from "@/lib/ai/types"
@@ -180,7 +180,7 @@ export function SourceChip({ source, onOpen }: { source: AISource; onOpen?: Sour
   return <span className={className}>{content}</span>
 }
 
-export function SourceChips({
+function SourceChips({
   refs,
   sources,
   onOpen,
@@ -371,7 +371,7 @@ const CONFIDENCE: Record<Confidence, { label: string; tone: "success" | "warning
   baixo: { label: "Confiança baixa", tone: "danger" },
 }
 
-export function ConfidenceBadge({ level }: { level: Confidence }) {
+function ConfidenceBadge({ level }: { level: Confidence }) {
   return (
     <StatusBadge tone={CONFIDENCE[level].tone} size="sm">
       {CONFIDENCE[level].label}

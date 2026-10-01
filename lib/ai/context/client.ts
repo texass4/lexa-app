@@ -5,10 +5,10 @@
  */
 
 import { AIError } from "@/lib/ai/errors"
-import { CLIENT_STATUS, INVOICE_STATUS, PROCESS_STATUS } from "@/lib/config"
-import { formatCurrency } from "@/lib/format"
-import { isOpenPrazo, nextPrazo } from "@/lib/prazos"
-import { toLocalISO } from "@/lib/dates"
+import { CLIENT_STATUS, INVOICE_STATUS, PROCESS_STATUS } from "@/lib/core/config"
+import { formatCurrency } from "@/lib/core/format"
+import { isOpenPrazo, nextPrazo } from "@/lib/prazos/prazos"
+import { toLocalISO } from "@/lib/core/dates"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Task } from "@/types"
 import type { AIRepository, Member, ProcessOverview } from "./repository"
 import {
@@ -32,7 +32,7 @@ import {
   upcoming,
 } from "./shared"
 
-export const CLIENT_LIMITS = {
+const CLIENT_LIMITS = {
   processes: 20,
   tasks: 15,
   prazos: 15,

@@ -11,8 +11,8 @@ import { UserMenu } from "./user-menu"
 import { isActive, routePermission } from "./nav-config"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
-import { useMounted } from "@/lib/hooks"
-import { getOrganization } from "@/lib/account"
+import { useMounted } from "@/lib/core/hooks"
+import { getOrganization } from "@/lib/auth/account"
 
 export function MobileDrawer() {
   const { mobileNavOpen, setMobileNavOpen } = useUI()

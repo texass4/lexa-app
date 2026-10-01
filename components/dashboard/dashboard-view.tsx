@@ -16,10 +16,10 @@ import { AttentionPanel } from "./attention-panel"
 import { AIDock } from "./ai-dock"
 import { FadeIn } from "@/components/ui/motion"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { OfficeAIPanel } from "@/components/ai/office-ai-panel"
-import { countByLevel, officeSignals } from "@/lib/attention"
+import { countByLevel, officeSignals } from "@/lib/dashboard/attention"
 
 const INSIGHTS_KEY = "lexa:dashboard:insights"
 
@@ -62,7 +62,7 @@ function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React
 }
 
 export function DashboardView() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can, user } = useSession()
   const [insights, setInsights] = React.useState(() => {
     try {

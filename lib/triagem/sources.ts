@@ -9,10 +9,10 @@
  * Lógica pura.
  */
 
-import { fold } from "@/lib/format"
+import { fold } from "@/lib/core/format"
 import { addCalendarDays } from "@/lib/intimacoes/calendar"
 import type { DeadlineSuggestion } from "@/lib/intimacoes/deadline"
-import { categorizeMovement, interpretMovement, type MovementCategory } from "@/lib/services/processes/movement-interpreter"
+import { categorizeMovement, interpretMovement, type MovementCategory } from "@/lib/services/processos/movement-interpreter"
 import type { Process, ProcessMovement, TriageKind, TriageSource } from "@/types"
 
 /** Um evento para `save_triage_items` (nomes das colunas). Nunca chega decidido. */
@@ -47,7 +47,7 @@ export interface TriageItemInput {
 /** Movimentação nova mais antiga que isso não entra (ex.: histórico de um processo recém-acompanhado). */
 export const RECENT_MOVEMENT_DAYS = 30
 /** Teto por processo numa sincronização — um lote de dezenas de atos não inunda a Triagem. */
-export const MAX_MOVEMENTS_PER_SYNC = 10
+const MAX_MOVEMENTS_PER_SYNC = 10
 
 /**
  * Categorias que costumam pedir atenção do advogado. Comunicações (intimação,

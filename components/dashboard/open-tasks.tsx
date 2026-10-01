@@ -9,14 +9,14 @@ import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { AnimatedCheckbox } from "@/components/ui/animated-checkbox"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { useToggleTask } from "@/components/tasks/task-row"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useToggleTask } from "@/components/tarefas/task-row"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
-import { getUser } from "@/lib/account"
-import { describeRelated, taskBucket, type TaskBucket } from "@/lib/selectors"
-import { fmtDayMonth, getNow } from "@/lib/dates"
-import type { TaskTab } from "@/lib/dashboard"
+import { getUser } from "@/lib/auth/account"
+import { describeRelated, taskBucket, type TaskBucket } from "@/lib/store/selectors"
+import { fmtDayMonth, getNow } from "@/lib/core/dates"
+import type { TaskTab } from "@/lib/dashboard/dashboard"
 import type { Task } from "@/types"
 import { PanelLink } from "./panel-link"
 
@@ -36,7 +36,7 @@ function dueBadge(bucket: TaskBucket, dueAt: string) {
 }
 
 function OpenTaskRow({ task }: { task: Task }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const toggle = useToggleTask()
   const editable = useSession().can("tasks.edit")
   const related = describeRelated(data, task.related)
@@ -81,7 +81,7 @@ function OpenTaskRow({ task }: { task: Task }) {
 
 /** Tarefas pendentes do escritório (ou só as suas), por prazo. */
 export function OpenTasks() {
-  const { tasks } = useDemoData()
+  const { tasks } = useOfficeData()
   const { user } = useSession()
   const { openDialog } = useUI()
   const [tab, setTab] = React.useState<TaskTab>("todas")

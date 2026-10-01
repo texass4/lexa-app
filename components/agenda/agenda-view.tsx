@@ -13,12 +13,12 @@ import { MonthGrid } from "./month-grid"
 import { AgendaList } from "./agenda-list"
 import { AppointmentDetail } from "./appointment-detail"
 import { AgendaToday } from "./agenda-today"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { fmtSlot, moveAppointment, moveToDay } from "@/lib/agenda"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { fmtSlot, moveAppointment, moveToDay } from "@/lib/agenda/agenda"
 import { useUI } from "@/lib/store/ui-store"
-import { categoryStyle } from "@/lib/config"
-import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, startOfDay, startOfWeek, weekdayName } from "@/lib/dates"
-import { currentUserId } from "@/lib/account"
+import { categoryStyle } from "@/lib/core/config"
+import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, startOfDay, startOfWeek, weekdayName } from "@/lib/core/dates"
+import { currentUserId } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 import { useSession } from "@/lib/auth/session"
 
@@ -30,8 +30,8 @@ const NONE = "__sem_categoria__"
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export function AgendaView() {
-  const data = useDemoData()
-  const { updateAppointment, versionOf } = useDemoActions()
+  const data = useOfficeData()
+  const { updateAppointment, versionOf } = useOfficeActions()
   const { openDialog } = useUI()
   const { can } = useSession()
   const editable = can("agenda.edit")

@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Building2, CreditCard, KeyRound, Layers, Settings2, UserRound, type LucideIcon } from "lucide-react"
 import { cn } from "cn"
 import { AUDIT_ACTIONS, auditLabel, type AuditEntry, type AuditGroup } from "@/lib/admin/catalog"
-import { fmtRelative } from "@/lib/dates"
+import { fmtRelative } from "@/lib/core/dates"
 
 export const AUDIT_ICON: Record<AuditGroup, LucideIcon> = {
   auth: KeyRound,

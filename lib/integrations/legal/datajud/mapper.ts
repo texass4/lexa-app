@@ -9,7 +9,7 @@
  * mudar de formato. Nada aqui assume presença de dado — e nada é inventado.
  */
 
-import { onlyDigits } from "@/lib/cnj"
+import { onlyDigits } from "@/lib/processos/cnj"
 import type { MovementComplement, MovementJudicialUnit } from "@/types"
 import type { ExternalMovement, ExternalParty, ExternalProcess } from "../types"
 
@@ -135,7 +135,7 @@ function mapParty(raw: DataJudRawParty): ExternalParty | null {
  * Partes por polo. Sem polo explícito, a parte vai para `others` —
  * autor e réu nunca são deduzidos a partir do nome ou da ordem.
  */
-export function mapParties(source: DataJudRawSource): ExternalProcess["parties"] {
+function mapParties(source: DataJudRawSource): ExternalProcess["parties"] {
   const active: ExternalParty[] = []
   const passive: ExternalParty[] = []
   const others: ExternalParty[] = []
@@ -163,7 +163,7 @@ export function mapParties(source: DataJudRawSource): ExternalProcess["parties"]
 const num = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined)
 
 /** Complementos no modelo neutro, campo a campo, sem descartar nenhum. */
-export function mapComplements(raw: DataJudRawMovement): MovementComplement[] {
+function mapComplements(raw: DataJudRawMovement): MovementComplement[] {
   return (raw.complementosTabelados ?? [])
     .filter((c): c is DataJudComplement => !!c && typeof c === "object")
     .map((c) => ({ code: num(c.codigo), key: text(c.descricao), value: num(c.valor), name: text(c.nome) }))
@@ -208,7 +208,7 @@ export function mapMovements(source: DataJudRawSource): ExternalMovement[] {
  * Um mesmo número pode ter vários documentos (graus diferentes, reprocessos).
  * Escolhe o mais recentemente atualizado; empate, o que tem mais movimentações.
  */
-export function pickBestHit(response: DataJudSearchResponse): DataJudHit | null {
+function pickBestHit(response: DataJudSearchResponse): DataJudHit | null {
   const hits = (response?.hits?.hits ?? []).filter((hit) => !!hit?._source)
   if (!hits.length) return null
 

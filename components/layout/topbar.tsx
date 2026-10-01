@@ -11,14 +11,14 @@ import { LexaTrigger } from "@/components/ai/lexa-trigger"
 import { UserMenu } from "./user-menu"
 import { ROUTE_META } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
-import { useDemoData } from "@/lib/store/demo-store"
-import { useIsMac } from "@/lib/hooks"
-import { BRAND } from "@/lib/brand"
+import { useOfficeData } from "@/lib/store/office-store"
+import { useIsMac } from "@/lib/core/hooks"
+import { BRAND } from "@/lib/core/brand"
 
 /** Trilha das telas de detalhe (cliente, processo). As demais têm o título na própria página. */
 function useBreadcrumb() {
   const pathname = usePathname()
-  const data = useDemoData()
+  const data = useOfficeData()
   const [, root, id] = pathname.split("/")
   if (id && root === "clientes") {
     const c = data.clients.find((x) => x.id === id)

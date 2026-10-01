@@ -8,11 +8,11 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Eyebrow } from "@/components/ui/panel"
 import { FileIcon } from "./file-icon"
-import { useDemoData } from "@/lib/store/demo-store"
-import { fmtNumericDate } from "@/lib/dates"
-import { formatFileSize } from "@/lib/format"
-import { getUser } from "@/lib/account"
-import { documentUrl, downloadDocument } from "@/lib/documents"
+import { useOfficeData } from "@/lib/store/office-store"
+import { fmtNumericDate } from "@/lib/core/dates"
+import { formatFileSize } from "@/lib/core/format"
+import { getUser } from "@/lib/auth/account"
+import { documentUrl, downloadDocument } from "@/lib/documentos/documents"
 import type { LegalDocument } from "@/types"
 
 type Preview = { status: "loading" } | { status: "missing" } | { status: "ready"; url: string; text?: string }
@@ -102,7 +102,7 @@ function PreviewBody({ doc }: { doc: LegalDocument }) {
 }
 
 export function DocumentPreviewSheet({ documentId, open, onOpenChange }: { documentId?: string; open: boolean; onOpenChange: (o: boolean) => void }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const [shown, setShown] = React.useState<LegalDocument | undefined>()
   const doc = documentId ? data.documents.find((d) => d.id === documentId) : undefined
   if (doc && doc !== shown) setShown(doc)

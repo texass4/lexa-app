@@ -20,17 +20,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { RevenueBarChart } from "./revenue-chart"
 import { NewInvoiceDialog } from "./new-invoice-dialog"
 import { PayInvoiceDialog } from "./pay-invoice-dialog"
-import { useDemoData } from "@/lib/store/demo-store"
-import { INVOICE_STATUS } from "@/lib/config"
-import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
-import { downloadCSV } from "@/lib/csv"
-import { formatCurrency } from "@/lib/format"
-import { financeSummary, invoiceStatus, monthlyRevenue, openReceivables, revenueByArea } from "@/lib/selectors"
+import { useOfficeData } from "@/lib/store/office-store"
+import { INVOICE_STATUS } from "@/lib/core/config"
+import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
+import { downloadCSV } from "@/lib/core/csv"
+import { formatCurrency } from "@/lib/core/format"
+import { financeSummary, invoiceStatus, monthlyRevenue, openReceivables, revenueByArea } from "@/lib/store/selectors"
 import { useSession } from "@/lib/auth/session"
 import type { Invoice } from "@/types"
 
 export function FinanceView() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can } = useSession()
   const ready = data.hydrated
   const open = openReceivables(data)

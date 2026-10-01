@@ -5,7 +5,7 @@
 
 import type { AIErrorCode } from "./types"
 
-export const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
+const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
   DISABLED: "A Íntegra IA está desativada neste ambiente.",
   NOT_CONFIGURED: "A configuração da Íntegra IA ainda não foi concluída. Configure GEMINI_API_KEY no ambiente do servidor.",
   INVALID_API_KEY: "A Gemini recusou a chave configurada em GEMINI_API_KEY. Confira se ela está correta e ativa no Google AI Studio.",
@@ -28,7 +28,7 @@ export const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
   UNEXPECTED: "Não foi possível concluir a análise agora. Tente novamente.",
 }
 
-export const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
+const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
   DISABLED: 503,
   NOT_CONFIGURED: 503,
   INVALID_API_KEY: 503,

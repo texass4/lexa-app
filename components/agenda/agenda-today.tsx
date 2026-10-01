@@ -2,10 +2,10 @@
 
 import Link from "next/link"
 import { ArrowUpRight, Sparkles } from "lucide-react"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
-import { todaysAppointments } from "@/lib/selectors"
-import { addDays, fmtFullDate, fmtStartsIn, fmtTime, getNow, parse, startOfDay } from "@/lib/dates"
+import { todaysAppointments } from "@/lib/store/selectors"
+import { addDays, fmtFullDate, fmtStartsIn, fmtTime, getNow, parse, startOfDay } from "@/lib/core/dates"
 import { officeContext } from "@/components/ai/ai-context"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { useCategoryLookup } from "./use-category"
@@ -15,7 +15,7 @@ import { useCategoryLookup } from "./use-category"
  * compromisso e com quem ele está ligado. Tudo dos compromissos cadastrados.
  */
 export function AgendaToday() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can } = useSession()
   const lexa = useLexaAI()
   const lookup = useCategoryLookup()

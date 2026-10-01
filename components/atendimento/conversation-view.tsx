@@ -40,11 +40,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { getUser } from "@/lib/account"
-import { normalize } from "@/lib/format"
+import { getUser } from "@/lib/auth/account"
+import { normalize } from "@/lib/core/format"
 import { SYSTEM_STATUSES, STATUS_TONE, statusOption } from "@/lib/whatsapp/config"
 import { attachmentKindFor } from "@/lib/whatsapp/files"
 import { formatPhone } from "@/lib/whatsapp/phone"
@@ -129,7 +129,7 @@ export function ConversationView({
 }) {
   const { upsertConversation, patchConversation } = useInbox()
   const { can, user, organization } = useSession()
-  const { processes } = useDemoData()
+  const { processes } = useOfficeData()
   const { openDialog } = useUI()
   const router = useRouter()
   const health = useConnectionHealth()

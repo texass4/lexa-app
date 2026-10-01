@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { FileIcon } from "@/components/shared/file-icon"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useDemoActions } from "@/lib/store/demo-store"
+import { useOfficeActions } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { getSupabase } from "@/lib/supabase/client"
-import { formatFileSize, uid } from "@/lib/format"
+import { formatFileSize, uid } from "@/lib/core/format"
 import { attachmentUrl } from "@/lib/whatsapp/client"
 import { extensionOf } from "@/lib/whatsapp/files"
 import type { DocumentKind, LegalDocument, WhatsAppAttachment } from "@/types"
@@ -65,7 +65,7 @@ const MIME: Record<LegalDocument["extension"], string> = {
 }
 
 function useSaveToDocuments(attachment: WhatsAppAttachment, clientId?: string) {
-  const { addDocument } = useDemoActions()
+  const { addDocument } = useOfficeActions()
   const { can, organization } = useSession()
   const extension = SAVABLE[extensionOf(attachment.fileName, attachment.mimeType)]
   const available = !!clientId && !!extension && can("documents.edit")

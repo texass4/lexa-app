@@ -12,12 +12,12 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { invoiceStatus, type clientFinance } from "@/lib/selectors"
-import { INVOICE_STATUS } from "@/lib/config"
-import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
+import { invoiceStatus, type clientFinance } from "@/lib/store/selectors"
+import { INVOICE_STATUS } from "@/lib/core/config"
+import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
 import type { Client, Invoice } from "@/types"
 import { Can } from "@/lib/auth/session"
 import { NewInvoiceDialog } from "@/components/financeiro/new-invoice-dialog"
@@ -30,9 +30,9 @@ const ICON_CLS: Record<Invoice["status"], string> = {
 }
 
 export function FinanceTab({ client, finance: f }: { client: Client; finance: ReturnType<typeof clientFinance> }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
-  const { markInvoicePaid, deleteInvoice } = useDemoActions()
+  const { markInvoicePaid, deleteInvoice } = useOfficeActions()
   const [toDelete, setToDelete] = React.useState<Invoice | null>(null)
   const [editing, setEditing] = React.useState<Invoice | undefined>()
   const invoices = [...f.invoices].sort((a, b) => b.dueDate.localeCompare(a.dueDate))

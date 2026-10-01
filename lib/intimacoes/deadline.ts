@@ -14,7 +14,7 @@
  * Lógica pura: roda no worker (captura) e no navegador (quando o advogado ajusta os dias).
  */
 
-import { fold } from "@/lib/format"
+import { fold } from "@/lib/core/format"
 import { addBusinessDays, addCalendarDeadline, nextBusinessDay, type CalendarOptions } from "./calendar"
 
 export type SuggestionConfidence = "alta" | "revisao"

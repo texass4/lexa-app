@@ -21,7 +21,7 @@ import type { AIProvider, AIRequest } from "@/lib/ai/provider"
 import type { AIRepository } from "@/lib/ai/context/repository"
 import type { BuiltContext } from "@/lib/ai/context/shared"
 import type { AIResult, AISources } from "@/lib/ai/types"
-import { getNow } from "@/lib/dates"
+import { getNow } from "@/lib/core/dates"
 
 export interface AIServiceDeps {
   repo: AIRepository

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Field, TextInput } from "@/components/ui/field"
 import { AuthCard, FormError } from "./auth-card"
 import { getSupabase } from "@/lib/supabase/client"
-import { maskDocument } from "@/lib/masks"
+import { maskDocument } from "@/lib/core/masks"
 import { isEmail, MIN_PASSWORD, normalizeEmail, passwordProblem } from "@/lib/auth/validation"
 import { hardNavigate } from "@/lib/auth/navigate"
 

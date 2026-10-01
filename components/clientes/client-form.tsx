@@ -7,11 +7,11 @@ import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { Eyebrow } from "@/components/ui/panel"
 import { TagInput } from "./tag-input"
-import { CLIENT_STATUS, PRACTICE_AREAS } from "@/lib/config"
-import { currentUserId, getMembers, getUser } from "@/lib/account"
-import { useDemoData } from "@/lib/store/demo-store"
-import { maskDocument, maskPhone } from "@/lib/masks"
-import { getNow, toLocalISO } from "@/lib/dates"
+import { CLIENT_STATUS, PRACTICE_AREAS } from "@/lib/core/config"
+import { currentUserId, getMembers, getUser } from "@/lib/auth/account"
+import { useOfficeData } from "@/lib/store/office-store"
+import { maskDocument, maskPhone } from "@/lib/core/masks"
+import { getNow, toLocalISO } from "@/lib/core/dates"
 import {
   UFS,
   formatAddress,
@@ -22,7 +22,7 @@ import {
   resolveClientStatus,
   validateClientForm,
   type ClientFormErrors,
-} from "@/lib/clients"
+} from "@/lib/clientes/clients"
 import type { Client, ClientAddress, ClientStatus, PracticeArea } from "@/types"
 
 const KINDS = ["Pessoa física", "Pessoa jurídica"] as const
@@ -122,7 +122,7 @@ export function ClientForm({
   onCancel: () => void
   onSubmit: (payload: ClientPayload) => void
 }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { clients } = data
   // Com processo, fatura ou contrato, o CPF/CNPJ não pode ser apagado (o banco também recusa).
   const documentLocked = !!client && requiresDocument(data, client.id)

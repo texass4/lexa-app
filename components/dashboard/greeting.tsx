@@ -1,8 +1,8 @@
 "use client"
 
-import { getNow, fmtFullDate, greeting } from "@/lib/dates"
-import { getUser, currentUserId } from "@/lib/account"
-import { countByLevel, type AttentionSignal } from "@/lib/attention"
+import { getNow, fmtFullDate, greeting } from "@/lib/core/dates"
+import { getUser, currentUserId } from "@/lib/auth/account"
+import { countByLevel, type AttentionSignal } from "@/lib/dashboard/attention"
 import { NewMenu } from "@/components/layout/new-menu"
 import { WeatherChip } from "./weather-chip"
 

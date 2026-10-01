@@ -8,8 +8,8 @@
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { BRAND } from "@/lib/brand"
-import { SYSTEM_ACTOR_ID } from "@/lib/system-actor"
+import { BRAND } from "@/lib/core/brand"
+import { SYSTEM_ACTOR_ID } from "@/lib/auth/system-actor"
 import { toOrganization, type OrganizationRow, type ProfileRow } from "@/lib/auth/profile"
 import {
   AUDIT_ACTIONS,
@@ -56,7 +56,7 @@ export interface PlanRow {
   updated_at: string
 }
 
-export const planLimits = (row: PlanRow): PlanLimits => ({
+const planLimits = (row: PlanRow): PlanLimits => ({
   users: row.max_users,
   processes: row.max_processes,
   clients: row.max_clients,
@@ -115,7 +115,7 @@ export interface SubscriptionRow {
   created_at: string
 }
 
-export const toSubscription = (row: SubscriptionRow): AdminSubscription => ({
+const toSubscription = (row: SubscriptionRow): AdminSubscription => ({
   status: row.status,
   trialEndsAt: row.trial_ends_at ?? undefined,
   currentPeriodStart: row.current_period_start ?? undefined,

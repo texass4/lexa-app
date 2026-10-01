@@ -15,12 +15,12 @@ import { ROLE_DEFAULTS, type Permission } from "@/lib/auth/permissions"
 import type { Appointment, Client, Invoice, LegalDocument, Process, Task } from "@/types"
 
 export const ORG_A = "org-a"
-export const ORG_B = "org-b"
+const ORG_B = "org-b"
 export const NOW = new Date("2026-09-26T10:00:00")
 
 const base = (organizationId: string, id: string) => ({ id, organizationId, createdAt: "2026-01-10T09:00:00" })
 
-export const clientA: Client = {
+const clientA: Client = {
   ...base(ORG_A, "c_a1"),
   name: "Maria Aparecida Souza",
   kind: "PF",
@@ -78,7 +78,7 @@ export const processA: Process = {
   ],
 }
 
-export const taskA: Task = {
+const taskA: Task = {
   ...base(ORG_A, "t_a1"),
   title: "Conferir documentos do cliente",
   dueAt: "2026-09-20T18:00:00",
@@ -88,7 +88,7 @@ export const taskA: Task = {
   related: { type: "process", id: processA.id },
 }
 
-export const appointmentA: Appointment = {
+const appointmentA: Appointment = {
   ...base(ORG_A, "a_a1"),
   title: "Reunião com a cliente",
   start: "2026-09-29T10:00:00",
@@ -98,7 +98,7 @@ export const appointmentA: Appointment = {
   processId: processA.id,
 }
 
-export const documentA: LegalDocument = {
+const documentA: LegalDocument = {
   ...base(ORG_A, "d_a1"),
   name: "Procuração.pdf",
   kind: "Procuração",
@@ -111,7 +111,7 @@ export const documentA: LegalDocument = {
   storagePath: "org-a/d_a1",
 }
 
-export const invoiceA: Invoice = {
+const invoiceA: Invoice = {
   ...base(ORG_A, "i_a1"),
   clientId: clientA.id,
   processId: processA.id,
@@ -125,7 +125,7 @@ export const invoiceA: Invoice = {
 
 export const SECRET_B = "Cliente Secreto do Escritório B"
 
-export const clientB: Client = { ...clientA, ...base(ORG_B, "c_b1"), name: SECRET_B, email: "segredo@b.com" }
+const clientB: Client = { ...clientA, ...base(ORG_B, "c_b1"), name: SECRET_B, email: "segredo@b.com" }
 export const processB: Process = {
   ...processA,
   ...base(ORG_B, "p_b1"),
@@ -134,7 +134,7 @@ export const processB: Process = {
   opposingParty: "Parte sigilosa B",
   movements: [{ id: "m_b1", at: "2026-09-25T10:00:00", title: "Sentença sigilosa B" }],
 }
-export const taskB: Task = { ...taskA, ...base(ORG_B, "t_b1"), title: "Tarefa sigilosa B", related: { type: "process", id: processB.id } }
+const taskB: Task = { ...taskA, ...base(ORG_B, "t_b1"), title: "Tarefa sigilosa B", related: { type: "process", id: processB.id } }
 
 /* ---------------------------- Supabase falso ----------------------------- */
 

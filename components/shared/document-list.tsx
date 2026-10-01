@@ -9,18 +9,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FileIcon } from "./file-icon"
 import { EditDocumentDialog } from "@/components/documentos/edit-document-dialog"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { copyDocumentLink, downloadDocument } from "@/lib/documents"
-import { fmtNumericDate } from "@/lib/dates"
-import { formatFileSize } from "@/lib/format"
-import { getUser } from "@/lib/account"
+import { copyDocumentLink, downloadDocument } from "@/lib/documentos/documents"
+import { fmtNumericDate } from "@/lib/core/dates"
+import { formatFileSize } from "@/lib/core/format"
+import { getUser } from "@/lib/auth/account"
 import type { LegalDocument } from "@/types"
 import { Can } from "@/lib/auth/session"
 
 export function DocumentActions({ doc }: { doc: LegalDocument }) {
   const { openDialog } = useUI()
-  const { deleteDocument } = useDemoActions()
+  const { deleteDocument } = useOfficeActions()
   const [deleting, setDeleting] = React.useState(false)
   const [editing, setEditing] = React.useState(false)
 
@@ -75,7 +75,7 @@ export function DocumentActions({ doc }: { doc: LegalDocument }) {
 
 /** Lista compacta de documentos (perfil do cliente e do processo). */
 export function DocumentList({ documents, showClient = false }: { documents: LegalDocument[]; showClient?: boolean }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
   return (
     <ul className="divide-y divide-border">

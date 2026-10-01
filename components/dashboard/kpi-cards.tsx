@@ -4,11 +4,11 @@ import { motion } from "framer-motion"
 import { ArrowDownRight, ArrowUpRight, CircleDollarSign, Scale, SquareCheckBig, UsersRound } from "lucide-react"
 import { cn } from "cn"
 import { MetricCard, type MetricTone } from "@/components/ui/metric-card"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
-import { dashboardKpis } from "@/lib/dashboard"
-import { formatCurrency, formatNumber } from "@/lib/format"
+import { dashboardKpis } from "@/lib/dashboard/dashboard"
+import { formatCurrency, formatNumber } from "@/lib/core/format"
 
 /** "↑ 12 este mês" — a variação do período, verde quando é bom, vermelha quando pede ação. */
 function Delta({ value, label, tone }: { value: React.ReactNode; label: string; tone: "up" | "down" | "alert" | "neutral" }) {
@@ -38,7 +38,7 @@ interface Card {
 }
 
 export function KpiCards() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can } = useSession()
   const k = dashboardKpis(data)
 

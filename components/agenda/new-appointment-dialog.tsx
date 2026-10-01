@@ -6,9 +6,9 @@ import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
-import { getMembers, currentUserId } from "@/lib/account"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { getNow, toLocalISO } from "@/lib/dates"
+import { getMembers, currentUserId } from "@/lib/auth/account"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { getNow, toLocalISO } from "@/lib/core/dates"
 import type { Appointment, Process } from "@/types"
 import { CategoryPicker } from "./category-picker"
 
@@ -60,8 +60,8 @@ function initialState(appointment: Appointment | undefined, defaults: Defaults |
 
 /** Formulário único de criar e editar compromisso. Na edição, grava só se ninguém alterou depois que o formulário abriu. */
 function AppointmentForm({ appointment, defaults, onClose }: { appointment?: Appointment; defaults?: Defaults; onClose: () => void }) {
-  const data = useDemoData()
-  const { addAppointment, updateAppointment, versionOf } = useDemoActions()
+  const data = useOfficeData()
+  const { addAppointment, updateAppointment, versionOf } = useOfficeActions()
 
   const [form, setForm] = React.useState(() => initialState(appointment, defaults, data.processes))
   const [error, setError] = React.useState("")

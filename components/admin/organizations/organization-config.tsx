@@ -6,7 +6,7 @@ import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { ToggleSwitch } from "@/components/ui/toggle-switch"
-import { maskDocument, maskPhone } from "@/lib/masks"
+import { maskDocument, maskPhone } from "@/lib/core/masks"
 import {
   formatCents,
   formatLimitValue,

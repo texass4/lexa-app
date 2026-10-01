@@ -8,8 +8,8 @@ import { Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { ToggleSwitch } from "@/components/ui/toggle-switch"
 import { getSupabase } from "@/lib/supabase/client"
-import { currentOrgId } from "@/lib/account"
-import { UFS } from "@/lib/clients"
+import { currentOrgId } from "@/lib/auth/account"
+import { UFS } from "@/lib/clientes/clients"
 import { formatOab, oabDigits, validateOab } from "@/lib/intimacoes/oab"
 import type { LawyerOab } from "@/types"
 
@@ -26,7 +26,7 @@ const toOab = (r: Row): LawyerOab => ({
 })
 
 /** Inscrições de uma pessoa (a RLS deixa ler as do escritório e gravar as próprias ou, com `users.manage`, as de todos). */
-export function useLawyerOabs(userId: string) {
+function useLawyerOabs(userId: string) {
   const [state, setState] = React.useState<{ oabs: LawyerOab[]; loading: boolean; unavailable: boolean }>({
     oabs: [],
     loading: true,

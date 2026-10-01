@@ -7,10 +7,10 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/field"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { getNow, toLocalISO } from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
-import { documentRequiredIssue } from "@/lib/clients"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { getNow, toLocalISO } from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
+import { documentRequiredIssue } from "@/lib/clientes/clients"
 import type { Invoice, Process } from "@/types"
 
 const SITUATIONS = ["A receber", "Já recebido"] as const
@@ -73,8 +73,8 @@ function initialState(invoice: Invoice | undefined, defaults: Defaults | undefin
 }
 
 function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaults?: Defaults; onClose: () => void }) {
-  const data = useDemoData()
-  const { addInvoice, updateInvoice, versionOf } = useDemoActions()
+  const data = useOfficeData()
+  const { addInvoice, updateInvoice, versionOf } = useOfficeActions()
   const today = toLocalISO(getNow()).slice(0, 10)
   const [form, setForm] = React.useState(() => initialState(invoice, defaults, data.processes, today))
   const [errors, setErrors] = React.useState<Record<string, string>>({})

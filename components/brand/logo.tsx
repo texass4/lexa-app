@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { BRAND, SYMBOL, WORDMARK } from "@/lib/brand"
+import { BRAND, SYMBOL, WORDMARK } from "@/lib/core/brand"
 
 /**
  * Marca da Íntegra: símbolo, logotipo tipográfico e a composição horizontal.

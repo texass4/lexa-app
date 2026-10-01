@@ -4,9 +4,9 @@
  * formato compacto que o modelo recebe.
  */
 
-import { diffInDays, fmtNumericDate, fmtTime, parse, toLocalISO } from "@/lib/dates"
-import { PRAZO_ORIGIN, PRAZO_STATUS, PRIORITY_CONFIG } from "@/lib/config"
-import { complementLabel, complementText, interpretMovement } from "@/lib/services/processes/movement-interpreter"
+import { diffInDays, fmtNumericDate, fmtTime, parse, toLocalISO } from "@/lib/core/dates"
+import { PRAZO_ORIGIN, PRAZO_STATUS, PRIORITY_CONFIG } from "@/lib/core/config"
+import { complementLabel, complementText, interpretMovement } from "@/lib/services/processos/movement-interpreter"
 import type { AISource, AISources, SourceKind } from "@/lib/ai/types"
 import type { Appointment, LegalDocument, Prazo, ProcessMovement, Task } from "@/types"
 import type { Member } from "./repository"

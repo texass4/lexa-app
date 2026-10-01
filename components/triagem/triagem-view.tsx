@@ -12,11 +12,11 @@ import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { SkeletonTable } from "@/components/ui/skeleton"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
-import { getUser } from "@/lib/account"
-import { fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
-import { formatCNJ } from "@/lib/cnj"
+import { getUser } from "@/lib/auth/account"
+import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
+import { formatCNJ } from "@/lib/processos/cnj"
 import {
   KIND_LABEL,
   SOURCE_LABEL,
@@ -52,7 +52,7 @@ const URGENCY_LABEL: Record<Urgency, string> = { alta: "Urgente", media: "Atenç
  * sozinhos (agendador no servidor + tempo real); aqui o advogado entende, decide e age.
  */
 export function TriagemView() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { user, can } = useSession()
   const { items, oabs, loading, unavailable } = useTriagem()
   const params = useSearchParams()

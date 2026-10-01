@@ -26,7 +26,7 @@ export interface NavItem {
   children?: NavItem[]
 }
 
-export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
+const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Visão geral",
     items: [{ href: "/dashboard", label: "Início", icon: LayoutGrid }],

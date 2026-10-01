@@ -18,11 +18,11 @@ import { FinanceTab } from "./finance-tab"
 import { AppointmentsTab, DocumentsTab, ProcessesTab, TasksTab, TimelineTab } from "./hub-tabs"
 import { EditClientDialog } from "./edit-client-dialog"
 import { useClientActions } from "@/components/clientes/client-actions"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { clientFinance, clientHub } from "@/lib/selectors"
-import { getNow, toLocalISO } from "@/lib/dates"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { clientFinance, clientHub } from "@/lib/store/selectors"
+import { getNow, toLocalISO } from "@/lib/core/dates"
 import { ClientAIPanel } from "@/components/ai/client-ai-panel"
-import { clientSignals } from "@/lib/attention"
+import { clientSignals } from "@/lib/dashboard/attention"
 import type { Permission } from "@/lib/auth/permissions"
 import { useSession } from "@/lib/auth/session"
 
@@ -61,8 +61,8 @@ function ProfileSkeleton() {
 }
 
 export function ClientProfile({ id }: { id: string }) {
-  const data = useDemoData()
-  const { updateClient, deleteClient, retryLoad } = useDemoActions()
+  const data = useOfficeData()
+  const { updateClient, deleteClient, retryLoad } = useOfficeActions()
   const { toggleActive, exportClient, deleteDescription } = useClientActions()
   const router = useRouter()
   const pathname = usePathname()

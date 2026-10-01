@@ -5,8 +5,8 @@ import { ChevronRight, Scale } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { EmptyState } from "@/components/ui/empty-state"
-import { useDemoData } from "@/lib/store/demo-store"
-import { RECENT_STATE_LABEL, recentProcesses, shortAgo, type RecentState } from "@/lib/dashboard"
+import { useOfficeData } from "@/lib/store/office-store"
+import { RECENT_STATE_LABEL, recentProcesses, shortAgo, type RecentState } from "@/lib/dashboard/dashboard"
 import { PanelLink } from "./panel-link"
 
 const STATE_STYLE: Record<RecentState, { dot: string; badge: string }> = {
@@ -18,7 +18,7 @@ const STATE_STYLE: Record<RecentState, { dot: string; badge: string }> = {
 
 /** Processos ativos com a movimentação mais recente, cada um com o que mudou. */
 export function RecentProcesses() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const items = recentProcesses(data)
 
   return (

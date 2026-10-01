@@ -4,8 +4,8 @@ import { AlertCircle, Check, CheckCheck, Clock3 } from "lucide-react"
 import { cn } from "cn"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { categoryStyle } from "@/lib/config"
-import { useDemoData } from "@/lib/store/demo-store"
+import { categoryStyle } from "@/lib/core/config"
+import { useOfficeData } from "@/lib/store/office-store"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import { STATUS_TONE, statusOption } from "@/lib/whatsapp/config"
 import type { Client, MessageStatus, WhatsAppContact, WhatsAppTag } from "@/types"
@@ -16,7 +16,7 @@ export function contactName(contact: WhatsAppContact, client?: Client) {
 }
 
 export function useContactClient(contact?: WhatsAppContact) {
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   return contact?.clientId ? clients.find((c) => c.id === contact.clientId) : undefined
 }
 

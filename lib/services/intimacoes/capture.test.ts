@@ -3,7 +3,7 @@ import { beforeEach, describe, it } from "node:test"
 
 import { LookupError } from "@/lib/integrations/legal/errors"
 import type { DjenItem, DjenQuery } from "@/lib/integrations/legal/djen/client"
-import type { RunRecord } from "@/lib/services/processes/monitor"
+import type { RunRecord } from "@/lib/services/processos/monitor"
 import {
   DEFAULT_CAPTURE_CONFIG,
   captureWindow,

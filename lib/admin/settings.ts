@@ -7,7 +7,7 @@
  * variáveis de ambiente do servidor.
  */
 
-import { BRAND } from "@/lib/brand"
+import { BRAND } from "@/lib/core/brand"
 import { LIMIT_KEYS, type PlanLimits } from "./catalog"
 
 export interface PlatformSettings {

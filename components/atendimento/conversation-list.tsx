@@ -10,11 +10,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState, ErrorState } from "@/components/ui/empty-state"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { Can, useSession } from "@/lib/auth/session"
-import { getUser } from "@/lib/account"
-import { diffInDays, fmtShortDate, fmtTime, getNow, parse, weekdayShort } from "@/lib/dates"
-import { matches } from "@/lib/format"
+import { getUser } from "@/lib/auth/account"
+import { diffInDays, fmtShortDate, fmtTime, getNow, parse, weekdayShort } from "@/lib/core/dates"
+import { matches } from "@/lib/core/format"
 import { statusOption } from "@/lib/whatsapp/config"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import type { WhatsAppConversation } from "@/types"
@@ -79,7 +79,7 @@ export function ConversationList({
 }) {
   const { conversations, tags, status, reload } = useInbox()
   const { user } = useSession()
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   const [query, setQuery] = React.useState("")
 
   const tagById = React.useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags])
@@ -219,7 +219,7 @@ function ConversationItem({
   clientName?: string
 }) {
   const { tags } = useInbox()
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   const client = clientName ? clients.find((x) => x.id === c.contact.clientId) : undefined
   const name = contactName(c.contact, client)
   const unread = c.unreadCount > 0

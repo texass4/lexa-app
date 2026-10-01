@@ -5,7 +5,7 @@
 
 import type { DjenItem } from "./client"
 
-export const DJEN_CERTIDAO_URL = (hash: string) => `https://comunicaapi.pje.jus.br/api/v1/comunicacao/${encodeURIComponent(hash)}/certidao`
+const DJEN_CERTIDAO_URL = (hash: string) => `https://comunicaapi.pje.jus.br/api/v1/comunicacao/${encodeURIComponent(hash)}/certidao`
 
 export interface Communication {
   externalId: string

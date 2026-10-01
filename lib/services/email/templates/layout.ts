@@ -1,4 +1,4 @@
-import { BRAND, BRAND_COLORS } from "@/lib/brand"
+import { BRAND, BRAND_COLORS } from "@/lib/core/brand"
 
 /**
  * Moldura comum dos e-mails da Íntegra. HTML para clientes de e-mail: tabelas, estilos

@@ -13,11 +13,11 @@ import { NativeSelect } from "@/components/ui/field"
 import { SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { MiniStat } from "@/components/shared/mini-stat"
 import { Can } from "@/lib/auth/session"
-import { getMembers } from "@/lib/account"
-import { getNow } from "@/lib/dates"
-import { matches } from "@/lib/format"
-import { PRAZO_PERIOD_LABEL, daysToPrazo, isOpenPrazo, prazoPeriod, prazoTask, type PrazoPeriod } from "@/lib/prazos"
-import { useDemoData } from "@/lib/store/demo-store"
+import { getMembers } from "@/lib/auth/account"
+import { getNow } from "@/lib/core/dates"
+import { matches } from "@/lib/core/format"
+import { PRAZO_PERIOD_LABEL, daysToPrazo, isOpenPrazo, prazoPeriod, prazoTask, type PrazoPeriod } from "@/lib/prazos/prazos"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import type { Prazo } from "@/types"
 import { PrazoRow } from "./prazos-panel"
@@ -31,7 +31,7 @@ const byFatal = (a: Prazo, b: Prazo) => a.fatalDate.localeCompare(b.fatalDate) |
 
 /** Panorama dos prazos do escritório: o que venceu, o que vence até domingo e adiante, por responsável. */
 export function PrazosView() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
   const param = useSearchParams().get("filtro") as Filter | null
   const [filter, setFilter] = React.useState<Filter>(() => (param && FILTERS.includes(param) ? param : "abertos"))

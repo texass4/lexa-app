@@ -8,7 +8,7 @@ import { NextResponse } from "next/server"
 import { requireMember, route } from "@/lib/auth/server"
 import { loadSettings } from "@/lib/admin/platform"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { loadMonitorStatus, monitorSetup } from "@/lib/services/processes/monitor-status"
+import { loadMonitorStatus, monitorSetup } from "@/lib/services/processos/monitor-status"
 
 export const dynamic = "force-dynamic"
 

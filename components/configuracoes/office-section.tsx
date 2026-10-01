@@ -8,8 +8,8 @@ import { Field, TextInput } from "@/components/ui/field"
 import { Tag } from "@/components/ui/status-badge"
 import { useSession } from "@/lib/auth/session"
 import { getSupabase } from "@/lib/supabase/client"
-import { PRACTICE_AREAS } from "@/lib/config"
-import { maskDocument, maskPhone } from "@/lib/masks"
+import { PRACTICE_AREAS } from "@/lib/core/config"
+import { maskDocument, maskPhone } from "@/lib/core/masks"
 
 export function OfficeSection() {
   const { organization, members, can, refresh } = useSession()

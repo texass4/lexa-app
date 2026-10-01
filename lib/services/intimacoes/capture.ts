@@ -27,8 +27,8 @@ import { suggestDeadline, type DeadlineSuggestion } from "@/lib/intimacoes/deadl
 import { addCalendarDays } from "@/lib/intimacoes/calendar"
 import { excerptOf } from "@/lib/triagem/model"
 import type { TriageItemInput } from "@/lib/triagem/sources"
-import { toLocalISOIn } from "@/lib/dates"
-import type { RunRecord, RunSummary } from "@/lib/services/processes/monitor"
+import { toLocalISOIn } from "@/lib/core/dates"
+import type { RunRecord, RunSummary } from "@/lib/services/processos/monitor"
 import {
   CLAIM_LEASE_MS,
   OFFICE_TIME_ZONE,
@@ -37,16 +37,16 @@ import {
   runStopFor,
   startOfDayIn,
   type RunStop,
-} from "@/lib/services/processes/monitoring-policy"
+} from "@/lib/services/processos/monitoring-policy"
 
 const DAY = 86_400_000
 
 /** Primeira consulta de uma OAB: lê os últimos dias (captura o que foi publicado antes do cadastro). */
-export const BACKFILL_DAYS = 7
+const BACKFILL_DAYS = 7
 /** Relê o último dia já lido: a fonte pode acrescentar comunicações ao dia depois da consulta. */
-export const OVERLAP_DAYS = 1
+const OVERLAP_DAYS = 1
 /** Hora local a partir da qual a consulta do dia é feita (a fonte publica de madrugada). */
-export const DAILY_HOUR = 6
+const DAILY_HOUR = 6
 
 export interface CaptureConfig {
   /** Inscrições por execução. */
@@ -185,7 +185,7 @@ export function nextDailyCheck(now: Date) {
 }
 
 /** Responsável: o dono do processo, se ele é um dos titulares; senão, o primeiro titular. */
-export function pickResponsible(holders: OabHolder[], ownerId?: string) {
+function pickResponsible(holders: OabHolder[], ownerId?: string) {
   return holders.find((h) => h.userId === ownerId)?.userId ?? holders[0].userId
 }
 
@@ -196,14 +196,14 @@ const AMBIGUOUS = "Há mais de um processo com este número no escritório: vinc
  * é ambíguo; qualquer dúvida vai para revisão manual, com o motivo. Sem processo
  * cadastrado, o evento aparece em "Sem processo" (nada é criado sozinho).
  */
-export function initialState(suggestion: Pick<DeadlineSuggestion, "confidence" | "reasons">, ambiguous: boolean): Pick<IntimacaoTriage, "state" | "review_reason"> {
+function initialState(suggestion: Pick<DeadlineSuggestion, "confidence" | "reasons">, ambiguous: boolean): Pick<IntimacaoTriage, "state" | "review_reason"> {
   const reasons = [...(ambiguous ? [AMBIGUOUS] : []), ...suggestion.reasons]
   if (!ambiguous && suggestion.confidence === "alta") return { state: "pendente" }
   return { state: "em_revisao", review_reason: reasons.join(" ").slice(0, 1000) || undefined }
 }
 
 /** Comunicações de uma OAB → linhas por escritório titular. */
-export async function buildRows(
+async function buildRows(
   repo: Pick<CaptureRepository, "matchProcesses">,
   communications: Communication[],
   holders: OabHolder[],

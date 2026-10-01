@@ -8,7 +8,7 @@ import { ModalBody, ModalFooter } from "@/components/ui/modal"
 import { ToggleSwitch } from "@/components/ui/toggle-switch"
 import { adminFetch } from "@/lib/admin/client"
 import { isEmail } from "@/lib/auth/validation"
-import { maskDocument } from "@/lib/masks"
+import { maskDocument } from "@/lib/core/masks"
 import { formatCents, type AdminPlan } from "@/lib/admin/catalog"
 
 /** Novo escritório criado pelo Admin: já nasce ativo e o sócio recebe convite. */

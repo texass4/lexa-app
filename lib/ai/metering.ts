@@ -52,7 +52,7 @@ export function reservationError(reservation: Pick<AIReservation, "reason" | "re
   return new AIError("RATE_LIMITED", { retryAfter: Math.max(1, reservation.retryAfterSeconds) })
 }
 
-export const DB_RATE_RULES: RateRules = {
+const DB_RATE_RULES: RateRules = {
   userPerMinute: RATE_RULES.user[0].limit,
   userPerHour: RATE_RULES.user[1].limit,
   organizationPerHour: RATE_RULES.organization[0].limit,

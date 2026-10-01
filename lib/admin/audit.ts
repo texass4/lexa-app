@@ -5,7 +5,7 @@ import type { AuditSeverity } from "./catalog"
 import { ROLE_LABELS, type Role } from "@/lib/auth/permissions"
 
 /** IP de quem fez a requisição, quando o proxy/CDN informa. */
-export function clientIp(request: Request): string | undefined {
+function clientIp(request: Request): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
   return forwarded || request.headers.get("x-real-ip") || undefined
 }

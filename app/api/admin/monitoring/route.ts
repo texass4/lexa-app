@@ -3,9 +3,9 @@ import { route } from "@/lib/auth/server"
 import { requireAdmin } from "@/lib/admin/guard"
 import { loadSettings } from "@/lib/admin/platform"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { loadMonitorStatus, monitorSetup, type MonitoringOverview, type MonitoringRun } from "@/lib/services/processes/monitor-status"
-import { monitorConfig } from "@/lib/services/processes/monitoring-policy"
-import { hasJobColumn } from "@/lib/services/processes/monitor-store"
+import { loadMonitorStatus, monitorSetup, type MonitoringOverview, type MonitoringRun } from "@/lib/services/processos/monitor-status"
+import { monitorConfig } from "@/lib/services/processos/monitoring-policy"
+import { hasJobColumn } from "@/lib/services/processos/monitor-store"
 import { hasTriage } from "@/lib/services/triagem/store"
 
 /** Execuções mostradas no painel. */
