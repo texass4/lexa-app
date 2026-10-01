@@ -79,8 +79,9 @@ Sem as variáveis `BREVO_*`, em desenvolvimento o link aparece no terminal do se
    Volte à Brevo e clique em *Authenticate*/*Verify* até todos os registros aparecerem como válidos (a propagação do DNS pode demorar).
 2. **Cadastre o remetente:** em *Senders*, adicione `BREVO_SENDER_EMAIL` (no domínio autenticado) com o nome `Íntegra`.
 3. **Gere a SMTP key:** em *SMTP & API › SMTP*, use *Generate a new SMTP key*. O *Login* exibido vai para `BREVO_SMTP_USER`, a chave para `BREVO_SMTP_PASSWORD`, e o servidor e a porta para `BREVO_SMTP_HOST`/`BREVO_SMTP_PORT`. A chave só aparece uma vez; se perder, gere outra e revogue a antiga.
-4. **(Recomendado)** Se o rastreamento de cliques estiver ativo na conta, os links passam por um redirecionamento da Brevo. Para e-mails de acesso (links de uso único), prefira desativá-lo.
-5. Para acompanhar entregas, rejeições e bloqueios, use *Transactional › Logs*.
+4. **IPs autorizados:** a Brevo pode bloquear o SMTP vindo de IPs não cadastrados (aviso "Os endereços IP não autorizados estão bloqueados para as suas chaves SMTP"). Com o bloqueio ligado, cadastre em *Segurança › IPs autorizados* o IP do seu computador (desenvolvimento) e os IPs de saída do servidor. Hospedagens serverless e o próprio Supabase não têm IP fixo; nesse caso, desative o bloqueio por IP nessa mesma tela, ou o envio falha com login recusado. A SMTP key continua sendo a proteção principal.
+5. **(Recomendado)** Se o rastreamento de cliques estiver ativo na conta, os links passam por um redirecionamento da Brevo. Para e-mails de acesso (links de uso único), prefira desativá-lo.
+6. Para acompanhar entregas, rejeições e bloqueios, use *Transactional › Logs*.
 
 Não use marketing, campanhas nem automações da Brevo para esses e-mails: eles são só transacionais.
 

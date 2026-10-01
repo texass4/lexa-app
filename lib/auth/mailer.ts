@@ -277,7 +277,7 @@ async function deliver(config: MailerConfig, message: EmailMessage & { to: strin
       }
       console.error(
         reason === "auth"
-          ? "[LEXA · e-mail] O SMTP recusou o login ou o remetente. Confira BREVO_SMTP_USER, BREVO_SMTP_PASSWORD e BREVO_SENDER_EMAIL (remetente validado na Brevo)."
+          ? "[LEXA · e-mail] O SMTP recusou o login ou o remetente. Confira BREVO_SMTP_USER, BREVO_SMTP_PASSWORD, BREVO_SENDER_EMAIL (remetente validado na Brevo) e se o IP deste servidor está autorizado na Brevo."
           : "[LEXA · e-mail] Falha no envio",
         log,
       )
