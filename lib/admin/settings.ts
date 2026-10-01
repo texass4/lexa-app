@@ -26,8 +26,11 @@ export interface PlatformSettings {
     /** A partir de quantos % do limite o uso vira alerta. */
     usageWarningPercent: number
   }
-  features: { datajud: boolean; whatsapp: boolean; ai: boolean }
-  ai: { provider: string; model: string }
+  /**
+   * `djen`: captura de intimações do DJEN. Desligada por padrão: a fonte (API pública do
+   * CNJ) não publica termos de uso — ligar depois de confirmar que o uso comercial é permitido.
+   */
+  features: { datajud: boolean; whatsapp: boolean; ai: boolean; djen: boolean }
   whatsapp: { provider: string; businessNumber: string }
   /** Sugeridos ao criar um plano novo. */
   defaultLimits: PlanLimits
@@ -46,20 +49,12 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
     enforceUserLimits: false,
     usageWarningPercent: 80,
   },
-  features: { datajud: true, whatsapp: false, ai: false },
-  ai: { provider: "gemini", model: "" },
+  features: { datajud: true, whatsapp: false, ai: false, djen: false },
   whatsapp: { provider: "", businessNumber: "" },
   defaultLimits: { users: 5, processes: 1000, clients: 2000, storage: 10240, whatsapp: 2000, ai: 500 },
   maintenance: { enabled: false, message: "Estamos fazendo uma manutenção programada. Voltamos em instantes." },
   admin: { auditRetentionDays: 365 },
 }
-
-export const AI_PROVIDERS = [
-  { value: "gemini", label: "Google Gemini" },
-  { value: "anthropic", label: "Anthropic (Claude)" },
-  { value: "openai", label: "OpenAI" },
-  { value: "other", label: "Outro" },
-]
 
 export const WHATSAPP_PROVIDERS = [
   { value: "", label: "Nenhum" },
@@ -78,8 +73,7 @@ const int = (v: unknown, fallback: number, min: number, max: number) => {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback
 }
 const obj = (v: unknown): Shape => (v && typeof v === "object" && !Array.isArray(v) ? (v as Shape) : {})
-const oneOf = (v: unknown, list: { value: string }[], fallback: string) =>
-  typeof v === "string" && list.some((o) => o.value === v) ? v : fallback
+const oneOf = (v: unknown, list: { value: string }[], fallback: string) => (typeof v === "string" && list.some((o) => o.value === v) ? v : fallback)
 
 function limits(v: unknown, fallback: PlanLimits): PlanLimits {
   const input = obj(v)
@@ -99,7 +93,6 @@ export function sanitizeSettings(input: unknown): PlatformSettings {
   const platform = obj(s.platform)
   const general = obj(s.general)
   const features = obj(s.features)
-  const ai = obj(s.ai)
   const whatsapp = obj(s.whatsapp)
   const maintenance = obj(s.maintenance)
   const admin = obj(s.admin)
@@ -122,10 +115,7 @@ export function sanitizeSettings(input: unknown): PlatformSettings {
       datajud: bool(features.datajud, d.features.datajud),
       whatsapp: bool(features.whatsapp, d.features.whatsapp),
       ai: bool(features.ai, d.features.ai),
-    },
-    ai: {
-      provider: oneOf(ai.provider, AI_PROVIDERS, d.ai.provider),
-      model: str(ai.model, d.ai.model, 80),
+      djen: bool(features.djen, d.features.djen),
     },
     whatsapp: {
       provider: oneOf(whatsapp.provider, WHATSAPP_PROVIDERS, d.whatsapp.provider),

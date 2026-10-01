@@ -11,6 +11,7 @@ import { useSession } from "@/lib/auth/session"
 const loaders = {
   client: () => import("@/components/clientes/new-client-dialog"),
   task: () => import("@/components/tasks/task-form-dialog"),
+  prazo: () => import("@/components/prazos/new-prazo-dialog"),
   appointment: () => import("@/components/agenda/new-appointment-dialog"),
   document: () => import("@/components/documentos/new-document-dialog"),
   process: () => import("@/components/processos/new-process-dialog"),
@@ -19,6 +20,7 @@ const loaders = {
 }
 const NewClientDialog = dynamic(() => loaders.client().then((m) => m.NewClientDialog))
 const TaskFormDialog = dynamic(() => loaders.task().then((m) => m.TaskFormDialog))
+const NewPrazoDialog = dynamic(() => loaders.prazo().then((m) => m.NewPrazoDialog))
 const NewAppointmentDialog = dynamic(() => loaders.appointment().then((m) => m.NewAppointmentDialog))
 const NewDocumentDialog = dynamic(() => loaders.document().then((m) => m.NewDocumentDialog))
 const NewProcessDialog = dynamic(() => loaders.process().then((m) => m.NewProcessDialog))
@@ -59,9 +61,10 @@ export function GlobalDialogs() {
     <>
       {mounted("client") && <NewClientDialog open={isOpen("client")} onOpenChange={onOpenChange} />}
       {mounted("task") && <TaskFormDialog open={isOpen("task")} onOpenChange={onOpenChange} defaults={defaults} />}
+      {mounted("prazo") && <NewPrazoDialog open={isOpen("prazo")} onOpenChange={onOpenChange} defaults={defaults} />}
       {mounted("appointment") && <NewAppointmentDialog open={isOpen("appointment")} onOpenChange={onOpenChange} defaults={defaults} />}
       {mounted("document") && <NewDocumentDialog open={isOpen("document")} onOpenChange={onOpenChange} defaults={defaults} />}
-      {mounted("process") && <NewProcessDialog open={isOpen("process")} onOpenChange={onOpenChange} clientId={defaults?.clientId} />}
+      {mounted("process") && <NewProcessDialog open={isOpen("process")} onOpenChange={onOpenChange} clientId={defaults?.clientId} number={defaults?.number} />}
       {mounted("invoice") && <NewInvoiceDialog open={isOpen("invoice")} onOpenChange={onOpenChange} defaults={defaults} />}
       {mounted("document-preview") && (
         <DocumentPreviewSheet documentId={defaults?.documentId} open={isOpen("document-preview")} onOpenChange={onOpenChange} />

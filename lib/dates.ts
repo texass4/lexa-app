@@ -11,6 +11,28 @@ export function toLocalISO(date: Date): string {
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}:00`
 }
 
+/**
+ * ISO local num fuso específico. O servidor roda em UTC, mas o que ele grava nos
+ * registros do escritório (monitoramento automático) precisa ser o horário local
+ * do escritório, como o navegador grava.
+ */
+export function toLocalISOIn(date: Date, timeZone: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value]),
+  )
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:00`
+}
+
 export function parse(iso: string): Date {
   return new Date(iso.length === 10 ? `${iso}T00:00:00` : iso)
 }

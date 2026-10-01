@@ -7,6 +7,7 @@ import { getNow, parse } from "@/lib/dates"
 import { useSession } from "@/lib/auth/session"
 import { refreshProcess } from "@/lib/services/processes/client"
 import { isAutoTracked } from "@/lib/services/processes/labels"
+import { isCheckDue } from "@/lib/services/processes/monitoring-policy"
 import { useDemoActions } from "@/lib/store/demo-store"
 import type { Process } from "@/types"
 
@@ -17,7 +18,12 @@ export type RefreshState = { status: "idle" } | { status: "refreshing"; manual: 
 
 const IDLE: RefreshState = { status: "idle" }
 
-const isStale = (lastSyncedAt?: string) => !lastSyncedAt || getNow().getTime() - parse(lastSyncedAt).getTime() > AUTO_REFRESH_AFTER_MS
+/**
+ * A mesma regra do monitoramento automático (`monitoring-policy.ts`): depois de uma
+ * consulta, nada de ir à fonte de novo no mesmo dia. O monitoramento costuma já ter
+ * atualizado o processo — abrir a página só mostra o que está salvo.
+ */
+const isStale = (lastSyncedAt?: string) => isCheckDue(lastSyncedAt ? parse(lastSyncedAt) : undefined, getNow())
 
 /**
  * Atualização das informações de um processo salvo (stale-while-revalidate).

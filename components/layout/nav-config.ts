@@ -1,4 +1,17 @@
-import { CalendarDays, FolderOpen, LayoutGrid, ListChecks, MessagesSquare, Scale, Settings, UsersRound, Wallet, type LucideIcon } from "lucide-react"
+import {
+  CalendarDays,
+  FolderOpen,
+  Hourglass,
+  Inbox,
+  LayoutGrid,
+  ListChecks,
+  MessagesSquare,
+  Scale,
+  Settings,
+  UsersRound,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react"
 import type { Permission } from "@/lib/auth/permissions"
 
 export interface NavItem {
@@ -6,9 +19,11 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   /** Contador que só aparece quando pede ação (ver `SidebarNav`). */
-  badgeKey?: "tasks" | "processes"
+  badgeKey?: "tasks" | "processes" | "prazos" | "triagem"
   /** Sem ela, o item some do menu e a rota mostra "sem acesso". */
   permission?: Permission
+  /** Telas dentro deste item (abrem pela setinha ao lado dele). */
+  children?: NavItem[]
 }
 
 export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -19,10 +34,24 @@ export const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Escritório",
     items: [
+      { href: "/triagem", label: "Triagem", icon: Inbox, badgeKey: "triagem", permission: "processes.view" },
       { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
       { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
-      { href: "/processos", label: "Processos", icon: Scale, badgeKey: "processes", permission: "processes.view" },
-      { href: "/tarefas", label: "Tarefas", icon: ListChecks, badgeKey: "tasks", permission: "tasks.view" },
+      {
+        href: "/processos",
+        label: "Processos",
+        icon: Scale,
+        badgeKey: "processes",
+        permission: "processes.view",
+      },
+      {
+        href: "/tarefas",
+        label: "Tarefas",
+        icon: ListChecks,
+        badgeKey: "tasks",
+        permission: "tasks.view",
+        children: [{ href: "/tarefas/prazos", label: "Prazos", icon: Hourglass, badgeKey: "prazos", permission: "processes.view" }],
+      },
       { href: "/agenda", label: "Agenda", icon: CalendarDays, permission: "agenda.view" },
     ],
   },
@@ -44,7 +73,9 @@ export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/clientes": { title: "Clientes", section: "Escritório" },
   "/atendimento": { title: "Central de atendimento", section: "WhatsApp" },
   "/processos": { title: "Processos", section: "Escritório" },
+  "/triagem": { title: "Triagem", section: "Escritório" },
   "/tarefas": { title: "Tarefas", section: "Escritório" },
+  "/tarefas/prazos": { title: "Prazos", section: "Tarefas" },
   "/agenda": { title: "Agenda", section: "Escritório" },
   "/documentos": { title: "Documentos", section: "Gestão" },
   "/financeiro": { title: "Financeiro", section: "Gestão" },
@@ -55,16 +86,18 @@ export function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-const ALL_ITEMS = NAV_SECTIONS.flatMap((section) => section.items)
+const ALL_ITEMS = NAV_SECTIONS.flatMap((section) => section.items.flatMap((item) => [item, ...(item.children ?? [])]))
 
-/** Permissão exigida pela rota (ou undefined se todos acessam). */
+/** Permissão exigida pela rota (ou undefined se todos acessam). Vale a do item mais específico. */
 export function routePermission(pathname: string) {
-  return ALL_ITEMS.find((item) => isActive(pathname, item.href))?.permission
+  return ALL_ITEMS.filter((item) => isActive(pathname, item.href)).sort((a, b) => b.href.length - a.href.length)[0]?.permission
 }
 
 /** Seções do menu só com o que a pessoa pode ver. */
 export function visibleSections(can: (p: Permission) => boolean) {
-  return NAV_SECTIONS.map((section) => ({ ...section, items: section.items.filter((i) => !i.permission || can(i.permission)) })).filter(
-    (section) => section.items.length > 0,
-  )
+  const allowed = (i: NavItem) => !i.permission || can(i.permission)
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter(allowed).map((item) => (item.children ? { ...item, children: item.children.filter(allowed) } : item)),
+  })).filter((section) => section.items.length > 0)
 }

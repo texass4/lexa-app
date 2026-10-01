@@ -16,7 +16,19 @@ const PRIORITIES = ["Alta", "Média", "Baixa"] as const
 const toPriority: Record<(typeof PRIORITIES)[number], Priority> = { Alta: "alta", Média: "media", Baixa: "baixa" }
 const fromPriority: Record<Priority, (typeof PRIORITIES)[number]> = { alta: "Alta", media: "Média", baixa: "Baixa" }
 
-type Defaults = { clientId?: string; processId?: string; columnId?: string; title?: string; description?: string; priority?: Priority }
+type Defaults = {
+  clientId?: string
+  processId?: string
+  columnId?: string
+  title?: string
+  description?: string
+  priority?: Priority
+  /** `YYYY-MM-DD` */
+  date?: string
+  assigneeId?: string
+  /** A tarefa criada fica vinculada a este prazo. */
+  prazoId?: string
+}
 
 function encodeRelated(r?: RelatedEntity) {
   return r ? `${r.type}:${r.id}` : ""
@@ -36,10 +48,10 @@ function initialState(task?: Task, defaults?: Defaults) {
   return {
     title: task?.title ?? defaults?.title ?? "",
     description: task?.description ?? defaults?.description ?? "",
-    date: task?.dueAt.slice(0, 10) ?? toLocalISO(getNow()).slice(0, 10),
+    date: task?.dueAt.slice(0, 10) ?? defaults?.date ?? toLocalISO(getNow()).slice(0, 10),
     time: task?.dueAt.slice(11, 16) ?? "18:00",
     priority: task ? fromPriority[task.priority] : defaults?.priority ? fromPriority[defaults.priority] : ("Média" as (typeof PRIORITIES)[number]),
-    assigneeId: task?.assigneeId ?? currentUserId(),
+    assigneeId: task?.assigneeId ?? defaults?.assigneeId ?? currentUserId(),
     related: encodeRelated(task?.related ?? related),
   }
 }
@@ -48,14 +60,18 @@ type FormState = ReturnType<typeof initialState>
 
 function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Defaults; onClose: () => void }) {
   const data = useDemoData()
-  const { addTask, updateTask } = useDemoActions()
+  const { addTask, updateTask, versionOf } = useDemoActions()
   const [form, setForm] = React.useState(() => initialState(task, defaults))
   const [error, setError] = React.useState("")
+  // Versão da tarefa quando o formulário abriu: se outra pessoa salvar antes, esta edição é recusada.
+  const [baseVersion, setBaseVersion] = React.useState(() => (task ? versionOf("tasks", task.id) : null))
+  const [saving, setSaving] = React.useState(false)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
     if (form.title.trim().length < 3) {
       setError("Descreva a tarefa em poucas palavras.")
       return
@@ -69,11 +85,20 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
       related: decodeRelated(form.related),
     }
     if (task) {
-      updateTask(task.id, payload)
-      toast.success("Alterações salvas.")
+      setSaving(true)
+      const result = await updateTask(task.id, payload, { baseVersion })
+      setSaving(false)
+      if (result.status === "conflict") {
+        // O aviso já apareceu; o formulário mostra a tarefa como está agora para revisar.
+        setForm(initialState(result.current, defaults))
+        setBaseVersion(versionOf("tasks", task.id))
+        return
+      }
+      if (result.status === "error") return
+      if (result.status === "saved") toast.success("Alterações salvas.")
     } else {
       const columnId = defaults?.columnId ?? data.taskColumns.find((c) => !c.isDone)?.id
-      addTask({ ...payload, columnId })
+      addTask({ ...payload, columnId }, { prazoId: defaults?.prazoId })
       toast.success("Tarefa criada.", {
         description: `${payload.title} — atribuída a ${getMembers().find((u) => u.id === payload.assigneeId)?.firstName}.`,
       })
@@ -161,7 +186,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="submit" form="task-form">
+        <Button type="submit" form="task-form" disabled={saving}>
           {task ? "Salvar alterações" : "Criar tarefa"}
         </Button>
       </ModalFooter>

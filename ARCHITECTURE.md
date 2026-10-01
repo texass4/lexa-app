@@ -97,6 +97,7 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 | `/clientes`, `/clientes/[id]` | `components/clientes/…` |
 | `/atendimento` (`?c=<conversa>`) | `components/atendimento/atendimento-view.tsx` |
 | `/processos`, `/processos/[id]` | `components/processos/processes-view.tsx`, `process-profile.tsx` |
+| `/triagem` (`?id=<evento>`) | `components/triagem/triagem-view.tsx` (Triagem jurídica: DJEN, DataJud) |
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
 | `/login` · `/cadastro` · `/recuperar-senha` · `/redefinir-senha` | `components/auth/*-form.tsx` |
@@ -118,7 +119,7 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 2. `POST /api/processes/search` → `lookup-service.ts`, com stale-while-revalidate: cache fresco responde na hora; cache vencido responde na hora e atualiza em segundo plano (`after`).
 3. A ficha é salva na hora (`importProcess`). Se o CNJ já existe, é atualizado (`applyProcessSync`), nunca duplicado.
 
-**Abrir um processo** — `use-process-refresh.ts`: o que está salvo aparece imediatamente; se a última atualização passou de 6 h, uma atualização roda em segundo plano ("Atualizando informações…"), sem bloquear a página. Continua mesmo se a pessoa sair da tela. Só movimentações novas entram (hash em `movements.ts`).
+**Abrir um processo** — `use-process-refresh.ts`: o que está salvo aparece imediatamente; se a última consulta não é de hoje (mesma regra do monitoramento, `monitoring-policy.ts › isCheckDue`), uma atualização roda em segundo plano ("Atualizando informações…"), sem bloquear a página. Continua mesmo se a pessoa sair da tela. Só movimentações novas entram (hash em `movements.ts`; a regra de mescla é `process-sync.ts › mergeProcessSheet`, a mesma do servidor).
 
 **Atualizar** — botão no perfil → `POST /api/processes/[id]/sync` com `force` → vai à fonte (salvo se alguém do escritório acabou de fazer isso há menos de 1 min). Um processo cadastrado à mão com CNJ válido também pode ser atualizado e passa a ser acompanhado.
 
@@ -129,7 +130,7 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 | Cache | memória do servidor (LRU, 500) → tabela `process_lookup_cache` no Supabase (migração 0005), **sempre por escritório** (RLS). Um cache global revelaria a um escritório quais processos outro acompanha. |
 | Validade | 6 h fresco · até 7 dias servido enquanto atualiza · "não encontrado" 10 min, só em memória |
 | Deduplicação | chamadas simultâneas (mesmo escritório + CNJ) compartilham uma ida à fonte; no navegador, `refreshProcess` também deduplica por processo |
-| Rede (`datajud/client.ts`) | 35 s por tentativa, 60 s no total, até 3 tentativas com backoff + jitter, `Retry-After` no 429; 401/403 e 4xx não se repetem |
+| Rede (`datajud/client.ts`) | 35 s por tentativa, 60 s no total, até 3 tentativas com backoff + jitter; `Retry-After` nunca é antecipado (se passa de 8 s, desiste e devolve `retryAfterMs` no `LookupError`); 401/403 e 4xx não se repetem |
 | Erros | `LookupError` (código + detalhe) → log; `publicLookupError` → `invalid` · `not_found` · `unsupported` · `unavailable` + mensagem amigável |
 
 Trocar de fornecedor: implementar `ProcessProvider` (`lib/integrations/legal/types.ts`) e trocar em `process-lookup.ts`. Interface, cache e rotas não mudam.
@@ -142,6 +143,59 @@ Detalhes da fonte que valem lembrar:
 
 Variáveis de ambiente (só servidor): `DATAJUD_API_KEY`; opcionais `PROCESS_LOOKUP_TIMEOUT_MS` e `DATAJUD_BASE_URL`.
 
+### Monitoramento automático
+
+Um processo que ninguém abriu continua sendo atualizado. O agendador da hospedagem chama `GET /api/cron/process-sync` (sugestão: a cada hora) com `Authorization: Bearer <CRON_SECRET>`; sem o segredo configurado, a rota não roda (`/api/cron/` é pública no `proxy.ts` porque se autentica sozinha).
+
+```
+agendador → /api/cron/process-sync → monitor.ts (runProcessMonitor)
+  → claim_process_monitoring (banco escolhe e reserva os elegíveis)
+  → lookup-service (cache do escritório → fonte; o mesmo das rotas)
+  → mergeProcessSheet → gravação condicionada à versão (updated_at)
+  → atividade "N novas movimentações no processo X" (autora: Íntegra) só se houver novidade
+  → process_monitoring (próxima consulta) + process_sync_runs (execução)
+  → Realtime entrega processo e atividade a quem está com a Íntegra aberta
+```
+
+| | |
+|---|---|
+| Elegível | escritório ativo, processo não concluído, acompanhado (`source.provider = datajud`), CNJ de 20 dígitos, `next_check_at` vencido — os nunca consultados e os mais antigos primeiro. Duas execuções simultâneas nunca pegam o mesmo processo (reserva de 15 min) |
+| Política (`monitoring-policy.ts`) | sucesso: próxima só no dia seguinte (fuso `America/Sao_Paulo`) e nunca antes de 12 h · falha passageira: 30 min × 2ⁿ até 24 h, nunca antes do `Retry-After` · não encontrado: 3 dias · tribunal sem consulta: 30 dias |
+| Parar a execução | 429 (pausa todas as execuções até o `Retry-After`, mínimo 15 min) · 3 indisponibilidades seguidas (10 min) · chave recusada (1 h). Qualquer outra falha fica só no processo e o lote segue |
+| Ritmo | lote de 20, 2 consultas por vez, 1 s de pausa entre idas à fonte, sem começar consultas depois de 120 s (`PROCESS_SYNC_*`, com limites) |
+| Cache | o do `lookup-service`; o worker aceita qualquer consulta do mesmo dia (de qualquer pessoa do escritório) sem ir à fonte |
+| Datas | `lastSyncedAt` = última consulta (qualquer caminho); `autoSyncedAt` = última sincronização do monitoramento — "Atualizado automaticamente em DD/MM às HH:MM" no perfil. Gravadas no horário do escritório (`toLocalISOIn`), não do servidor |
+| Isolamento | service role (sem sessão), então todo acesso em `monitor-store.ts` filtra por `organization_id`; o cache continua por escritório |
+
+Estado: `monitor-status.ts` — "Ativo" só com consulta ligada, `CRON_SECRET`, `DATAJUD_API_KEY`, migração 0009 e uma execução concluída nas últimas 26 h. Admin › Monitoramento mostra estado, fila e as execuções (avaliados, consultados, do cache, novidades, erros, 429, 503, duração); Configurações › Integrações mostra o cartão "Monitoramento processual" com o estado real.
+
+### Triagem jurídica (`/triagem`)
+
+Uma caixa única com os eventos que podem exigir ação do escritório: `evento → interpretação → atenção → decisão → ação`. Não é uma caixa de notificações: só entra o que pode pedir providência, e cada evento tem estado persistido.
+
+```
+DJEN (intimações por OAB) ─┐
+DataJud (movimentações)   ├→ save_triage_items → triage_items → Íntegra IA (uma vez) → Triagem (tempo real)
+próximas fontes           ─┘                                         → advogado decide → Prazo (Etapa 4) + tarefa
+```
+
+| | |
+|---|---|
+| Modelo único | `triage_items` (`0012_triagem.sql`) + `lib/triagem/model.ts`. Toda fonte grava pelo mesmo caminho (`save_triage_items`): tipo (`intimacao`, `movimentacao`), origem (`djen`, `datajud`), chave na fonte (nunca duplica), data, processo, responsável, trecho do original. Nova fonte = nova função em `lib/triagem/sources.ts`, sem regra de triagem própria |
+| Estados | `pendente`, `em_revisao`, `decidido` (`prazo_criado` ou `sem_prazo`), `ignorado` — no banco. Quem decidiu e quando: o banco grava a pessoa logada (não dá para informar outra). Decidido com prazo não reabre; sem prazo e ignorado, sim |
+| Abas | A revisar (pendente com processo) · Sem processo · Revisar (em revisão) · Decididos. "Somente minhas" = responsável. Ordem: urgência (prazo sugerido em até 5 dias), exige ação, prazo, data |
+| DJEN | `lib/services/intimacoes/capture.ts`, no agendador da Etapa 5: OABs ativas, uma consulta por número+UF (mesmo em dois escritórios), janela com 1 dia de sobra, retry/backoff, 429 para a execução, falha de uma OAB não para as outras. `intimacoes` guarda a comunicação como veio (teor original, imutável); `save_intimacoes` cria o evento na mesma transação |
+| DataJud | `monitor.ts` (Etapa 5): das movimentações novas, as que pedem atenção (julgamento, audiência, prazo, citação, trânsito em julgado; não "conclusos", "mero expediente", juntadas) e dos últimos 30 dias entram como evento, no máximo 10 por processo |
+| Vínculo | pelo CNJ, só com UM processo do escritório com o número. Nenhum → "Sem processo" (cadastrar e vincular pela própria tela). Mais de um → revisão. Processo cadastrado depois → `relink_triage_items` na execução seguinte. Nada é criado sozinho |
+| Íntegra IA | `lib/triagem/interpret.ts` + `lib/services/triagem/interpret.ts`, no agendador, depois da captura, com o modelo leve, 30 s por evento e a mesma medição/limite do plano (escritório sem cota espera o mês virar, sem gastar tentativa): resumo em uma frase, "exige ação?" e o prazo **copiado** do teor. O trecho citado precisa existir no original e trazer o número — senão é descartado. A data nunca vem da IA (é calculada pelas regras). Divergência ou dúvida → `em_revisao` com o motivo. Guardado em `triage_items.ai`, gerado uma vez; abrir a tela não chama o modelo. Falhou: o evento continua com o original; nova tentativa em 15 min, 1 h, 4 h |
+| Prazo | `lib/intimacoes/deadline.ts`: publicação = 1º dia útil após a disponibilização (Lei 11.419/2006, art. 4º, §3º); contagem a partir do dia útil seguinte (§4º; CPC 224, §3º); dias úteis (CPC 219), recesso de 20/12 a 20/01 (CPC 220), feriados nacionais (+ Lei 5.010/66 na Justiça Federal). Horas, mais de um prazo, "prazo legal", prazo em dobro, matéria penal ou nenhum prazo → revisão, sem data. Confirmar cria o Prazo da Etapa 4 (origem `intimacao` ou `movimentacao`, `triageItemId` único no banco) e a tarefa; rejeitar não cria nada |
+| Timeline | vincular uma intimação registra UMA atividade no processo (id determinístico). Movimentações já estão na timeline. O perfil do processo tem o painel "Triagem" com tipo, origem, data, resumo e responsável |
+| Auditoria | `triage_events`, só por gatilho: registrou, visualizou (uma vez por pessoa), vinculou, atribuiu, marcou revisão, confirmou prazo, decidiu sem prazo, ignorou, reabriu, interpretou |
+| Isolamento | RLS: ver com `processes.view`, decidir com `processes.edit`; origem, sugestão e interpretação só o servidor grava (`triage_items_guard`). `djen_oab_state` e as funções de captura/IA só service role |
+| Ritmo | DJEN: 30 OABs por execução, 1 s entre consultas, sem consultas novas depois de 90 s (`DJEN_*`). IA: até 15 eventos por execução, sem pedidos novos depois de 240 s da chamada |
+
+A fonte do DJEN é a API pública de Comunicações Processuais do CNJ (`comunicaapi.pje.jus.br`): gratuita, sem chave, limite por IP (429 → 60 s), bloqueio fora do Brasil e teto de 10 mil resultados. A captura fica desligada (`features.djen`) até o escritório confirmar os termos de uso com o CNJ e hospedar a função no Brasil. Admin › Monitoramento tem a aba "Intimações (DJEN)".
+
 ---
 
 ## 4. Store, persistência e dados
@@ -151,7 +205,15 @@ const data = useDemoData()          // clients, processes, tasks, taskColumns, a
 const { addTask, importProcess } = useDemoActions()
 ```
 
-- **Os dados moram no Supabase.** Cada coleção é uma tabela (`organization_id`, `id`, `data jsonb`). `lib/store/storage.ts` carrega o que a RLS deixa a pessoa ver e grava só o que mudou (`diffState`, comparando por identidade — o store é imutável). A gravação é agrupada (300 ms) e em fila; se o banco recusar (sem permissão, falha), aparece um aviso e a tela recarrega o que está salvo.
+- **Os dados moram no Supabase** — o store é só a cópia local. Cada coleção é uma tabela (`organization_id`, `id`, `data jsonb`, `updated_at`). `lib/store/storage.ts` carrega o que a RLS deixa a pessoa ver e grava só o que mudou (`diffState`, comparando por identidade — o store é imutável). A gravação é agrupada (300 ms) e em fila; se o banco recusar (sem permissão, falha), aparece um aviso e a tela recarrega o que está salvo.
+- **Equipe ao mesmo tempo** (`lib/store/office-sync.ts`, a única camada que grava, assina o Realtime e revalida):
+  - *Tempo real*: um canal por escritório, INSERT/UPDATE/DELETE das 10 coleções, sempre com filtro `organization_id=eq.…` (sem ele, o Realtime entrega exclusões de qualquer escritório). Tudo é aplicado por id: o eco da própria gravação não duplica.
+  - *Versão*: `updated_at` muda a cada gravação (`bump_row_version`, migração `0006`). Alterar/excluir é `update … where id = … and updated_at = <versão conhecida>` — atômico no banco. Nenhuma linha afetada = outra pessoa gravou antes: a gravação é recusada, aparece "Este registro foi alterado por outra pessoa." e só aquele registro é recarregado.
+  - *Formulários de edição* guardam `versionOf(coleção, id)` ao abrir e passam `{ baseVersion }` para a ação (`updateTask`, `updateClient`, `updateProcess`, renomear coluna/categoria), que devolve `SaveResult` (`saved`/`conflict`/`removed`/`error`) depois que o banco confirma. Em `conflict`, o formulário mostra o registro atual.
+  - *Revalidação*: ao (re)conectar o Realtime e ao voltar à aba depois de 3 min (`REVALIDATE_AFTER_HIDDEN_MS`), baixa só id + versão e busca apenas o que mudou.
+  - *Código do processo* (`#103000`…): gerado pelo banco no INSERT (contador por escritório, migração `0007`); `addProcess`/`importProcess` esperam o banco para ter o código. Único por escritório.
+  - Teste com Supabase real: `npm run test:integration` (ver o cabeçalho de `tests/integration/office-sync.integration.ts`).
+- **Prazos** (`types/index.ts › Prazo`, tabela `deadlines`, migração `0008`): a única fonte de prazos — `Process.nextDeadline` não existe mais. Próximo prazo = o aberto de menor data fatal (`lib/prazos.ts › nextPrazo`). Vínculos (processo, cliente, responsável, tarefa, quem criou) são colunas com chave estrangeira derivadas de `data` pelo banco; o cliente acompanha o do processo. Criar prazo (`addPrazo`) cria junto a tarefa vinculada por id (data interna, responsável do prazo); cumprir/perder (`setPrazoStatus`) registra atividade `deadline` nas timelines do processo e do cliente. Alertas em `lib/attention.ts` (5 dias, 2 dias, hoje, vencido e "Prazo sem tarefa").
 - `hydrated` fica `true` quando os dados do escritório terminam de carregar. As telas mostram esqueleto só até lá.
 - A carga começa junto com a sessão (`preloadOfficeData`), não depois dela: a RLS já decide o que volta.
 - Arquivos de documentos ficam no Storage (`documents/<organization_id>/…`); a pré-visualização usa URL assinada de 5 min (`lib/documents.ts`).
@@ -163,6 +225,8 @@ Nova coleção: tipo → `PersistedState` + `TABLES` em `storage.ts` → tabela 
 Nova ação de negócio: método em `DemoActions` + implementação, registrando uma `Activity` quando fizer sentido.
 
 ### Categorias de compromisso
+
+Remarcar: arrastar o compromisso na semana/dia (encaixa em 15 min, mantém a duração) ou para outro dia no mês; "Editar" no detalhe abre o mesmo formulário do cadastro. A timeline registra "Fulana remarcou o compromisso de 10/10 14:00 para 11/10 15:00." e o aviso oferece desfazer.
 
 Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da paleta `CATEGORY_COLORS` em `lib/config.ts`) direto no formulário do compromisso — `components/agenda/category-picker.tsx`. Excluir uma categoria deixa os compromissos dela "Sem categoria". Para colorir um compromisso em qualquer tela, use `useCategoryLookup()` (`components/agenda/use-category.ts`) + `categoryStyle(color)`.
 
@@ -211,6 +275,9 @@ O cliente é a entidade central: processos (`clientId`), tarefas (`related`), do
 - Lançamentos financeiros: diálogo global `"invoice"` (`components/financeiro/new-invoice-dialog.tsx`), gravando em `invoices` — o mesmo dado do módulo Financeiro.
 - `updateClient` registra na timeline mudança de status, de responsável e de dados; atividades de tarefa, documento e compromisso vinculados a processo levam o `clientId` do processo.
 - WhatsApp: link oficial (wa.me) no cadastro; a conversa em si fica na Central de Atendimento (seção 4b).
+- **Contato** (status `contato`): pessoa sem CPF/CNPJ — criada no formulário, pela importação ou em "Transformar em cliente" na Central. O documento, quando informado, continua validado e único. `resolveClientStatus` mantém o status coerente (sem documento: Contato ou Inativo; ao ganhar documento, Novo). Para vincular processo, anexar contrato ou lançar honorários, o CPF/CNPJ é exigido (`documentRequiredIssue`) — e o banco repete a regra (`0010_contacts.sql`, só em vínculos novos ou alterados), além de impedir que um cliente com processo, fatura ou contrato perca o documento.
+- **Importação por planilha** (Clientes › Importar): `lib/csv.ts › parseCSV/decodeCSV` (`;`/`,`/tab, aspas, Windows-1252) → `lib/client-import.ts` (colunas pelo cabeçalho, mesmas validações do cadastro, duplicados por CPF/CNPJ — ou e-mail/telefone quando falta documento —, contra o escritório e dentro do arquivo) → prévia → confirmação → `importClients` (lotes de 100 pela sessão de quem importa, com a RLS de sempre; lote recusado é refeito um a um para apontar a linha) → relatório (importados, duplicados, inválidos, falhas e motivo; baixável em CSV).
+- Edição com conferência de versão (`SaveOptions.baseVersion`) em compromissos (`updateAppointment`), lançamentos (`updateInvoice`, inclusive a baixa pela lista do Financeiro) e documentos (`updateDocument`: nome — a extensão é mantida —, tipo, cliente e processo). Cada edição registra quem fez e o que mudou (`lib/agenda.ts`, `lib/invoices.ts`).
 
 ## 5. UI global
 
@@ -264,7 +331,7 @@ A barra do Admin usa os mesmos valores (`admin-rail`, `admin-rail-highlight`), p
 
 ### O que merece atenção (sem IA)
 
-`lib/attention.ts` transforma os dados em sinais — prazo vencendo, tarefa atrasada, movimentação recente (as de prazo/julgamento/comunicação/audiência pedem revisão), processo parado há mais de `STALE_DAYS` (60, a mesma regra do panorama da IA), valor em atraso, documento novo. Cada sinal tem nível (`critical` · `warning` · `info` · `done`), frase, link para o registro real e, quando faz sentido, ação ("Criar tarefa" abre o formulário preenchido). Respeita as permissões de quem olha e agrupa sinais repetidos. Usado no Painel (`attention-panel.tsx`), nos perfis de Processo e Cliente, na lista de processos, no sino, na busca Ctrl K e nos badges do menu. Testes: `lib/attention.test.ts`.
+`lib/attention.ts` transforma os dados em sinais — prazo vencendo, tarefa atrasada, movimentação recente (as de prazo/julgamento/comunicação/audiência pedem revisão), processo parado há mais de `STALE_DAYS` (60) **e sem consulta à fonte nos últimos 7 dias** — consultado há pouco, a falta de movimentação está confirmada e o processo não é tratado como esquecido; o alerta mostra as duas datas, valor em atraso, documento novo. Cada sinal tem nível (`critical` · `warning` · `info` · `done`), frase, link para o registro real e, quando faz sentido, ação ("Criar tarefa" abre o formulário preenchido). Respeita as permissões de quem olha e agrupa sinais repetidos. Usado no Painel (`attention-panel.tsx`), nos perfis de Processo e Cliente, na lista de processos, no sino, na busca Ctrl K e nos badges do menu. Testes: `lib/attention.test.ts`.
 
 "Desde sua última visita" (`changesSince` + `lib/visits.ts`): a última presença fica no `localStorage` do navegador, por pessoa; o painel mostra o que outras pessoas registraram e as tarefas que venceram desde então.
 
@@ -295,8 +362,10 @@ Centro de controle do Super Admin, com shell próprio (barra lateral escura, bus
 | `/admin/usuarios` | `components/admin/users/users-view.tsx` | `GET /api/admin/users`, `PATCH /api/admin/users/[id]` (mover) |
 | `/admin/planos` | `components/admin/plans/plans-view.tsx` | `/api/admin/plans[/id]` |
 | `/admin/uso` | `components/admin/usage/usage-view.tsx` | `GET /api/admin/organizations` |
+| `/admin/ia` | `components/admin/usage/ai-usage-view.tsx` | `GET /api/admin/ai-usage?from&to` (consumo de IA por escritório: chamadas, cache, tokens, custo, operações, modelos, erros) |
 | `/admin/financeiro` | `components/admin/finance/finance-view.tsx` | `GET /api/admin/finance` |
 | `/admin/atividade` | `components/admin/audit/audit-view.tsx` | `GET /api/admin/audit` |
+| `/admin/monitoramento` | `components/admin/monitoring/monitoring-view.tsx` | `GET /api/admin/monitoring` |
 | `/admin/configuracoes` | `components/admin/settings/settings-view.tsx` | `GET/PUT /api/admin/settings` |
 
 Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e contadores do menu), `/api/auth/events` (login/logout na auditoria).
@@ -313,11 +382,11 @@ Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e 
 
 ## 8. O que ainda não existe
 
-Notificações (o envio de e-mail já existe — `sendEmail` em `lib/services/email` —, mas nenhum aviso automático o usa ainda), monitoramento automático de processos, cadastro de prazos, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
+Notificações (o envio de e-mail já existe — `sendEmail` em `lib/services/email` —, mas nenhum aviso automático o usa ainda), integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
 
 **Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
 
-Autenticação, e-mail transacional (SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Autenticação, e-mail transacional (SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), a Triagem (intimações do DJEN — captura desligada por padrão; depende da hospedagem no Brasil — e movimentações relevantes), o salvamento dos processos, os prazos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 
@@ -345,20 +414,31 @@ lib/ai/context/repository.ts               somente leitura: sessão do usuário 
     ↓
 lib/ai/context/{process,client,office}.ts  escolhe campos e limita volume; refs curtas (M1, T1, P1) → fontes reais
     ↓ sanitizeAIContext                    remove senha/token/e-mail/CPF/raw/storagePath/organizationId…
-lib/ai/services/*  →  services/run.ts      cache curto + pedido igual em andamento → limite de uso → provedor
-    ↓                                      → schema (schemas/) → grounding.ts (refs inexistentes saem; data/prazo sem origem = aviso) → log seguro
-lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai
+lib/ai/services/*  →  services/run.ts      cache no banco (cache.ts) + pedido igual em andamento → reserva no banco (metering.ts)
+    ↓                                      → provedor → schema (schemas/) → grounding.ts (refs inexistentes saem; data/prazo sem origem = aviso)
+    ↓                                      → consumo em usage_events (modelo, tokens, custo, erro) → log seguro
+lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai; modelo por nível (standard/light)
 ```
 
-**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `chat` e `GET /api/ai/status` (ligada/configurada; não chama o modelo). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
+**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `chat`, `GET /api/ai/status` (ligada/configurada; não chama o modelo) e `GET /api/ai/usage` (uso do mês contra o plano). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
 
-**Modelo reserva** — `GEMINI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva, repete o principal uma vez. O log (`model`) mostra quem respondeu.
+**Modelo reserva** — `AI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva, repete o principal uma vez. O log (`model`) mostra quem respondeu.
 
 **Trocar de provedor** — implemente `AIProvider` (`generateText` e `generateJSON`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
 
 **Regras do modelo** — prompt único em `lib/ai/prompts/system.ts` (fato × inferência × limitação; sem prazos, jurisprudência ou fatos inventados; dados tratados como dados). Mudou o texto? Suba `PROMPT_VERSION`. Instruções de cada funcionalidade em `prompts/tasks.ts`; formato das respostas em `schemas/`.
 
-**Custo** — modelo Flash (`GEMINI_MODEL`), temperatura baixa, contexto enxuto (até 20 movimentações, listas curtas, métricas agregadas no panorama), histórico do chat limitado a 10 mensagens, cache de 10 min para análises idênticas e limite de uso por pessoa (8/min, 60/h) e por escritório (200/h) em `guard.ts` — em memória, por instância do servidor.
+**Provedor e modelos** — um provedor só no núcleo (Gemini): toda chamada passa por `lib/ai/provider.ts`, e os nomes de modelo só existem em `lib/ai/config.ts`, lidos do ambiente: `AI_MODEL` (análises e chat) e `AI_MODEL_LIGHT` (operações simples: Triagem automática e análise de uma movimentação; padrão Flash-Lite, sem raciocínio). Se o leve falhar, o principal responde. A Central de Atendimento (WhatsApp) usa a Anthropic em `lib/services/whatsapp/ai.ts` e fica fora desta camada por enquanto.
+
+**Custo e consumo** — cada chamada é reservada no banco antes de ir ao modelo (`ai_reserve`, `0013_ia_consumo.sql`) e registrada depois (`ai_finish`) em `usage_events`: escritório, pessoa (ou nenhuma, se automática), operação, provedor, modelo, tokens de entrada/saída/cache, custo estimado em US$ (`lib/ai/pricing.ts`, sobreposto por `AI_PRICES`), duração e erro — nunca prompt ou resposta. Admin › Consumo de IA mostra por escritório e período.
+
+**Limites** — no banco, atômicos por escritório (trava transacional), valendo com vários servidores: limite mensal do plano (`plans.max_ai_requests`, ou `custom_limits.ai` do escritório; só contam chamadas que chegaram ao modelo) e ritmo de 8/min e 60/h por pessoa e 200/h por escritório (regras em `guard.ts`). Estourou o plano → `PLAN_LIMIT`; o ritmo → `RATE_LIMITED`, com `Retry-After`. Sem conseguir reservar, o modelo não é chamado.
+
+**Cache** — análises idênticas (mesmo escritório, operação, modelo, prompt e contexto — que inclui a data de hoje) são reaproveitadas por 12 h a partir de `ai_result_cache`, por todos os servidores; o acerto é registrado como "cache" e não conta no plano. O prefixo estável (instruções de sistema) aproveita o cache implícito do Gemini, medido em `cached_tokens`.
+
+**Contexto enxuto** — `repository.ts` pede ao banco só o recorte de cada análise: tarefas, prazos, compromissos futuros e documentos recentes do processo; do cliente e dos processos dele; no panorama, contagens (clientes, documentos), tarefas pendentes, prazos abertos, agenda da semana e faturas em aberto/do mês. Até 20 movimentações, listas curtas, chat com 10 mensagens.
+
+**Privacidade** — Configurações › Integrações › "Íntegra IA e privacidade" diz o que usa IA, o que é enviado (só o necessário; CPF, CNPJ, e-mails e telefones retirados ou mascarados) e para quê; cada análise traz a nota com o link.
 
 **Tarefas sugeridas** — nunca são gravadas pela IA: "Criar tarefa" abre `openDialog("task", { title, description, priority, processId })`, o mesmo formulário da Íntegra.
 
@@ -368,4 +448,4 @@ lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/
 
 **Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
 
-Variáveis: `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.
+Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.

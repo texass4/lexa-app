@@ -5,10 +5,10 @@
  */
 
 import { diffInDays, fmtNumericDate, fmtTime, parse, toLocalISO } from "@/lib/dates"
-import { PRIORITY_CONFIG } from "@/lib/config"
+import { PRAZO_ORIGIN, PRAZO_STATUS, PRIORITY_CONFIG } from "@/lib/config"
 import { complementLabel, complementText, interpretMovement } from "@/lib/services/processes/movement-interpreter"
 import type { AISource, AISources, SourceKind } from "@/lib/ai/types"
-import type { Appointment, LegalDocument, ProcessMovement, Task } from "@/types"
+import type { Appointment, LegalDocument, Prazo, ProcessMovement, Task } from "@/types"
 import type { Member } from "./repository"
 
 /** Contexto pronto para o modelo + fontes que ele pode citar. */
@@ -32,6 +32,7 @@ const PREFIX: Record<SourceKind, string> = {
   movement: "M",
   process: "P",
   task: "T",
+  deadline: "PZ",
   appointment: "A",
   document: "D",
   client: "C",
@@ -106,6 +107,33 @@ export function describeTask(task: Task, ref: string, members: Member[], now: Da
 
 export function registerTask(registry: SourceRegistry, task: Task) {
   return registry.add("task", { id: task.id, label: task.title, date: task.dueAt, href: "/tarefas" })
+}
+
+/** Prazo cadastrado no escritório, como está nos dados — a IA nunca calcula nem inventa prazos. */
+export function describePrazo(prazo: Prazo, ref: string, members: Member[], now: Date) {
+  const days = daysUntil(prazo.fatalDate, now)
+  return {
+    ref,
+    descricao: prazo.description,
+    data_fatal: fmtDate(prazo.fatalDate),
+    data_interna: fmtDate(prazo.internalDate),
+    justificativa_da_data_interna: prazo.internalDateReason,
+    situacao: PRAZO_STATUS[prazo.status]?.label,
+    dias_ate_a_data_fatal: prazo.status === "aberto" ? days : undefined,
+    responsavel: memberName(members, prazo.responsibleId),
+    origem: PRAZO_ORIGIN[prazo.origin],
+    tem_tarefa_vinculada: prazo.status === "aberto" ? !!prazo.taskId : undefined,
+  }
+}
+
+export function registerPrazo(registry: SourceRegistry, prazo: Prazo) {
+  return registry.add("deadline", {
+    id: prazo.id,
+    label: prazo.description,
+    date: prazo.fatalDate,
+    processId: prazo.processId,
+    href: `/processos/${prazo.processId}`,
+  })
 }
 
 export function describeAppointment(appointment: Appointment, ref: string) {

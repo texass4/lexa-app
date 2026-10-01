@@ -13,6 +13,7 @@ import { useSession } from "@/lib/auth/session"
 import { userTitle } from "@/lib/account"
 import { getSupabase } from "@/lib/supabase/client"
 import { maskPhone } from "@/lib/masks"
+import { OabManager } from "./oab-manager"
 import { isEmail, MIN_PASSWORD, passwordProblem } from "@/lib/auth/validation"
 
 const AVATAR_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }
@@ -103,11 +104,11 @@ function PhotoPicker() {
 
 function DetailsForm() {
   const { user, refresh } = useSession()
-  const [form, setForm] = React.useState({ name: user.name, phone: user.phone, jobTitle: user.jobTitle ?? "", oab: user.oab ?? "" })
+  const [form, setForm] = React.useState({ name: user.name, phone: user.phone, jobTitle: user.jobTitle ?? "" })
   const [error, setError] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }))
-  const dirty = form.name !== user.name || form.phone !== user.phone || form.jobTitle !== (user.jobTitle ?? "") || form.oab !== (user.oab ?? "")
+  const dirty = form.name !== user.name || form.phone !== user.phone || form.jobTitle !== (user.jobTitle ?? "")
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -116,7 +117,7 @@ function DetailsForm() {
     setBusy(true)
     const { error: saveError } = await getSupabase()
       .from("profiles")
-      .update({ name: form.name.trim(), phone: form.phone || null, job_title: form.jobTitle.trim() || null, oab: form.oab.trim() || null })
+      .update({ name: form.name.trim(), phone: form.phone || null, job_title: form.jobTitle.trim() || null })
       .eq("id", user.id)
     setBusy(false)
     if (saveError) return toast.error("Não foi possível salvar o perfil.")
@@ -135,9 +136,6 @@ function DetailsForm() {
         </Field>
         <Field label="Telefone" htmlFor="p-phone" optional>
           <TextInput id="p-phone" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e) => set("phone", maskPhone(e.target.value))} />
-        </Field>
-        <Field label="Inscrição na OAB" htmlFor="p-oab" optional>
-          <TextInput id="p-oab" placeholder="OAB/SC 00.000" value={form.oab} onChange={(e) => set("oab", e.target.value)} />
         </Field>
       </div>
       <div className="flex justify-end border-t border-border px-5 py-3.5">
@@ -260,6 +258,27 @@ function PasswordForm() {
   )
 }
 
+/** Inscrições na OAB — obrigatória para advogados (é por elas que as intimações chegam). */
+function OabPanel() {
+  const { user } = useSession()
+  const lawyer = user.role === "lawyer"
+  return (
+    <Panel>
+      <PanelHeader
+        title="Inscrições na OAB"
+        description={
+          lawyer
+            ? "Obrigatória para advogados. Cada inscrição ativa é consultada diariamente no Diário de Justiça Eletrônico Nacional."
+            : "Se você advoga, cadastre suas inscrições para receber as intimações do DJEN."
+        }
+      />
+      <div className="px-5 pb-5">
+        <OabManager userId={user.id} required={lawyer} />
+      </div>
+    </Panel>
+  )
+}
+
 export function ProfileSection() {
   const { theme, setTheme } = useTheme()
   const [endingOthers, setEndingOthers] = React.useState(false)
@@ -281,6 +300,8 @@ export function ProfileSection() {
         </div>
         <DetailsForm />
       </Panel>
+
+      <OabPanel />
 
       <Panel>
         <PanelHeader title="Acesso" description="E-mail e senha usados para entrar na Íntegra." />

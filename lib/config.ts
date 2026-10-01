@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react"
-import type { ClientStatus, InvoiceStatus, PracticeArea, Priority, ProcessStatus } from "@/types"
+import type { ClientStatus, InvoiceStatus, PracticeArea, PrazoOrigin, PrazoStatus, Priority, ProcessStatus } from "@/types"
 
 export type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "brand" | "violet"
 
@@ -16,6 +16,7 @@ export const CLIENT_STATUS: Record<ClientStatus, { label: string; tone: Tone }> 
   novo: { label: "Novo", tone: "info" },
   inativo: { label: "Inativo", tone: "neutral" },
   inadimplente: { label: "Inadimplente", tone: "danger" },
+  contato: { label: "Contato", tone: "violet" },
 }
 
 export const PROCESS_STATUS: Record<ProcessStatus, { label: string; tone: Tone }> = {
@@ -25,6 +26,18 @@ export const PROCESS_STATUS: Record<ProcessStatus, { label: string; tone: Tone }
   recurso: { label: "Em recurso", tone: "brand" },
   suspenso: { label: "Suspenso", tone: "neutral" },
   concluido: { label: "Concluído", tone: "success" },
+}
+
+export const PRAZO_STATUS: Record<PrazoStatus, { label: string; tone: Tone }> = {
+  aberto: { label: "Aberto", tone: "info" },
+  cumprido: { label: "Cumprido", tone: "success" },
+  perdido: { label: "Perdido", tone: "danger" },
+}
+
+export const PRAZO_ORIGIN: Record<PrazoOrigin, string> = {
+  manual: "Manual",
+  intimacao: "Intimação",
+  movimentacao: "Movimentação",
 }
 
 export const INVOICE_STATUS: Record<InvoiceStatus, { label: string; tone: Tone }> = {

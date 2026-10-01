@@ -16,8 +16,9 @@ import { isOverdue } from "@/lib/selectors"
 import type { Task } from "@/types"
 import { useSession } from "@/lib/auth/session"
 import { useDemoData } from "@/lib/store/demo-store"
-import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/config"
-import { fmtRelative } from "@/lib/dates"
+import { CLIENT_STATUS, PRAZO_STATUS, PROCESS_STATUS } from "@/lib/config"
+import { fmtNumericDate, fmtRelative } from "@/lib/dates"
+import { nextPrazo, taskPrazo } from "@/lib/prazos"
 import { clientContext, processContext, taskPrompts } from "@/components/ai/ai-context"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 
@@ -49,6 +50,9 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
   const aiContext = process ? processContext(process.id, process.code) : clientContext(client!.id, client!.name)
   const prompts = taskPrompts(task.title, process ? "process" : "client")
   const lastMovement = process?.movements.length ? process.lastMovementAt : undefined
+  // Prazo desta tarefa (vínculo por id) ou, se não houver, o próximo prazo aberto do processo.
+  const ownPrazo = can("processes.view") ? taskPrazo(task, data.deadlines) : undefined
+  const shownPrazo = ownPrazo ?? (process && process.status !== "concluido" ? nextPrazo(data.deadlines, process.id) : undefined)
 
   return (
     <section className="space-y-3">
@@ -67,11 +71,12 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
             </StatusBadge>
           </div>
           <dl className="mt-2 space-y-1 text-[12.5px] text-muted-foreground">
-            {process.nextDeadline && process.status !== "concluido" && (
+            {shownPrazo && (
               <div className="flex gap-1.5">
-                <dt>Próximo prazo:</dt>
+                <dt>{ownPrazo ? "Prazo desta tarefa:" : "Próximo prazo:"}</dt>
                 <dd className="min-w-0 truncate text-foreground">
-                  {fmtDueIn(process.nextDeadline.date)} · {process.nextDeadline.title}
+                  {shownPrazo.status === "aberto" ? fmtDueIn(shownPrazo.fatalDate) : PRAZO_STATUS[shownPrazo.status].label.toLowerCase()} · fatal em{" "}
+                  {fmtNumericDate(shownPrazo.fatalDate)} · {shownPrazo.description}
                 </dd>
               </div>
             )}

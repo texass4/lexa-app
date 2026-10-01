@@ -5,12 +5,13 @@ import { createLocalStore } from "@/lib/hooks"
 import type { Permission } from "@/lib/auth/permissions"
 import type { Priority } from "@/types"
 
-export type DialogKind = "client" | "task" | "appointment" | "document" | "process" | "invoice" | "document-preview"
+export type DialogKind = "client" | "task" | "prazo" | "appointment" | "document" | "process" | "invoice" | "document-preview"
 
 /** Permissão necessária para abrir cada diálogo global. */
 export const DIALOG_PERMISSION: Record<DialogKind, Permission> = {
   client: "clients.edit",
   task: "tasks.edit",
+  prazo: "processes.edit",
   appointment: "agenda.edit",
   document: "documents.edit",
   process: "processes.edit",
@@ -30,6 +31,12 @@ export interface DialogDefaults {
   title?: string
   description?: string
   priority?: Priority
+  /** Responsável sugerido para a tarefa. */
+  assigneeId?: string
+  /** Tarefa criada para este prazo: fica vinculada a ele (por id). */
+  prazoId?: string
+  /** Número CNJ já conhecido (cadastro de processo a partir de uma intimação). */
+  number?: string
 }
 
 interface UIState {

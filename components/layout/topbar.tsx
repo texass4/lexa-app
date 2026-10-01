@@ -24,6 +24,7 @@ function useBreadcrumb() {
     const c = data.clients.find((x) => x.id === id)
     return { title: c?.name ?? "Cliente", parent: { label: ROUTE_META["/clientes"].title, href: "/clientes" } }
   }
+  if (id === "prazos" && root === "tarefas") return { title: "Prazos", parent: { label: "Tarefas", href: "/tarefas" } }
   if (id && root === "processos") {
     const p = data.processes.find((x) => x.id === id)
     return { title: p ? `Processo ${p.code}` : "Processo", parent: { label: ROUTE_META["/processos"].title, href: "/processos" } }

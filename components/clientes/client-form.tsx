@@ -12,7 +12,17 @@ import { currentUserId, getMembers, getUser } from "@/lib/account"
 import { useDemoData } from "@/lib/store/demo-store"
 import { maskDocument, maskPhone } from "@/lib/masks"
 import { getNow, toLocalISO } from "@/lib/dates"
-import { UFS, formatAddress, knownTags, maskZipCode, normalizeTags, validateClientForm, type ClientFormErrors } from "@/lib/clients"
+import {
+  UFS,
+  formatAddress,
+  knownTags,
+  maskZipCode,
+  normalizeTags,
+  requiresDocument,
+  resolveClientStatus,
+  validateClientForm,
+  type ClientFormErrors,
+} from "@/lib/clients"
 import type { Client, ClientAddress, ClientStatus, PracticeArea } from "@/types"
 
 const KINDS = ["Pessoa física", "Pessoa jurídica"] as const
@@ -81,7 +91,7 @@ function toPayload(form: FormState, client?: Client): ClientPayload {
     addressDetails: hasAddress ? (Object.fromEntries(Object.entries(details).filter(([, v]) => v)) as ClientAddress) : undefined,
     area: form.area,
     ownerId: form.ownerId,
-    status: form.status,
+    status: resolveClientStatus(form.status, form.document),
     tags: form.tags.length ? normalizeTags(form.tags) : undefined,
     notes: blank(form.notes),
     profession: client?.profession,
@@ -112,13 +122,18 @@ export function ClientForm({
   onCancel: () => void
   onSubmit: (payload: ClientPayload) => void
 }) {
-  const { clients } = useDemoData()
+  const data = useDemoData()
+  const { clients } = data
+  // Com processo, fatura ou contrato, o CPF/CNPJ não pode ser apagado (o banco também recusa).
+  const documentLocked = !!client && requiresDocument(data, client.id)
   const [form, setForm] = React.useState(() => initialState(client))
   const [errors, setErrors] = React.useState<ClientFormErrors>({})
   const suggestions = React.useMemo(() => knownTags(clients), [clients])
   const pj = form.kind === "Pessoa jurídica"
   const members = getMembers()
   const ownerMissing = !members.some((m) => m.id === form.ownerId)
+  const noDocument = !form.document.replace(/\D/g, "")
+  const status = resolveClientStatus(form.status, form.document)
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }))
@@ -144,6 +159,9 @@ export function ClientForm({
       toLocalISO(getNow()).slice(0, 10),
       client?.id,
     )
+    if (!next.document && documentLocked && noDocument) {
+      next.document = `Este cadastro tem processo, fatura ou contrato: o ${pj ? "CNPJ" : "CPF"} é obrigatório.`
+    }
     setErrors(next)
     const first = Object.keys(next)[0]
     if (first) {
@@ -173,7 +191,15 @@ export function ClientForm({
           <Field label={pj ? "Razão social" : "Nome completo"} htmlFor="client-name" error={errors.name} className="sm:col-span-2">
             <TextInput id="client-name" autoFocus value={form.name} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
           </Field>
-          <Field label={pj ? "CNPJ" : "CPF"} htmlFor="client-document" error={errors.document}>
+          <Field
+            label={pj ? "CNPJ" : "CPF"}
+            htmlFor="client-document"
+            error={errors.document}
+            optional={!documentLocked}
+            hint={
+              noDocument && !documentLocked ? "Sem documento, o cadastro fica como Contato — exigido para processo, contrato e fatura." : undefined
+            }
+          >
             <TextInput
               id="client-document"
               inputMode="numeric"
@@ -284,12 +310,15 @@ export function ClientForm({
             </NativeSelect>
           </Field>
           <Field label="Status" htmlFor="client-status">
-            <NativeSelect id="client-status" value={form.status} onChange={(e) => set("status", e.target.value as ClientStatus)}>
-              {(Object.keys(CLIENT_STATUS) as ClientStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {CLIENT_STATUS[s].label}
-                </option>
-              ))}
+            <NativeSelect id="client-status" value={status} onChange={(e) => set("status", e.target.value as ClientStatus)}>
+              {/* O status acompanha o documento: sem ele, só Contato ou Inativo. */}
+              {(Object.keys(CLIENT_STATUS) as ClientStatus[])
+                .filter((s) => (noDocument ? s === "contato" || s === "inativo" : s !== "contato"))
+                .map((s) => (
+                  <option key={s} value={s}>
+                    {CLIENT_STATUS[s].label}
+                  </option>
+                ))}
             </NativeSelect>
           </Field>
           <Field label="Tags" htmlFor="client-tags" optional className="sm:col-span-2">

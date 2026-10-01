@@ -1,6 +1,6 @@
 "use client"
 
-import { CalendarPlus, ChevronDown, FilePlus, ListChecks, Plus, Scale, UsersRound } from "lucide-react"
+import { CalendarPlus, ChevronDown, FilePlus, Hourglass, ListChecks, Plus, Scale, UsersRound } from "lucide-react"
 import { cn } from "cn"
 import {
   DropdownMenu,
@@ -18,7 +18,8 @@ import { useSession } from "@/lib/auth/session"
 const ITEMS: { kind: DialogKind; label: string; description: string; icon: React.ElementType }[] = [
   { kind: "process", label: "Novo processo", description: "Consultar pelo CNJ e salvar", icon: Scale },
   { kind: "client", label: "Novo cliente", description: "Cadastrar cliente do escritório", icon: UsersRound },
-  { kind: "task", label: "Nova tarefa", description: "Atribuir uma atividade ou prazo", icon: ListChecks },
+  { kind: "prazo", label: "Novo prazo", description: "Prazo processual, com tarefa vinculada", icon: Hourglass },
+  { kind: "task", label: "Nova tarefa", description: "Atribuir uma atividade", icon: ListChecks },
   { kind: "appointment", label: "Novo compromisso", description: "Consulta, audiência ou reunião", icon: CalendarPlus },
 ]
 

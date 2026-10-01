@@ -16,6 +16,9 @@ import {
   validateClientForm,
   validateDocument,
   whatsappLink,
+  documentRequiredIssue,
+  hasDocument,
+  resolveClientStatus,
   type ClientFormValues,
 } from "./clients"
 
@@ -74,6 +77,35 @@ describe("CPF e CNPJ", () => {
     // CNPJ válido informado como pessoa física: o tamanho não bate.
     assert.equal(validateDocument("PF", "11.222.333/0001-81"), "CPF deve ter 11 dígitos.")
     assert.equal(validateDocument("PJ", "11.222.333/0001-81"), undefined)
+  })
+
+  it("opcional para Contato: vazio passa, mas o que foi digitado continua validado", () => {
+    assert.equal(validateDocument("PF", "", { required: false }), undefined)
+    assert.equal(validateDocument("PF", "123.456.789-00", { required: false }), "CPF inválido — confira os dígitos.")
+  })
+})
+
+describe("contato sem CPF/CNPJ", () => {
+  it("o formulário aceita cadastro sem documento", () => {
+    assert.deepEqual(validateClientForm(form({ document: "" }), [], "2026-09-26"), {})
+    assert.equal(validateClientForm(form({ document: "529.982.247-24" }), [], "2026-09-26").document, "CPF inválido — confira os dígitos.")
+  })
+
+  it("status acompanha o documento", () => {
+    assert.equal(resolveClientStatus("novo", ""), "contato")
+    assert.equal(resolveClientStatus("ativo", ""), "contato")
+    assert.equal(resolveClientStatus("inativo", ""), "inativo")
+    assert.equal(resolveClientStatus("contato", "529.982.247-25"), "novo")
+    assert.equal(resolveClientStatus("ativo", "529.982.247-25"), "ativo")
+  })
+
+  it("processo, contrato e fatura exigem o documento", () => {
+    const contact = client("x", { name: "Joana", document: "" })
+    assert.equal(hasDocument(contact), false)
+    assert.equal(documentRequiredIssue(contact, "processo"), "Joana ainda não tem CPF. Complete o cadastro para vincular um processo.")
+    assert.match(documentRequiredIssue({ ...contact, kind: "PJ" }, "fatura") ?? "", /CNPJ.*lançar honorários/)
+    assert.equal(documentRequiredIssue(client("y", { document: "529.982.247-25" }), "contrato"), undefined)
+    assert.equal(documentRequiredIssue(undefined, "processo"), undefined)
   })
 })
 
@@ -165,6 +197,7 @@ describe("exclusão", () => {
       appointments: [],
       invoices: [{ id: "i1", clientId: "c1" }],
       taskColumns: [],
+      deadlines: [],
       appointmentCategories: [],
       activities: [],
       notifications: [],

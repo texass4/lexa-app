@@ -9,7 +9,7 @@ import type { AIResult, ClientSummary } from "@/lib/ai/types"
 import { nowOf, runStructured, withKnownRefs, type AIServiceDeps } from "./run"
 
 export async function summarizeClient(deps: AIServiceDeps, clientId: string): Promise<AIResult<ClientSummary>> {
-  const data = await loadClientData(deps.repo, clientId)
+  const data = await loadClientData(deps.repo, clientId, nowOf(deps))
   const hasData = data.processes.length || data.tasks.length || data.appointments.length || data.invoices.length || data.activities.length
   if (!hasData) throw new AIError("INSUFFICIENT_DATA")
 

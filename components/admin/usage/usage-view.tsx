@@ -83,7 +83,13 @@ export function UsageView() {
             />
             <StatCard label="Armazenamento total" value={formatBytes(storage)} icon={<Gauge />} hint={`${orgs.length} escritórios com acesso`} />
             <StatCard label="Mensagens WhatsApp" value={formatCount(whatsapp)} hint="Neste mês · integração em preparação" />
-            <StatCard label="Chamadas de IA" value={formatCount(ai)} hint="Neste mês · integração em preparação" />
+            <StatCard
+              label="Chamadas de IA"
+              value={formatCount(ai)}
+              hint="Neste mês · contam no limite do plano"
+              href="/admin/ia"
+              action="Consumo de IA"
+            />
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -130,18 +136,27 @@ export function UsageView() {
                   >
                     <div className="flex flex-col gap-2 border-b border-border px-5 py-3.5 sm:flex-row sm:items-center">
                       <div className="min-w-0 flex-1">
-                        <Link href={`/admin/escritorios/${o.id}?aba=uso`} className="group inline-flex items-center gap-1.5 font-medium outline-none hover:underline">
+                        <Link
+                          href={`/admin/escritorios/${o.id}?aba=uso`}
+                          className="group inline-flex items-center gap-1.5 font-medium outline-none hover:underline"
+                        >
                           {o.name}
                           <ArrowUpRight className="size-3.5 text-subtle transition-transform group-hover:-translate-y-px group-hover:translate-x-px" />
                         </Link>
                         <p className="text-[12px] text-muted-foreground">
                           Plano {o.plan}
-                          {o.customLimits && " · limites personalizados"} · {formatCount(o.usage.tasks)} tarefas · {formatCount(o.usage.documents)} documentos
+                          {o.customLimits && " · limites personalizados"} · {formatCount(o.usage.tasks)} tarefas · {formatCount(o.usage.documents)}{" "}
+                          documentos
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         {worst && (
-                          <span className={cn("inline-flex items-center gap-1 text-[12px] font-medium", worst.level === "warning" ? "text-warning" : "text-danger")}>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 text-[12px] font-medium",
+                              worst.level === "warning" ? "text-warning" : "text-danger",
+                            )}
+                          >
                             <TriangleAlert className="size-3.5" /> {LIMIT_META[worst.key].label} {Math.round(worst.ratio * 100)}%
                           </span>
                         )}

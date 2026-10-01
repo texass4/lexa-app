@@ -127,11 +127,16 @@ describe("períodos", () => {
 describe("configurações", () => {
   it("completa com os padrões e descarta o desconhecido", () => {
     assert.deepEqual(sanitizeSettings(undefined), DEFAULT_SETTINGS)
-    const s = sanitizeSettings({ general: { trialDays: "400", usageWarningPercent: 10, publicSignup: "sim" }, evil: true, ai: { provider: "desconhecido" } })
+    const s = sanitizeSettings({
+      general: { trialDays: "400", usageWarningPercent: 10, publicSignup: "sim" },
+      evil: true,
+      ai: { provider: "desconhecido" },
+    })
     assert.equal(s.general.trialDays, 365)
     assert.equal(s.general.usageWarningPercent, 50)
     assert.equal(s.general.publicSignup, true)
-    assert.equal(s.ai.provider, "gemini")
+    // Provedor e modelo da IA não são configuração da plataforma: vêm do ambiente (lib/ai/config.ts).
+    assert.ok(!("ai" in s))
     assert.ok(!("evil" in s))
   })
 

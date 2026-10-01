@@ -5,7 +5,7 @@
  * (`supabase/migrations/0004_clients_hub.sql`).
  */
 
-import type { Client, ClientAddress } from "@/types"
+import type { Client, ClientAddress, ClientStatus } from "@/types"
 import type { PersistedState } from "@/lib/store/storage"
 import { onlyDigits as digitsOf } from "@/lib/cnj"
 import { relatedClientId } from "@/lib/selectors"
@@ -40,14 +40,56 @@ export function isValidCNPJ(value: string) {
 
 export const documentLabel = (kind: Client["kind"]) => (kind === "PJ" ? "CNPJ" : "CPF")
 
-/** Mensagem de erro do CPF/CNPJ, ou `undefined` se válido. */
-export function validateDocument(kind: Client["kind"], value: string): string | undefined {
+/**
+ * Mensagem de erro do CPF/CNPJ, ou `undefined` se válido. Com `required: false`,
+ * vazio é aceito (cadastro como Contato) — mas o que foi digitado continua validado.
+ */
+export function validateDocument(kind: Client["kind"], value: string, { required = true }: { required?: boolean } = {}): string | undefined {
   const d = onlyDigits(value)
   const label = documentLabel(kind)
-  if (!d) return `Informe o ${label}.`
+  if (!d) return required ? `Informe o ${label}.` : undefined
   if (d.length !== (kind === "PJ" ? 14 : 11)) return `${label} deve ter ${kind === "PJ" ? 14 : 11} dígitos.`
   if (!(kind === "PJ" ? isValidCNPJ(d) : isValidCPF(d))) return `${label} inválido — confira os dígitos.`
   return undefined
+}
+
+/** O cadastro tem CPF/CNPJ? */
+export const hasDocument = (client: Pick<Client, "document"> | undefined) => !!client && onlyDigits(client.document).length > 0
+
+/**
+ * Status coerente com o documento. Sem CPF/CNPJ, a pessoa é Contato (ou Inativo);
+ * ao ganhar o documento, um Contato passa a Novo.
+ */
+export function resolveClientStatus(status: ClientStatus, document: string): ClientStatus {
+  if (!onlyDigits(document)) return status === "inativo" ? "inativo" : "contato"
+  return status === "contato" ? "novo" : status
+}
+
+/** O que exige CPF/CNPJ do cliente. */
+export type DocumentRequiredFor = "processo" | "contrato" | "fatura"
+
+const REQUIRED_FOR: Record<DocumentRequiredFor, string> = {
+  processo: "vincular um processo",
+  contrato: "anexar um contrato",
+  fatura: "lançar honorários",
+}
+
+/**
+ * Motivo para bloquear a ação por falta de CPF/CNPJ, ou `undefined` se pode seguir.
+ * O banco repete a regra (`0010_contacts.sql`).
+ */
+export function documentRequiredIssue(client: Pick<Client, "name" | "kind" | "document"> | undefined, action: DocumentRequiredFor) {
+  if (!client || hasDocument(client)) return undefined
+  return `${client.name} ainda não tem ${documentLabel(client.kind)}. Complete o cadastro para ${REQUIRED_FOR[action]}.`
+}
+
+/** O cliente já tem processo, fatura ou contrato — então não pode ficar sem CPF/CNPJ. */
+export function requiresDocument(s: Pick<PersistedState, "processes" | "invoices" | "documents">, clientId: string) {
+  return (
+    s.processes.some((p) => p.clientId === clientId) ||
+    s.invoices.some((i) => i.clientId === clientId) ||
+    s.documents.some((d) => d.clientId === clientId && d.kind === "Contrato")
+  )
 }
 
 /** Telefone brasileiro com DDD: fixo (10 dígitos) ou celular (11, começando por 9). */
@@ -153,7 +195,8 @@ export function validateClientForm(values: ClientFormValues, clients: readonly C
   const pj = values.kind === "PJ"
   const errors: ClientFormErrors = {}
   if (values.name.trim().length < 3) errors.name = pj ? "Informe a razão social." : "Informe o nome completo."
-  errors.document = validateDocument(values.kind, values.document)
+  // CPF/CNPJ é opcional (Contato); o que for digitado precisa ser válido e único.
+  errors.document = validateDocument(values.kind, values.document, { required: false })
   if (!errors.document) {
     const duplicate = findDuplicateClient(clients, values.document, exceptId)
     if (duplicate) errors.document = `Já existe um cliente com este ${documentLabel(values.kind)}: ${duplicate.name}.`

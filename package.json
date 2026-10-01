@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --import ./tests/register.mjs \"lib/**/*.test.ts\"",
     "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --test --import ./tests/register.mjs \"lib/**/*.test.ts\"",
+    "test:integration": "node --test --test-concurrency=1 --import ./tests/register.mjs \"tests/integration/*.integration.ts\"",
     "email:templates": "node --import ./tests/register.mjs scripts/supabase-email-templates.ts",
     "email:verify": "node --env-file-if-exists=.env.local --import ./tests/register.mjs scripts/verify-smtp.ts"
   },

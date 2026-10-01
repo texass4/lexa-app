@@ -158,7 +158,12 @@ export function ClientProfile({ id }: { id: string }) {
         </motion.div>
       </AnimatePresence>
 
-      <EditClientDialog client={client} open={editing} onOpenChange={setEditing} onSave={(patch) => updateClient(client.id, patch)} />
+      <EditClientDialog
+        client={client}
+        open={editing}
+        onOpenChange={setEditing}
+        onSave={(patch, options) => updateClient(client.id, patch, options)}
+      />
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}

@@ -1,6 +1,7 @@
-import type { Activity, Appointment, Client, Invoice, InvoiceStatus, LegalDocument, PracticeArea, Process, RelatedEntity, Task } from "@/types"
+import type { Activity, Appointment, Client, Invoice, InvoiceStatus, LegalDocument, PracticeArea, Prazo, Process, RelatedEntity, Task } from "@/types"
 import type { PersistedState } from "@/lib/store/storage"
 import { getNow, diffInDays, isSameDay, monthName, monthShort, parse, toLocalISO } from "@/lib/dates"
+import { nextPrazo } from "@/lib/prazos"
 
 /** O que os seletores precisam do store (o `DemoState` inteiro também serve). */
 type DemoState = PersistedState
@@ -67,12 +68,13 @@ export interface ClientHub {
  * documento ou compromisso vinculado só ao processo também é do cliente.
  */
 export function clientHub(s: DemoState, clientId: string): ClientHub {
+  const nextFatal = (p: Process) => nextPrazo(s.deadlines, p.id)?.fatalDate ?? "9"
   const processes = s.processes
     .filter((p) => p.clientId === clientId)
     .sort(
       (a, b) =>
         (a.status === "concluido" ? 1 : 0) - (b.status === "concluido" ? 1 : 0) ||
-        (a.nextDeadline?.date ?? "9").localeCompare(b.nextDeadline?.date ?? "9") ||
+        nextFatal(a).localeCompare(nextFatal(b)) ||
         b.lastMovementAt.localeCompare(a.lastMovementAt),
     )
   const ids = new Set(processes.map((p) => p.id))
@@ -102,11 +104,14 @@ export function lastActivityByClient(s: Pick<DemoState, "activities" | "processe
   return last
 }
 
-/** Prazo mais próximo entre os processos ativos — um prazo já vencido vem primeiro, para não passar despercebido. */
-export function nextClientDeadline(processes: Process[]) {
-  return processes
-    .filter((p) => p.status !== "concluido" && p.nextDeadline)
-    .sort((a, b) => a.nextDeadline!.date.localeCompare(b.nextDeadline!.date))[0]
+/**
+ * Próximo prazo aberto entre os processos ativos do cliente (menor data fatal — um
+ * prazo aberto já vencido vem primeiro, para não passar despercebido).
+ */
+export function nextClientDeadline(processes: Process[], prazos: readonly Prazo[]): { prazo: Prazo; process: Process } | undefined {
+  const active = new Map(processes.filter((p) => p.status !== "concluido").map((p) => [p.id, p]))
+  const prazo = nextPrazo(prazos, new Set(active.keys()))
+  return prazo ? { prazo, process: active.get(prazo.processId)! } : undefined
 }
 
 export const sum = (items: Invoice[]) => items.reduce((acc, i) => acc + i.amount, 0)

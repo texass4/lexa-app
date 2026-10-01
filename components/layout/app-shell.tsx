@@ -14,6 +14,7 @@ import { routePermission } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { LexaAIProvider } from "@/components/ai/lexa-ai-provider"
+import { TriagemProvider } from "@/components/triagem/triagem-provider"
 import { trackVisit } from "@/lib/visits"
 import * as React from "react"
 
@@ -31,48 +32,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const fullHeight = allowed && FULL_HEIGHT.some((href) => pathname === href || pathname.startsWith(`${href}/`))
   return (
     <LexaAIProvider>
-      <div className="min-h-dvh">
-        <a
-          href="#conteudo"
-          className="fixed top-2 left-2 z-[60] -translate-y-16 rounded-md bg-primary px-3 py-2 text-[13px] text-primary-foreground transition-transform focus:translate-y-0"
-        >
-          Pular para o conteúdo
-        </a>
-        <Sidebar />
-        <div
-          className={cn(
-            "flex min-h-dvh min-w-0 flex-col transition-[padding] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] md:pl-[76px]",
-            !sidebarCollapsed && "lg:pl-[256px]",
-          )}
-        >
-          <Topbar />
-          <main
-            id="conteudo"
+      <TriagemProvider>
+        <div className="min-h-dvh">
+          <a
+            href="#conteudo"
+            className="fixed top-2 left-2 z-[60] -translate-y-16 rounded-md bg-primary px-3 py-2 text-[13px] text-primary-foreground transition-transform focus:translate-y-0"
+          >
+            Pular para o conteúdo
+          </a>
+          <Sidebar />
+          <div
             className={cn(
-              "mx-auto w-full flex-1",
-              fullHeight
-                ? "flex h-[calc(100dvh-64px)] min-h-0 flex-col px-2 pt-2 pb-[calc(68px+env(safe-area-inset-bottom))] sm:px-3 sm:pt-3 md:h-[calc(100dvh-72px)] md:pb-3 lg:px-4 lg:pb-4"
-                : "max-w-[1480px] px-4 pt-6 pb-28 sm:px-6 md:pb-16 lg:px-8 lg:pt-9 xl:px-10",
+              "flex min-h-dvh min-w-0 flex-col transition-[padding] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] md:pl-[76px]",
+              !sidebarCollapsed && "lg:pl-[256px]",
             )}
           >
-            {allowed ? (
-              children
-            ) : (
-              <Panel className="mt-4">
-                <EmptyState
-                  icon={<ShieldOff />}
-                  title="Sem acesso a este módulo."
-                  description="Seu usuário não tem permissão para ver esta área. Fale com o sócio responsável pelo escritório."
-                />
-              </Panel>
-            )}
-          </main>
+            <Topbar />
+            <main
+              id="conteudo"
+              className={cn(
+                "mx-auto w-full flex-1",
+                fullHeight
+                  ? "flex h-[calc(100dvh-64px)] min-h-0 flex-col px-2 pt-2 pb-[calc(68px+env(safe-area-inset-bottom))] sm:px-3 sm:pt-3 md:h-[calc(100dvh-72px)] md:pb-3 lg:px-4 lg:pb-4"
+                  : "max-w-[1480px] px-4 pt-6 pb-28 sm:px-6 md:pb-16 lg:px-8 lg:pt-9 xl:px-10",
+              )}
+            >
+              {allowed ? (
+                children
+              ) : (
+                <Panel className="mt-4">
+                  <EmptyState
+                    icon={<ShieldOff />}
+                    title="Sem acesso a este módulo."
+                    description="Seu usuário não tem permissão para ver esta área. Fale com o sócio responsável pelo escritório."
+                  />
+                </Panel>
+              )}
+            </main>
+          </div>
+          <MobileBottomNav />
+          <MobileDrawer />
+          <CommandMenu />
+          <GlobalDialogs />
         </div>
-        <MobileBottomNav />
-        <MobileDrawer />
-        <CommandMenu />
-        <GlobalDialogs />
-      </div>
+      </TriagemProvider>
     </LexaAIProvider>
   )
 }

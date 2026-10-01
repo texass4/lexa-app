@@ -7,6 +7,7 @@ import { toUser, type MemberAccess, type ProfileRow } from "./profile"
 import { isEmail, normalizeEmail } from "./validation"
 import { loadSettings } from "@/lib/admin/platform"
 import { sanitizeLimits } from "@/lib/admin/catalog"
+import { oabDigits, validateOab } from "@/lib/intimacoes/oab"
 
 /**
  * Gestão de usuários de um escritório, com a service role. Usado pelas rotas do
@@ -87,6 +88,26 @@ export interface InviteInput {
   name?: string
   role?: string
   jobTitle?: string
+  /** Inscrição na OAB — obrigatória para o papel Advogado (recebe as intimações). */
+  oab?: { number?: string; uf?: string }
+}
+
+/** Inscrição válida para gravar, ou erro com a mensagem da tela. */
+function oabFrom(input: InviteInput["oab"]) {
+  const oab = { number: oabDigits(input?.number ?? ""), uf: (input?.uf ?? "").toUpperCase() }
+  const problem = validateOab(oab)
+  if (problem) throw new HttpError(400, `${problem} Advogados precisam de OAB para receber intimações.`)
+  return oab
+}
+
+/** A pessoa tem alguma inscrição ativa? Sem a migração 0011, não há como exigir. */
+async function hasActiveOab(userId: string) {
+  const { count, error } = await getSupabaseAdmin()
+    .from("lawyer_oabs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("active", true)
+  return error ? true : (count ?? 0) > 0
 }
 
 export async function inviteMember(request: NextRequest, organizationId: string, input: InviteInput) {
@@ -96,6 +117,7 @@ export async function inviteMember(request: NextRequest, organizationId: string,
   if (!isEmail(email)) throw new HttpError(400, "E-mail inválido.")
   if (name.length < 3) throw new HttpError(400, "Informe o nome completo.")
   if (!MEMBER_ROLES.includes(role)) throw new HttpError(400, "Papel inválido.")
+  const oab = role === "lawyer" ? oabFrom(input.oab) : null
 
   const admin = getSupabaseAdmin()
   const { data: created, error } = await admin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { name } })
@@ -114,6 +136,21 @@ export async function inviteMember(request: NextRequest, organizationId: string,
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id)
     throw profileError
+  }
+  if (oab) {
+    const { error: oabError } = await admin.from("lawyer_oabs").insert({ organization_id: organizationId, user_id: created.user.id, ...oab })
+    // Sem a migração 0011, a inscrição fica só no texto do perfil (como antes).
+    const missingTable = oabError?.code === "42P01" || oabError?.code === "PGRST205"
+    if (missingTable)
+      await admin
+        .from("profiles")
+        .update({ oab: `OAB/${oab.uf} ${oab.number}` })
+        .eq("id", created.user.id)
+    else if (oabError) {
+      await admin.auth.admin.deleteUser(created.user.id)
+      if (oabError.code === "23505") throw new HttpError(409, "Esta inscrição na OAB já está cadastrada para outra pessoa do escritório.")
+      throw oabError
+    }
   }
 
   // A conta já existe: se o e-mail falhar, o convite continua pendente e pode ser reenviado.
@@ -168,6 +205,10 @@ export async function updateMember(organizationId: string, userId: string, patch
   const role = (patch.role ?? target.role) as MemberRole
   if (patch.role !== undefined) {
     if (!MEMBER_ROLES.includes(role)) throw new HttpError(400, "Papel inválido.")
+    // Quem passa a ser Advogado precisa de OAB (usuários existentes não são afetados).
+    if (role === "lawyer" && target.role !== "lawyer" && !(await hasActiveOab(userId))) {
+      throw new HttpError(400, "Cadastre ao menos uma inscrição na OAB antes de definir o papel Advogado.")
+    }
     update.role = role
     // Ao trocar de papel, as permissões voltam ao padrão do novo papel (a menos que venham junto).
     if (patch.permissions === undefined) update.permissions = null
@@ -197,7 +238,11 @@ export async function assertUserCapacity(organizationId: string) {
   if (!settings.general.enforceUserLimits) return
   const admin = getSupabaseAdmin()
   const [{ data: org }, { count }] = await Promise.all([
-    admin.from("organizations").select("plan, custom_limits").eq("id", organizationId).maybeSingle<{ plan: string; custom_limits: Record<string, unknown> | null }>(),
+    admin
+      .from("organizations")
+      .select("plan, custom_limits")
+      .eq("id", organizationId)
+      .maybeSingle<{ plan: string; custom_limits: Record<string, unknown> | null }>(),
     admin.from("profiles").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
   ])
   if (!org) return

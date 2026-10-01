@@ -56,3 +56,13 @@ export function matches(query: string, ...fields: (string | undefined)[]) {
 export function uid(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`
 }
+
+/**
+ * Nome de arquivo com a extensão do arquivo salvo: renomear um documento não pode
+ * trocar nem tirar a extensão (o download usa o nome). "Contrato" → "Contrato.pdf".
+ */
+export function ensureExtension(name: string, extension: string) {
+  const trimmed = name.trim().replace(/\s+/g, " ")
+  const suffix = `.${extension.toLowerCase()}`
+  return trimmed.toLowerCase().endsWith(suffix) ? trimmed : `${trimmed.replace(/\.+$/, "")}${suffix}`
+}

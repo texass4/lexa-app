@@ -53,7 +53,11 @@ export interface User extends TenantEntity {
 
 /* -------------------------------- Clientes -------------------------------- */
 
-export type ClientStatus = "ativo" | "inativo" | "novo" | "inadimplente"
+/**
+ * `contato`: pessoa cadastrada ainda sem CPF/CNPJ (ex.: veio do WhatsApp). Pode ser
+ * atendida e agendada; para abrir processo, contrato ou fatura, o documento é exigido.
+ */
+export type ClientStatus = "ativo" | "inativo" | "novo" | "inadimplente" | "contato"
 
 /** Endereço em partes. `Client.address` guarda a mesma informação em uma linha. */
 export interface ClientAddress {
@@ -209,7 +213,6 @@ export interface Process extends TenantEntity {
   claimValue: number
   distributedAt: string
   lastMovementAt: string
-  nextDeadline?: { date: string; title: string }
   movements: ProcessMovement[]
 
   /* ----- Campos preenchidos por consulta externa (todos opcionais) ----- */
@@ -229,8 +232,10 @@ export interface Process extends TenantEntity {
   system?: string
   parties?: { active: ProcessParty[]; passive: ProcessParty[]; others: ProcessParty[] }
   source?: ProcessSource
-  /** Última vez que o processo foi sincronizado com a fonte. */
+  /** Última vez que as informações foram conferidas na fonte (por qualquer caminho). */
   lastSyncedAt?: string
+  /** Última sincronização feita pelo monitoramento automático (servidor). Ausente = nunca. */
+  autoSyncedAt?: string
 }
 
 /* -------------------------------- Tarefas --------------------------------- */
@@ -257,6 +262,168 @@ export interface TaskColumn extends TenantEntity {
   order: number
   /** Tarefas nesta coluna contam como concluídas. */
   isDone?: boolean
+}
+
+/* --------------------------------- Prazos --------------------------------- */
+
+/** De onde veio o prazo: cadastrado à mão, ou confirmado na Triagem a partir de uma intimação ou movimentação. */
+export type PrazoOrigin = "manual" | "intimacao" | "movimentacao"
+
+/** Só prazos `aberto` contam como próximos/pendentes. */
+export type PrazoStatus = "aberto" | "cumprido" | "perdido"
+
+/**
+ * Prazo processual — a fonte de verdade dos prazos do escritório (tabela `deadlines`,
+ * `0008_prazos.sql`). O banco confere processo, cliente, responsável e tarefa por id.
+ */
+export interface Prazo extends TenantEntity {
+  processId: ID
+  /** Cliente do processo (o banco acompanha o processo; some se o cliente for excluído). */
+  clientId?: ID
+  description: string
+  /** `YYYY-MM-DD` — o último dia para cumprir. */
+  fatalDate: string
+  /** `YYYY-MM-DD` — até quando o escritório quer concluir (data da tarefa vinculada). */
+  internalDate: string
+  /** Obrigatória quando a data interna fica depois da data fatal. */
+  internalDateReason?: string
+  responsibleId: ID
+  origin: PrazoOrigin
+  status: PrazoStatus
+  /** Tarefa criada para o prazo (vínculo por id; some se a tarefa for excluída). */
+  taskId?: ID
+  /** Quem cadastrou (o banco grava a pessoa logada). */
+  createdById: ID
+  updatedAt?: string
+  /** Quando foi cumprido ou marcado como perdido, e por quem. */
+  closedAt?: string
+  closedById?: ID
+  /** Intimação que originou o prazo (confirmada pelo advogado). Único por escritório. */
+  intimacaoId?: ID
+  /** Evento da Triagem que originou o prazo. Um prazo por evento. */
+  triageItemId?: ID
+}
+
+/* ------------------------------- Intimações ------------------------------- */
+
+/** Inscrição na OAB de um membro do escritório (tabela `lawyer_oabs`). */
+export interface LawyerOab {
+  id: ID
+  organizationId: ID
+  userId: ID
+  /** Só dígitos. */
+  number: string
+  /** UF da seccional. */
+  uf: string
+  active: boolean
+  createdAt: string
+}
+
+/** Intimação capturada de uma fonte oficial (tabela `intimacoes`): a comunicação como veio — o teor original nunca muda. A triagem dela fica em `TriageItem`. */
+export interface Intimacao {
+  id: ID
+  organizationId: ID
+  source: "djen"
+  externalId: string
+  hash?: string
+  /** Inscrições do escritório que receberam a comunicação. */
+  oabIds: ID[]
+  cnj?: string
+  processNumber?: string
+  tribunal?: string
+  orgao?: string
+  tipoComunicacao?: string
+  tipoDocumento?: string
+  classe?: string
+  meio?: string
+  /** `YYYY-MM-DD` — data de disponibilização na fonte. */
+  availableAt: string
+  /** `YYYY-MM-DD` — data de publicação considerada (1º dia útil seguinte). */
+  publishedAt?: string
+  /** Teor integral, como a fonte publicou. */
+  content: string
+  documentUrl?: string
+  officialUrl?: string
+  parties: { name: string; pole?: string }[]
+  lawyers: { name: string; number: string; uf: string }[]
+  createdAt: string
+}
+
+/* -------------------------------- Triagem --------------------------------- */
+
+/** Tipo do evento jurídico na Triagem. Novas fontes acrescentam tipos aqui. */
+export type TriageKind = "intimacao" | "movimentacao"
+/** Fonte que gerou o evento. */
+export type TriageSource = "djen" | "datajud"
+/**
+ * Estado persistido do evento:
+ * - `pendente`: aguarda decisão;
+ * - `em_revisao`: há dúvida (interpretação, prazo, vínculo) — exige revisão manual;
+ * - `decidido`: o advogado confirmou o prazo (`prazo_criado`) ou decidiu que não há (`sem_prazo`);
+ * - `ignorado`: não exige atenção.
+ */
+export type TriageState = "pendente" | "em_revisao" | "decidido" | "ignorado"
+export type TriageDecision = "prazo_criado" | "sem_prazo"
+export type TriageRequiresAction = "sim" | "nao" | "incerto"
+
+/** Interpretação da Íntegra IA — gerada uma vez, guardada, nunca substitui o original. */
+export interface TriageAI {
+  /** Uma frase. */
+  summary: string
+  requiresAction: TriageRequiresAction
+  /** Por que exige (ou não) ação, nas palavras da IA. */
+  reason?: string
+  /** Prazo que a IA leu no teor — só fica se o trecho existe literalmente no original. */
+  term?: { days: number; unit: "uteis" | "corridos"; excerpt: string }
+  /** Data calculada pelas regras da Íntegra a partir do prazo lido (a IA não calcula datas). */
+  fatalDate?: string
+  /** Como a data foi calculada (mesmas regras da sugestão). */
+  basis?: string[]
+  /** O que a IA disse e foi descartado por não estar no teor. */
+  discarded?: string
+  model?: string
+  generatedAt: string
+}
+
+/** Evento jurídico na Triagem (tabela `triage_items`), de qualquer fonte. */
+export interface TriageItem {
+  id: ID
+  organizationId: ID
+  kind: TriageKind
+  source: TriageSource
+  sourceKey: string
+  /** A comunicação original, quando o evento é uma intimação. */
+  intimacaoId?: ID
+  processId?: ID
+  clientId?: ID
+  linkMethod?: "cnj" | "manual" | "processo"
+  cnj?: string
+  processNumber?: string
+  /** `YYYY-MM-DD` — publicação (intimação) ou data do ato (movimentação). */
+  eventDate: string
+  /** `YYYY-MM-DD` — disponibilização na fonte (intimação). */
+  availableAt?: string
+  title: string
+  /** Trecho legível do original, para a lista. */
+  excerpt?: string
+  tribunal?: string
+  orgao?: string
+  responsibleId?: ID
+  /** Sugestão calculada pelas regras (`lib/intimacoes/deadline.ts`). */
+  suggestion?: import("@/lib/intimacoes/deadline").DeadlineSuggestion
+  ai?: TriageAI
+  aiStatus: "pendente" | "pronto" | "falhou"
+  state: TriageState
+  decision?: TriageDecision
+  /** Por que está em revisão (a Íntegra ou quem marcou). */
+  reviewReason?: string
+  /** Observação de quem decidiu. */
+  decisionNote?: string
+  prazoId?: ID
+  decidedBy?: ID
+  decidedAt?: string
+  createdAt: string
+  updatedAt: string
 }
 
 /* --------------------------------- Agenda --------------------------------- */
@@ -317,7 +484,18 @@ export interface Invoice extends TenantEntity {
 
 /* ------------------------------- Atividade -------------------------------- */
 
-export type ActivityType = "document" | "contract" | "petition" | "appointment" | "payment" | "task" | "client" | "hearing" | "summons" | "movement"
+export type ActivityType =
+  | "document"
+  | "contract"
+  | "petition"
+  | "appointment"
+  | "payment"
+  | "task"
+  | "client"
+  | "hearing"
+  | "summons"
+  | "movement"
+  | "deadline"
 
 export interface Activity extends TenantEntity {
   type: ActivityType

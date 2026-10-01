@@ -23,7 +23,7 @@ export function SidebarAICard({ onOpen }: { onOpen?: () => void }) {
           lexa.open()
         }}
         aria-expanded={lexa.isOpen}
-        className="group mt-3 inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-white/[0.08] px-3 text-[12.5px] font-medium text-sidebar-foreground outline-none ring-1 ring-white/10 transition-colors hover:bg-white/[0.12] focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
+        className="group mt-3 inline-flex h-8 items-center gap-1.5 rounded-control bg-white/[0.08] px-3 text-[12.5px] font-medium text-sidebar-foreground outline-none ring-1 ring-white/10 transition-colors hover:bg-white/[0.12] focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
       >
         Conversar com a IA
         <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />

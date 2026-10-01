@@ -12,6 +12,7 @@ import { fmtNumericDate, fmtRelative, toLocalISO } from "@/lib/dates"
 import type { AIRequestError } from "@/lib/ai/client"
 import { CONFIG_ERROR_CODES } from "@/lib/ai/errors"
 import type { ActionSuggestion, AIResult, AISource, AISources, AIStatus, AttentionPoint, Confidence, Nature, ReferencedNote } from "@/lib/ai/types"
+import { AIPrivacyNote } from "./ai-privacy"
 
 /* ---------------------------------- marca ---------------------------------- */
 
@@ -179,7 +180,17 @@ export function SourceChip({ source, onOpen }: { source: AISource; onOpen?: Sour
   return <span className={className}>{content}</span>
 }
 
-export function SourceChips({ refs, sources, onOpen, className }: { refs: string[]; sources: AISources; onOpen?: SourceHandler; className?: string }) {
+export function SourceChips({
+  refs,
+  sources,
+  onOpen,
+  className,
+}: {
+  refs: string[]
+  sources: AISources
+  onOpen?: SourceHandler
+  className?: string
+}) {
   const known = refs.map((ref) => sources[ref]).filter(Boolean)
   if (!known.length) return null
   return (
@@ -374,7 +385,10 @@ export function AIWarnings({ warnings }: { warnings: string[] }) {
   return (
     <div className="space-y-1.5">
       {warnings.map((warning, i) => (
-        <p key={i} className="flex items-start gap-2 rounded-[10px] border border-warning/20 bg-warning-soft/60 px-3 py-2 text-[12.5px] leading-snug text-warning">
+        <p
+          key={i}
+          className="flex items-start gap-2 rounded-[10px] border border-warning/20 bg-warning-soft/60 px-3 py-2 text-[12.5px] leading-snug text-warning"
+        >
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
           {warning}
         </p>
@@ -389,7 +403,10 @@ export function AIFooter({ result, confidence }: { result: AIResult<unknown>; co
     <div className="space-y-3 border-t border-border pt-3.5">
       <AIWarnings warnings={result.warnings} />
       <div className="flex flex-col gap-2 text-[11.5px] text-subtle sm:flex-row sm:items-center sm:justify-between">
-        <p className="leading-snug">{result.basis} Gerado por IA — confira antes de usar.</p>
+        <div className="space-y-0.5">
+          <p className="leading-snug">{result.basis} Gerado por IA — confira antes de usar.</p>
+          <AIPrivacyNote />
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           {confidence && <ConfidenceBadge level={confidence} />}
           <span className="tabular">{result.cached ? "Análise recente" : `Gerado ${fmtRelative(toLocalISO(new Date(result.generatedAt)))}`}</span>

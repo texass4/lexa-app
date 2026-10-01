@@ -1,19 +1,22 @@
 /**
- * Caminho único de toda chamada à IA:
+ * Caminho único de toda chamada à IA do núcleo da Íntegra:
  *
- *   contexto sanitizado → cache / pedido igual em andamento → limite de uso
- *   → provedor → validação do schema → verificação das fontes → log
+ *   contexto sanitizado → cache (banco, comum a todos os servidores) / pedido igual em
+ *   andamento → reserva no banco (limite do plano + ritmo) → provedor → validação do
+ *   schema → verificação das fontes → consumo registrado (tokens, custo) → log
  *
- * Os serviços só escolhem contexto, instrução e schema.
+ * Os serviços só escolhem contexto, instrução, schema e o nível do modelo.
  */
 
 import { AIError, isAIError } from "@/lib/ai/errors"
-import { RATE_RULES, RateLimiter, ResultCache, shortHash } from "@/lib/ai/guard"
+import { CACHE_TTL_MS, InFlight, type AICache } from "@/lib/ai/guard"
 import { groundingWarnings, collectStrings, keepKnownRefs, refsInText } from "@/lib/ai/grounding"
 import { logAIEvent, type AILogger } from "@/lib/ai/log"
+import { meteredCall, type AIMeter } from "@/lib/ai/metering"
 import { PROMPT_VERSION, buildSystemPrompt, dataMessage } from "@/lib/ai/prompts/system"
 import { SchemaError, type Schema } from "@/lib/ai/schema"
 import { sanitizeAIContext } from "@/lib/ai/context/sanitize"
+import type { AITier } from "@/lib/ai/config"
 import type { AIProvider, AIRequest } from "@/lib/ai/provider"
 import type { AIRepository } from "@/lib/ai/context/repository"
 import type { BuiltContext } from "@/lib/ai/context/shared"
@@ -24,26 +27,21 @@ export interface AIServiceDeps {
   repo: AIRepository
   provider: AIProvider
   userId: string
+  /** Limites e consumo (no banco em produção). */
+  meter: AIMeter
+  /** Cache de análises (no banco em produção). */
+  cache: AICache
+  /** Monta a chave do cache (hash forte no servidor). */
+  cacheKey: (parts: string[]) => string
   signal?: AbortSignal
   now?: Date
-  limiter?: RateLimiter
-  cache?: ResultCache<AIResult<unknown>>
   log?: AILogger
 }
 
-// Compartilhados entre requisições do mesmo processo do servidor.
-const sharedLimiter = new RateLimiter()
-const sharedCache = new ResultCache<AIResult<unknown>>()
+// Pedidos iguais ao mesmo tempo neste servidor viram uma chamada só.
+const inFlight = new InFlight<AIResult<unknown>>()
 
 export const nowOf = (deps: AIServiceDeps) => deps.now ?? getNow()
-
-/** Conta uma chamada ao modelo para a pessoa e para o escritório. */
-export function consumeQuota(deps: AIServiceDeps) {
-  ;(deps.limiter ?? sharedLimiter).consume([
-    { key: `user:${deps.userId}`, rules: RATE_RULES.user },
-    { key: `org:${deps.repo.organizationId}`, rules: RATE_RULES.organization },
-  ])
-}
 
 /** Só as fontes que a resposta de fato cita (menos dados trafegando). */
 export function citedSources(output: unknown, sources: AISources, always: string[] = []): AISources {
@@ -86,29 +84,36 @@ interface StructuredOptions<T> {
   finalize?: (data: T, sources: AISources) => T
   /** Referências sempre devolvidas (ex.: a movimentação analisada). */
   alwaysCite?: string[]
+  /** `light`: operação simples, modelo mais barato. */
+  tier?: AITier
 }
 
 export async function runStructured<T>(options: StructuredOptions<T>): Promise<AIResult<T>> {
   const { deps, operation, built, schema } = options
+  const tier = options.tier ?? "standard"
   const context = sanitizeAIContext(built.context)
   const contextText = JSON.stringify(context)
   const provider = deps.provider
-  const cache = (deps.cache ?? sharedCache) as ResultCache<AIResult<T> & { usage?: object }>
-  const key = [operation, deps.repo.organizationId, provider.name, provider.model, PROMPT_VERSION, shortHash(contextText + options.request)].join(":")
+  const model = provider.modelFor?.(tier) ?? provider.model
+  const call = { organizationId: deps.repo.organizationId, userId: deps.userId, operation }
+  const key = deps.cacheKey([operation, deps.repo.organizationId, provider.name, model, PROMPT_VERSION, options.task, options.request, contextText])
 
   return track(deps, operation, async () => {
-    const hit = cache.get(key)
-    if (hit) return { ...hit, usage: undefined, cached: true }
+    const hit = await deps.cache.get<AIResult<T>>(key)
+    if (hit) {
+      await deps.meter.cacheHit(call, provider.name, model).catch(() => undefined)
+      return { ...hit, cached: true, usage: undefined }
+    }
 
-    return cache.run(key, async () => {
-      consumeQuota(deps)
+    return (await inFlight.run(key, async () => {
       const request: AIRequest & { schema: typeof schema.json } = {
         system: buildSystemPrompt(options.task),
         messages: [{ role: "user", content: dataMessage(context, options.request) }],
         schema: schema.json,
         signal: deps.signal,
+        tier,
       }
-      const { value, usage } = await provider.generateJSON(request)
+      const { value, usage } = await meteredCall(deps.meter, provider, call, tier, () => provider.generateJSON(request))
 
       let data: T
       try {
@@ -119,16 +124,17 @@ export async function runStructured<T>(options: StructuredOptions<T>): Promise<A
       }
       if (options.finalize) data = options.finalize(data, built.sources)
 
-      return {
+      const result: AIResult<T> = {
         data,
         sources: citedSources(data, built.sources, options.alwaysCite),
         warnings: groundingWarnings(data, contextText),
         basis: built.basis,
         generatedAt: nowOf(deps).toISOString(),
         cached: false,
-        usage,
       }
-    })
+      await deps.cache.set(key, { organizationId: deps.repo.organizationId, operation, value: result, ttlMs: CACHE_TTL_MS }).catch(() => undefined)
+      return { ...result, usage } as AIResult<unknown>
+    })) as AIResult<T> & { usage?: { inputTokens?: number; outputTokens?: number } }
   })
 }
 

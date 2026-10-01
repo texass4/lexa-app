@@ -168,8 +168,8 @@ export function AIChatSheet({
           <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
             <p className="font-display text-[18px] leading-snug font-semibold tracking-[-0.015em] text-foreground">{context.headline}</p>
             <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-              A Íntegra lê os dados registrados sobre {TOPIC[context.scope.type]} e pode {CAPABILITIES.slice(0, -1).join(", ")} e {CAPABILITIES.at(-1)} —
-              citando de onde tirou cada informação. Respostas viram tarefas com um clique.
+              A Íntegra lê os dados registrados sobre {TOPIC[context.scope.type]} e pode {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
+              {CAPABILITIES.at(-1)} — citando de onde tirou cada informação. Respostas viram tarefas com um clique.
             </p>
             <div className="mt-5 flex flex-col gap-1.5">
               {context.prompts.map((prompt) => (

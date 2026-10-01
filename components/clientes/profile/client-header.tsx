@@ -43,6 +43,7 @@ const STATUS_LONG: Record<Client["status"], string> = {
   novo: "Novo cliente",
   inativo: "Cliente inativo",
   inadimplente: "Inadimplente",
+  contato: "Contato — sem CPF/CNPJ",
 }
 
 const CREATE: { kind: DialogKind; label: string; icon: React.ElementType }[] = [

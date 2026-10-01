@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import type { Activity, Client, Invoice, LegalDocument, Process, Task } from "@/types"
-import { changesSince, clientSignals, countByLevel, officeSignals, processSignals, type AttentionData } from "./attention"
+import type { Activity, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
+import { changesSince, clientSignals, countByLevel, isStale, officeSignals, processSignals, type AttentionData } from "./attention"
 
 const NOW = new Date(2026, 8, 24, 10, 0) // qui, 24/09/2026 10:00
 
@@ -39,10 +39,26 @@ const task = (id: string, patch: Partial<Task> = {}): Task => ({
   ...patch,
 })
 
+const prazo = (id: string, patch: Partial<Prazo> = {}): Prazo => ({
+  ...base,
+  id,
+  processId: "p1",
+  clientId: "c1",
+  description: `Prazo ${id}`,
+  fatalDate: "2026-10-10",
+  internalDate: "2026-10-08",
+  responsibleId: "u1",
+  origin: "manual",
+  status: "aberto",
+  createdById: "u1",
+  ...patch,
+})
+
 const empty = (patch: Partial<AttentionData> = {}): AttentionData => ({
   clients: [],
   processes: [],
   tasks: [],
+  deadlines: [],
   appointments: [],
   documents: [],
   invoices: [],
@@ -51,34 +67,33 @@ const empty = (patch: Partial<AttentionData> = {}): AttentionData => ({
 })
 
 describe("processSignals", () => {
-  it("prazo amanhã sem tarefa aberta é crítico e oferece criar tarefa", () => {
-    const p = process("p1", { nextDeadline: { date: "2026-09-25", title: "Contestação" } })
-    const [signal] = processSignals(empty({ processes: [p] }), p, NOW)
-    assert.equal(signal.level, "critical")
-    assert.equal(signal.title, "Prazo vence amanhã")
-    assert.match(signal.detail ?? "", /sem tarefa vinculada/)
-    assert.equal(signal.action?.type, "create-task")
-  })
-
-  it("prazo com tarefa aberta não sugere criar outra", () => {
-    const p = process("p1", { nextDeadline: { date: "2026-09-29", title: "Réplica" } })
-    const t = task("t1", { related: { type: "process", id: "p1" } })
-    const signals = processSignals(empty({ processes: [p], tasks: [t] }), p, NOW)
-    assert.equal(signals.length, 1)
-    assert.equal(signals[0].level, "warning")
-    assert.equal(signals[0].action, undefined)
-  })
-
-  it("prazo distante não gera sinal", () => {
-    const p = process("p1", { nextDeadline: { date: "2026-11-20", title: "Audiência" } })
-    assert.deepEqual(processSignals(empty({ processes: [p] }), p, NOW), [])
-  })
-
   it("processo parado há mais de 60 dias pede verificação", () => {
     const p = process("p1", { lastMovementAt: "2026-06-01T10:00:00" })
     const [signal] = processSignals(empty({ processes: [p] }), p, NOW)
     assert.equal(signal.kind, "process-stale")
     assert.match(signal.title, /Sem movimentação há 115 dias/)
+    assert.match(signal.detail ?? "", /sem consulta automática/)
+  })
+
+  it("consultado há pouco na fonte: sem movimentação não é processo abandonado", () => {
+    const p = process("p1", {
+      lastMovementAt: "2026-06-01T10:00:00",
+      lastSyncedAt: "2026-09-23T03:10:00",
+      source: { provider: "datajud" },
+    })
+    assert.deepEqual(processSignals(empty({ processes: [p] }), p, NOW), [])
+    assert.equal(isStale(p, NOW), false)
+  })
+
+  it("acompanhado, mas sem consulta recente: alerta diferencia movimentação e consulta", () => {
+    const old = process("p1", { lastMovementAt: "2026-06-01T10:00:00", lastSyncedAt: "2026-08-20T03:10:00", source: { provider: "datajud" } })
+    const [signal] = processSignals(empty({ processes: [old] }), old, NOW)
+    assert.equal(signal.kind, "process-stale")
+    assert.match(signal.detail ?? "", /última consulta em 20\/08\/2026/)
+
+    const never = process("p2", { lastMovementAt: "2026-06-01T10:00:00", source: { provider: "datajud" } })
+    const [unchecked] = processSignals(empty({ processes: [never] }), never, NOW)
+    assert.match(unchecked.detail ?? "", /ainda não consultado/)
   })
 
   it("movimentação recente de julgamento pede revisão; de tramitação só informa", () => {
@@ -100,8 +115,112 @@ describe("processSignals", () => {
   })
 
   it("processo concluído não gera sinais", () => {
-    const p = process("p1", { status: "concluido", nextDeadline: { date: "2026-09-24", title: "Prazo" }, lastMovementAt: "2026-01-01T00:00:00" })
-    assert.deepEqual(processSignals(empty({ processes: [p] }), p, NOW), [])
+    const p = process("p1", { status: "concluido", lastMovementAt: "2026-01-01T00:00:00" })
+    const deadlines = [prazo("z", { fatalDate: "2026-09-24" })]
+    assert.deepEqual(processSignals(empty({ processes: [p], deadlines }), p, NOW), [])
+  })
+})
+
+describe("prazos (sinais)", () => {
+  // Hoje é qui, 24/09/2026. Todos com tarefa vinculada, salvo quando o teste diz o contrário.
+  const t = task("t1", { related: { type: "process", id: "p1" } })
+  const withTask = (id: string, patch: Partial<Prazo>) => prazo(id, { taskId: "t1", ...patch })
+  const signalsOf = (deadlines: Prazo[], tasks: Task[] = [t]) => {
+    const p = process("p1")
+    return processSignals(empty({ processes: [p], deadlines, tasks }), p, NOW).filter((s) => s.kind.startsWith("deadline"))
+  }
+
+  it("5 dias: alerta de verificação", () => {
+    const [s] = signalsOf([withTask("a", { fatalDate: "2026-09-29" })])
+    assert.equal(s.kind, "deadline-week")
+    assert.equal(s.level, "warning")
+    assert.equal(s.title, "Prazo vence em 5 dias")
+    assert.equal(s.href, "/processos/p1")
+  })
+
+  it("6 dias ainda não gera alerta", () => {
+    assert.deepEqual(signalsOf([withTask("a", { fatalDate: "2026-09-30" })]), [])
+  })
+
+  it("2 dias: alerta crítico", () => {
+    const [s] = signalsOf([withTask("a", { fatalDate: "2026-09-26" })])
+    assert.equal(s.kind, "deadline-soon")
+    assert.equal(s.level, "critical")
+    assert.equal(s.title, "Prazo vence em 2 dias")
+  })
+
+  it("hoje: alerta crítico do dia", () => {
+    const [s] = signalsOf([withTask("a", { fatalDate: "2026-09-24" })])
+    assert.equal(s.kind, "deadline-today")
+    assert.equal(s.level, "critical")
+    assert.equal(s.title, "Prazo vence hoje")
+  })
+
+  it("aberto e vencido continua crítico", () => {
+    const [s] = signalsOf([withTask("a", { fatalDate: "2026-09-22" })])
+    assert.equal(s.kind, "deadline-overdue")
+    assert.equal(s.title, "Prazo venceu há 2 dias")
+  })
+
+  it("cumprido não gera sinal", () => {
+    assert.deepEqual(signalsOf([prazo("a", { fatalDate: "2026-09-24", status: "cumprido" })]), [])
+  })
+
+  it("perdido não gera sinal", () => {
+    assert.deepEqual(signalsOf([prazo("a", { fatalDate: "2026-09-26", status: "perdido" })]), [])
+  })
+
+  it("sem tarefa: 'Prazo sem tarefa', mesmo longe da data, com ação que vincula a tarefa ao prazo", () => {
+    const [s] = signalsOf([prazo("a", { fatalDate: "2026-11-20", internalDate: "2026-11-18", responsibleId: "u2" })], [])
+    assert.equal(s.kind, "deadline-no-task")
+    assert.equal(s.title, "Prazo sem tarefa")
+    assert.deepEqual(s.action, {
+      type: "create-task",
+      label: "Criar tarefa",
+      processId: "p1",
+      title: "Prazo a",
+      prazoId: "a",
+      date: "2026-11-18",
+      assigneeId: "u2",
+    })
+  })
+
+  it("tarefa vinculada que foi excluída conta como sem tarefa", () => {
+    const [s] = signalsOf([prazo("a", { fatalDate: "2026-11-20", taskId: "apagada" })])
+    assert.equal(s.kind, "deadline-no-task")
+  })
+
+  it("com tarefa vinculada: sem 'Prazo sem tarefa'", () => {
+    assert.deepEqual(signalsOf([withTask("a", { fatalDate: "2026-11-20" })]), [])
+  })
+
+  it("múltiplos prazos: um sinal por prazo; o escritório agrupa acima de dois", () => {
+    const deadlines = [
+      withTask("hoje", { fatalDate: "2026-09-24" }),
+      withTask("dois", { fatalDate: "2026-09-26" }),
+      prazo("cinco", { fatalDate: "2026-09-29" }),
+      withTask("longe", { fatalDate: "2026-12-01" }),
+    ]
+    assert.deepEqual(
+      signalsOf(deadlines)
+        .map((s) => s.id)
+        .sort(),
+      ["deadline-no-task:cinco", "deadline-soon:dois", "deadline-today:hoje", "deadline-week:cinco"],
+    )
+
+    const p = process("p1")
+    const many = ["a", "b", "c"].map((id) => prazo(id, { fatalDate: "2026-11-20" }))
+    const grouped = officeSignals(empty({ processes: [p], deadlines: many }), { now: NOW }).filter((s) => s.kind === "deadline-no-task")
+    assert.equal(grouped.length, 1)
+    assert.equal(grouped[0].title, "3 prazos sem tarefa")
+  })
+
+  it("sem prazo: nenhum sinal de prazo", () => {
+    assert.deepEqual(signalsOf([]), [])
+  })
+
+  it("prazo de outro processo não entra", () => {
+    assert.deepEqual(signalsOf([withTask("a", { processId: "p2", fatalDate: "2026-09-24" })]), [])
   })
 })
 
@@ -148,11 +267,13 @@ describe("officeSignals", () => {
   it("ordena do crítico ao informativo", () => {
     const processes = [
       process("p1", { lastMovementAt: "2026-09-23T10:00:00", movements: [{ id: "m", at: "2026-09-23T10:00:00", title: "Remetidos os Autos" }] }),
-      process("p2", { nextDeadline: { date: "2026-09-24", title: "Prazo" } }),
+      process("p2"),
     ]
-    const levels = officeSignals(empty({ processes }), { now: NOW }).map((s) => s.level)
+    const deadlines = [prazo("hoje", { processId: "p2", fatalDate: "2026-09-24", taskId: "t1" })]
+    const tasks = [task("t1", { related: { type: "process", id: "p2" } })]
+    const levels = officeSignals(empty({ processes, deadlines, tasks }), { now: NOW }).map((s) => s.level)
     assert.deepEqual(levels, ["critical", "info"])
-    assert.deepEqual(countByLevel(officeSignals(empty({ processes }), { now: NOW })), { critical: 1, warning: 0, info: 1, done: 0 })
+    assert.deepEqual(countByLevel(officeSignals(empty({ processes, deadlines, tasks }), { now: NOW })), { critical: 1, warning: 0, info: 1, done: 0 })
   })
 })
 
@@ -160,10 +281,12 @@ describe("clientSignals", () => {
   it("junta processos, tarefas e valores em atraso do cliente", () => {
     const client = { ...base, id: "c1", name: "Ana" } as Client
     const data = empty({
-      processes: [
-        process("p1", { nextDeadline: { date: "2026-09-26", title: "Recurso" } }),
-        process("p2", { clientId: "outro", nextDeadline: { date: "2026-09-24", title: "X" } }),
+      processes: [process("p1"), process("p2", { clientId: "outro" })],
+      deadlines: [
+        prazo("recurso", { fatalDate: "2026-09-26", taskId: "t1" }),
+        prazo("x", { processId: "p2", clientId: "outro", fatalDate: "2026-09-24", taskId: "t1" }),
       ],
+      tasks: [task("t1", { related: { type: "process", id: "p1" }, dueAt: "2026-09-25T18:00:00" })],
       invoices: [{ ...base, id: "i1", clientId: "c1", description: "Honorários", amount: 800, dueDate: "2026-09-01", status: "atrasado" }],
     })
     const signals = clientSignals(data, client, NOW)

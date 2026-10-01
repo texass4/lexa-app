@@ -401,7 +401,16 @@ export interface OverviewData {
     organizations: { active: number; trial: number; pending: number; suspended: number; inactive: number; total: number }
     newOrganizations: { current: number; previous: number }
     users: { total: number; active: number; signedInPeriod: number; newCurrent: number; newPrevious: number }
-    totals: { clients: number; processes: number; tasks: number; documents: number; appointments: number; storageBytes: number; whatsappMonth: number; aiMonth: number }
+    totals: {
+      clients: number
+      processes: number
+      tasks: number
+      documents: number
+      appointments: number
+      storageBytes: number
+      whatsappMonth: number
+      aiMonth: number
+    }
     mrrCents: number
     payingOrganizations: number
     unpricedPlans: number

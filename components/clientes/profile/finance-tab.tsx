@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { CircleCheck, CircleDollarSign, Clock3, Ellipsis, Plus, Trash2, TriangleAlert } from "lucide-react"
+import { CircleCheck, CircleDollarSign, Clock3, Ellipsis, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
@@ -20,6 +20,7 @@ import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "
 import { formatCurrency } from "@/lib/format"
 import type { Client, Invoice } from "@/types"
 import { Can } from "@/lib/auth/session"
+import { NewInvoiceDialog } from "@/components/financeiro/new-invoice-dialog"
 
 const ICON: Record<Invoice["status"], React.ElementType> = { pago: CircleCheck, pendente: Clock3, atrasado: TriangleAlert }
 const ICON_CLS: Record<Invoice["status"], string> = {
@@ -33,6 +34,7 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
   const { openDialog } = useUI()
   const { markInvoicePaid, deleteInvoice } = useDemoActions()
   const [toDelete, setToDelete] = React.useState<Invoice | null>(null)
+  const [editing, setEditing] = React.useState<Invoice | undefined>()
   const invoices = [...f.invoices].sort((a, b) => b.dueDate.localeCompare(a.dueDate))
   const paidPct = f.contracted ? Math.round((f.paid / f.contracted) * 100) : 0
   const newInvoice = () => openDialog("invoice", { clientId: client.id })
@@ -209,6 +211,9 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
                             <CircleCheck /> Registrar pagamento hoje
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem className="h-8 px-2" onClick={() => setEditing(inv)}>
+                          <Pencil /> Editar lançamento
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setToDelete(inv)}>
                           <Trash2 /> Excluir lançamento
                         </DropdownMenuItem>
@@ -222,6 +227,7 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
         </ol>
       </Panel>
 
+      <NewInvoiceDialog open={!!editing} onOpenChange={(o) => !o && setEditing(undefined)} invoice={editing} />
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}
