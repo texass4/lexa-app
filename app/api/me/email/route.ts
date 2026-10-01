@@ -5,8 +5,8 @@ import { HttpError, readJson, requireMember, route } from "@/lib/auth/server"
 import { isEmail, normalizeEmail } from "@/lib/auth/validation"
 
 /**
- * Troca o e-mail de login. Exige a senha atual — sem provedor de e-mail ainda, é a
- * confirmação de que quem pede é o dono da conta.
+ * Troca o e-mail de login. Exige a senha atual: é a confirmação de que quem pede é o
+ * dono da conta.
  */
 export const PATCH = route(async (request) => {
   const { user } = await requireMember()

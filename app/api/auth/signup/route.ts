@@ -56,7 +56,7 @@ export const POST = route(async (request) => {
   const { data: created, error: userError } = await admin.auth.admin.createUser({
     email,
     password,
-    // A aprovação do escritório é a porta de entrada; o e-mail será verificado quando houver provedor.
+    // A aprovação do escritório é a porta de entrada: a conta nasce com o e-mail já confirmado.
     email_confirm: true,
     user_metadata: { name },
   })

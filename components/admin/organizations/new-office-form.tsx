@@ -14,7 +14,15 @@ import { formatCents, type AdminPlan } from "@/lib/admin/catalog"
 /** Novo escritório criado pelo Admin: já nasce ativo e o sócio recebe convite. */
 export function NewOfficeForm({ plans, onDone }: { plans: AdminPlan[]; onDone: (created: boolean) => void }) {
   const active = plans.filter((p) => p.status === "active")
-  const [form, setForm] = React.useState({ name: "", cnpj: "", email: "", plan: active[0]?.name ?? "", ownerName: "", ownerEmail: "", skipTrial: false })
+  const [form, setForm] = React.useState({
+    name: "",
+    cnpj: "",
+    email: "",
+    plan: active[0]?.name ?? "",
+    ownerName: "",
+    ownerEmail: "",
+    skipTrial: false,
+  })
   const [error, setError] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }))
@@ -27,8 +35,12 @@ export function NewOfficeForm({ plans, onDone }: { plans: AdminPlan[]; onDone: (
     setError("")
     setBusy(true)
     try {
-      await adminFetch("/api/admin/organizations", "POST", form)
-      toast.success("Escritório criado.", { description: `${form.ownerEmail} recebeu o convite.` })
+      const { email } = await adminFetch<{ email?: { sent: boolean; message?: string } }>("/api/admin/organizations", "POST", form)
+      if (email?.sent) toast.success("Escritório criado.", { description: `${form.ownerEmail} recebeu o convite.` })
+      else
+        toast.warning("Escritório criado, mas o convite não foi enviado por e-mail.", {
+          description: `${email?.message ?? ""} Reenvie o convite na equipe do escritório.`.trim(),
+        })
       onDone(true)
     } catch (err) {
       setError((err as Error).message)

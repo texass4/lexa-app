@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { HttpError, readJson, route } from "@/lib/auth/server"
 import { inviteMember } from "@/lib/auth/members"
+import { emailStatus, type EmailResult } from "@/lib/auth/mailer"
 import { toOrganization, type OrganizationRow } from "@/lib/auth/profile"
 import { requireAdmin } from "@/lib/admin/guard"
 import { recordAudit } from "@/lib/admin/audit"
@@ -44,8 +45,9 @@ export const POST = route(async (request) => {
     .single<OrganizationRow>()
   if (error) throw error
 
+  let email: EmailResult
   try {
-    await inviteMember(request, org.id, { name: body.ownerName, email: body.ownerEmail, role: "owner" })
+    email = (await inviteMember(request, org.id, { name: body.ownerName, email: body.ownerEmail, role: "owner" })).email
   } catch (inviteError) {
     await admin.from("organizations").delete().eq("id", org.id)
     throw inviteError
@@ -61,8 +63,8 @@ export const POST = route(async (request) => {
     actor: profile,
     organizationId: org.id,
     target: { type: "organization", id: org.id, label: org.name },
-    summary: `Escritório ${org.name} criado no plano ${plan}; convite enviado para ${body.ownerEmail}`,
-    metadata: { plan, skipTrial: !!body.skipTrial },
+    summary: `Escritório ${org.name} criado no plano ${plan}; convite ${email.ok ? "enviado" : "criado (e-mail não enviado)"} para ${body.ownerEmail}`,
+    metadata: { plan, skipTrial: !!body.skipTrial, emailSent: email.ok },
   })
-  return NextResponse.json({ organization: toOrganization(org) }, { status: 201 })
+  return NextResponse.json({ organization: toOrganization(org), email: emailStatus(email) }, { status: 201 })
 })

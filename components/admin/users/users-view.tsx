@@ -69,8 +69,14 @@ function CreateForm({ orgs, defaultOrg, onDone }: { orgs: OrgOption[]; defaultOr
     setBusy(true)
     setError("")
     try {
-      await adminFetch(`/api/admin/organizations/${form.organizationId}/users`, "POST", { name: form.name, email: form.email, role: form.role, jobTitle: form.jobTitle })
-      toast.success("Usuário criado.", { description: `${form.email} recebeu o link para criar a senha.` })
+      const { email } = await adminFetch<{ email?: { sent: boolean; message?: string } }>(`/api/admin/organizations/${form.organizationId}/users`, "POST", {
+        name: form.name,
+        email: form.email,
+        role: form.role,
+        jobTitle: form.jobTitle,
+      })
+      if (email?.sent) toast.success("Usuário criado.", { description: `${form.email} recebeu o link para criar a senha.` })
+      else toast.warning("Usuário criado, mas o e-mail não foi enviado.", { description: `${email?.message ?? ""} Use “Reenviar convite”.`.trim() })
       onDone(true)
     } catch (err) {
       setError((err as Error).message)

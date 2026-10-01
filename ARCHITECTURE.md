@@ -43,7 +43,7 @@ lexa-app/
 │   │                         tarefas, agenda, documentos, financeiro, configuracoes
 │   ├── (auth)/               login, cadastro, recuperar-senha, redefinir-senha
 │   ├── (admin)/admin         painel do Super Admin (papel checado no servidor)
-│   ├── auth/confirm          troca o token dos links (recuperação/convite) por sessão
+│   ├── auth/confirm          troca o token dos links (recuperação/convite/confirmação) por sessão
 │   └── api/                  processes/* (consulta), auth/* (cadastro, recuperação),
 │                             team/users (gestão do escritório), me/email, admin/*,
 │                             ai/* (Íntegra IA), whatsapp/* (Central de Atendimento + webhook da Z-API)
@@ -64,7 +64,7 @@ lexa-app/
 │   ├── ai/                   Íntegra IA: provedor (Gemini), contexto, prompts, schemas, serviços
 │   ├── services/whatsapp/    recebimento, envio, conversas, instância, Íntegra IA (servidor)
 │   ├── whatsapp/             telefone, status, mapeadores de linha, cliente do navegador
-│   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros
+│   ├── auth/                 permissões, sessão, helpers de rota, gestão de membros, e-mail (mailer + templates)
 │   ├── supabase/             clientes: navegador, servidor (cookie) e admin (service role)
 │   ├── store/                demo-store, ui-store, storage (persistência no Supabase)
 │   ├── account.ts            pessoa e escritório logados (preenchido pela sessão)
@@ -74,6 +74,7 @@ lexa-app/
 │   ├── dates.ts              `getNow()` + formatadores
 │   └── format.ts             moeda, busca, normalização de texto, IDs
 ├── supabase/migrations/      SQL do banco: tabelas, RLS, Storage (rodar no SQL Editor)
+├── supabase/templates/       templates de e-mail do Supabase Auth (gerados; colar no painel)
 ├── proxy.ts                  sessão e bloqueio de rotas (o "middleware" do Next 16)
 ├── instrumentation.ts        cria o Super Admin no start do servidor
 ├── types/index.ts            contratos de todas as entidades
@@ -267,7 +268,9 @@ Transições: `app/(app)/template.tsx` (entrada de página em CSS, `.page-enter`
 
 **Na interface** — `useSession().can("x.edit")` ou `<Can permission="x.edit">` para esconder ações; `nav-config.ts` diz a permissão de cada rota (menu, busca e "sem acesso" no `AppShell`); `DIALOG_PERMISSION` (`ui-store.tsx`) diz a de cada diálogo global.
 
-**Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único; enquanto não há provedor de e-mail, o link sai no terminal (`lib/auth/mailer.ts`).
+**Fluxos** — cadastro público cria escritório `pending` (Super Admin aprova em `/admin`). Convite e recuperação geram link de uso único (`generateLink` do Supabase, que não envia nada) e a Íntegra envia o e-mail pelo SMTP da Brevo.
+
+**E-mail** — `lib/auth/mailer.ts` é o único ponto que fala com o SMTP: `sendEmail({ to, subject, html, text? })` para qualquer e-mail transacional e `sendAuthLink` para convite e recuperação. Nunca lança por falha de envio: devolve `EmailResult` (`not_configured`, `invalid_recipient`, `rejected`, `auth`, `timeout`, `unavailable`, `unexpected`) e a API repassa ao navegador só `{ sent, message }` (`emailStatus`). Convite criado com e-mail que falhou continua pendente (o toast avisa; dá para reenviar); no reenvio, a falha vira erro. Pedidos repetidos para a mesma pessoa em 60 s não geram outro link (um link novo invalida o anterior). Templates em `lib/auth/email-templates.ts`; os do Supabase Auth (`supabase/templates/`) são gerados deles com `npm run email:templates` e um teste falha se divergirem. Sem `BREVO_SMTP_*`: em desenvolvimento o link sai no terminal; em produção, nada é gerado. Configuração da Brevo e do Supabase: [README › E-mail](./README.md#e-mail-brevo-smtp).
 
 ## 7. Íntegra Admin (`/admin`)
 
@@ -298,11 +301,11 @@ Também: `/api/admin/search` (busca global), `/api/admin/notifications` (sino e 
 
 ## 8. O que ainda não existe
 
-Envio de e-mail (os links de convite e de nova senha saem no log do servidor), notificações, monitoramento automático de processos, cadastro de prazos, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
+Notificações (o envio de e-mail já existe — `sendEmail` em `lib/auth/mailer.ts` —, mas nenhum aviso automático o usa ainda), monitoramento automático de processos, cadastro de prazos, integrações (agenda, assinatura eletrônica, Outlook e Gmail, boletos e Pix) e cobrança automática (a estrutura de assinaturas está pronta — seção 7).
 
 **Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
 
-Autenticação, banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Autenticação, e-mail transacional (Brevo SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o salvamento dos processos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 
@@ -312,7 +315,8 @@ Primeira vez: rode as migrações de `supabase/migrations/` em ordem numérica n
 npm run dev      # http://localhost:3000
 npm test         # CNJ, consulta (cliente HTTP, cache, SWR, isolamento, erros), mapper, interpretador, timeline, permissões, financeiro, WhatsApp
 npm run lint
-npx tsc --noEmit
+npm run typecheck   # next typegen + tsc --noEmit
+npm run email:templates   # regenera supabase/templates/ depois de mudar lib/auth/email-templates.ts
 ```
 
 ## 10. Íntegra IA
