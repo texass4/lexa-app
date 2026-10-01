@@ -162,7 +162,7 @@ export function AdminSidebar() {
   return (
     <aside
       aria-label="Barra lateral do Admin"
-      className="sidebar-surface fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col text-admin-rail-foreground md:flex lg:w-[256px]"
+      className="sidebar-surface sidebar-columns fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col text-admin-rail-foreground md:flex lg:w-[256px]"
     >
       <div className="flex h-[76px] shrink-0 items-center justify-center px-4 lg:justify-start lg:px-5">
         <Link href="/admin" aria-label={`${BRAND.name} Admin — dashboard`} className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-admin-rail-highlight/50">

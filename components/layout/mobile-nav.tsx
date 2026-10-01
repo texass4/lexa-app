@@ -21,7 +21,7 @@ export function MobileDrawer() {
     <DialogPrimitive.Root open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0d1b31]/40 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
-        <DialogPrimitive.Popup className="sidebar-surface fixed inset-y-0 left-0 z-50 flex w-[min(300px,86vw)] flex-col text-sidebar-foreground shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
+        <DialogPrimitive.Popup className="sidebar-surface sidebar-columns fixed inset-y-0 left-0 z-50 flex w-[min(300px,86vw)] flex-col text-sidebar-foreground shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
           <DialogPrimitive.Title className="sr-only">Menu de navegação</DialogPrimitive.Title>
           <div className="flex h-[72px] items-center justify-between px-4">
             <Logo tone="inverse" subtitle={getOrganization().name} />

@@ -41,19 +41,19 @@ function DashboardSkeleton() {
   )
 }
 
-/** Dois cartões lado a lado (7 + 5 colunas); se a pessoa só pode ver um, ele ocupa a linha. */
+/** Dois cartões lado a lado (7 + 5 colunas), com a mesma altura; se a pessoa só pode ver um, ele ocupa a linha. */
 function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React.ReactNode; delay?: number }) {
   if (!left && !right) return null
   const both = !!left && !!right
   return (
     <div className="grid gap-4 lg:grid-cols-12 lg:gap-6">
       {left && (
-        <FadeIn delay={delay} className={cn("min-w-0", both ? "lg:col-span-7" : "lg:col-span-12")}>
+        <FadeIn delay={delay} className={cn("min-w-0 [&>*]:h-full", both ? "lg:col-span-7" : "lg:col-span-12")}>
           {left}
         </FadeIn>
       )}
       {right && (
-        <FadeIn delay={delay + 0.04} className={cn("min-w-0", both ? "lg:col-span-5" : "lg:col-span-12")}>
+        <FadeIn delay={delay + 0.04} className={cn("min-w-0 [&>*]:h-full", both ? "lg:col-span-5" : "lg:col-span-12")}>
           {right}
         </FadeIn>
       )}

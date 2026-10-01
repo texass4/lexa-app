@@ -328,7 +328,7 @@ export function ProfileSection() {
         <div className="grid grid-cols-1 gap-3 px-5 pb-5 sm:grid-cols-2">
           {(
             [
-              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F5F6F8]", rail: "bg-[#0D1B31]", bar: "bg-white", line: "bg-[#E5E8EE]", accent: "bg-[#2B57C4]" },
+              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F5F6F8]", rail: "bg-[#0B1526]", bar: "bg-white", line: "bg-[#E5E8EE]", accent: "bg-[#2B57C4]" },
               { id: "dark", label: "Escuro", icon: Moon, preview: "bg-[#0A0F18]", rail: "bg-[#08111F]", bar: "bg-[#111723]", line: "bg-[#212A39]", accent: "bg-[#7FA3F5]" },
             ] as const
           ).map((t) => (

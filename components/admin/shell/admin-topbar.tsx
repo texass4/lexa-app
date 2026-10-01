@@ -222,7 +222,7 @@ export function AdminDrawer() {
     <DialogPrimitive.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0e1726]/35 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
-        <DialogPrimitive.Popup className="sidebar-surface fixed inset-y-0 left-0 z-50 flex w-[min(296px,86vw)] flex-col text-admin-rail-foreground shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
+        <DialogPrimitive.Popup className="sidebar-surface sidebar-columns fixed inset-y-0 left-0 z-50 flex w-[min(296px,86vw)] flex-col text-admin-rail-foreground shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
           <DialogPrimitive.Title className="sr-only">Menu do Admin</DialogPrimitive.Title>
           <div className="flex h-[64px] items-center justify-between px-4">
             <AdminBrand />
