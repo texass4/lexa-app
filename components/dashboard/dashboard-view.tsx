@@ -13,7 +13,7 @@ import { FinancePanel } from "./finance-panel"
 import { WeekPrazos } from "./week-prazos"
 import { RecentActivity } from "./recent-activity"
 import { AttentionPanel } from "./attention-panel"
-import { AIDock } from "./ai-dock"
+import { OfficeAIDock } from "./office-ai-dock"
 import { FadeIn } from "@/components/ui/motion"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { useOfficeData } from "@/lib/store/office-store"
@@ -122,7 +122,7 @@ export function DashboardView() {
       </div>
 
       <aside className="sticky top-[96px] hidden h-[calc(100dvh-120px)] min-h-[560px] 2xl:block">
-        <AIDock />
+        <OfficeAIDock />
       </aside>
     </div>
   )
