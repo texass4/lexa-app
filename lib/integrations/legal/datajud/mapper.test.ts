@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { buildProcessSheet } from "@/lib/services/processes/sheet"
-import { buildProcessDraft } from "@/lib/services/processes/import"
+import { buildProcessSheet } from "@/lib/services/processos/sheet"
+import { buildProcessDraft } from "@/lib/services/processos/import"
 import { mapSearchResponse } from "./mapper"
 import { emptyResponse, realMovementsResponse, sparseResponse, trf1Response, twoDegreesResponse, withPartiesResponse } from "./__fixtures__/responses"
 

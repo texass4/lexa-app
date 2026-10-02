@@ -7,11 +7,12 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { PRIORITY_CONFIG } from "@/lib/config"
-import { fmtNumericDate, fmtRelative, toLocalISO } from "@/lib/dates"
+import { PRIORITY_CONFIG } from "@/lib/core/config"
+import { fmtNumericDate, fmtRelative, toLocalISO } from "@/lib/core/dates"
 import type { AIRequestError } from "@/lib/ai/client"
 import { CONFIG_ERROR_CODES } from "@/lib/ai/errors"
 import type { ActionSuggestion, AIResult, AISource, AISources, AIStatus, AttentionPoint, Confidence, Nature, ReferencedNote } from "@/lib/ai/types"
+import { AIPrivacyNote } from "./ai-privacy"
 
 /* ---------------------------------- marca ---------------------------------- */
 
@@ -20,7 +21,7 @@ export function AIMark({ className }: { className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-brand/25 bg-brand-soft text-brand-strong [&_svg]:size-4",
+        "flex size-10 shrink-0 items-center justify-center rounded-full bg-surface text-brand shadow-[0_2px_8px_-2px_rgb(43_87_196/0.3)] ring-1 ring-brand/15 [&_svg]:size-[18px]",
         className,
       )}
     >
@@ -44,13 +45,13 @@ export function AIPanel({
   className?: string
 }) {
   return (
-    <section className={cn("min-w-0 rounded-[14px] border border-border bg-card shadow-card", className)} aria-label={title}>
-      <header className="flex flex-col gap-3 px-5 pt-4.5 pb-4 lg:flex-row lg:items-center lg:justify-between">
+    <section className={cn("ai-surface min-w-0 rounded-card border border-border/90 shadow-card", className)} aria-label={title}>
+      <header className="flex flex-col gap-3 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <AIMark />
           <div className="min-w-0">
-            <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-foreground">{title}</h2>
-            <p className="mt-0.5 text-[12.5px] text-muted-foreground">{description}</p>
+            <h2 className="text-[15px] font-semibold tracking-[-0.015em] text-foreground">{title}</h2>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{description}</p>
           </div>
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -179,7 +180,17 @@ export function SourceChip({ source, onOpen }: { source: AISource; onOpen?: Sour
   return <span className={className}>{content}</span>
 }
 
-export function SourceChips({ refs, sources, onOpen, className }: { refs: string[]; sources: AISources; onOpen?: SourceHandler; className?: string }) {
+function SourceChips({
+  refs,
+  sources,
+  onOpen,
+  className,
+}: {
+  refs: string[]
+  sources: AISources
+  onOpen?: SourceHandler
+  className?: string
+}) {
   const known = refs.map((ref) => sources[ref]).filter(Boolean)
   if (!known.length) return null
   return (
@@ -360,7 +371,7 @@ const CONFIDENCE: Record<Confidence, { label: string; tone: "success" | "warning
   baixo: { label: "Confiança baixa", tone: "danger" },
 }
 
-export function ConfidenceBadge({ level }: { level: Confidence }) {
+function ConfidenceBadge({ level }: { level: Confidence }) {
   return (
     <StatusBadge tone={CONFIDENCE[level].tone} size="sm">
       {CONFIDENCE[level].label}
@@ -374,7 +385,10 @@ export function AIWarnings({ warnings }: { warnings: string[] }) {
   return (
     <div className="space-y-1.5">
       {warnings.map((warning, i) => (
-        <p key={i} className="flex items-start gap-2 rounded-[10px] border border-warning/20 bg-warning-soft/60 px-3 py-2 text-[12.5px] leading-snug text-warning">
+        <p
+          key={i}
+          className="flex items-start gap-2 rounded-[10px] border border-warning/20 bg-warning-soft/60 px-3 py-2 text-[12.5px] leading-snug text-warning"
+        >
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
           {warning}
         </p>
@@ -389,7 +403,10 @@ export function AIFooter({ result, confidence }: { result: AIResult<unknown>; co
     <div className="space-y-3 border-t border-border pt-3.5">
       <AIWarnings warnings={result.warnings} />
       <div className="flex flex-col gap-2 text-[11.5px] text-subtle sm:flex-row sm:items-center sm:justify-between">
-        <p className="leading-snug">{result.basis} Gerado por IA — confira antes de usar.</p>
+        <div className="space-y-0.5">
+          <p className="leading-snug">{result.basis} Gerado por IA — confira antes de usar.</p>
+          <AIPrivacyNote />
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           {confidence && <ConfidenceBadge level={confidence} />}
           <span className="tabular">{result.cached ? "Análise recente" : `Gerado ${fmtRelative(toLocalISO(new Date(result.generatedAt)))}`}</span>

@@ -28,8 +28,10 @@ import { adminFetch, useAdminData } from "@/lib/admin/client"
 import type { AdminUser, OrgStatus } from "@/lib/admin/catalog"
 import { MEMBER_ROLES, ROLE_LABELS, type MemberRole } from "@/lib/auth/permissions"
 import { isEmail } from "@/lib/auth/validation"
-import { fmtNumericDate, fmtRelative, getNow } from "@/lib/dates"
-import { matches } from "@/lib/format"
+import { UFS } from "@/lib/clientes/clients"
+import { validateOab } from "@/lib/intimacoes/oab"
+import { fmtNumericDate, fmtRelative, getNow } from "@/lib/core/dates"
+import { matches } from "@/lib/core/format"
 import { AdminHeader, rowMenuTrigger } from "../ui/admin-header"
 import { ConfirmAction, type ConfirmRequest } from "../ui/confirm-action"
 
@@ -49,7 +51,7 @@ function statusOf(u: AdminUser) {
 function FormError({ children }: { children?: string }) {
   if (!children) return null
   return (
-    <p role="alert" className="rounded-[9px] bg-danger-soft px-3 py-2 text-[12.5px] text-danger sm:col-span-2">
+    <p role="alert" className="rounded-control bg-danger-soft px-3 py-2 text-[12.5px] text-danger sm:col-span-2">
       {children}
     </p>
   )
@@ -57,7 +59,16 @@ function FormError({ children }: { children?: string }) {
 
 function CreateForm({ orgs, defaultOrg, onDone }: { orgs: OrgOption[]; defaultOrg?: string; onDone: (ok: boolean) => void }) {
   const selectable = orgs.filter((o) => o.status !== "inactive")
-  const [form, setForm] = React.useState({ organizationId: defaultOrg ?? selectable[0]?.id ?? "", name: "", email: "", role: "lawyer" as MemberRole, jobTitle: "" })
+  const [form, setForm] = React.useState({
+    organizationId: defaultOrg ?? selectable[0]?.id ?? "",
+    name: "",
+    email: "",
+    role: "lawyer" as MemberRole,
+    jobTitle: "",
+    oabNumber: "",
+    oabUf: "",
+  })
+  const lawyer = form.role === "lawyer"
   const [error, setError] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }))
@@ -66,11 +77,20 @@ function CreateForm({ orgs, defaultOrg, onDone }: { orgs: OrgOption[]; defaultOr
     if (!form.organizationId) return setError("Escolha o escritório.")
     if (form.name.trim().length < 3) return setError("Informe o nome completo.")
     if (!isEmail(form.email.trim())) return setError("E-mail inválido.")
+    const oabProblem = lawyer ? validateOab({ number: form.oabNumber, uf: form.oabUf }) : undefined
+    if (oabProblem) return setError(`${oabProblem} É obrigatória para advogados.`)
     setBusy(true)
     setError("")
     try {
-      await adminFetch(`/api/admin/organizations/${form.organizationId}/users`, "POST", { name: form.name, email: form.email, role: form.role, jobTitle: form.jobTitle })
-      toast.success("Usuário criado.", { description: `${form.email} recebeu o link para criar a senha.` })
+      const { email } = await adminFetch<{ email?: { sent: boolean; message?: string } }>(`/api/admin/organizations/${form.organizationId}/users`, "POST", {
+        name: form.name,
+        email: form.email,
+        role: form.role,
+        jobTitle: form.jobTitle,
+        ...(lawyer ? { oab: { number: form.oabNumber, uf: form.oabUf } } : {}),
+      })
+      if (email?.sent) toast.success("Usuário criado.", { description: `${form.email} recebeu o link para criar a senha.` })
+      else toast.warning("Usuário criado, mas o e-mail não foi enviado.", { description: `${email?.message ?? ""} Use “Reenviar convite”.`.trim() })
       onDone(true)
     } catch (err) {
       setError((err as Error).message)
@@ -109,6 +129,26 @@ function CreateForm({ orgs, defaultOrg, onDone }: { orgs: OrgOption[]; defaultOr
           <Field label="Cargo" htmlFor="cu-job" optional>
             <TextInput id="cu-job" placeholder="Ex.: Advogada associada" value={form.jobTitle} onChange={(e) => set("jobTitle", e.target.value)} />
           </Field>
+          {lawyer && (
+            <>
+              <Field label="Número da OAB" htmlFor="cu-oab" hint="Obrigatória para advogados (intimações do DJEN).">
+                <TextInput
+                  id="cu-oab"
+                  inputMode="numeric"
+                  value={form.oabNumber}
+                  onChange={(e) => set("oabNumber", e.target.value.replace(/[^\d.]/g, "").slice(0, 9))}
+                />
+              </Field>
+              <Field label="UF da OAB" htmlFor="cu-oab-uf">
+                <NativeSelect id="cu-oab-uf" value={form.oabUf} onChange={(e) => set("oabUf", e.target.value)}>
+                  <option value="">—</option>
+                  {UFS.map((uf) => (
+                    <option key={uf}>{uf}</option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            </>
+          )}
         </form>
       </ModalBody>
       <ModalFooter>
@@ -488,7 +528,7 @@ export function UsersView() {
           {rows.map((u) => {
             const s = statusOf(u)
             return (
-              <li key={u.id} className={cn("rounded-[14px] border border-border bg-card p-4 shadow-card", !u.active && "opacity-60")}>
+              <li key={u.id} className={cn("rounded-card border border-border/90 bg-card p-4 shadow-card", !u.active && "opacity-60")}>
                 <div className="flex items-start gap-3">
                   <UserAvatar name={u.name} src={u.avatarUrl} />
                   <div className="min-w-0 flex-1">

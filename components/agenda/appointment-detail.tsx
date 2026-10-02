@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, CalendarDays, Clock3, MapPin, StickyNote, Trash2, UserRound } from "lucide-react"
+import { ArrowUpRight, CalendarDays, Clock3, MapPin, Pencil, StickyNote, Trash2, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { Modal } from "@/components/ui/modal"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -10,9 +10,10 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useCategoryLookup } from "./use-category"
-import { fmtFullDate, fmtTime, parse } from "@/lib/dates"
-import { getUser } from "@/lib/account"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { NewAppointmentDialog } from "./new-appointment-dialog"
+import { fmtFullDate, fmtTime, parse } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import type { Appointment } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -26,11 +27,14 @@ function Row({ icon, children }: { icon: React.ReactNode; children: React.ReactN
 }
 
 export function AppointmentDetail({ appointment, onClose }: { appointment?: Appointment; onClose: () => void }) {
-  const data = useDemoData()
-  const { deleteAppointment } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteAppointment } = useOfficeActions()
   const lookup = useCategoryLookup()
   const [shown, setShown] = React.useState(appointment)
   const [deleting, setDeleting] = React.useState(false)
+  // Edição: o detalhe fecha e o formulário abre com o compromisso atual (pode ter mudado pelo tempo real).
+  const [editingId, setEditingId] = React.useState<string | null>(null)
+  const editing = editingId ? data.appointments.find((x) => x.id === editingId) : undefined
   if (appointment && appointment !== shown) setShown(appointment)
   const a = appointment ?? shown
   if (!a) return null
@@ -41,85 +45,98 @@ export function AppointmentDetail({ appointment, onClose }: { appointment?: Appo
   const client = data.clients.find((c) => c.id === a.clientId)
 
   return (
-    <Modal
-      open={!!appointment}
-      onOpenChange={(o) => !o && onClose()}
-      title={a.title}
-      description={a.personName}
-      size="sm"
-      icon={<span className="size-2.5 rounded-full" style={style.dot} />}
-      footer={
-        <>
-          <Can permission="agenda.edit">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Excluir compromisso"
-              className="text-danger hover:bg-danger-soft"
-              onClick={() => setDeleting(true)}
-            >
-              <Trash2 />
-            </Button>
-          </Can>
-          {process ? (
-            <Link href={`/processos/${process.id}`} className={buttonVariants()} onClick={onClose}>
-              Abrir processo <ArrowUpRight />
-            </Link>
-          ) : client ? (
-            <Link href={`/clientes/${client.id}`} className={buttonVariants()} onClick={onClose}>
-              Abrir cliente <ArrowUpRight />
-            </Link>
-          ) : null}
-        </>
-      }
-    >
-      <div className="-mt-1">
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {category && (
-            <span
-              className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium"
-              style={{ ...style.soft, ...style.text }}
-            >
-              <span className="size-1.5 rounded-full" style={style.dot} />
-              {category.name}
+    <>
+      <Modal
+        open={!!appointment}
+        onOpenChange={(o) => !o && onClose()}
+        title={a.title}
+        description={a.personName}
+        size="sm"
+        icon={<span className="size-2.5 rounded-full" style={style.dot} />}
+        footer={
+          <>
+            <Can permission="agenda.edit">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Excluir compromisso"
+                className="text-danger hover:bg-danger-soft"
+                onClick={() => setDeleting(true)}
+              >
+                <Trash2 />
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setEditingId(a.id)
+                  onClose()
+                }}
+              >
+                <Pencil /> Editar
+              </Button>
+            </Can>
+            {process ? (
+              <Link href={`/processos/${process.id}`} className={buttonVariants()} onClick={onClose}>
+                Abrir processo <ArrowUpRight />
+              </Link>
+            ) : client ? (
+              <Link href={`/clientes/${client.id}`} className={buttonVariants()} onClick={onClose}>
+                Abrir cliente <ArrowUpRight />
+              </Link>
+            ) : null}
+          </>
+        }
+      >
+        <div className="-mt-1">
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {category && (
+              <span
+                className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium"
+                style={{ ...style.soft, ...style.text }}
+              >
+                <span className="size-1.5 rounded-full" style={style.dot} />
+                {category.name}
+              </span>
+            )}
+            {a.area && <StatusBadge dot={false}>{a.area}</StatusBadge>}
+          </div>
+          <Row icon={<CalendarDays />}>{fmtFullDate(parse(a.start))}</Row>
+          <Row icon={<Clock3 />}>
+            <span className="tabular">
+              {fmtTime(a.start)} – {fmtTime(a.end)}
             </span>
+          </Row>
+          {a.location && <Row icon={<MapPin />}>{a.location}</Row>}
+          <Row icon={<UserRound />}>
+            <span className="inline-flex items-center gap-1.5">
+              <UserAvatar name={owner.name} size="xs" /> {owner.name}
+            </span>
+          </Row>
+          {process && (
+            <Row icon={<span className="font-mono text-[10px] font-bold">#</span>}>
+              <span className="font-mono text-[12.5px]">{process.number}</span>
+            </Row>
           )}
-          {a.area && <StatusBadge dot={false}>{a.area}</StatusBadge>}
+          {a.notes && (
+            <Row icon={<StickyNote />}>
+              <span className="text-muted-foreground">{a.notes}</span>
+            </Row>
+          )}
         </div>
-        <Row icon={<CalendarDays />}>{fmtFullDate(parse(a.start))}</Row>
-        <Row icon={<Clock3 />}>
-          <span className="tabular">
-            {fmtTime(a.start)} – {fmtTime(a.end)}
-          </span>
-        </Row>
-        {a.location && <Row icon={<MapPin />}>{a.location}</Row>}
-        <Row icon={<UserRound />}>
-          <span className="inline-flex items-center gap-1.5">
-            <UserAvatar name={owner.name} size="xs" /> {owner.name}
-          </span>
-        </Row>
-        {process && (
-          <Row icon={<span className="font-mono text-[10px] font-bold">#</span>}>
-            <span className="font-mono text-[12.5px]">{process.number}</span>
-          </Row>
-        )}
-        {a.notes && (
-          <Row icon={<StickyNote />}>
-            <span className="text-muted-foreground">{a.notes}</span>
-          </Row>
-        )}
-      </div>
-      <ConfirmDialog
-        open={deleting}
-        onOpenChange={setDeleting}
-        title={`Excluir "${a.title}"?`}
-        description="Esta ação não pode ser desfeita."
-        onConfirm={() => {
-          deleteAppointment(a.id)
-          toast.success("Compromisso excluído.", { description: a.title })
-          onClose()
-        }}
-      />
-    </Modal>
+        <ConfirmDialog
+          open={deleting}
+          onOpenChange={setDeleting}
+          title={`Excluir "${a.title}"?`}
+          description="Esta ação não pode ser desfeita."
+          onConfirm={() => {
+            deleteAppointment(a.id)
+            toast.success("Compromisso excluído.", { description: a.title })
+            onClose()
+          }}
+        />
+      </Modal>
+      {/* Fora do detalhe: ele fecha ao abrir a edição. */}
+      <NewAppointmentDialog open={!!editing} onOpenChange={(o) => !o && setEditingId(null)} appointment={editing} />
+    </>
   )
 }

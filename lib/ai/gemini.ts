@@ -21,12 +21,14 @@ export interface GeminiResponseLike {
   text?: string
   candidates?: { finishReason?: string }[]
   promptFeedback?: { blockReason?: string }
-  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number; cachedContentTokenCount?: number }
 }
 
 interface GeminiOptions {
   apiKey: string
   model: string
+  /** Modelo das operações simples (`tier: "light"`). Sem ele, usa `model`. */
+  lightModel?: string
   fallbackModels?: string[]
   timeoutMs: number
   client?: GeminiClientLike
@@ -44,6 +46,8 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 8192
  * padrão do provedor, porque não dá para saber qual parâmetro aceitam.
  */
 function thinkingFor(model: string) {
+  // Flash-Lite não raciocina por padrão — e as operações simples não precisam.
+  if (/-lite\b/.test(model)) return undefined
   if (/^gemini-2\.5-flash/.test(model)) return { thinkingBudget: 1024 }
   if (/^gemini-3/.test(model)) return { thinkingLevel: ThinkingLevel.LOW }
   return undefined
@@ -55,6 +59,7 @@ const SWITCHABLE = new Set(["UNAVAILABLE", "PROVIDER_RATE_LIMITED", "MODEL_UNAVA
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini"
   readonly model: string
+  readonly lightModel: string
   private readonly fallbackModels: string[]
   private readonly client: GeminiClientLike
   private readonly timeoutMs: number
@@ -63,11 +68,16 @@ export class GeminiProvider implements AIProvider {
   constructor(options: GeminiOptions) {
     if (typeof window !== "undefined") throw new Error("GeminiProvider só pode rodar no servidor.")
     this.model = options.model
+    this.lightModel = options.lightModel || options.model
     this.fallbackModels = options.fallbackModels ?? []
     this.timeoutMs = options.timeoutMs
     this.retryDelayMs = options.retryDelayMs ?? 1500
     // Sem novas tentativas dentro do SDK: quem decide repetir ou trocar de modelo é `call`.
     this.client = options.client ?? new GoogleGenAI({ apiKey: options.apiKey })
+  }
+
+  modelFor(tier: AIRequest["tier"] = "standard") {
+    return tier === "light" ? this.lightModel : this.model
   }
 
   async generateText(request: AIRequest): Promise<AIProviderResult<string>> {
@@ -93,7 +103,10 @@ export class GeminiProvider implements AIProvider {
   private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}) {
     const timeout = AbortSignal.timeout(this.timeoutMs)
     const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
-    const chain = this.fallbackModels.length ? [this.model, ...this.fallbackModels] : [this.model, this.model]
+    // Leve: se o modelo leve falhar, o principal responde (mais caro, mas o evento não fica sem análise).
+    const first = this.modelFor(request.tier)
+    const chain =
+      first !== this.model ? [first, this.model] : this.fallbackModels.length ? [this.model, ...this.fallbackModels] : [this.model, this.model]
 
     for (let i = 0; ; i++) {
       const model = chain[i]
@@ -149,11 +162,16 @@ function readText(response: GeminiResponseLike): string {
 
 function usage(response: GeminiResponseLike, model: string): AIUsage {
   const meta = response.usageMetadata
-  return { inputTokens: meta?.promptTokenCount, outputTokens: meta?.candidatesTokenCount, model }
+  // Raciocínio é cobrado como saída; o que veio do cache (implícito do Gemini) já está na entrada.
+  const output =
+    meta?.candidatesTokenCount === undefined && meta?.thoughtsTokenCount === undefined
+      ? undefined
+      : (meta?.candidatesTokenCount ?? 0) + (meta?.thoughtsTokenCount ?? 0)
+  return { inputTokens: meta?.promptTokenCount, outputTokens: output, cachedTokens: meta?.cachedContentTokenCount, model }
 }
 
 /** Erro do SDK → código da Íntegra. A mensagem original fica só em `cause`. */
-export function mapGeminiError(error: unknown): AIError {
+function mapGeminiError(error: unknown): AIError {
   if (error instanceof AIError) return error
   const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : undefined
   const message = error instanceof Error ? error.message : ""

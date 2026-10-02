@@ -13,8 +13,8 @@
 
 import { NextResponse } from "next/server"
 import { LOOKUP_MESSAGES } from "@/lib/integrations/legal/errors"
-import { handleLookup } from "@/lib/services/processes/lookup-http"
-import { FRESH_FOR_MS, MIN_REFRESH_INTERVAL_MS } from "@/lib/services/processes/lookup-service"
+import { handleLookup } from "@/lib/services/processos/lookup-http"
+import { FRESH_FOR_MS, MIN_REFRESH_INTERVAL_MS } from "@/lib/services/processos/lookup-service"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

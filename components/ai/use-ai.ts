@@ -3,11 +3,12 @@
 import * as React from "react"
 import { AIRequestError, aiApi, fetchAIStatus } from "@/lib/ai/client"
 import { CHAT_LIMITS, type ActionSuggestion, type AIMessage, type AISources, type AIStatus, type ChatScope } from "@/lib/ai/types"
-import { uid } from "@/lib/format"
+import { uid } from "@/lib/core/format"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
 
-const toError = (error: unknown) => (error instanceof AIRequestError ? error : new AIRequestError("UNEXPECTED", "Não foi possível concluir a análise agora."))
+const toError = (error: unknown) =>
+  error instanceof AIRequestError ? error : new AIRequestError("UNEXPECTED", "Não foi possível concluir a análise agora.")
 
 /** Estado da IA (ligada/configurada). Consulta leve, uma vez por sessão — não chama o modelo. */
 export function useAIStatus() {
@@ -93,7 +94,10 @@ export function useAIChat(scope: ChatScope) {
           history.slice(-CHAT_LIMITS.history).map(({ role, content }) => ({ role, content })),
           current.signal,
         )
-        setMessages((list) => [...list, { id: uid("msg"), role: "assistant", content: result.data.text, sources: result.sources, warnings: result.warnings }])
+        setMessages((list) => [
+          ...list,
+          { id: uid("msg"), role: "assistant", content: result.data.text, sources: result.sources, warnings: result.warnings },
+        ])
       } catch (failure) {
         const known = toError(failure)
         // Pergunta sem resposta sai do histórico: pode ser reenviada.
@@ -131,7 +135,9 @@ export function useCreateTaskFromSuggestion(target: { processId?: string; client
     openDialog("task", {
       ...target,
       title: suggestion.titulo,
-      description: [suggestion.descricao, suggestion.justificativa && `Motivo (Íntegra IA): ${suggestion.justificativa}`].filter(Boolean).join("\n\n"),
+      description: [suggestion.descricao, suggestion.justificativa && `Motivo (Íntegra IA): ${suggestion.justificativa}`]
+        .filter(Boolean)
+        .join("\n\n"),
       priority: suggestion.prioridade,
     })
 }

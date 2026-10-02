@@ -1,12 +1,13 @@
 import type { NextRequest } from "next/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { HttpError, siteUrl } from "./server"
-import { sendAuthLink } from "./mailer"
+import { sendAuthLink, type EmailResult } from "./mailer"
 import { MEMBER_ROLES, sanitizePermissions, type MemberRole } from "./permissions"
 import { toUser, type MemberAccess, type ProfileRow } from "./profile"
 import { isEmail, normalizeEmail } from "./validation"
 import { loadSettings } from "@/lib/admin/platform"
 import { sanitizeLimits } from "@/lib/admin/catalog"
+import { oabDigits, validateOab } from "@/lib/intimacoes/oab"
 
 /**
  * Gestão de usuários de um escritório, com a service role. Usado pelas rotas do
@@ -53,15 +54,33 @@ export async function listMembers(organizationId: string): Promise<MemberAccess[
 }
 
 /**
- * Link de uso único para definir a senha. O de recuperação serve de convite: a conta
- * já existe e só precisa de senha. `kind` muda o texto do e-mail e da tela.
+ * Link de uso único para definir a senha, enviado por e-mail. O de recuperação serve
+ * de convite: a conta já existe e só precisa de senha. `kind` muda o texto do e-mail
+ * e da tela. Não lança por falha de envio — devolve o resultado.
  */
-async function sendPasswordLink(request: NextRequest, email: string, kind: "invite" | "recovery") {
-  const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({ type: "recovery", email })
-  if (error || !data.properties?.hashed_token) throw error ?? new Error("Falha ao gerar o link.")
-  const next = kind === "invite" ? "/redefinir-senha?convite=1" : "/redefinir-senha"
-  const link = `${siteUrl(request)}/auth/confirm?token_hash=${data.properties.hashed_token}&type=recovery&next=${encodeURIComponent(next)}`
-  await sendAuthLink(email, kind, link)
+async function sendPasswordLink(
+  request: NextRequest,
+  target: { email: string; name?: string; organizationId?: string },
+  kind: "invite" | "recovery",
+): Promise<EmailResult> {
+  const admin = getSupabaseAdmin()
+  let organizationName: string | undefined
+  if (kind === "invite" && target.organizationId) {
+    const { data } = await admin.from("organizations").select("name").eq("id", target.organizationId).maybeSingle<{ name: string }>()
+    organizationName = data?.name
+  }
+  return sendAuthLink({
+    to: target.email,
+    kind,
+    name: target.name,
+    organizationName,
+    createLink: async () => {
+      const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email: target.email })
+      if (error || !data.properties?.hashed_token) throw error ?? new Error("Falha ao gerar o link.")
+      const next = kind === "invite" ? "/redefinir-senha?convite=1" : "/redefinir-senha"
+      return `${siteUrl(request)}/auth/confirm?token_hash=${data.properties.hashed_token}&type=recovery&next=${encodeURIComponent(next)}`
+    },
+  })
 }
 
 export interface InviteInput {
@@ -69,6 +88,26 @@ export interface InviteInput {
   name?: string
   role?: string
   jobTitle?: string
+  /** Inscrição na OAB — obrigatória para o papel Advogado (recebe as intimações). */
+  oab?: { number?: string; uf?: string }
+}
+
+/** Inscrição válida para gravar, ou erro com a mensagem da tela. */
+function oabFrom(input: InviteInput["oab"]) {
+  const oab = { number: oabDigits(input?.number ?? ""), uf: (input?.uf ?? "").toUpperCase() }
+  const problem = validateOab(oab)
+  if (problem) throw new HttpError(400, `${problem} Advogados precisam de OAB para receber intimações.`)
+  return oab
+}
+
+/** A pessoa tem alguma inscrição ativa? Sem a migração 0011, não há como exigir. */
+async function hasActiveOab(userId: string) {
+  const { count, error } = await getSupabaseAdmin()
+    .from("lawyer_oabs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("active", true)
+  return error ? true : (count ?? 0) > 0
 }
 
 export async function inviteMember(request: NextRequest, organizationId: string, input: InviteInput) {
@@ -78,6 +117,7 @@ export async function inviteMember(request: NextRequest, organizationId: string,
   if (!isEmail(email)) throw new HttpError(400, "E-mail inválido.")
   if (name.length < 3) throw new HttpError(400, "Informe o nome completo.")
   if (!MEMBER_ROLES.includes(role)) throw new HttpError(400, "Papel inválido.")
+  const oab = role === "lawyer" ? oabFrom(input.oab) : null
 
   const admin = getSupabaseAdmin()
   const { data: created, error } = await admin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { name } })
@@ -97,17 +137,41 @@ export async function inviteMember(request: NextRequest, organizationId: string,
     await admin.auth.admin.deleteUser(created.user.id)
     throw profileError
   }
+  if (oab) {
+    const { error: oabError } = await admin.from("lawyer_oabs").insert({ organization_id: organizationId, user_id: created.user.id, ...oab })
+    // Sem a migração 0011, a inscrição fica só no texto do perfil (como antes).
+    const missingTable = oabError?.code === "42P01" || oabError?.code === "PGRST205"
+    if (missingTable)
+      await admin
+        .from("profiles")
+        .update({ oab: `OAB/${oab.uf} ${oab.number}` })
+        .eq("id", created.user.id)
+    else if (oabError) {
+      await admin.auth.admin.deleteUser(created.user.id)
+      if (oabError.code === "23505") throw new HttpError(409, "Esta inscrição na OAB já está cadastrada para outra pessoa do escritório.")
+      throw oabError
+    }
+  }
 
-  await sendPasswordLink(request, email, "invite")
-  return { ...toUser(profile), invitePending: true } satisfies MemberAccess
+  // A conta já existe: se o e-mail falhar, o convite continua pendente e pode ser reenviado.
+  const delivery = await sendPasswordLink(request, { email, name, organizationId }, "invite")
+  return { member: { ...toUser(profile), invitePending: true } satisfies MemberAccess, email: delivery }
 }
 
-/** Reenvia o convite (quem nunca entrou) ou manda um link de nova senha (quem já entrou). */
+/**
+ * Reenvia o convite (quem nunca entrou) ou manda um link de nova senha (quem já entrou).
+ * Aqui o e-mail é a própria operação: se não sair, vira erro para quem pediu.
+ */
 export async function resendInvite(request: NextRequest, organizationId: string, userId: string) {
   const target = await targetIn(organizationId, userId)
   if (!target.active) throw new HttpError(400, "Reative o usuário antes de enviar o link.")
   const { data } = await getSupabaseAdmin().auth.admin.getUserById(userId)
-  await sendPasswordLink(request, target.email, data.user?.last_sign_in_at ? "recovery" : "invite")
+  const result = await sendPasswordLink(
+    request,
+    { email: target.email, name: target.name, organizationId },
+    data.user?.last_sign_in_at ? "recovery" : "invite",
+  )
+  if (!result.ok) throw new HttpError(result.status, result.message)
 }
 
 export interface MemberPatch {
@@ -141,6 +205,10 @@ export async function updateMember(organizationId: string, userId: string, patch
   const role = (patch.role ?? target.role) as MemberRole
   if (patch.role !== undefined) {
     if (!MEMBER_ROLES.includes(role)) throw new HttpError(400, "Papel inválido.")
+    // Quem passa a ser Advogado precisa de OAB (usuários existentes não são afetados).
+    if (role === "lawyer" && target.role !== "lawyer" && !(await hasActiveOab(userId))) {
+      throw new HttpError(400, "Cadastre ao menos uma inscrição na OAB antes de definir o papel Advogado.")
+    }
     update.role = role
     // Ao trocar de papel, as permissões voltam ao padrão do novo papel (a menos que venham junto).
     if (patch.permissions === undefined) update.permissions = null
@@ -170,7 +238,11 @@ export async function assertUserCapacity(organizationId: string) {
   if (!settings.general.enforceUserLimits) return
   const admin = getSupabaseAdmin()
   const [{ data: org }, { count }] = await Promise.all([
-    admin.from("organizations").select("plan, custom_limits").eq("id", organizationId).maybeSingle<{ plan: string; custom_limits: Record<string, unknown> | null }>(),
+    admin
+      .from("organizations")
+      .select("plan, custom_limits")
+      .eq("id", organizationId)
+      .maybeSingle<{ plan: string; custom_limits: Record<string, unknown> | null }>(),
     admin.from("profiles").select("id", { count: "exact", head: true }).eq("organization_id", organizationId),
   ])
   if (!org) return

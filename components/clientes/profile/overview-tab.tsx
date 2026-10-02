@@ -25,9 +25,11 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { MiniStat } from "@/components/shared/mini-stat"
 import { ActivityIcon } from "@/components/shared/activity-icon"
-import { TaskRow } from "@/components/tasks/task-row"
+import { TaskRow } from "@/components/tarefas/task-row"
 import { useUI } from "@/lib/store/ui-store"
-import { clientFinance, nextClientDeadline, type ClientHub } from "@/lib/selectors"
+import { useOfficeData } from "@/lib/store/office-store"
+import { PRAZO_ALERT_DAYS } from "@/lib/dashboard/attention"
+import { clientFinance, nextClientDeadline, type ClientHub } from "@/lib/store/selectors"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import {
   getNow,
@@ -41,11 +43,11 @@ import {
   fmtRelative,
   fmtTime,
   parse,
-} from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
-import { getUser } from "@/lib/account"
-import { whatsappLink, whatsappNumber } from "@/lib/clients"
-import { maskPhone } from "@/lib/masks"
+} from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
+import { getUser } from "@/lib/auth/account"
+import { whatsappLink, whatsappNumber } from "@/lib/clientes/clients"
+import { maskPhone } from "@/lib/core/masks"
 import type { Client, ClientWhatsAppSummary } from "@/types"
 import { Can, useSession } from "@/lib/auth/session"
 import type { ProfileTab } from "./client-profile"
@@ -93,7 +95,7 @@ function InfoRow({
 /** Card de número que leva para a seção correspondente. */
 function StatLink({ onClick, href, label, children }: { onClick?: () => void; href?: string; label: string; children: React.ReactNode }) {
   const cls =
-    "block min-w-0 rounded-[14px] text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-brand/40 hover:[&>div]:border-border-strong"
+    "block h-full min-w-0 rounded-card text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-brand/40 [&>div]:h-full hover:[&>div]:border-border-strong"
   if (href)
     return (
       <Link href={href} aria-label={label} className={cls}>
@@ -122,9 +124,10 @@ export function OverviewTab({
   const { openDialog } = useUI()
   const { can } = useSession()
   const lookup = useCategoryLookup()
+  const { deadlines } = useOfficeData()
   const { processes, activeProcesses, activities } = hub
-  const nextDeadline = nextClientDeadline(processes)
-  const deadlineDays = nextDeadline ? diffInDays(parse(nextDeadline.nextDeadline!.date), getNow()) : undefined
+  const nextDeadline = nextClientDeadline(processes, deadlines)
+  const deadlineDays = nextDeadline ? diffInDays(parse(nextDeadline.prazo.fatalDate), getNow()) : undefined
   const tasks = hub.tasks.slice(0, 5)
   const pendingTasks = hub.tasks.filter((t) => t.status === "pendente").length
   const upcoming = hub.appointments.filter((a) => parse(a.end) > getNow()).slice(0, 4)
@@ -134,23 +137,23 @@ export function OverviewTab({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-4">
         <StatLink label="Ver processos do cliente" onClick={() => onNavigate("processos")}>
           <MiniStat
-            label="Processos ativos"
-            value={String(activeProcesses.length).padStart(2, "0")}
-            hint={`${processes.length} no total`}
+            label="Processos"
+            value={String(activeProcesses.length)}
+            hint={`${activeProcesses.length === 1 ? "ativo" : "ativos"} · ${processes.length} no total`}
             icon={<Scale />}
           />
         </StatLink>
         {nextDeadline ? (
-          <StatLink label={`Abrir processo ${nextDeadline.code}`} href={`/processos/${nextDeadline.id}`}>
+          <StatLink label={`Abrir processo ${nextDeadline.process.code}`} href={`/processos/${nextDeadline.process.id}`}>
             <MiniStat
               label="Próximo prazo"
-              value={fmtDayMonth(nextDeadline.nextDeadline!.date)}
-              hint={`${fmtDueIn(nextDeadline.nextDeadline!.date)} · ${nextDeadline.nextDeadline!.title}`}
+              value={fmtDayMonth(nextDeadline.prazo.fatalDate)}
+              hint={`${fmtDueIn(nextDeadline.prazo.fatalDate)} · ${nextDeadline.prazo.description}`}
               icon={<Hourglass />}
-              tone={deadlineDays !== undefined && deadlineDays <= 3 ? "danger" : undefined}
+              tone={deadlineDays !== undefined && deadlineDays <= PRAZO_ALERT_DAYS.soon ? "danger" : undefined}
             />
           </StatLink>
         ) : (
@@ -159,7 +162,7 @@ export function OverviewTab({
         {finance ? (
           <StatLink label="Ver financeiro do cliente" onClick={() => onNavigate("financeiro")}>
             <MiniStat
-              label="Honorários em aberto"
+              label="Em aberto"
               value={formatCurrency(finance.open)}
               hint={
                 finance.overdue ? (
@@ -174,20 +177,21 @@ export function OverviewTab({
             />
           </StatLink>
         ) : (
-          <MiniStat label="Honorários em aberto" value="—" hint="Sem acesso ao financeiro" icon={<Wallet />} />
+          <MiniStat label="Em aberto" value="—" hint="Sem acesso ao financeiro" icon={<Wallet />} />
         )}
         <StatLink label="Ver timeline do cliente" onClick={() => onNavigate("timeline")}>
           <MiniStat
             label="Última interação"
             value={lastLabel === "Hoje" || lastLabel === "Ontem" ? lastLabel : lastActivity ? fmtRelative(lastActivity.at) : "—"}
-            hint={lastActivity ? `${lastActivity.actor ?? ""} ${lastActivity.message}`.trim() : "Nenhuma atividade registrada"}
+            hint={lastActivity ? (lastActivity.actor ? `Por ${lastActivity.actor}` : lastActivity.message) : "Nenhuma atividade registrada"}
             icon={<MessageSquare />}
           />
         </StatLink>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <div className="space-y-5 lg:col-span-5">
+      {/* Duas colunas da mesma largura; o último cartão de cada uma estica até a base da outra. */}
+      <div className="grid grid-cols-1 gap-5 @3xl:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-5">
           <Panel>
             <PanelHeader title="Informações" description={client.kind === "PJ" ? "Dados cadastrais da empresa" : "Dados cadastrais do cliente"} />
             <div className="divide-y divide-border px-5 pb-2">
@@ -216,7 +220,7 @@ export function OverviewTab({
             </div>
           </Panel>
 
-          <Panel>
+          <Panel className="flex-1">
             <PanelHeader title="Contato principal" />
             <div className="px-5 pb-5">
               <div className="flex items-center gap-3 rounded-[12px] border border-border bg-surface-muted/40 p-3.5">
@@ -245,10 +249,9 @@ export function OverviewTab({
             </div>
           </Panel>
 
-          <WhatsAppPanel client={client} />
         </div>
 
-        <div className="space-y-5 lg:col-span-7">
+        <div className="flex min-w-0 flex-col gap-5">
           {can("agenda.view") && (
             <Panel>
               <PanelHeader
@@ -347,7 +350,9 @@ export function OverviewTab({
             </Panel>
           )}
 
-          <Panel>
+          <WhatsAppPanel client={client} />
+
+          <Panel className="flex-1">
             <PanelHeader
               title="Atividade recente"
               action={

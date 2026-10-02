@@ -5,6 +5,8 @@ import { recordAudit } from "@/lib/admin/audit"
 import { loadSettings, saveSettings } from "@/lib/admin/platform"
 import { sanitizeSettings } from "@/lib/admin/settings"
 import { loadPlans } from "@/lib/admin/data"
+import { isEmailConfigured } from "@/lib/services/email"
+import { describeAIModels } from "@/lib/ai/config"
 
 export const GET = route(async (request) => {
   await requireAdmin(request)
@@ -14,11 +16,13 @@ export const GET = route(async (request) => {
     plans: plans.map((p) => ({ name: p.name, status: p.status })),
     // Só se existem, nunca o valor: segredos ficam nas variáveis de ambiente.
     secrets: {
-      ai: !!(process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY),
+      ai: !!process.env.GEMINI_API_KEY?.trim(),
       whatsapp: !!(process.env.ZAPI_TOKEN || process.env.WHATSAPP_API_TOKEN),
       datajud: !!process.env.DATAJUD_API_KEY,
-      email: false,
+      email: isEmailConfigured(),
     },
+    // Provedor e modelos em uso (do ambiente: AI_MODEL, AI_MODEL_LIGHT) — nunca a chave.
+    ai: describeAIModels(),
   })
 })
 

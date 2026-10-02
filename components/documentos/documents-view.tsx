@@ -15,12 +15,12 @@ import { FadeIn } from "@/components/ui/motion"
 import { NativeSelect } from "@/components/ui/field"
 import { FileIcon } from "@/components/shared/file-icon"
 import { DocumentActions, DocumentList } from "@/components/shared/document-list"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { diffInDays, fmtNumericDate, getNow, parse } from "@/lib/dates"
-import { RECENT_DAYS } from "@/lib/attention"
-import { formatFileSize, matches } from "@/lib/format"
-import { getUser } from "@/lib/account"
+import { diffInDays, fmtNumericDate, getNow, parse } from "@/lib/core/dates"
+import { RECENT_DAYS } from "@/lib/dashboard/attention"
+import { formatFileSize, matches } from "@/lib/core/format"
+import { getUser } from "@/lib/auth/account"
 import type { DocumentKind } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -39,7 +39,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 const MAIN_KINDS: DocumentKind[] = ["Contrato", "Procuração", "Petição", "Documento pessoal", "Laudo"]
 
 export function DocumentsView() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
   const ready = data.hydrated
   const [filter, setFilter] = React.useState<Filter>("todos")
@@ -201,7 +201,7 @@ export function DocumentsView() {
               </table>
             </div>
           </TableShell>
-          <div className="overflow-hidden rounded-[14px] border border-border bg-card shadow-card md:hidden">
+          <div className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card md:hidden">
             <DocumentList documents={rows} showClient />
           </div>
         </FadeIn>

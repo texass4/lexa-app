@@ -59,7 +59,7 @@ export async function requireSuperAdmin() {
 
 /**
  * Para as rotas de consulta processual: o escritório de quem chama, ou a resposta
- * de erro no formato que `lib/services/processes/client.ts` entende.
+ * de erro no formato que `lib/services/processos/client.ts` entende.
  */
 export async function authorizeMember(permission?: Permission): Promise<{ organizationId: string } | { response: Response }> {
   try {

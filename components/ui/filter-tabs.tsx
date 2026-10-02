@@ -30,7 +30,7 @@ export function FilterTabs<T extends string>({
       <div
         role="tablist"
         aria-label={ariaLabel}
-        className="inline-flex items-center gap-1 rounded-[10px] border border-border bg-surface-muted/60 p-[3px]"
+        className="inline-flex items-center gap-0.5 rounded-[12px] border border-border/80 bg-surface-muted/70 p-1"
       >
         {options.map((opt) => {
           const active = opt.value === value
@@ -42,7 +42,7 @@ export function FilterTabs<T extends string>({
               aria-selected={active}
               onClick={() => onChange(opt.value)}
               className={cn(
-                "relative inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-2.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                "relative inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -50,12 +50,19 @@ export function FilterTabs<T extends string>({
                 <motion.span
                   layoutId={layoutId}
                   transition={{ type: "spring", stiffness: 500, damping: 38 }}
-                  className="absolute inset-0 rounded-[7px] border border-border bg-surface shadow-xs"
+                  className="absolute inset-0 rounded-control border border-border/80 bg-surface shadow-xs"
                 />
               )}
               <span className="relative">{opt.label}</span>
               {opt.count !== undefined && (
-                <span className={cn("relative tabular text-[11px]", active ? "text-muted-foreground" : "text-subtle")}>{opt.count}</span>
+                <span
+                  className={cn(
+                    "relative tabular flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold",
+                    active ? "bg-primary text-primary-foreground" : "bg-border/60 text-muted-foreground",
+                  )}
+                >
+                  {opt.count}
+                </span>
               )}
             </button>
           )

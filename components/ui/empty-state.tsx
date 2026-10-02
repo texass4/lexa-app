@@ -20,15 +20,12 @@ export function EmptyState({
   return (
     <div className={cn("flex flex-col items-center justify-center text-center", compact ? "px-6 py-10" : "px-6 py-16", className)}>
       {icon && (
-        <div className="relative mb-4">
-          <div className="absolute inset-0 -m-3 rounded-full bg-brand-soft/70 blur-md" aria-hidden />
-          <div className="relative flex size-11 items-center justify-center rounded-xl border border-border bg-surface text-muted-foreground shadow-xs [&_svg]:size-5">
-            {icon}
-          </div>
+        <div className="mb-4 flex size-12 items-center justify-center rounded-[14px] bg-surface-muted text-muted-foreground ring-1 ring-border/70 ring-inset [&_svg]:size-5">
+          {icon}
         </div>
       )}
-      <p className="text-[14px] font-semibold text-foreground">{title}</p>
-      {description && <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-muted-foreground">{description}</p>}
+      <p className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">{title}</p>
+      {description && <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   )
@@ -47,11 +44,11 @@ export function ErrorState({
 }) {
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-16 text-center", className)}>
-      <div className="mb-4 flex size-11 items-center justify-center rounded-xl border border-danger/15 bg-danger-soft text-danger">
+      <div className="mb-4 flex size-12 items-center justify-center rounded-[14px] bg-danger-soft text-danger">
         <CircleAlert className="size-5" />
       </div>
-      <p className="text-[14px] font-semibold text-foreground">{title}</p>
-      <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+      <p className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">{title}</p>
+      <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">{description}</p>
       {onRetry && (
         <Button variant="secondary" size="sm" className="mt-5" onClick={onRetry}>
           <RefreshCw /> Recarregar

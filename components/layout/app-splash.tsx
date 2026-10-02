@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Wordmark } from "@/components/brand/logo"
-import { BRAND, SYMBOL } from "@/lib/brand"
+import { BRAND, SYMBOL } from "@/lib/core/brand"
 
 /**
  * Intro da Íntegra — aparece só enquanto o app realmente inicializa.

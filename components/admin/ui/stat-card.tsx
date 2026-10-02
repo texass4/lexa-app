@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react"
 import { cn } from "cn"
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 
 const HINT_TONE: Partial<Record<Tone, string>> = {
   warning: "text-warning",
@@ -39,16 +39,16 @@ export function StatCard({
 }) {
   const body = (
     <>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[12.5px] font-medium text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-3">
         {icon && (
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-border bg-surface-muted/60 text-muted-foreground transition-colors group-hover:border-brand/30 group-hover:text-brand-strong [&_svg]:size-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand transition-colors [&_svg]:size-[17px]">
             {icon}
           </span>
         )}
+        <p className="min-w-0 flex-1 text-[13px] font-medium text-foreground/80">{label}</p>
       </div>
-      <div className="mt-2 flex items-baseline gap-2">
-        <p className="tabular text-[28px] font-semibold leading-none tracking-[-0.025em] text-foreground">{value}</p>
+      <div className="mt-4 flex items-baseline gap-2">
+        <p className="tabular text-[28px] font-semibold leading-none tracking-[-0.03em] text-foreground">{value}</p>
         {delta !== undefined && <Delta value={delta} />}
       </div>
       {(hint || (href && action)) && (
@@ -65,8 +65,8 @@ export function StatCard({
     </>
   )
   const cls = cn(
-    "group relative flex min-w-0 flex-col rounded-[14px] border border-border bg-card p-4.5 shadow-card transition-[border-color,box-shadow,transform] duration-200",
-    href && "outline-none hover:-translate-y-px hover:border-border-strong hover:shadow-float focus-visible:ring-2 focus-visible:ring-brand/45",
+    "group relative flex min-w-0 flex-col rounded-card border border-border/90 bg-card p-5 shadow-card transition-[border-color,box-shadow,transform] duration-200",
+    href && "outline-none hover:-translate-y-px hover:border-border-strong hover:shadow-raised focus-visible:ring-2 focus-visible:ring-brand/45",
     className,
   )
   return href ? (

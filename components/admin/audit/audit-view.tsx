@@ -190,7 +190,7 @@ export function AuditView() {
             <button
               type="button"
               onClick={() => router.replace("/admin/atividade")}
-              className="col-span-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-brand/30 bg-brand-soft px-3 text-[12.5px] font-medium text-brand-strong hover:border-brand/50"
+              className="col-span-2 inline-flex h-9 items-center gap-1.5 rounded-control border border-brand/30 bg-brand-soft px-3 text-[12.5px] font-medium text-brand-strong hover:border-brand/50"
             >
               Usuário: {actorName ?? "selecionado"} <X className="size-3.5" />
             </button>

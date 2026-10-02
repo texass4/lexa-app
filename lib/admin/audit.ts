@@ -5,7 +5,7 @@ import type { AuditSeverity } from "./catalog"
 import { ROLE_LABELS, type Role } from "@/lib/auth/permissions"
 
 /** IP de quem fez a requisição, quando o proxy/CDN informa. */
-export function clientIp(request: Request): string | undefined {
+function clientIp(request: Request): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
   return forwarded || request.headers.get("x-real-ip") || undefined
 }
@@ -37,7 +37,11 @@ export function auditMemberPatch(
       : patch.role !== undefined
         ? ["user.role_changed", "warning", `Papel de ${member.name} alterado para ${ROLE_LABELS[patch.role as Role] ?? patch.role}`]
         : patch.permissions !== undefined
-          ? ["user.permissions_changed", "warning", `Permissões de ${member.name} ${patch.permissions === null ? "restauradas ao padrão" : "personalizadas"}`]
+          ? [
+              "user.permissions_changed",
+              "warning",
+              `Permissões de ${member.name} ${patch.permissions === null ? "restauradas ao padrão" : "personalizadas"}`,
+            ]
           : ["user.updated", "info", `Dados de ${member.name} alterados`]
   return recordAudit(request, {
     action,
@@ -46,7 +50,11 @@ export function auditMemberPatch(
     organizationId,
     target: { type: "user", id: member.id, label: member.name },
     summary,
-    metadata: { changes: Object.keys(patch), ...(patch.role !== undefined ? { role: patch.role } : {}), ...(patch.active !== undefined ? { active: patch.active } : {}) },
+    metadata: {
+      changes: Object.keys(patch),
+      ...(patch.role !== undefined ? { role: patch.role } : {}),
+      ...(patch.active !== undefined ? { active: patch.active } : {}),
+    },
   })
 }
 

@@ -119,7 +119,7 @@ function Workspace() {
   )
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden rounded-[16px] border border-border bg-card shadow-card">
+    <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
       <aside
         aria-label="Caixa de entrada"
         className={cn("flex min-h-0 w-full shrink-0 flex-col border-border md:w-[300px] md:border-r xl:w-[320px]", selected && "max-md:hidden")}

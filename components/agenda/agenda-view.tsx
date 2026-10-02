@@ -3,6 +3,7 @@
 import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { FilterTabs } from "@/components/ui/filter-tabs"
@@ -12,11 +13,12 @@ import { MonthGrid } from "./month-grid"
 import { AgendaList } from "./agenda-list"
 import { AppointmentDetail } from "./appointment-detail"
 import { AgendaToday } from "./agenda-today"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { fmtSlot, moveAppointment, moveToDay } from "@/lib/agenda/agenda"
 import { useUI } from "@/lib/store/ui-store"
-import { categoryStyle } from "@/lib/config"
-import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, startOfDay, startOfWeek, weekdayName } from "@/lib/dates"
-import { currentUserId } from "@/lib/account"
+import { categoryStyle } from "@/lib/core/config"
+import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, startOfDay, startOfWeek, weekdayName } from "@/lib/core/dates"
+import { currentUserId } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 import { useSession } from "@/lib/auth/session"
 
@@ -28,7 +30,8 @@ const NONE = "__sem_categoria__"
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export function AgendaView() {
-  const data = useDemoData()
+  const data = useOfficeData()
+  const { updateAppointment, versionOf } = useOfficeActions()
   const { openDialog } = useUI()
   const { can } = useSession()
   const editable = can("agenda.edit")
@@ -77,6 +80,22 @@ export function AgendaView() {
 
   const processCode = (id?: string) => data.processes.find((p) => p.id === id)?.code
 
+  /** Arrastar na agenda: grava o novo horário (mesma duração) e oferece desfazer. */
+  const reschedule = async (a: Appointment, next: { start: string; end: string }) => {
+    if (next.start === a.start && next.end === a.end) return
+    const result = await updateAppointment(a.id, next, { baseVersion: versionOf("appointments", a.id) })
+    if (result.status !== "saved") return
+    toast.success("Compromisso remarcado.", {
+      description: `${a.title} — ${fmtSlot(a.start)} → ${fmtSlot(next.start)}`,
+      action: {
+        label: "Desfazer",
+        onClick: () => void updateAppointment(a.id, { start: a.start, end: a.end }, { baseVersion: versionOf("appointments", a.id) }),
+      },
+    })
+  }
+  const moveInGrid = editable ? (a: Appointment, date: string, startMin: number) => reschedule(a, moveAppointment(a, date, startMin)) : undefined
+  const moveInMonth = editable ? (a: Appointment, date: string) => reschedule(a, moveToDay(a, date)) : undefined
+
   const toggleType = (t: string) =>
     setHidden((s) => {
       const n = new Set(s)
@@ -118,7 +137,7 @@ export function AgendaView() {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-[9px] border border-border bg-surface shadow-xs">
+          <div className="flex items-center rounded-control border border-border bg-surface shadow-xs">
             <button
               type="button"
               aria-label="Período anterior"
@@ -159,7 +178,7 @@ export function AgendaView() {
             aria-checked={onlyMine}
             onClick={() => setOnlyMine((v) => !v)}
             className={cn(
-              "h-8 rounded-[9px] border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+              "h-8 rounded-control border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
               onlyMine ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-muted-foreground hover:text-foreground",
             )}
           >
@@ -225,6 +244,7 @@ export function AgendaView() {
                     events={events}
                     onSelect={setSelected}
                     onCreate={editable ? create : undefined}
+                    onMove={moveInGrid}
                     processCode={processCode}
                   />
                 </div>
@@ -234,7 +254,14 @@ export function AgendaView() {
               </>
             )}
             {view === "dia" && (
-              <TimeGrid days={[anchor]} events={events} onSelect={setSelected} onCreate={editable ? create : undefined} processCode={processCode} />
+              <TimeGrid
+                days={[anchor]}
+                events={events}
+                onSelect={setSelected}
+                onCreate={editable ? create : undefined}
+                onMove={moveInGrid}
+                processCode={processCode}
+              />
             )}
             {view === "mes" && (
               <MonthGrid
@@ -246,6 +273,7 @@ export function AgendaView() {
                   setAnchor(startOfDay(d))
                   setView("dia")
                 }}
+                onMove={moveInMonth}
               />
             )}
           </motion.div>

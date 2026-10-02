@@ -5,17 +5,19 @@
 
 import type { AIErrorCode } from "./types"
 
-export const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
+const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
   DISABLED: "A Íntegra IA está desativada neste ambiente.",
   NOT_CONFIGURED: "A configuração da Íntegra IA ainda não foi concluída. Configure GEMINI_API_KEY no ambiente do servidor.",
   INVALID_API_KEY: "A Gemini recusou a chave configurada em GEMINI_API_KEY. Confira se ela está correta e ativa no Google AI Studio.",
-  MODEL_UNAVAILABLE: "O modelo configurado em GEMINI_MODEL não está disponível para esta chave. Troque por outro modelo Flash disponível na sua conta.",
+  MODEL_UNAVAILABLE:
+    "O modelo configurado em GEMINI_MODEL não está disponível para esta chave. Troque por outro modelo Flash disponível na sua conta.",
   UNAUTHORIZED: "Sua sessão expirou. Entre novamente para usar a Íntegra IA.",
   FORBIDDEN: "Você não tem permissão para consultar estas informações.",
   NOT_FOUND: "Não encontramos este registro no seu escritório.",
   BAD_REQUEST: "Não foi possível entender o pedido enviado à Íntegra IA.",
   INSUFFICIENT_DATA: "Nenhum dado suficiente foi encontrado para realizar esta análise.",
   RATE_LIMITED: "A Íntegra IA atingiu temporariamente o limite de consultas. Tente novamente em alguns instantes.",
+  PLAN_LIMIT: "O escritório atingiu o limite de uso da Íntegra IA do plano neste mês. Fale com a equipe da Íntegra para ampliar.",
   PROVIDER_RATE_LIMITED: "A Íntegra IA atingiu temporariamente o limite de consultas do provedor. Tente novamente em alguns instantes.",
   TIMEOUT: "A análise demorou mais do que o esperado. Tente novamente.",
   CANCELLED: "Análise cancelada.",
@@ -26,7 +28,7 @@ export const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
   UNEXPECTED: "Não foi possível concluir a análise agora. Tente novamente.",
 }
 
-export const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
+const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
   DISABLED: 503,
   NOT_CONFIGURED: 503,
   INVALID_API_KEY: 503,
@@ -37,6 +39,7 @@ export const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
   BAD_REQUEST: 400,
   INSUFFICIENT_DATA: 422,
   RATE_LIMITED: 429,
+  PLAN_LIMIT: 429,
   PROVIDER_RATE_LIMITED: 429,
   TIMEOUT: 504,
   CANCELLED: 499,

@@ -20,7 +20,7 @@ export function EmojiPicker({ onPick, disabled }: { onPick: (emoji: string) => v
       <PopoverTrigger
         disabled={disabled}
         aria-label="Inserir emoji"
-        className="flex size-9 shrink-0 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50 aria-expanded:bg-accent aria-expanded:text-foreground"
+        className="flex size-9 shrink-0 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50 aria-expanded:bg-accent aria-expanded:text-foreground"
       >
         <Smile className="size-[18px]" />
       </PopoverTrigger>

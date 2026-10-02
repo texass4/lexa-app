@@ -20,11 +20,11 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { PRIORITY_CONFIG } from "@/lib/config"
-import { addDays, fmtDayLabel, getNow, startOfDay, toLocalISO } from "@/lib/dates"
+import { PRIORITY_CONFIG } from "@/lib/core/config"
+import { addDays, fmtDayLabel, getNow, startOfDay, toLocalISO } from "@/lib/core/dates"
 import { whatsappApi, type AiAction, type AiResponse } from "@/lib/whatsapp/client"
 import type { WhatsAppConversation } from "@/types"
 import { ConfirmActionDialog } from "./dialogs"
@@ -43,8 +43,8 @@ type Pending = { kind: "note"; text: string } | { kind: "task"; index: number } 
 
 export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppConversation; onUseReply: () => void }) {
   const { can, user } = useSession()
-  const data = useDemoData()
-  const { addTask } = useDemoActions()
+  const data = useOfficeData()
+  const { addTask } = useOfficeActions()
   const { openDialog } = useUI()
   const [configured, setConfigured] = React.useState<boolean | null>(null)
   const [running, setRunning] = React.useState<AiAction | null>(null)

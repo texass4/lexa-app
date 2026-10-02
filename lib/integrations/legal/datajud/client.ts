@@ -8,7 +8,9 @@
  *   fonte lenta nunca deixa a tela carregando indefinidamente.
  * - Poucas tentativas (3), só para falhas passageiras: timeout, conexão,
  *   HTTP 408/429/5xx e resposta parcial. Espera com backoff exponencial +
- *   jitter, respeitando `Retry-After` no 429, sempre dentro do prazo total.
+ *   jitter, sempre dentro do prazo total. `Retry-After` é respeitado: nunca se
+ *   tenta antes dele — se a espera pedida passa do teto, a consulta desiste e o
+ *   erro leva o `retryAfterMs` para quem decide quando voltar (o monitoramento).
  * - Sob carga, o Elasticsearch da fonte responde 200 com shards falhos e sem
  *   resultados. Isso é falha passageira, não "processo não encontrado".
  */
@@ -129,13 +131,12 @@ export function createDataJudClient(options: DataJudClientOptions) {
     // Libera a conexão; o corpo de erro não interessa além do log.
     const text = await response.text().catch(() => "")
 
-    if (status === 401 || status === 403) return { error: new LookupError("AUTHENTICATION", `HTTP ${status}`), retry: false }
-    if (status === 429) {
-      return { error: new LookupError("RATE_LIMIT", "HTTP 429"), retry: true, hintMs: parseRetryAfter(response.headers.get("retry-after"), now()) }
-    }
-    if (status === 408 || status === 504) return { error: new LookupError("TIMEOUT", `HTTP ${status}`), retry: true }
-    if (status >= 500) return { error: new LookupError("UNAVAILABLE", `HTTP ${status}`), retry: true }
-    return { error: new LookupError("UNAVAILABLE", `HTTP ${status} não recuperável: ${text.slice(0, 200)}`), retry: false }
+    if (status === 401 || status === 403) return { error: new LookupError("AUTHENTICATION", `HTTP ${status}`, { status }), retry: false }
+    const hintMs = parseRetryAfter(response.headers.get("retry-after"), now())
+    if (status === 429) return { error: new LookupError("RATE_LIMIT", "HTTP 429", { status, retryAfterMs: hintMs }), retry: true, hintMs }
+    if (status === 408 || status === 504) return { error: new LookupError("TIMEOUT", `HTTP ${status}`, { status, retryAfterMs: hintMs }), retry: true, hintMs }
+    if (status >= 500) return { error: new LookupError("UNAVAILABLE", `HTTP ${status}`, { status, retryAfterMs: hintMs }), retry: true, hintMs }
+    return { error: new LookupError("UNAVAILABLE", `HTTP ${status} não recuperável: ${text.slice(0, 200)}`, { status }), retry: false }
   }
 
   /**
@@ -157,8 +158,10 @@ export function createDataJudClient(options: DataJudClientOptions) {
 
       last = outcome.error
       if (!outcome.retry || attempt === config.maxAttempts) break
+      // A fonte pediu mais espera do que cabe aqui: tentar antes seria desrespeitar o pedido.
+      if (outcome.hintMs !== undefined && outcome.hintMs > config.maxWaitMs) break
 
-      const wait = Math.min(outcome.hintMs ?? backoff(attempt), config.maxWaitMs) + random() * 250
+      const wait = (outcome.hintMs ?? Math.min(backoff(attempt), config.maxWaitMs)) + random() * 250
       // Não vale esperar se não sobra tempo para outra tentativa útil.
       if (now() + wait + 2000 > deadline) break
       log("retry", { attempt, waitMs: Math.round(wait), code: last.code })

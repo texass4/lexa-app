@@ -12,13 +12,28 @@ const REF_IN_TEXT = /\[([A-Z]\d{1,3})\]/g
 
 /** Mantém só referências conhecidas, sem repetição. */
 export function keepKnownRefs(refs: string[], sources: AISources) {
-  return [...new Set(refs.map((ref) => ref.trim().replace(/^\[|\]$/g, "").toUpperCase()))].filter((ref) => ref in sources)
+  return [
+    ...new Set(
+      refs.map((ref) =>
+        ref
+          .trim()
+          .replace(/^\[|\]$/g, "")
+          .toUpperCase(),
+      ),
+    ),
+  ].filter((ref) => ref in sources)
 }
 
 /** Notas cuja referência não existe são descartadas — seria um registro inventado. */
 export function keepKnownNotes(notes: ReferencedNote[], sources: AISources) {
   return notes
-    .map((note) => ({ ...note, ref: note.ref.trim().replace(/^\[|\]$/g, "").toUpperCase() }))
+    .map((note) => ({
+      ...note,
+      ref: note.ref
+        .trim()
+        .replace(/^\[|\]$/g, "")
+        .toUpperCase(),
+    }))
     .filter((note) => note.ref in sources)
 }
 
@@ -64,7 +79,9 @@ export function groundingWarnings(output: unknown, contextText: string): string[
   const lowerContext = contextText.toLowerCase()
   const dayCounts = [...text.matchAll(DAY_COUNT)].map((m) => m[0].trim()).filter((phrase) => !lowerContext.includes(phrase.toLowerCase()))
   if (dayCounts.length) {
-    warnings.push(`A resposta menciona contagem de prazo ("${dayCounts[0]}") que não vem dos dados da Íntegra. Prazos processuais devem ser conferidos pelo advogado.`)
+    warnings.push(
+      `A resposta menciona contagem de prazo ("${dayCounts[0]}") que não vem dos dados da Íntegra. Prazos processuais devem ser conferidos pelo advogado.`,
+    )
   }
 
   return warnings

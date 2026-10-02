@@ -5,9 +5,9 @@ import { CircleAlert, CircleCheck, RotateCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { FadeIn } from "@/components/ui/motion"
-import { fmtNumericDate } from "@/lib/dates"
-import { degreeLabel } from "@/lib/services/processes/labels"
-import type { ProcessSheet } from "@/lib/services/processes/sheet"
+import { fmtNumericDate } from "@/lib/core/dates"
+import { degreeLabel } from "@/lib/services/processos/labels"
+import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import type { Process } from "@/types"
 
 /** Campos que a consulta preenche — mesmos rótulos no esqueleto e no resultado. */

@@ -18,7 +18,8 @@ import type { BuiltContext } from "@/lib/ai/context/shared"
 import { buildSystemPrompt } from "@/lib/ai/prompts/system"
 import { CHAT_SCOPE_LABEL, CHAT_TASK } from "@/lib/ai/prompts/tasks"
 import { CHAT_LIMITS, type AIMessage, type AIResult, type ChatReply, type ChatScope } from "@/lib/ai/types"
-import { citedSources, consumeQuota, nowOf, track, type AIServiceDeps } from "./run"
+import { meteredCall } from "@/lib/ai/metering"
+import { citedSources, nowOf, track, type AIServiceDeps } from "./run"
 
 /** Histórico enxuto: últimas mensagens, cada uma limitada, terminando numa pergunta. */
 export function trimHistory(messages: AIMessage[]): AIMessage[] {
@@ -28,7 +29,8 @@ export function trimHistory(messages: AIMessage[]): AIMessage[] {
     .slice(-CHAT_LIMITS.history)
   // O Gemini exige que a conversa comece pelo usuário.
   while (cleaned.length && cleaned[0].role !== "user") cleaned.shift()
-  if (!cleaned.length || cleaned[cleaned.length - 1].role !== "user") throw new AIError("BAD_REQUEST", { message: "A conversa precisa terminar numa pergunta." })
+  if (!cleaned.length || cleaned[cleaned.length - 1].role !== "user")
+    throw new AIError("BAD_REQUEST", { message: "A conversa precisa terminar numa pergunta." })
   return cleaned
 }
 
@@ -36,11 +38,11 @@ async function buildScopeContext(deps: AIServiceDeps, scope: ChatScope): Promise
   const now = nowOf(deps)
   switch (scope.type) {
     case "process":
-      return buildProcessContext(await loadProcessData(deps.repo, scope.id), now)
+      return buildProcessContext(await loadProcessData(deps.repo, scope.id, now), now)
     case "client":
-      return buildClientContext(await loadClientData(deps.repo, scope.id), now)
+      return buildClientContext(await loadClientData(deps.repo, scope.id, now), now)
     case "office":
-      return buildOfficeContext(await loadOfficeData(deps.repo), now, { forChat: true })
+      return buildOfficeContext(await loadOfficeData(deps.repo, now), now, { forChat: true })
   }
 }
 
@@ -50,10 +52,16 @@ export async function chat(deps: AIServiceDeps, scope: ChatScope, messages: AIMe
   const context = sanitizeAIContext(built.context)
   const contextText = JSON.stringify(context)
 
-  return track(deps, `chat.${scope.type}`, async () => {
-    consumeQuota(deps)
+  const operation = `chat.${scope.type}`
+  return track(deps, operation, async () => {
     const system = buildSystemPrompt(`${CHAT_TASK}\n\n${CHAT_SCOPE_LABEL[scope.type]}\n\nDADOS DA ÍNTEGRA (JSON):\n<dados>\n${contextText}\n</dados>`)
-    const { value, usage } = await deps.provider.generateText({ system, messages: history, temperature: 0.3, signal: deps.signal })
+    const { value, usage } = await meteredCall(
+      deps.meter,
+      deps.provider,
+      { organizationId: deps.repo.organizationId, userId: deps.userId, operation },
+      "standard",
+      () => deps.provider.generateText({ system, messages: history, temperature: 0.3, signal: deps.signal }),
+    )
     const text = stripUnknownRefs(value, built.sources).trim()
     if (!text) throw new AIError("EMPTY_RESPONSE")
 

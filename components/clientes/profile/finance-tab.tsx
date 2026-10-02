@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { CircleCheck, CircleDollarSign, Clock3, Ellipsis, Plus, Trash2, TriangleAlert } from "lucide-react"
+import { Ban, CircleCheck, CircleDollarSign, Clock3, Ellipsis, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
@@ -12,27 +12,30 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { invoiceStatus, type clientFinance } from "@/lib/selectors"
-import { INVOICE_STATUS } from "@/lib/config"
-import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
+import { invoiceStatus, type clientFinance } from "@/lib/store/selectors"
+import { INVOICE_STATUS } from "@/lib/core/config"
+import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
 import type { Client, Invoice } from "@/types"
 import { Can } from "@/lib/auth/session"
+import { NewInvoiceDialog } from "@/components/financeiro/new-invoice-dialog"
 
-const ICON: Record<Invoice["status"], React.ElementType> = { pago: CircleCheck, pendente: Clock3, atrasado: TriangleAlert }
+const ICON: Record<Invoice["status"], React.ElementType> = { pago: CircleCheck, pendente: Clock3, atrasado: TriangleAlert, cancelado: Ban }
 const ICON_CLS: Record<Invoice["status"], string> = {
   pago: "border-success/25 bg-success-soft text-success",
   pendente: "border-border bg-surface text-muted-foreground",
   atrasado: "border-danger/25 bg-danger-soft text-danger",
+  cancelado: "border-border bg-surface text-subtle",
 }
 
 export function FinanceTab({ client, finance: f }: { client: Client; finance: ReturnType<typeof clientFinance> }) {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { openDialog } = useUI()
-  const { markInvoicePaid, deleteInvoice } = useDemoActions()
+  const { markInvoicePaid, deleteInvoice } = useOfficeActions()
   const [toDelete, setToDelete] = React.useState<Invoice | null>(null)
+  const [editing, setEditing] = React.useState<Invoice | undefined>()
   const invoices = [...f.invoices].sort((a, b) => b.dueDate.localeCompare(a.dueDate))
   const paidPct = f.contracted ? Math.round((f.paid / f.contracted) * 100) : 0
   const newInvoice = () => openDialog("invoice", { clientId: client.id })
@@ -168,10 +171,12 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
                     <p className="truncate text-[13.5px] font-medium">{inv.description}</p>
                     <p className="truncate text-[12px] text-muted-foreground">
                       {current === "pago"
-                        ? `Pago em ${inv.paidAt ? fmtNumericDate(inv.paidAt) : "data não informada"}${method}`
-                        : current === "atrasado"
-                          ? `${fmtDueIn(inv.dueDate).replace(/^v/, "V")}${method}`
-                          : `Vence ${fmtDueIn(inv.dueDate)}${method}`}
+                        ? `Recebido em ${inv.paidAt ? fmtNumericDate(inv.paidAt) : "data não informada"}${method}`
+                        : current === "cancelado"
+                          ? `Cancelado${inv.category ? ` · ${inv.category}` : ""}`
+                          : current === "atrasado"
+                            ? `${fmtDueIn(inv.dueDate).replace(/^v/, "V")}${method}`
+                            : `Vence ${fmtDueIn(inv.dueDate)}${method}`}
                       {process && (
                         <>
                           {" · "}
@@ -204,11 +209,14 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52 rounded-[10px] p-1">
                       <DropdownMenuGroup>
-                        {current !== "pago" && (
+                        {current !== "pago" && current !== "cancelado" && (
                           <DropdownMenuItem className="h-8 px-2" onClick={() => markPaid(inv)}>
-                            <CircleCheck /> Registrar pagamento hoje
+                            <CircleCheck /> Marcar como recebido
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem className="h-8 px-2" onClick={() => setEditing(inv)}>
+                          <Pencil /> Editar lançamento
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setToDelete(inv)}>
                           <Trash2 /> Excluir lançamento
                         </DropdownMenuItem>
@@ -222,6 +230,7 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
         </ol>
       </Panel>
 
+      <NewInvoiceDialog open={!!editing} onOpenChange={(o) => !o && setEditing(undefined)} invoice={editing} />
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}

@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { BRAND, SYMBOL, WORDMARK } from "@/lib/brand"
+import { BRAND, SYMBOL, WORDMARK } from "@/lib/core/brand"
 
 /**
  * Marca da Íntegra: símbolo, logotipo tipográfico e a composição horizontal.
@@ -38,7 +38,7 @@ export function Wordmark({ className, tone = "auto" }: { className?: string; ton
 const SIZES = {
   sm: { gap: "gap-2", mark: "size-7", word: "h-[15px]" },
   md: { gap: "gap-2.5", mark: "size-8", word: "h-[17px]" },
-  lg: { gap: "gap-3", mark: "size-10", word: "h-[26px]" },
+  lg: { gap: "gap-3", mark: "size-10", word: "h-[22px]" },
 } as const
 
 /** Símbolo + "Íntegra". `collapsed` mostra só o símbolo; `subtitle` entra abaixo do nome. */
@@ -63,7 +63,11 @@ export function Logo({
       {!collapsed && (
         <span className="flex min-w-0 flex-col items-start">
           <Wordmark tone={tone} className={s.word} />
-          {subtitle && <span className="mt-0.5 max-w-full truncate text-[10.5px] tracking-[0.01em] text-muted-foreground">{subtitle}</span>}
+          {subtitle && (
+            <span className={cn("mt-1 max-w-[168px] truncate text-[11px] tracking-[0.01em]", tone === "inverse" ? "text-sidebar-muted" : "text-muted-foreground")}>
+              {subtitle}
+            </span>
+          )}
         </span>
       )}
     </span>

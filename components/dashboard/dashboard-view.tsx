@@ -1,84 +1,129 @@
 "use client"
 
+import * as React from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { cn } from "cn"
 import { Greeting } from "./greeting"
+import { InsightBanner } from "./insight-banner"
 import { KpiCards } from "./kpi-cards"
+import { RecentProcesses } from "./recent-processes"
 import { TodayAgenda } from "./today-agenda"
+import { OpenTasks } from "./open-tasks"
+import { FinancePanel } from "./finance-panel"
+import { WeekPrazos } from "./week-prazos"
 import { RecentActivity } from "./recent-activity"
-import { MyTasks } from "./my-tasks"
-import { RevenuePanel } from "./revenue-panel"
+import { AttentionPanel } from "./attention-panel"
+import { OfficeAIDock } from "./office-ai-dock"
 import { FadeIn } from "@/components/ui/motion"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { OfficeAIPanel } from "@/components/ai/office-ai-panel"
-import { AttentionPanel } from "./attention-panel"
-import { officeSignals } from "@/lib/attention"
+import { countByLevel, officeSignals } from "@/lib/dashboard/attention"
+
+const INSIGHTS_KEY = "lexa:dashboard:insights"
 
 function DashboardSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Carregando painel">
       <div className="space-y-3">
+        <Skeleton className="h-3 w-48" />
         <Skeleton className="h-10 w-72" />
         <Skeleton className="h-4 w-96 max-w-full" />
       </div>
+      <Skeleton className="h-[104px] w-full rounded-card" />
       <SkeletonStats />
       <div className="grid gap-4 lg:grid-cols-12">
-        <SkeletonCard className="lg:col-span-8" lines={5} />
-        <SkeletonCard className="lg:col-span-4" lines={5} />
+        <SkeletonCard className="lg:col-span-7" lines={4} />
+        <SkeletonCard className="lg:col-span-5" lines={4} />
       </div>
     </div>
   )
 }
 
+/** Dois cartões lado a lado (7 + 5 colunas), com a mesma altura; se a pessoa só pode ver um, ele ocupa a linha. */
+function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React.ReactNode; delay?: number }) {
+  if (!left && !right) return null
+  const both = !!left && !!right
+  return (
+    <div className="grid gap-4 lg:grid-cols-12 lg:gap-6">
+      {left && (
+        <FadeIn delay={delay} className={cn("min-w-0 [&>*]:h-full", both ? "lg:col-span-7" : "lg:col-span-12")}>
+          {left}
+        </FadeIn>
+      )}
+      {right && (
+        <FadeIn delay={delay + 0.04} className={cn("min-w-0 [&>*]:h-full", both ? "lg:col-span-5" : "lg:col-span-12")}>
+          {right}
+        </FadeIn>
+      )}
+    </div>
+  )
+}
+
 export function DashboardView() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can, user } = useSession()
+  const [insights, setInsights] = React.useState(() => {
+    try {
+      return localStorage.getItem(INSIGHTS_KEY) === "1"
+    } catch {
+      return false
+    }
+  })
   if (!data.hydrated) return <DashboardSkeleton />
 
   const signals = officeSignals(data, { userId: user.id, can })
   const empty = data.processes.length === 0 && data.tasks.length === 0 && data.clients.length === 0
+  const toggleInsights = () =>
+    setInsights((open) => {
+      try {
+        localStorage.setItem(INSIGHTS_KEY, open ? "0" : "1")
+      } catch {
+        // Preferência só local.
+      }
+      return !open
+    })
 
-  // Hierarquia: 1) o que merece atenção, 2) o que fazer hoje (agenda e tarefas),
-  // 3) perguntar à Íntegra, 4) contexto (atividade, receita).
-  // No mobile as colunas viram "contents" para a ordem seguir essa hierarquia.
   return (
-    <div className="space-y-6 lg:space-y-7">
-      <FadeIn>
-        <Greeting signals={signals} empty={empty} />
-      </FadeIn>
-      <KpiCards />
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-5">
-        <div className="contents lg:col-span-8 lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
-          <FadeIn delay={0.06} className="order-1 lg:order-none">
-            <AttentionPanel signals={signals} empty={empty} />
-          </FadeIn>
-          <FadeIn delay={0.12} className="order-4 lg:order-none">
-            <OfficeAIPanel />
-          </FadeIn>
-          <div className="contents lg:grid lg:gap-5 xl:grid-cols-2">
-            {can("tasks.view") && (
-              <FadeIn delay={0.16} className="order-3 lg:order-none">
-                <MyTasks />
-              </FadeIn>
+    <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] 2xl:gap-7">
+      <div className="min-w-0 space-y-6">
+        <FadeIn>
+          <Greeting signals={signals} empty={empty} />
+        </FadeIn>
+
+        <FadeIn delay={0.04} className="space-y-4">
+          <InsightBanner expanded={insights} onToggle={toggleInsights} critical={countByLevel(signals).critical} />
+          <AnimatePresence initial={false}>
+            {insights && (
+              <motion.div
+                id="painel-atencao"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden"
+              >
+                <AttentionPanel signals={signals} empty={empty} />
+              </motion.div>
             )}
-            <FadeIn delay={0.2} className="order-5 lg:order-none">
-              <RecentActivity />
-            </FadeIn>
-          </div>
-        </div>
-        <div className="contents lg:col-span-4 lg:flex lg:min-w-0 lg:flex-col lg:gap-5">
-          {can("agenda.view") && (
-            <FadeIn delay={0.1} className="order-2 lg:order-none">
-              <TodayAgenda />
-            </FadeIn>
-          )}
-          {can("finance.view") && (
-            <FadeIn delay={0.18} className="order-6 lg:order-none">
-              <RevenuePanel />
-            </FadeIn>
-          )}
-        </div>
+          </AnimatePresence>
+        </FadeIn>
+
+        <KpiCards />
+
+        <Row left={can("processes.view") && <RecentProcesses />} right={can("agenda.view") && <TodayAgenda />} delay={0.08} />
+        <Row left={can("tasks.view") && <OpenTasks />} right={can("finance.view") && <FinancePanel />} delay={0.12} />
+        <Row left={can("processes.view") && <WeekPrazos />} right={<RecentActivity />} delay={0.16} />
+
+        <FadeIn delay={0.2}>
+          <OfficeAIPanel />
+        </FadeIn>
       </div>
+
+      <aside className="sticky top-[96px] hidden h-[calc(100dvh-120px)] min-h-[560px] 2xl:block">
+        <OfficeAIDock />
+      </aside>
     </div>
   )
 }

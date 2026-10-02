@@ -6,21 +6,21 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createSupabaseRepository } from "../context/repository"
-import { RateLimiter, ResultCache } from "../guard"
+import { MemoryAICache } from "../guard"
+import { reservationError, type AICallContext, type AICallOutcome, type AIMeter } from "../metering"
 import type { AIProvider, AIRequest } from "../provider"
 import type { JsonSchema } from "../schema"
 import type { AIServiceDeps } from "../services/run"
-import type { AIResult } from "../types"
 import { ROLE_DEFAULTS, type Permission } from "@/lib/auth/permissions"
-import type { Appointment, Client, Invoice, LegalDocument, Process, Task } from "@/types"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Process, Task } from "@/types"
 
 export const ORG_A = "org-a"
-export const ORG_B = "org-b"
+const ORG_B = "org-b"
 export const NOW = new Date("2026-09-26T10:00:00")
 
 const base = (organizationId: string, id: string) => ({ id, organizationId, createdAt: "2026-01-10T09:00:00" })
 
-export const clientA: Client = {
+const clientA: Client = {
   ...base(ORG_A, "c_a1"),
   name: "Maria Aparecida Souza",
   kind: "PF",
@@ -78,7 +78,7 @@ export const processA: Process = {
   ],
 }
 
-export const taskA: Task = {
+const taskA: Task = {
   ...base(ORG_A, "t_a1"),
   title: "Conferir documentos do cliente",
   dueAt: "2026-09-20T18:00:00",
@@ -88,7 +88,7 @@ export const taskA: Task = {
   related: { type: "process", id: processA.id },
 }
 
-export const appointmentA: Appointment = {
+const appointmentA: Appointment = {
   ...base(ORG_A, "a_a1"),
   title: "Reunião com a cliente",
   start: "2026-09-29T10:00:00",
@@ -98,7 +98,7 @@ export const appointmentA: Appointment = {
   processId: processA.id,
 }
 
-export const documentA: LegalDocument = {
+const documentA: LegalDocument = {
   ...base(ORG_A, "d_a1"),
   name: "Procuração.pdf",
   kind: "Procuração",
@@ -111,7 +111,7 @@ export const documentA: LegalDocument = {
   storagePath: "org-a/d_a1",
 }
 
-export const invoiceA: Invoice = {
+const invoiceA: Invoice = {
   ...base(ORG_A, "i_a1"),
   clientId: clientA.id,
   processId: processA.id,
@@ -125,7 +125,7 @@ export const invoiceA: Invoice = {
 
 export const SECRET_B = "Cliente Secreto do Escritório B"
 
-export const clientB: Client = { ...clientA, ...base(ORG_B, "c_b1"), name: SECRET_B, email: "segredo@b.com" }
+const clientB: Client = { ...clientA, ...base(ORG_B, "c_b1"), name: SECRET_B, email: "segredo@b.com" }
 export const processB: Process = {
   ...processA,
   ...base(ORG_B, "p_b1"),
@@ -134,9 +134,28 @@ export const processB: Process = {
   opposingParty: "Parte sigilosa B",
   movements: [{ id: "m_b1", at: "2026-09-25T10:00:00", title: "Sentença sigilosa B" }],
 }
-export const taskB: Task = { ...taskA, ...base(ORG_B, "t_b1"), title: "Tarefa sigilosa B", related: { type: "process", id: processB.id } }
+const taskB: Task = { ...taskA, ...base(ORG_B, "t_b1"), title: "Tarefa sigilosa B", related: { type: "process", id: processB.id } }
 
 /* ---------------------------- Supabase falso ----------------------------- */
+
+/** Atividades do cliente A: uma financeira (com valor) e uma de cadastro. */
+export const paymentActivityA: Activity = {
+  ...base(ORG_A, "act_pay_a1"),
+  type: "payment",
+  at: "2026-09-20T10:00:00",
+  actor: "Ana Advogada",
+  message: "registrou um pagamento recebido.",
+  detail: "Honorários iniciais · R$ 3.000,00 · pago em 20/09/2026",
+  clientId: clientA.id,
+}
+const clientActivityA: Activity = {
+  ...base(ORG_A, "act_cli_a1"),
+  type: "client",
+  at: "2026-09-19T10:00:00",
+  actor: "Ana Advogada",
+  message: "atualizou o cadastro do cliente.",
+  clientId: clientA.id,
+}
 
 type Row = { organization_id: string; id: string; data: Record<string, unknown> }
 
@@ -150,7 +169,7 @@ export function seedTables(): Record<string, Row[]> {
     appointments: [row(appointmentA)],
     documents: [row(documentA)],
     invoices: [row(invoiceA)],
-    activities: [],
+    activities: [row(paymentActivityA), row(clientActivityA)],
     profiles: [
       { organization_id: ORG_A, id: "u_a1", data: {}, name: "Ana Advogada" } as Row & { name: string },
       { organization_id: ORG_B, id: "u_b1", data: {}, name: "Bruno do Escritório B" } as Row & { name: string },
@@ -174,43 +193,137 @@ function project(target: Row, select: string) {
   return result
 }
 
-/** Aplica `eq`, `range` e `select` com caminhos JSON — o bastante para o repositório da IA. */
+type Condition = (row: Row) => boolean
+
+const unquote = (value: string) => (value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1).replace(/\\(.)/g, "$1") : value)
+
+/** Divide por vírgulas fora de parênteses e aspas. */
+function splitTop(text: string) {
+  const parts: string[] = []
+  let depth = 0
+  let quoted = false
+  let current = ""
+  for (const ch of text) {
+    if (ch === '"') quoted = !quoted
+    if (!quoted && ch === "(") depth++
+    if (!quoted && ch === ")") depth--
+    if (!quoted && depth === 0 && ch === ",") {
+      parts.push(current)
+      current = ""
+    } else current += ch
+  }
+  if (current) parts.push(current)
+  return parts
+}
+
+function compare(row: Row, column: string, op: string, raw: string | string[]) {
+  const value = resolvePath(row, column)
+  const text = value === undefined || value === null ? undefined : String(value)
+  switch (op) {
+    case "eq":
+      return text === raw
+    case "neq":
+      return text !== raw
+    case "gte":
+      return text !== undefined && text >= (raw as string)
+    case "gt":
+      return text !== undefined && text > (raw as string)
+    case "lt":
+      return text !== undefined && text < (raw as string)
+    case "lte":
+      return text !== undefined && text <= (raw as string)
+    case "in":
+      return text !== undefined && (raw as string[]).includes(text)
+    default:
+      throw new Error(`operador não suportado no teste: ${op}`)
+  }
+}
+
+/** Filtro `or(...)`/`and(...)` do PostgREST (o subconjunto que o repositório usa). */
+function parseLogic(expression: string, all: boolean): Condition {
+  const conditions = splitTop(expression).map((part): Condition => {
+    const nested = part.match(/^(and|or)\((.*)\)$/)
+    if (nested) return parseLogic(nested[2], nested[1] === "and")
+    const match = part.match(/^(.+?)\.(eq|neq|gte|gt|lte|lt|in)\.(.*)$/)
+    if (!match) throw new Error(`filtro não suportado no teste: ${part}`)
+    const [, column, op, raw] = match
+    const value = op === "in" ? splitTop(raw.slice(1, -1)).map(unquote) : unquote(raw)
+    return (row) => compare(row, column, op, value)
+  })
+  return (row) => (all ? conditions.every((c) => c(row)) : conditions.some((c) => c(row)))
+}
+
+/** Aplica filtros, ordem, limite, contagem e `select` com caminhos JSON — o bastante para o repositório da IA. */
 export function fakeSupabase(tables: Record<string, Row[]> = seedTables()) {
   const writes: string[] = []
-  const queries: { table: string; filters: [string, string][] }[] = []
+  const queries: { table: string; filters: [string, string][]; head: boolean; limit?: number }[] = []
 
   const client = {
     from(table: string) {
       const filters: [string, string][] = []
+      const conditions: Condition[] = []
       let select = "*"
+      let head = false
       let range: [number, number] | undefined
-      queries.push({ table, filters })
+      let order: { column: string; ascending: boolean } | undefined
+      const query = { table, filters, head, limit: undefined as number | undefined }
+      queries.push(query)
       const run = () => {
-        let rows = (tables[table] ?? []).filter((r) => filters.every(([col, value]) => String(resolvePath(r, col)) === value))
+        let rows = (tables[table] ?? []).filter((r) => conditions.every((c) => c(r)))
+        if (order) {
+          const { column, ascending } = order
+          rows = [...rows].sort(
+            (a, b) => String(resolvePath(a, column) ?? "").localeCompare(String(resolvePath(b, column) ?? "")) * (ascending ? 1 : -1),
+          )
+        }
         if (range) rows = rows.slice(range[0], range[1] + 1)
-        return rows.map((r) => project(r, select))
+        if (query.limit !== undefined) rows = rows.slice(0, query.limit)
+        return rows
+      }
+      const result = () => {
+        const rows = run()
+        return head ? { data: null, count: rows.length, error: null } : { data: rows.map((r) => project(r, select)), count: null, error: null }
+      }
+      const add = (column: string, op: string, value: string | string[]) => {
+        filters.push([column, Array.isArray(value) ? value.join(",") : value])
+        conditions.push((row) => compare(row, column, op, value))
+        return builder
       }
       const builder = {
-        select(value: string) {
+        select(value: string, options?: { head?: boolean }) {
           select = value
+          head = !!options?.head
+          query.head = head
           return builder
         },
-        eq(column: string, value: string) {
-          filters.push([column, value])
+        eq: (column: string, value: string) => add(column, "eq", value),
+        neq: (column: string, value: string) => add(column, "neq", value),
+        gte: (column: string, value: string) => add(column, "gte", value),
+        gt: (column: string, value: string) => add(column, "gt", value),
+        lt: (column: string, value: string) => add(column, "lt", value),
+        in: (column: string, values: string[]) => add(column, "in", values),
+        or(expression: string) {
+          filters.push(["or", expression])
+          conditions.push(parseLogic(expression, false))
           return builder
         },
-        order() {
+        order(column: string, options?: { ascending?: boolean }) {
+          order = { column, ascending: options?.ascending ?? true }
+          return builder
+        },
+        limit(n: number) {
+          query.limit = n
           return builder
         },
         range(from: number, to: number) {
           range = [from, to]
-          return Promise.resolve({ data: run(), error: null })
+          return Promise.resolve(result())
         },
         maybeSingle() {
-          return Promise.resolve({ data: run()[0] ?? null, error: null })
+          return Promise.resolve({ data: result().data?.[0] ?? null, error: null })
         },
-        then(resolve: (value: { data: unknown; error: null }) => unknown) {
-          return Promise.resolve({ data: run(), error: null }).then(resolve)
+        then(resolve: (value: ReturnType<typeof result>) => unknown) {
+          return Promise.resolve(result()).then(resolve)
         },
         insert: () => writes.push(`insert:${table}`),
         upsert: () => writes.push(`upsert:${table}`),
@@ -232,9 +345,13 @@ export function fakeProvider(respond: Respond) {
   const provider: AIProvider = {
     name: "fake",
     model: "fake-flash",
+    modelFor: (tier) => (tier === "light" ? "fake-flash-lite" : "fake-flash"),
     async generateJSON(request) {
       calls.push(request)
-      return { value: await respond(request), usage: { inputTokens: 10, outputTokens: 5 } }
+      return {
+        value: await respond(request),
+        usage: { inputTokens: 10, outputTokens: 5, model: request.tier === "light" ? "fake-flash-lite" : "fake-flash" },
+      }
     },
     async generateText(request) {
       calls.push(request)
@@ -244,9 +361,41 @@ export function fakeProvider(respond: Respond) {
   return { provider, calls }
 }
 
+/**
+ * Medição em memória com as mesmas regras do banco (`ai_reserve`): limite do mês e
+ * ritmo por pessoa. Só para testes — em produção quem conta é o banco.
+ */
+export function memoryMeter({ monthlyLimit = null as number | null, perUserMinute = 8 } = {}) {
+  const events: { context: AICallContext; status: "pendente" | "ok" | "erro" | "cache"; model: string; outcome?: AICallOutcome }[] = []
+  const meter: AIMeter = {
+    async reserve(context, _provider, model) {
+      const counted = events.filter(
+        (e) => e.context.organizationId === context.organizationId && (e.status === "ok" || e.status === "pendente"),
+      ).length
+      if (monthlyLimit !== null && counted >= monthlyLimit) throw reservationError({ reason: "plano", retryAfterSeconds: 3600, monthlyLimit })
+      const mine = events.filter((e) => e.context.userId && e.context.userId === context.userId && e.status !== "cache").length
+      if (context.userId && mine >= perUserMinute) throw reservationError({ reason: "pessoa", retryAfterSeconds: 30, monthlyLimit })
+      events.push({ context, status: "pendente", model })
+      return { eventId: events.length - 1 }
+    },
+    async finish({ eventId }, _context, _provider, outcome) {
+      if (eventId === null) return
+      Object.assign(events[eventId], { status: outcome.ok ? "ok" : "erro", outcome })
+    },
+    async cacheHit(context, _provider, model) {
+      events.push({ context, status: "cache", model })
+    },
+  }
+  return { meter, events }
+}
+
 export function makeDeps(
   respond: Respond,
-  { organizationId = ORG_A, permissions = ROLE_DEFAULTS.owner as readonly Permission[], limiter = new RateLimiter() } = {},
+  {
+    organizationId = ORG_A,
+    permissions = ROLE_DEFAULTS.owner as readonly Permission[],
+    meter = memoryMeter(),
+  }: { organizationId?: string; permissions?: readonly Permission[]; meter?: ReturnType<typeof memoryMeter> } = {},
 ) {
   const db = fakeSupabase()
   const repo = createSupabaseRepository(db.supabase, organizationId, (p) => permissions.includes(p))
@@ -256,11 +405,12 @@ export function makeDeps(
     provider,
     userId: "u_a1",
     now: NOW,
-    limiter,
-    cache: new ResultCache<AIResult<unknown>>(),
+    meter: meter.meter,
+    cache: new MemoryAICache(),
+    cacheKey: (parts) => parts.join("|"),
     log: () => {},
   }
-  return { deps, calls, db }
+  return { deps, calls, db, usage: meter.events }
 }
 
 /** Todo o texto enviado ao modelo numa chamada. */

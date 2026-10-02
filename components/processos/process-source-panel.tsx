@@ -6,8 +6,8 @@ import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { fmtDayLabel, fmtNumericDate, fmtTime } from "@/lib/dates"
-import { degreeLabel, isAutoTracked, ORIGIN_LABEL } from "@/lib/services/processes/labels"
+import { fmtDayLabel, fmtNumericDate, fmtShortDate, fmtTime } from "@/lib/core/dates"
+import { degreeLabel, isAutoTracked, ORIGIN_LABEL } from "@/lib/services/processos/labels"
 import type { Process, ProcessParty } from "@/types"
 import type { RefreshState } from "./use-process-refresh"
 
@@ -159,7 +159,7 @@ export function ProcessSyncPanel({
           </div>
           {auto && (
             <div className="flex items-baseline justify-between gap-4 py-2.5">
-              <dt className="text-[12.5px] text-muted-foreground">Informações atualizadas</dt>
+              <dt className="text-[12.5px] text-muted-foreground">Última consulta</dt>
               <dd className="text-right text-[13px] font-medium">
                 {refreshing ? (
                   <span className="text-muted-foreground">Atualizando…</span>
@@ -175,8 +175,14 @@ export function ProcessSyncPanel({
 
         {auto && (
           <p className="flex items-start gap-2 text-[11.5px] leading-relaxed text-subtle">
-            <ShieldCheck className="mt-px size-3.5 shrink-0" />A Íntegra consulta automaticamente as informações do processo. Movimentações já conhecidas
-            não são importadas de novo.
+            <ShieldCheck className="mt-px size-3.5 shrink-0" />
+            <span>
+              {/* A última sincronização real do monitoramento automático (servidor), não a consulta feita ao abrir. */}
+              {process.autoSyncedAt
+                ? `Atualizado automaticamente em ${fmtShortDate(process.autoSyncedAt)} às ${fmtTime(process.autoSyncedAt)}.`
+                : "Ainda não foi atualizado automaticamente."}{" "}
+              Movimentações já conhecidas não são importadas de novo.
+            </span>
           </p>
         )}
       </div>

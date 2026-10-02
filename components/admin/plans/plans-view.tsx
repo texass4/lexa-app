@@ -107,7 +107,7 @@ function PlanForm({ plan, defaults, onDone }: { plan: AdminPlan | null; defaults
       <ModalBody>
         <form id="plan-form" onSubmit={submit} noValidate className="space-y-6">
           {error && (
-            <p role="alert" className="rounded-[9px] bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
+            <p role="alert" className="rounded-control bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
               {error}
             </p>
           )}

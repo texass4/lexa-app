@@ -1,15 +1,15 @@
 import { AppShell } from "@/components/layout/app-shell"
 import { SplashGate } from "@/components/layout/app-splash"
 import { SessionProvider } from "@/lib/auth/session"
-import { DemoStoreProvider } from "@/lib/store/demo-store"
+import { OfficeStoreProvider } from "@/lib/store/office-store"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SplashGate>
       <SessionProvider>
-        <DemoStoreProvider>
+        <OfficeStoreProvider>
           <AppShell>{children}</AppShell>
-        </DemoStoreProvider>
+        </OfficeStoreProvider>
       </SessionProvider>
     </SplashGate>
   )

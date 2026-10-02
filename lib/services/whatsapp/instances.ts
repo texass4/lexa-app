@@ -41,7 +41,7 @@ export function envSetup() {
 let ensured: { key: string; instance: Instance } | null = null
 
 /** Cria (uma vez) a linha da instância do `.env` para o escritório configurado. */
-export async function ensureEnvInstance(): Promise<Instance | null> {
+async function ensureEnvInstance(): Promise<Instance | null> {
   const { credentials, organizationId } = envSetup()
   if (!credentials || !organizationId) return null
   const key = `${credentials.instanceId}:${organizationId}`

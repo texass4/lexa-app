@@ -14,9 +14,10 @@ import { ProfileSection } from "./profile-section"
 import { OfficeSection } from "./office-section"
 import { MembersManager } from "./members-manager"
 import { PermissionsSection } from "./permissions-section"
+import { AIPrivacyCard } from "@/components/ai/ai-privacy"
 import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 import { whatsappApi, type InstanceInfo } from "@/lib/whatsapp/client"
 import { connectionHealth, connectionProblem, type ConnectionHealth } from "@/lib/whatsapp/connection"
 import { formatPhone } from "@/lib/whatsapp/phone"
@@ -96,8 +97,10 @@ function WhatsAppCard() {
     whatsappApi
       .instance()
       .then((info) => !cancelled && setState({ info, loading: false }))
-      .catch((error: unknown) =>
-        !cancelled && setState({ info: null, loading: false, failure: error instanceof Error ? error.message : "Não foi possível verificar a conexão." }),
+      .catch(
+        (error: unknown) =>
+          !cancelled &&
+          setState({ info: null, loading: false, failure: error instanceof Error ? error.message : "Não foi possível verificar a conexão." }),
       )
     return () => {
       cancelled = true
@@ -144,9 +147,92 @@ function WhatsAppCard() {
   )
 }
 
+type MonitoringHealth = "active" | "waiting" | "paused" | "failing" | "disabled" | "unconfigured"
+
+const MONITORING_BADGE: Record<MonitoringHealth | "loading" | "error", { tone: Tone; label: string }> = {
+  loading: { tone: "neutral", label: "Verificando…" },
+  active: { tone: "success", label: "Ativo" },
+  waiting: { tone: "neutral", label: "Aguardando" },
+  paused: { tone: "warning", label: "Pausado" },
+  failing: { tone: "danger", label: "Atrasado" },
+  disabled: { tone: "neutral", label: "Desativado" },
+  unconfigured: { tone: "neutral", label: "Não configurado" },
+  error: { tone: "danger", label: "Indisponível" },
+}
+
+const fmtCheck = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+}
+
+/**
+ * Estado real do monitoramento automático (`GET /api/processes/monitoring`). "Ativo" só
+ * quando o servidor confirma execuções concluídas recentemente — configurado não basta.
+ */
+function MonitoringCard() {
+  const { can } = useSession()
+  const allowed = can("processes.view")
+  const [state, setState] = React.useState<{
+    health: MonitoringHealth | "loading" | "error"
+    lastHealthyRunAt?: string | null
+    resumeAfter?: string | null
+  }>({ health: "loading" })
+
+  React.useEffect(() => {
+    if (!allowed) return
+    let cancelled = false
+    fetch("/api/processes/monitoring", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data) => !cancelled && setState(data))
+      .catch(() => !cancelled && setState({ health: "error" }))
+    return () => {
+      cancelled = true
+    }
+  }, [allowed])
+
+  if (!allowed) {
+    return (
+      <IntegrationCard
+        mark="MP"
+        name="Monitoramento processual"
+        badge={null}
+        description="Você não tem acesso a Processos. Quem administra o escritório pode liberar a permissão."
+      />
+    )
+  }
+
+  const badge = MONITORING_BADGE[state.health]
+  const last = state.lastHealthyRunAt ? ` Última verificação em ${fmtCheck(state.lastHealthyRunAt)}.` : ""
+  const description = {
+    loading: "Consultando o estado do monitoramento.",
+    active: `Movimentações dos tribunais atualizadas automaticamente nos processos acompanhados.${last}`,
+    waiting: "O monitoramento está configurado e ainda não fez a primeira verificação.",
+    paused: `A fonte pública limitou as consultas; o monitoramento retoma sozinho${state.resumeAfter ? ` às ${fmtCheck(state.resumeAfter).split(" às ")[1]}` : ""}.${last}`,
+    failing: `As atualizações automáticas estão atrasadas.${last} Você pode atualizar cada processo pelo botão "Atualizar".`,
+    disabled: "A consulta automática de processos está desativada pela administração da Íntegra.",
+    unconfigured: 'O monitoramento automático ainda não foi configurado. Atualize os processos pelo botão "Atualizar".',
+    error: "Não foi possível verificar o monitoramento agora.",
+  }[state.health]
+
+  return (
+    <IntegrationCard
+      mark="MP"
+      name="Monitoramento processual"
+      badge={
+        <StatusBadge tone={badge.tone} size="sm">
+          {badge.label}
+        </StatusBadge>
+      }
+      description={description}
+    />
+  )
+}
+
 function IntegrationsSection() {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <AIPrivacyCard />
+      <MonitoringCard />
       <WhatsAppCard />
       {UPCOMING.map((it) => (
         <IntegrationCard
@@ -190,7 +276,7 @@ export function SettingsView() {
                     onClick={() => go(s.id)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative flex h-9 w-full items-center gap-2.5 whitespace-nowrap rounded-[9px] px-3 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                      "relative flex h-9 w-full items-center gap-2.5 whitespace-nowrap rounded-control px-3 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                       active ? "text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                     )}
                   >
@@ -198,7 +284,7 @@ export function SettingsView() {
                       <motion.span
                         layoutId="settings-nav"
                         transition={{ type: "spring", stiffness: 520, damping: 42 }}
-                        className="absolute inset-0 rounded-[9px] border border-border bg-card shadow-xs"
+                        className="absolute inset-0 rounded-control border border-border bg-card shadow-xs"
                       />
                     )}
                     <s.icon className="relative size-4 shrink-0" strokeWidth={1.8} />

@@ -8,13 +8,14 @@ import { cn } from "cn"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect } from "@/components/ui/field"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { formatFileSize, uid } from "@/lib/format"
-import { currentOrgId } from "@/lib/account"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { formatFileSize, uid } from "@/lib/core/format"
+import { currentOrgId } from "@/lib/auth/account"
+import { documentRequiredIssue } from "@/lib/clientes/clients"
 import { getSupabase } from "@/lib/supabase/client"
 import type { DocumentKind } from "@/types"
 
-const KINDS: DocumentKind[] = ["Contrato", "Procuração", "Documento pessoal", "Petição", "Comprovante", "Laudo", "Decisão"]
+export const DOCUMENT_KINDS: DocumentKind[] = ["Contrato", "Procuração", "Documento pessoal", "Petição", "Comprovante", "Laudo", "Decisão"]
 const EXTENSIONS = ["pdf", "docx", "doc", "txt", "jpg", "png"] as const
 const MAX_BYTES = 25 * 1024 * 1024
 /** O tipo vem da extensão aceita, nunca do navegador: um .pdf é servido sempre como PDF. */
@@ -45,8 +46,8 @@ export function NewDocumentDialog({ open, onOpenChange, defaults }: { open: bool
 }
 
 function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => void }) {
-  const data = useDemoData()
-  const { addDocument } = useDemoActions()
+  const data = useOfficeData()
+  const { addDocument } = useOfficeActions()
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [file, setFile] = React.useState<{ name: string; size: number; source: File } | null>(null)
   const [dragging, setDragging] = React.useState(false)
@@ -71,6 +72,8 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
       setError("Selecione ou arraste um arquivo.")
       return
     }
+    // Contrato exige CPF/CNPJ do cliente (o banco também confere, `0010_contacts.sql`).
+    if (contractIssue) return
     setUploading(true)
     const ext = (file.name.split(".").pop()?.toLowerCase() ?? "pdf") as (typeof EXTENSIONS)[number]
     const extension = EXTENSIONS.includes(ext) ? ext : "pdf"
@@ -98,6 +101,13 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
   }
 
   const processes = data.processes.filter((p) => !clientId || p.clientId === clientId)
+  const contractIssue =
+    kind === "Contrato"
+      ? documentRequiredIssue(
+          data.clients.find((c) => c.id === clientId),
+          "contrato",
+        )
+      : undefined
 
   return (
     <>
@@ -142,7 +152,11 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
               }}
               className={cn(
                 "flex flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-8 text-center transition-colors",
-                dragging ? "border-brand bg-brand-soft/60" : error ? "border-danger/50 bg-danger-soft/40" : "border-border-strong bg-surface-muted/40",
+                dragging
+                  ? "border-brand bg-brand-soft/60"
+                  : error
+                    ? "border-danger/50 bg-danger-soft/40"
+                    : "border-border-strong bg-surface-muted/40",
               )}
             >
               <span className="flex size-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground">
@@ -167,12 +181,12 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Tipo" htmlFor="doc-kind">
               <NativeSelect id="doc-kind" value={kind} onChange={(e) => setKind(e.target.value as DocumentKind)}>
-                {KINDS.map((k) => (
+                {DOCUMENT_KINDS.map((k) => (
                   <option key={k}>{k}</option>
                 ))}
               </NativeSelect>
             </Field>
-            <Field label="Cliente" htmlFor="doc-client" optional>
+            <Field label="Cliente" htmlFor="doc-client" error={contractIssue} optional>
               <NativeSelect
                 id="doc-client"
                 value={clientId}

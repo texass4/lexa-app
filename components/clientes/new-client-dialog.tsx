@@ -5,10 +5,10 @@ import { UsersRound } from "lucide-react"
 import { toast } from "sonner"
 import { Modal } from "@/components/ui/modal"
 import { ClientForm } from "./client-form"
-import { useDemoActions } from "@/lib/store/demo-store"
+import { useOfficeActions } from "@/lib/store/office-store"
 
 export function NewClientDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { addClient } = useDemoActions()
+  const { addClient } = useOfficeActions()
   const router = useRouter()
   const close = () => onOpenChange(false)
 

@@ -6,9 +6,9 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { TextInput } from "@/components/ui/field"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CATEGORY_COLORS, categoryStyle } from "@/lib/config"
-import { fold } from "@/lib/format"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { CATEGORY_COLORS, categoryStyle } from "@/lib/core/config"
+import { fold } from "@/lib/core/format"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import type { AppointmentCategory } from "@/types"
 
 const MAX_NAME = 40
@@ -64,8 +64,8 @@ function CategoryChip({ category, active, onClick }: { category: AppointmentCate
 }
 
 function CreateCategory({ onCreated }: { onCreated: (category: AppointmentCategory) => void }) {
-  const { appointmentCategories } = useDemoData()
-  const { addAppointmentCategory } = useDemoActions()
+  const { appointmentCategories } = useOfficeData()
+  const { addAppointmentCategory } = useOfficeActions()
   const [open, setOpen] = React.useState(false)
   const [name, setName] = React.useState("")
   const [color, setColor] = React.useState(() => nextColor(appointmentCategories))
@@ -120,15 +120,18 @@ function CreateCategory({ onCreated }: { onCreated: (category: AppointmentCatego
 }
 
 function CategoryRow({ category, usage }: { category: AppointmentCategory; usage: number }) {
-  const { updateAppointmentCategory, deleteAppointmentCategory } = useDemoActions()
-  const [name, setName] = React.useState(category.name)
+  const { updateAppointmentCategory, deleteAppointmentCategory, versionOf } = useOfficeActions()
+  // Enquanto o campo está em foco, o texto digitado e a versão da categoria nesse momento;
+  // fora dele, o campo mostra o nome atual (que pode ter mudado por outra pessoa).
+  const [draft, setDraft] = React.useState<{ name: string; baseVersion: string | null } | null>(null)
   const [editingColor, setEditingColor] = React.useState(false)
   const [confirming, setConfirming] = React.useState(false)
 
   const commitName = () => {
-    const trimmed = name.trim()
-    if (trimmed && trimmed !== category.name) updateAppointmentCategory(category.id, { name: trimmed })
-    else setName(category.name)
+    const trimmed = draft?.name.trim()
+    if (draft && trimmed && trimmed !== category.name)
+      void updateAppointmentCategory(category.id, { name: trimmed }, { baseVersion: draft.baseVersion })
+    setDraft(null)
   }
 
   return (
@@ -146,8 +149,11 @@ function CategoryRow({ category, usage }: { category: AppointmentCategory; usage
           aria-label="Nome da categoria"
           className="h-8 flex-1"
           maxLength={MAX_NAME}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={draft?.name ?? category.name}
+          onFocus={() => setDraft({ name: category.name, baseVersion: versionOf("appointmentCategories", category.id) })}
+          onChange={(e) =>
+            setDraft((d) => ({ name: e.target.value, baseVersion: d?.baseVersion ?? versionOf("appointmentCategories", category.id) }))
+          }
           onBlur={commitName}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -191,7 +197,7 @@ function CategoryRow({ category, usage }: { category: AppointmentCategory; usage
 }
 
 function ManageCategories() {
-  const { appointmentCategories, appointments } = useDemoData()
+  const { appointmentCategories, appointments } = useOfficeData()
   const usage = React.useMemo(() => {
     const count = new Map<string, number>()
     for (const a of appointments) if (a.categoryId) count.set(a.categoryId, (count.get(a.categoryId) ?? 0) + 1)
@@ -222,7 +228,7 @@ function ManageCategories() {
  * Clicar na categoria selecionada desmarca — compromisso sem categoria é válido.
  */
 export function CategoryPicker({ value, onChange }: { value?: string; onChange: (categoryId?: string) => void }) {
-  const { appointmentCategories } = useDemoData()
+  const { appointmentCategories } = useOfficeData()
 
   return (
     <div className="flex flex-col gap-1.5">

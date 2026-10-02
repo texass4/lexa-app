@@ -40,11 +40,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { getUser } from "@/lib/account"
-import { normalize } from "@/lib/format"
+import { getUser } from "@/lib/auth/account"
+import { normalize } from "@/lib/core/format"
 import { SYSTEM_STATUSES, STATUS_TONE, statusOption } from "@/lib/whatsapp/config"
 import { attachmentKindFor } from "@/lib/whatsapp/files"
 import { formatPhone } from "@/lib/whatsapp/phone"
@@ -129,7 +129,7 @@ export function ConversationView({
 }) {
   const { upsertConversation, patchConversation } = useInbox()
   const { can, user, organization } = useSession()
-  const { processes } = useDemoData()
+  const { processes } = useOfficeData()
   const { openDialog } = useUI()
   const router = useRouter()
   const health = useConnectionHealth()
@@ -493,7 +493,7 @@ export function EmptyConversation() {
     <div className="flex h-full flex-col items-center justify-center px-8 text-center">
       <div className="relative mb-5">
         <div className="absolute inset-0 -m-6 rounded-full bg-brand-soft/80 blur-2xl" aria-hidden />
-        <div className="relative flex size-16 items-center justify-center rounded-[18px] border border-border bg-surface shadow-card">
+        <div className="relative flex size-16 items-center justify-center rounded-card border border-border/90 bg-surface shadow-card">
           <svg viewBox="0 0 24 24" className="size-7 text-brand" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
             <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
             <path d="M8.5 8.5h7M8.5 11.5h4.5" strokeLinecap="round" />

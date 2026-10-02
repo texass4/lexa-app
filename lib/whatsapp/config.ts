@@ -1,4 +1,4 @@
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 import type { ConversationStatusCategory, ConversationStatusOption, MessageType } from "@/types"
 
 /**

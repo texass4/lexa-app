@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import type { Metadata } from "next"
-import { TasksView } from "@/components/tasks/tasks-view"
+import { TasksView } from "@/components/tarefas/tasks-view"
 
 export const metadata: Metadata = { title: "Tarefas" }
 

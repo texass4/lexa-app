@@ -9,11 +9,16 @@
  * Além disso, cada módulo só é lido com a permissão de visualização
  * correspondente — a IA nunca vê o que a pessoa não veria na tela.
  * O modelo nunca executa consultas: só recebe o que estas funções devolvem.
+ *
+ * Cada consulta já vem recortada do banco (processo, cliente, período, situação,
+ * quantidade) — nada de ler uma tabela inteira e filtrar depois. Números do
+ * panorama saem de contagens (`count`), não dos registros.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Permission } from "@/lib/auth/permissions"
-import type { Activity, Appointment, Client, Invoice, LegalDocument, Process, ProcessMovement, Task } from "@/types"
+import { FINANCIAL_ACTIVITY_TYPES, visibleActivities } from "@/lib/financeiro/access"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, ProcessMovement, Task } from "@/types"
 
 /** Processo sem a lista de movimentações (só a mais recente) — para visões de vários processos. */
 export type ProcessOverview = Omit<Process, "movements"> & { lastMovement?: ProcessMovement }
@@ -23,22 +28,60 @@ export interface Member {
   name: string
 }
 
+/** Recortes pedidos ao banco — cada contexto busca só o que usa. */
+export interface TaskFilter {
+  /** Tarefas ligadas a este processo. */
+  processId?: string
+  /** Tarefas ligadas a este cliente ou a um dos processos dele (`processIds`). */
+  clientId?: string
+  processIds?: string[]
+  /** Só pendentes (o panorama não usa as concluídas). */
+  pendingOnly?: boolean
+}
+
+export interface PrazoFilter {
+  processId?: string
+  processIds?: string[]
+  openOnly?: boolean
+}
+
+export interface RelatedFilter {
+  processId?: string
+  /** Do cliente ou de um dos processos dele (`processIds`). */
+  clientId?: string
+  processIds?: string[]
+}
+
 export interface AIRepository {
   readonly organizationId: string
   can(permission: Permission): boolean
   getProcess(id: string): Promise<Process | null>
   getClient(id: string): Promise<Client | null>
+  /** Processos sem o histórico de movimentações (só a mais recente). */
   listProcessOverviews(filter?: { clientId?: string }): Promise<ProcessOverview[]>
-  listClients(): Promise<Client[]>
-  listTasks(): Promise<Task[]>
-  listAppointments(): Promise<Appointment[]>
-  listDocuments(): Promise<LegalDocument[]>
-  listInvoices(): Promise<Invoice[]>
-  listActivities(filter?: { clientId?: string }): Promise<Activity[]>
+  /** Números de clientes para o panorama (contagens no banco, sem ler os cadastros). */
+  countClients(): Promise<{ total: number; active: number; delinquent: number } | null>
+  /** Só o nome dos clientes pedidos. */
+  clientNames(ids: string[]): Promise<Map<string, string>>
+  listTasks(filter?: TaskFilter): Promise<Task[]>
+  /** Prazos (módulo de processos): de um processo, de vários, ou só os abertos. */
+  listPrazos(filter?: PrazoFilter): Promise<Prazo[]>
+  /** Compromissos ligados ao recorte, só os que terminam depois de `endsAfter` e começam antes de `startsBefore`. */
+  listAppointments(filter?: RelatedFilter & { endsAfter?: string; startsBefore?: string }): Promise<Appointment[]>
+  /** Os documentos mais recentes do recorte. */
+  listDocuments(filter: RelatedFilter & { limit: number }): Promise<LegalDocument[]>
+  /** Contagem de documentos (todos e os enviados desde `since`), sem ler os registros. */
+  countDocuments(since: string): Promise<{ total: number; addedSince: number } | null>
+  /** Faturas do cliente, ou (sem cliente) as em aberto e as com vencimento/pagamento desde `relevantSince`. */
+  listInvoices(filter: { clientId?: string; relevantSince?: string }): Promise<Invoice[]>
+  /** As atividades mais recentes do cliente. */
+  listActivities(filter: { clientId: string; limit: number }): Promise<Activity[]>
   listMembers(): Promise<Member[]>
 }
 
 const PAGE = 1000
+/** Listas de ids enviadas numa consulta (acima disso, em partes). */
+const IN_CHUNK = 150
 
 /** Campos do processo lidos em listas: tudo menos o histórico completo de movimentações. */
 const OVERVIEW_FIELDS = [
@@ -56,7 +99,6 @@ const OVERVIEW_FIELDS = [
   "claimValue",
   "distributedAt",
   "lastMovementAt",
-  "nextDeadline",
   "tribunal",
   "degree",
   "className",
@@ -68,34 +110,63 @@ const OVERVIEW_FIELDS = [
 const OVERVIEW_SELECT = [...OVERVIEW_FIELDS.map((key) => `${key}:data->${key}`), "lastMovement:data->movements->0"].join(",")
 
 type Row = Record<string, unknown>
-type Filters = Record<string, string>
+// O construtor de consultas do Supabase é genérico demais para tipar aqui sem ruído.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Query = any
+type Refine = (query: Query) => Query
 
-export function createSupabaseRepository(
-  supabase: SupabaseClient,
-  organizationId: string,
-  can: (permission: Permission) => boolean,
-): AIRepository {
+/** Valor seguro dentro de `in.(…)` / `or(…)` do PostgREST. */
+const quote = (value: string) => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+const inList = (values: string[]) => `(${values.map(quote).join(",")})`
+const chunks = <T>(items: T[], size = IN_CHUNK) =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size))
+
+/** `ligado ao cliente OU a um dos processos` — num filtro só do banco. */
+function relatedTo(query: Query, filter: RelatedFilter, paths: { client: string; process: string }): Query {
+  if (filter.processId) return query.eq(paths.process, filter.processId)
+  if (filter.clientId) {
+    const ids = (filter.processIds ?? []).slice(0, IN_CHUNK)
+    return query.or([`${paths.client}.eq.${quote(filter.clientId)}`, ...(ids.length ? [`${paths.process}.in.${inList(ids)}`] : [])].join(","))
+  }
+  return query
+}
+
+export function createSupabaseRepository(supabase: SupabaseClient, organizationId: string, can: (permission: Permission) => boolean): AIRepository {
   if (!organizationId) throw new Error("Escritório obrigatório para consultar dados da IA.")
 
-  async function list(table: string, select: string, filters: Filters = {}): Promise<Row[]> {
+  const base = (table: string, select: string, options?: { count: "exact"; head: true }) =>
+    supabase.from(table).select(select, options).eq("organization_id", organizationId)
+
+  /** Todas as linhas do recorte (em páginas). Só para recortes já filtrados no banco. */
+  async function list(table: string, select: string, refine: Refine = (q) => q): Promise<Row[]> {
     const rows: Row[] = []
     for (let from = 0; ; from += PAGE) {
-      let query = supabase.from(table).select(select).eq("organization_id", organizationId)
-      for (const [column, value] of Object.entries(filters)) query = query.eq(column, value)
-      const { data, error } = await query.order("id").range(from, from + PAGE - 1)
+      const { data, error } = await refine(base(table, select))
+        .order("id")
+        .range(from, from + PAGE - 1)
       if (error) throw error
-      const page = (data ?? []) as unknown as Row[]
+      const page = (data ?? []) as Row[]
       rows.push(...page)
       if (page.length < PAGE) return rows
     }
   }
 
-  async function listData<T>(table: string, filters?: Filters): Promise<T[]> {
-    return (await list(table, "data", filters)).map((row) => row.data as T)
+  /** As primeiras `limit` linhas do recorte, na ordem pedida. */
+  async function top(table: string, select: string, refine: Refine, order: string, limit: number): Promise<Row[]> {
+    const { data, error } = await refine(base(table, select)).order(order, { ascending: false }).limit(limit)
+    if (error) throw error
+    return (data ?? []) as Row[]
   }
 
+  async function count(table: string, refine: Refine = (q) => q): Promise<number | null> {
+    const { count: total, error } = await refine(base(table, "id", { count: "exact", head: true }))
+    return error ? null : (total ?? 0)
+  }
+
+  const dataOf = <T>(rows: Row[]) => rows.map((row) => row.data as T)
+
   async function getData<T>(table: string, id: string): Promise<T | null> {
-    const { data, error } = await supabase.from(table).select("data").eq("organization_id", organizationId).eq("id", id).maybeSingle()
+    const { data, error } = await base(table, "data").eq("id", id).maybeSingle()
     if (error) throw error
     return ((data as Row | null)?.data as T | undefined) ?? null
   }
@@ -105,18 +176,119 @@ export function createSupabaseRepository(
     can,
     getProcess: async (id) => (can("processes.view") ? getData<Process>("processes", id) : null),
     getClient: async (id) => (can("clients.view") ? getData<Client>("clients", id) : null),
+
     async listProcessOverviews(filter = {}) {
       if (!can("processes.view")) return []
-      const rows = await list("processes", OVERVIEW_SELECT, filter.clientId ? { "data->>clientId": filter.clientId } : {})
+      const rows = await list("processes", OVERVIEW_SELECT, (q) => (filter.clientId ? q.eq("data->>clientId", filter.clientId) : q))
       return rows.map((row) => ({ ...(row as unknown as ProcessOverview), lastMovement: (row.lastMovement as ProcessMovement | null) ?? undefined }))
     },
-    listClients: async () => (can("clients.view") ? listData<Client>("clients") : []),
-    listTasks: async () => (can("tasks.view") ? listData<Task>("tasks") : []),
-    listAppointments: async () => (can("agenda.view") ? listData<Appointment>("appointments") : []),
-    listDocuments: async () => (can("documents.view") ? listData<LegalDocument>("documents") : []),
-    listInvoices: async () => (can("finance.view") ? listData<Invoice>("invoices") : []),
-    // Atividades: todo membro lê (mesma regra da RLS); filtradas por cliente quando pedido.
-    listActivities: async (filter = {}) => listData<Activity>("activities", filter.clientId ? { "data->>clientId": filter.clientId } : undefined),
+
+    async countClients() {
+      if (!can("clients.view")) return null
+      const [total, active, delinquent] = await Promise.all([
+        count("clients"),
+        count("clients", (q) => q.in("data->>status", ["ativo", "novo"])),
+        count("clients", (q) => q.eq("data->>status", "inadimplente")),
+      ])
+      return total === null || active === null || delinquent === null ? null : { total, active, delinquent }
+    },
+
+    async clientNames(ids) {
+      const names = new Map<string, string>()
+      const unique = [...new Set(ids.filter(Boolean))]
+      if (!can("clients.view") || !unique.length) return names
+      for (const part of chunks(unique)) {
+        for (const row of await list("clients", "id,name:data->>name", (q) => q.in("id", part))) names.set(String(row.id), String(row.name ?? ""))
+      }
+      return names
+    },
+
+    async listTasks(filter = {}) {
+      if (!can("tasks.view")) return []
+      return dataOf<Task>(
+        await list("tasks", "data", (q) => {
+          let query = q
+          if (filter.pendingOnly) query = query.eq("data->>status", "pendente")
+          if (filter.processId) return query.eq("data->related->>type", "process").eq("data->related->>id", filter.processId)
+          if (filter.clientId) {
+            const ids = (filter.processIds ?? []).slice(0, IN_CHUNK)
+            return query.or(
+              [
+                `and(data->related->>type.eq.client,data->related->>id.eq.${quote(filter.clientId)})`,
+                ...(ids.length ? [`and(data->related->>type.eq.process,data->related->>id.in.${inList(ids)})`] : []),
+              ].join(","),
+            )
+          }
+          return query
+        }),
+      )
+    },
+
+    async listPrazos(filter = {}) {
+      if (!can("processes.view")) return []
+      if (filter.processIds && !filter.processIds.length) return []
+      const refine = (ids?: string[]) => (q: Query) => {
+        let query = q
+        if (filter.openOnly) query = query.eq("data->>status", "aberto")
+        if (filter.processId) query = query.eq("process_id", filter.processId)
+        if (ids) query = query.in("process_id", ids)
+        return query
+      }
+      if (!filter.processIds) return dataOf<Prazo>(await list("deadlines", "data", refine()))
+      const rows: Row[] = []
+      for (const part of chunks(filter.processIds)) rows.push(...(await list("deadlines", "data", refine(part))))
+      return dataOf<Prazo>(rows)
+    },
+
+    async listAppointments(filter = {}) {
+      if (!can("agenda.view")) return []
+      return dataOf<Appointment>(
+        await list("appointments", "data", (q) => {
+          let query = relatedTo(q, filter, { client: "data->>clientId", process: "data->>processId" })
+          if (filter.endsAfter) query = query.gte("data->>end", filter.endsAfter)
+          if (filter.startsBefore) query = query.lt("data->>start", filter.startsBefore)
+          return query
+        }),
+      )
+    },
+
+    async listDocuments(filter) {
+      if (!can("documents.view")) return []
+      const refine = (q: Query) => relatedTo(q, filter, { client: "data->>clientId", process: "data->>processId" })
+      return dataOf<LegalDocument>(await top("documents", "data", refine, "data->>uploadedAt", filter.limit))
+    },
+
+    async countDocuments(since) {
+      if (!can("documents.view")) return null
+      const [total, addedSince] = await Promise.all([count("documents"), count("documents", (q) => q.gte("data->>uploadedAt", since))])
+      return total === null || addedSince === null ? null : { total, addedSince }
+    },
+
+    async listInvoices(filter) {
+      if (!can("finance.view")) return []
+      return dataOf<Invoice>(
+        await list("invoices", "data", (q) => {
+          if (filter.clientId) return q.eq("data->>clientId", filter.clientId)
+          if (filter.relevantSince) {
+            const since = quote(filter.relevantSince)
+            return q.or(`data->>status.neq.pago,data->>dueDate.gte.${since},data->>paidAt.gte.${since}`)
+          }
+          return q
+        }),
+      )
+    },
+
+    // Atividades: todo membro lê, menos as financeiras sem `finance.view` (mesma regra da RLS, 0014).
+    async listActivities(filter) {
+      const canViewFinance = can("finance.view")
+      const refine = (q: Query) => {
+        let query = q.eq("data->>clientId", filter.clientId)
+        if (!canViewFinance) for (const type of FINANCIAL_ACTIVITY_TYPES) query = query.neq("data->>type", type)
+        return query
+      }
+      return visibleActivities(dataOf<Activity>(await top("activities", "data", refine, "created_at", filter.limit)), canViewFinance)
+    },
+
     async listMembers() {
       const { data, error } = await supabase.from("profiles").select("id,name").eq("organization_id", organizationId)
       if (error) throw error
