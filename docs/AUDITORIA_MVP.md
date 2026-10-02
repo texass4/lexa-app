@@ -230,7 +230,7 @@ Fluxo: login → dashboard → criar cliente → processo → tarefa → abrir p
 
 | ID | Problema |
 |---|---|
-| P1-1 | Atividade recente/notificações expõem valores financeiros sem checar permissão |
+| P1-1 | Atividade recente/notificações expõem valores financeiros sem checar permissão — **corrigido** (migração 0014 + `lib/financeiro/access.ts`) |
 | P1-2 | IA do WhatsApp sem medição/limite, modelo fixo, contexto grande |
 | P1-3 | Store carrega tudo; `activities`/`notifications` sem retenção |
 | P1-4 | Sem gateway/plano de cobrança (receita "estimada") |

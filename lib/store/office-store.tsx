@@ -16,6 +16,8 @@ import { buildProcessDraft, type ImportProcessMeta } from "@/lib/services/proces
 import { mergeProcessSheet, newMovementsMessage } from "@/lib/services/processos/process-sync"
 import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import { getSupabase } from "@/lib/supabase/client"
+import { useSession } from "@/lib/auth/session"
+import { withoutFinance } from "@/lib/financeiro/access"
 import { useSplashReady } from "@/components/layout/app-splash"
 import { COLLECTION_LABELS, loadState, type Collection, type PersistedState, type Snapshot } from "./storage"
 import { OfficeSync, REVALIDATE_AFTER_HIDDEN_MS, type SaveResult, type SyncNotice } from "./office-sync"
@@ -1203,9 +1205,14 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
     }
   }, [sync])
 
+  // Sem Financeiro, nenhuma tela recebe lançamentos nem atividades financeiras. A RLS já
+  // não devolve essas linhas; aqui a regra se repete para valer também no que está em memória.
+  const canViewFinance = useSession().can("finance.view")
+  const visible = React.useMemo(() => withoutFinance(state, canViewFinance), [state, canViewFinance])
+
   return (
     <ActionsContext.Provider value={actions}>
-      <DataContext.Provider value={state}>{children}</DataContext.Provider>
+      <DataContext.Provider value={visible}>{children}</DataContext.Provider>
     </ActionsContext.Provider>
   )
 }

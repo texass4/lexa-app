@@ -13,6 +13,7 @@ import {
   SECRET_B,
   fakeSupabase,
   makeDeps,
+  paymentActivityA,
   memoryMeter,
   processA,
   processB,
@@ -414,6 +415,47 @@ describe("cliente e escritório", () => {
     assert.equal(result.sources.P1.id, processA.id)
     assert.doesNotMatch(sent, /Honorários iniciais|total_faturado/)
     assert.match(sent, /financeiro/)
+  })
+
+  it("sem Financeiro, nenhuma atividade financeira chega ao contexto do cliente", async () => {
+    const summary = {
+      resumo: "Cliente com um processo ativo.",
+      processos: [],
+      pontos_atencao: [],
+      atividades_recentes: [],
+      pendencias: [],
+      proximas_acoes: [],
+      informacoes_ausentes: [],
+      nivel_confianca: "medio",
+    }
+    // Com Financeiro: o pagamento entra (é dado que a pessoa já pode ver).
+    const owner = makeDeps(() => summary)
+    await summarizeClient(owner.deps, "c_a1")
+    assert.match(promptText(owner.calls[0]), /registrou um pagamento recebido/)
+    assert.match(promptText(owner.calls[0]), /total_faturado/)
+
+    // Sem Financeiro: nem o lançamento, nem a atividade com o valor.
+    const staff = makeDeps(() => summary, { permissions: ROLE_DEFAULTS.staff })
+    await summarizeClient(staff.deps, "c_a1")
+    const sent = promptText(staff.calls[0])
+    assert.doesNotMatch(sent, /pagamento recebido|R\$ 3\.000|Honorários iniciais|total_faturado/)
+    assert.match(sent, /atualizou o cadastro do cliente/)
+  })
+
+  it("o filtro das atividades financeiras vai para o banco, não só para a tela", async () => {
+    const db = fakeSupabase()
+    const repo = createSupabaseRepository(db.supabase, ORG_A, (p) => ROLE_DEFAULTS.staff.includes(p))
+    const activities = await repo.listActivities({ clientId: "c_a1", limit: 10 })
+    assert.ok(activities.every((a) => a.type !== "payment"))
+    assert.ok(activities.length > 0)
+    const query = db.queries.find((q) => q.table === "activities")
+    assert.deepEqual(
+      query?.filters.find(([column]) => column === "data->>type"),
+      ["data->>type", "payment"],
+    )
+
+    const finance = createSupabaseRepository(fakeSupabase().supabase, ORG_A, (p) => ROLE_DEFAULTS.lawyer.includes(p))
+    assert.ok((await finance.listActivities({ clientId: "c_a1", limit: 10 })).some((a) => a.id === paymentActivityA.id))
   })
 
   it("métricas do escritório vêm dos dados, por permissão", async () => {

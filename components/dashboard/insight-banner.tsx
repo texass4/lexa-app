@@ -6,6 +6,7 @@ import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { useOfficeData } from "@/lib/store/office-store"
 import { officeDigest } from "@/lib/dashboard/dashboard"
 import { BRAND } from "@/lib/core/brand"
+import { useSession } from "@/lib/auth/session"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
@@ -17,12 +18,14 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 export function InsightBanner({ expanded, onToggle, critical }: { expanded: boolean; onToggle: () => void; critical: number }) {
   const data = useOfficeData()
   const lexa = useLexaAI()
+  const { can } = useSession()
   const digest = officeDigest(data)
   const found = [
     plural(digest.recentMovements, "movimentação nos últimos 7 dias", "movimentações nos últimos 7 dias"),
     plural(digest.upcomingPrazos, "prazo próximo", "prazos próximos"),
-    plural(digest.overdueInvoices, "parcela em atraso", "parcelas em atraso"),
-  ]
+    // Parcelas em atraso só para quem tem o Financeiro.
+    can("finance.view") && plural(digest.overdueInvoices, "parcela em atraso", "parcelas em atraso"),
+  ].filter((item): item is string => !!item)
   const aiState = lexa.ready ? "Pronta para ajudar" : lexa.status ? (lexa.status.enabled ? "Ainda não configurada" : "Desligada") : "Verificando…"
 
   return (

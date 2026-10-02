@@ -12,7 +12,7 @@ import type { AIProvider, AIRequest } from "../provider"
 import type { JsonSchema } from "../schema"
 import type { AIServiceDeps } from "../services/run"
 import { ROLE_DEFAULTS, type Permission } from "@/lib/auth/permissions"
-import type { Appointment, Client, Invoice, LegalDocument, Process, Task } from "@/types"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Process, Task } from "@/types"
 
 export const ORG_A = "org-a"
 const ORG_B = "org-b"
@@ -138,6 +138,25 @@ const taskB: Task = { ...taskA, ...base(ORG_B, "t_b1"), title: "Tarefa sigilosa 
 
 /* ---------------------------- Supabase falso ----------------------------- */
 
+/** Atividades do cliente A: uma financeira (com valor) e uma de cadastro. */
+export const paymentActivityA: Activity = {
+  ...base(ORG_A, "act_pay_a1"),
+  type: "payment",
+  at: "2026-09-20T10:00:00",
+  actor: "Ana Advogada",
+  message: "registrou um pagamento recebido.",
+  detail: "Honorários iniciais · R$ 3.000,00 · pago em 20/09/2026",
+  clientId: clientA.id,
+}
+const clientActivityA: Activity = {
+  ...base(ORG_A, "act_cli_a1"),
+  type: "client",
+  at: "2026-09-19T10:00:00",
+  actor: "Ana Advogada",
+  message: "atualizou o cadastro do cliente.",
+  clientId: clientA.id,
+}
+
 type Row = { organization_id: string; id: string; data: Record<string, unknown> }
 
 const row = (entity: { id: string; organizationId: string }): Row => ({ organization_id: entity.organizationId, id: entity.id, data: entity })
@@ -150,7 +169,7 @@ export function seedTables(): Record<string, Row[]> {
     appointments: [row(appointmentA)],
     documents: [row(documentA)],
     invoices: [row(invoiceA)],
-    activities: [],
+    activities: [row(paymentActivityA), row(clientActivityA)],
     profiles: [
       { organization_id: ORG_A, id: "u_a1", data: {}, name: "Ana Advogada" } as Row & { name: string },
       { organization_id: ORG_B, id: "u_b1", data: {}, name: "Bruno do Escritório B" } as Row & { name: string },

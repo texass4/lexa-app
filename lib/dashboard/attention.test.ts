@@ -326,6 +326,22 @@ describe("changesSince", () => {
     )
   })
 
+  it("sem Financeiro, pagamentos não aparecem em \"desde sua última visita\"", () => {
+    const since = new Date(2026, 8, 22, 9, 0)
+    const payment: Activity = {
+      ...activity("pay", "2026-09-23T12:00:00", "u2"),
+      type: "payment",
+      message: "registrou um pagamento recebido.",
+      detail: "Honorários · R$ 8.500,00",
+    }
+    const data = empty({ activities: [activity("a1", "2026-09-23T10:00:00", "u2"), payment] })
+    const without = changesSince(data, since, { now: NOW, userId: "u1", can: (p) => p !== "finance.view" })
+    assert.deepEqual(without.map((c) => c.id), ["activity:a1"])
+    assert.ok(without.every((c) => !`${c.text} ${c.detail ?? ""}`.includes("R$")))
+    const withFinance = changesSince(data, since, { now: NOW, userId: "u1", can: () => true })
+    assert.ok(withFinance.some((c) => c.id === "activity:pay"))
+  })
+
   it("agrupa as tarefas vencidas no intervalo numa linha só", () => {
     const since = new Date(2026, 8, 20, 9, 0)
     const data = empty({ tasks: [task("t1", { dueAt: "2026-09-23T18:00:00" }), task("t2", { dueAt: "2026-09-21T18:00:00" })] })

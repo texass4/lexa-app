@@ -17,6 +17,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Permission } from "@/lib/auth/permissions"
+import { FINANCIAL_ACTIVITY_TYPES, visibleActivities } from "@/lib/financeiro/access"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, ProcessMovement, Task } from "@/types"
 
 /** Processo sem a lista de movimentações (só a mais recente) — para visões de vários processos. */
@@ -277,9 +278,16 @@ export function createSupabaseRepository(supabase: SupabaseClient, organizationI
       )
     },
 
-    // Atividades: todo membro lê (mesma regra da RLS).
-    listActivities: async (filter) =>
-      dataOf<Activity>(await top("activities", "data", (q) => q.eq("data->>clientId", filter.clientId), "created_at", filter.limit)),
+    // Atividades: todo membro lê, menos as financeiras sem `finance.view` (mesma regra da RLS, 0014).
+    async listActivities(filter) {
+      const canViewFinance = can("finance.view")
+      const refine = (q: Query) => {
+        let query = q.eq("data->>clientId", filter.clientId)
+        if (!canViewFinance) for (const type of FINANCIAL_ACTIVITY_TYPES) query = query.neq("data->>type", type)
+        return query
+      }
+      return visibleActivities(dataOf<Activity>(await top("activities", "data", refine, "created_at", filter.limit)), canViewFinance)
+    },
 
     async listMembers() {
       const { data, error } = await supabase.from("profiles").select("id,name").eq("organization_id", organizationId)

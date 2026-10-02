@@ -19,6 +19,7 @@ import { addDays, diffInDays, fmtNumericDate, getNow, parse, startOfDay } from "
 import { invoiceStatus, isOverdue } from "@/lib/store/selectors"
 import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } from "@/lib/services/processos/movement-interpreter"
 import type { Permission } from "@/lib/auth/permissions"
+import { isFinancialActivity } from "@/lib/financeiro/access"
 import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos/prazos"
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { MONITORING_STALE_AFTER_DAYS } from "@/lib/services/processos/monitoring-policy"
@@ -490,6 +491,7 @@ export function changesSince(data: AttentionData, since: Date, options: Attentio
   const items: ChangeItem[] = []
 
   for (const a of data.activities ?? []) {
+    if (isFinancialActivity(a) && !allowed("finance.view")) continue
     const at = parse(a.at)
     if (at <= since || at > now) continue
     if (options.userId && a.actorUserId === options.userId) continue

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --test --import ./tests/register.mjs \"lib/**/*.test.ts\"",
+    "test:rls": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f supabase/tests/financeiro_privacidade.sql",
     "test:integration": "node --test --test-concurrency=1 --import ./tests/register.mjs \"tests/integration/*.integration.ts\"",
     "email:templates": "node --import ./tests/register.mjs scripts/supabase-email-templates.ts",
     "email:verify": "node --env-file-if-exists=.env.local --import ./tests/register.mjs scripts/verify-smtp.ts"
