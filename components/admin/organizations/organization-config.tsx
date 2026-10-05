@@ -6,7 +6,7 @@ import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { ToggleSwitch } from "@/components/ui/toggle-switch"
-import { maskDocument, maskPhone } from "@/lib/masks"
+import { maskDocument, maskPhone } from "@/lib/core/masks"
 import {
   formatCents,
   formatLimitValue,
@@ -251,7 +251,7 @@ function StatusPanel({ org, actions }: { org: AdminOrganization; actions: Action
     <Panel>
       <PanelHeader title="Status e notas internas" description={ORG_STATUS[org.status].description} action={<OrgStatusBadge status={org.status} />} />
       {org.statusReason && org.status !== "active" && (
-        <p className="mx-5 mb-3 rounded-[9px] bg-surface-muted/70 px-3 py-2 text-[12.5px] text-muted-foreground">
+        <p className="mx-5 mb-3 rounded-control bg-surface-muted/70 px-3 py-2 text-[12.5px] text-muted-foreground">
           <strong className="font-medium text-foreground">Motivo:</strong> {org.statusReason}
         </p>
       )}

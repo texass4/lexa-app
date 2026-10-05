@@ -18,11 +18,11 @@ import { FinanceTab } from "./finance-tab"
 import { AppointmentsTab, DocumentsTab, ProcessesTab, TasksTab, TimelineTab } from "./hub-tabs"
 import { EditClientDialog } from "./edit-client-dialog"
 import { useClientActions } from "@/components/clientes/client-actions"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { clientFinance, clientHub } from "@/lib/selectors"
-import { getNow, toLocalISO } from "@/lib/dates"
-import { ClientAIPanel } from "@/components/ai/client-ai-panel"
-import { clientSignals } from "@/lib/attention"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { clientFinance, clientHub } from "@/lib/store/selectors"
+import { getNow, toLocalISO } from "@/lib/core/dates"
+import { ClientAIDock } from "./client-ai-dock"
+import { clientSignals } from "@/lib/dashboard/attention"
 import type { Permission } from "@/lib/auth/permissions"
 import { useSession } from "@/lib/auth/session"
 
@@ -41,7 +41,7 @@ const TAB_PERMISSION: Partial<Record<ProfileTab, Permission>> = {
 function ProfileSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Carregando cliente">
-      <div className="rounded-[18px] border border-border bg-card p-7">
+      <div className="rounded-card border border-border/90 bg-card p-7">
         <div className="flex items-center gap-5">
           <Skeleton className="size-16 rounded-full" />
           <div className="space-y-2.5">
@@ -61,8 +61,8 @@ function ProfileSkeleton() {
 }
 
 export function ClientProfile({ id }: { id: string }) {
-  const data = useDemoData()
-  const { updateClient, deleteClient, retryLoad } = useDemoActions()
+  const data = useOfficeData()
+  const { updateClient, deleteClient, retryLoad } = useOfficeActions()
   const { toggleActive, exportClient, deleteDescription } = useClientActions()
   const router = useRouter()
   const pathname = usePathname()
@@ -125,51 +125,67 @@ export function ClientProfile({ id }: { id: string }) {
     ] as { value: ProfileTab; label: string; count?: number }[]
   ).filter((t) => allowed(t.value))
 
+  const signals = clientSignals(data, client, getNow(), can)
+
   return (
-    <div className="space-y-6">
-      <ClientHeader
-        client={client}
-        delinquent={!!finance?.overdue}
-        onEdit={() => setEditing(true)}
-        onToggleActive={() => toggleActive(client)}
-        onExport={() => exportClient(client)}
-        onDelete={() => setDeleting(true)}
-      />
-      <ClientAIPanel key={client.id} client={client} signals={clientSignals(data, client, getNow(), can)} />
+    // Mesmo desenho do Painel: conteúdo à esquerda e a Íntegra IA fixa à direita (telas largas).
+    <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] 2xl:gap-7">
+      <div className="@container min-w-0 space-y-6">
+        <ClientHeader
+          client={client}
+          delinquent={!!finance?.overdue}
+          onEdit={() => setEditing(true)}
+          onToggleActive={() => toggleActive(client)}
+          onExport={() => exportClient(client)}
+          onDelete={() => setDeleting(true)}
+        />
 
-      <UnderlineTabs ariaLabel="Seções do cliente" layoutId="client-tabs" value={tab} onChange={setTab} tabs={tabs} />
+        <UnderlineTabs ariaLabel="Seções do cliente" layoutId="client-tabs" value={tab} onChange={setTab} tabs={tabs} />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={tab}
-          role="tabpanel"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {tab === "visao-geral" && <OverviewTab client={client} hub={hub} finance={finance} onNavigate={setTab} />}
-          {tab === "processos" && <ProcessesTab client={client} hub={hub} />}
-          {tab === "tarefas" && <TasksTab client={client} hub={hub} />}
-          {tab === "documentos" && <DocumentsTab client={client} hub={hub} />}
-          {tab === "compromissos" && <AppointmentsTab client={client} hub={hub} />}
-          {tab === "financeiro" && finance && <FinanceTab client={client} finance={finance} />}
-          {tab === "timeline" && <TimelineTab hub={hub} />}
-        </motion.div>
-      </AnimatePresence>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            role="tabpanel"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {tab === "visao-geral" && <OverviewTab client={client} hub={hub} finance={finance} onNavigate={setTab} />}
+            {tab === "processos" && <ProcessesTab client={client} hub={hub} />}
+            {tab === "tarefas" && <TasksTab client={client} hub={hub} />}
+            {tab === "documentos" && <DocumentsTab client={client} hub={hub} />}
+            {tab === "compromissos" && <AppointmentsTab client={client} hub={hub} />}
+            {tab === "financeiro" && finance && <FinanceTab client={client} finance={finance} />}
+            {tab === "timeline" && <TimelineTab hub={hub} />}
+          </motion.div>
+        </AnimatePresence>
 
-      <EditClientDialog client={client} open={editing} onOpenChange={setEditing} onSave={(patch) => updateClient(client.id, patch)} />
-      <ConfirmDialog
-        open={deleting}
-        onOpenChange={setDeleting}
-        title={`Excluir ${client.name}?`}
-        description={deleteDescription(client)}
-        onConfirm={() => {
-          deleteClient(client.id)
-          toast.success("Cliente excluído.", { description: client.name })
-          router.push("/clientes")
-        }}
-      />
+        {/* Telas menores: a Íntegra IA fica no fim da visão geral, como no Painel. */}
+        {tab === "visao-geral" && <ClientAIDock client={client} signals={signals} className="2xl:hidden" />}
+
+        <EditClientDialog
+          client={client}
+          open={editing}
+          onOpenChange={setEditing}
+          onSave={(patch, options) => updateClient(client.id, patch, options)}
+        />
+        <ConfirmDialog
+          open={deleting}
+          onOpenChange={setDeleting}
+          title={`Excluir ${client.name}?`}
+          description={deleteDescription(client)}
+          onConfirm={() => {
+            deleteClient(client.id)
+            toast.success("Cliente excluído.", { description: client.name })
+            router.push("/clientes")
+          }}
+        />
+      </div>
+
+      <aside className="sticky top-[96px] hidden h-[calc(100dvh-120px)] min-h-[560px] 2xl:block">
+        <ClientAIDock client={client} signals={signals} className="h-full" />
+      </aside>
     </div>
   )
 }

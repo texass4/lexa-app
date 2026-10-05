@@ -2,8 +2,8 @@
 
 import { cn } from "cn"
 import { useCategoryLookup } from "./use-category"
-import { getNow, fmtTime, isSameDay, parse, weekdayName } from "@/lib/dates"
-import { getUser } from "@/lib/account"
+import { getNow, fmtTime, isSameDay, parse, weekdayName } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 
 /** Lista por dia usada na visão semanal em telas pequenas. */
@@ -29,7 +29,7 @@ export function AgendaList({ days, events, onSelect }: { days: Date[]; events: A
               <span className="text-[12px] text-subtle">{items.length ? `${items.length} compromissos` : "Livre"}</span>
             </header>
             {items.length > 0 && (
-              <ul className="overflow-hidden rounded-[14px] border border-border bg-card shadow-card">
+              <ul className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
                 {items.map((a) => {
                   const { category, style } = lookup(a.categoryId)
                   return (

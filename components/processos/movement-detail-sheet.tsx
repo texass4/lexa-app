@@ -5,11 +5,11 @@ import { ArrowUpRight, CalendarClock, Hash, Landmark, Tag as TagIcon } from "luc
 import { SideSheet } from "@/components/ui/side-sheet"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Eyebrow } from "@/components/ui/panel"
-import { fmtNumericDate, fmtTime } from "@/lib/dates"
-import { MOVEMENT_CATEGORY_LABEL, type LexaMovement } from "@/lib/services/processes/movement-interpreter"
+import { fmtNumericDate, fmtTime } from "@/lib/core/dates"
+import { MOVEMENT_CATEGORY_LABEL, type LexaMovement } from "@/lib/services/processos/movement-interpreter"
 import { MovementAISection } from "@/components/ai/movement-ai-section"
 import { useCreateTaskFromSuggestion } from "@/components/ai/use-ai"
-import { ORIGIN_LABEL } from "@/lib/services/processes/labels"
+import { ORIGIN_LABEL } from "@/lib/services/processos/labels"
 
 function Fact({ icon: Icon, label, children }: { icon: React.ElementType; label: string; children: React.ReactNode }) {
   return (

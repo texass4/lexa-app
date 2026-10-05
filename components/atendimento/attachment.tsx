@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { FileIcon } from "@/components/shared/file-icon"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useDemoActions } from "@/lib/store/demo-store"
+import { useOfficeActions } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { getSupabase } from "@/lib/supabase/client"
-import { formatFileSize, uid } from "@/lib/format"
+import { formatFileSize, uid } from "@/lib/core/format"
 import { attachmentUrl } from "@/lib/whatsapp/client"
 import { extensionOf } from "@/lib/whatsapp/files"
 import type { DocumentKind, LegalDocument, WhatsAppAttachment } from "@/types"
@@ -65,7 +65,7 @@ const MIME: Record<LegalDocument["extension"], string> = {
 }
 
 function useSaveToDocuments(attachment: WhatsAppAttachment, clientId?: string) {
-  const { addDocument } = useDemoActions()
+  const { addDocument } = useOfficeActions()
   const { can, organization } = useSession()
   const extension = SAVABLE[extensionOf(attachment.fileName, attachment.mimeType)]
   const available = !!clientId && !!extension && can("documents.edit")
@@ -180,14 +180,14 @@ function ImageAttachment({ attachment, clientId }: { attachment: WhatsAppAttachm
               <button
                 type="button"
                 onClick={() => openAttachment(attachment, true)}
-                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
+                className="flex size-9 items-center justify-center rounded-control bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
                 aria-label="Baixar imagem"
               >
                 <Download className="size-4" />
               </button>
               <DialogPrimitive.Close
                 aria-label="Fechar"
-                className="flex size-9 items-center justify-center rounded-[9px] bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
+                className="flex size-9 items-center justify-center rounded-control bg-white/10 text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand/50"
               >
                 <X className="size-4" />
               </DialogPrimitive.Close>

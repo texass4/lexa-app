@@ -30,10 +30,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SourceIcon } from "@/components/clientes/source-icon"
-import { CLIENT_STATUS } from "@/lib/config"
-import { fmtLongDate } from "@/lib/dates"
-import { getUser } from "@/lib/account"
-import { whatsappLink } from "@/lib/clients"
+import { CLIENT_STATUS } from "@/lib/core/config"
+import { fmtLongDate } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
+import { whatsappLink } from "@/lib/clientes/clients"
 import { DIALOG_PERMISSION, useUI, type DialogKind } from "@/lib/store/ui-store"
 import type { Client } from "@/types"
 import { Can, useSession } from "@/lib/auth/session"
@@ -43,6 +43,7 @@ const STATUS_LONG: Record<Client["status"], string> = {
   novo: "Novo cliente",
   inativo: "Cliente inativo",
   inadimplente: "Inadimplente",
+  contato: "Contato — sem CPF/CNPJ",
 }
 
 const CREATE: { kind: DialogKind; label: string; icon: React.ElementType }[] = [
@@ -76,7 +77,7 @@ export function ClientHeader({
   const create = CREATE.filter((item) => can(DIALOG_PERMISSION[item.kind]))
 
   return (
-    <div className="relative overflow-hidden rounded-[18px] border border-border bg-card shadow-card">
+    <div className="relative overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(120%_100%_at_0%_0%,color-mix(in_oklab,var(--brand)_10%,transparent),transparent_60%)]"
@@ -88,7 +89,7 @@ export function ClientHeader({
         >
           <ArrowLeft className="size-3.5" /> Clientes
         </Link>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-6 @5xl:flex-row @5xl:items-end @5xl:justify-between">
           <div className="flex min-w-0 items-start gap-4 sm:gap-5">
             <UserAvatar
               name={client.name}
@@ -96,19 +97,20 @@ export function ClientHeader({
               className="ring-4 ring-surface shadow-[0_1px_2px_rgb(0_0_0/0.06)] max-sm:size-14 max-sm:text-base"
             />
             <div className="min-w-0 pt-0.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="font-display text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] text-foreground sm:text-[32px]">{client.name}</h1>
+              <h1 className="font-display text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] text-foreground sm:text-[32px]">{client.name}</h1>
+              {/* Situação e "cliente desde" numa linha só, abaixo do nome, em qualquer largura. */}
+              <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                 <StatusBadge tone={status.tone}>{STATUS_LONG[client.status]}</StatusBadge>
                 {delinquent && client.status !== "inadimplente" && (
                   <StatusBadge tone="danger" dot={false}>
                     Parcelas em atraso
                   </StatusBadge>
                 )}
+                <span className="text-[13.5px] text-muted-foreground">
+                  Cliente desde {fmtLongDate(client.clientSince)}
+                  {client.profession && <span className="max-sm:hidden"> · {client.profession}</span>}
+                </span>
               </div>
-              <p className="mt-1.5 text-[13.5px] text-muted-foreground">
-                Cliente desde {fmtLongDate(client.clientSince)}
-                {client.profession && <span className="max-sm:hidden"> · {client.profession}</span>}
-              </p>
               <div className="mt-3.5 flex flex-wrap gap-1.5">
                 <Tag>{client.kind === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</Tag>
                 <Tag>{client.area}</Tag>
@@ -122,7 +124,7 @@ export function ClientHeader({
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap">
+          <div className="flex flex-wrap gap-2 @5xl:shrink-0 @5xl:flex-nowrap">
             <Can permission="clients.edit">
               <Button variant="secondary" onClick={onEdit}>
                 <Pencil /> Editar

@@ -2,12 +2,13 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import { hasValidCheckDigits, onlyDigits } from "@/lib/cnj"
-import { getNow, parse } from "@/lib/dates"
+import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
+import { getNow, parse } from "@/lib/core/dates"
 import { useSession } from "@/lib/auth/session"
-import { refreshProcess } from "@/lib/services/processes/client"
-import { isAutoTracked } from "@/lib/services/processes/labels"
-import { useDemoActions } from "@/lib/store/demo-store"
+import { refreshProcess } from "@/lib/services/processos/client"
+import { isAutoTracked } from "@/lib/services/processos/labels"
+import { isCheckDue } from "@/lib/services/processos/monitoring-policy"
+import { useOfficeActions } from "@/lib/store/office-store"
 import type { Process } from "@/types"
 
 /** Mesmo prazo do cache do servidor: antes disso, o que está salvo já é o mais recente. */
@@ -17,7 +18,12 @@ export type RefreshState = { status: "idle" } | { status: "refreshing"; manual: 
 
 const IDLE: RefreshState = { status: "idle" }
 
-const isStale = (lastSyncedAt?: string) => !lastSyncedAt || getNow().getTime() - parse(lastSyncedAt).getTime() > AUTO_REFRESH_AFTER_MS
+/**
+ * A mesma regra do monitoramento automático (`monitoring-policy.ts`): depois de uma
+ * consulta, nada de ir à fonte de novo no mesmo dia. O monitoramento costuma já ter
+ * atualizado o processo — abrir a página só mostra o que está salvo.
+ */
+const isStale = (lastSyncedAt?: string) => isCheckDue(lastSyncedAt ? parse(lastSyncedAt) : undefined, getNow())
 
 /**
  * Atualização das informações de um processo salvo (stale-while-revalidate).
@@ -28,7 +34,7 @@ const isStale = (lastSyncedAt?: string) => !lastSyncedAt || getNow().getTime() -
  * da página — o resultado é aplicado no store do escritório.
  */
 export function useProcessRefresh(process: Process | undefined) {
-  const { applyProcessSync } = useDemoActions()
+  const { applyProcessSync } = useOfficeActions()
   const { can } = useSession()
   // Estado atrelado ao processo: ao trocar de processo na mesma tela, não herda o anterior.
   const [current, setCurrent] = React.useState<{ id?: string; state: RefreshState }>({ state: IDLE })

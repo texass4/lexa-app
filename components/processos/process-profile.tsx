@@ -16,22 +16,26 @@ import { FadeIn } from "@/components/ui/motion"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DocumentList } from "@/components/shared/document-list"
-import { TaskRow } from "@/components/tasks/task-row"
+import { TaskRow } from "@/components/tarefas/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
 import { useProcessRefresh } from "./use-process-refresh"
+import { ProcessTriagePanel } from "@/components/triagem/process-triage"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { PROCESS_STATUS } from "@/lib/config"
+import { PROCESS_STATUS } from "@/lib/core/config"
 import { useCategoryLookup } from "@/components/agenda/use-category"
-import { getNow, diffInDays, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtNumericDate, fmtTime, parse } from "@/lib/dates"
-import { formatCurrency } from "@/lib/format"
-import { getUser, userTitle } from "@/lib/account"
-import { interpretMovements } from "@/lib/services/processes/movement-interpreter"
+import { getNow, diffInDays, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtNumericDate, fmtTime, parse } from "@/lib/core/dates"
+import { formatCurrency } from "@/lib/core/format"
+import { getUser, userTitle } from "@/lib/auth/account"
+import { interpretMovements } from "@/lib/services/processos/movement-interpreter"
 import { Can } from "@/lib/auth/session"
-import { processSignals } from "@/lib/attention"
+import { PRAZO_ALERT_DAYS, processSignals } from "@/lib/dashboard/attention"
+import { nextPrazo } from "@/lib/prazos/prazos"
+import { PrazosPanel } from "@/components/prazos/prazos-panel"
+import { ActivityTimeline } from "@/components/shared/activity-timeline"
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -43,8 +47,8 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 }
 
 export function ProcessProfile({ id }: { id: string }) {
-  const data = useDemoData()
-  const { deleteProcess } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteProcess } = useOfficeActions()
   const { openDialog } = useUI()
   const router = useRouter()
   const lookup = useCategoryLookup()
@@ -99,7 +103,12 @@ export function ProcessProfile({ id }: { id: string }) {
   const appointments = data.appointments
     .filter((a) => a.processId === process.id && parse(a.end) > getNow())
     .sort((a, b) => a.start.localeCompare(b.start))
-  const deadlineDiff = process.nextDeadline ? diffInDays(parse(process.nextDeadline.date), getNow()) : undefined
+  // Próximo prazo = o aberto de menor data fatal (a coleção de prazos é a fonte de verdade).
+  const next = process.status === "concluido" ? undefined : nextPrazo(data.deadlines, process.id)
+  const deadlineDiff = next ? diffInDays(parse(next.fatalDate), getNow()) : undefined
+  const urgentDeadline = deadlineDiff !== undefined && deadlineDiff <= PRAZO_ALERT_DAYS.soon
+  // Timeline do processo: o que a equipe registrou (prazos cumpridos/perdidos, tarefas, documentos…).
+  const activities = data.activities.filter((a) => a.processId === process.id).sort((a, b) => b.at.localeCompare(a.at))
   // Memoizado por identidade do array dentro do interpretador.
   const movements = interpretMovements(process.movements, process.id)
 
@@ -156,8 +165,13 @@ export function ProcessProfile({ id }: { id: string }) {
               </Button>
             </Can>
             <Can permission="tasks.edit">
-              <Button onClick={() => openDialog("task", { processId: process.id })}>
+              <Button variant="secondary" onClick={() => openDialog("task", { processId: process.id })}>
                 <ListChecks /> Nova tarefa
+              </Button>
+            </Can>
+            <Can permission="processes.edit">
+              <Button onClick={() => openDialog("prazo", { processId: process.id })}>
+                <Hourglass /> Novo prazo
               </Button>
             </Can>
             <Can permission="processes.edit">
@@ -186,32 +200,27 @@ export function ProcessProfile({ id }: { id: string }) {
         <div
           className={cn(
             "col-span-2 rounded-[14px] border p-4 shadow-card sm:col-span-1",
-            deadlineDiff !== undefined && deadlineDiff <= 3 ? "border-danger/25 bg-danger-soft/50" : "border-border bg-card",
+            urgentDeadline ? "border-danger/25 bg-danger-soft/50" : "border-border bg-card",
           )}
         >
           <div className="flex items-center justify-between">
             <span className="text-[12px] font-medium text-muted-foreground">Próximo prazo</span>
-            <Hourglass className={cn("size-4", deadlineDiff !== undefined && deadlineDiff <= 3 ? "text-danger" : "text-subtle")} />
+            <Hourglass className={cn("size-4", urgentDeadline ? "text-danger" : "text-subtle")} />
           </div>
-          {process.nextDeadline && process.status !== "concluido" ? (
+          {next ? (
             <>
-              <p
-                className={cn(
-                  "tabular mt-2.5 text-[22px] font-semibold leading-none tracking-[-0.025em]",
-                  deadlineDiff !== undefined && deadlineDiff <= 3 && "text-danger",
-                )}
-              >
-                {fmtDayMonth(process.nextDeadline.date)}
+              <p className={cn("tabular mt-2.5 text-[22px] font-semibold leading-none tracking-[-0.025em]", urgentDeadline && "text-danger")}>
+                {fmtDayMonth(next.fatalDate)}
               </p>
               <p className="mt-2 truncate text-[12px] text-muted-foreground">
-                <span className="font-medium text-foreground">{fmtDueIn(process.nextDeadline.date)}</span> · {process.nextDeadline.title}
+                <span className="font-medium text-foreground">{fmtDueIn(next.fatalDate)}</span> · {next.description}
               </p>
             </>
           ) : (
             <p className="mt-2.5 text-[15px] font-medium text-subtle">Sem prazos</p>
           )}
         </div>
-        <div className="rounded-[14px] border border-border bg-card p-4 shadow-card">
+        <div className="rounded-card border border-border/90 bg-card p-4 shadow-card">
           <span className="text-[12px] font-medium text-muted-foreground">Responsável</span>
           <div className="mt-2.5 flex items-center gap-2.5">
             <UserAvatar name={owner.name} size="md" />
@@ -221,7 +230,7 @@ export function ProcessProfile({ id }: { id: string }) {
             </div>
           </div>
         </div>
-        <div className="rounded-[14px] border border-border bg-card p-4 shadow-card">
+        <div className="rounded-card border border-border/90 bg-card p-4 shadow-card">
           <span className="text-[12px] font-medium text-muted-foreground">Valor da causa</span>
           <p className="tabular mt-2.5 truncate text-[22px] font-semibold leading-none tracking-[-0.025em]">{formatCurrency(process.claimValue)}</p>
           <p className="mt-2 truncate text-[12px] text-muted-foreground">Distribuído em {fmtNumericDate(process.distributedAt)}</p>
@@ -232,26 +241,41 @@ export function ProcessProfile({ id }: { id: string }) {
       <ProcessAIPanel key={process.id} process={process} client={client} signals={processSignals(data, process)} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <Panel className="lg:col-span-7">
-          <PanelHeader
-            title="Movimentações"
-            description={
-              refresh.state.status === "refreshing" ? (
-                <span className="inline-flex items-center gap-1.5" role="status">
-                  <span className="size-1.5 animate-pulse rounded-full bg-brand" aria-hidden />
-                  Atualizando informações…
-                </span>
-              ) : (
-                `${process.movements.length} registros · última em ${fmtDayLabel(process.lastMovementAt).toLowerCase()}, ${fmtTime(process.lastMovementAt)}`
-              )
-            }
-          />
-          <div className="px-5 pt-2 pb-6 sm:px-6">
-            <ProcessTimeline movements={movements} />
-          </div>
-        </Panel>
+        <div className="space-y-5 lg:col-span-7">
+          <Panel>
+            <PanelHeader
+              title="Movimentações"
+              description={
+                refresh.state.status === "refreshing" ? (
+                  <span className="inline-flex items-center gap-1.5" role="status">
+                    <span className="size-1.5 animate-pulse rounded-full bg-brand" aria-hidden />
+                    Atualizando informações…
+                  </span>
+                ) : (
+                  `${process.movements.length} registros · última em ${fmtDayLabel(process.lastMovementAt).toLowerCase()}, ${fmtTime(process.lastMovementAt)}`
+                )
+              }
+            />
+            <div className="px-5 pt-2 pb-6 sm:px-6">
+              <ProcessTimeline movements={movements} />
+            </div>
+          </Panel>
+
+          <ProcessTriagePanel process={process} />
+
+          {activities.length > 0 && (
+            <Panel>
+              <PanelHeader title="Histórico do escritório" description="Prazos, tarefas e registros da equipe neste processo" />
+              <div className="px-5 pt-2 pb-6 sm:px-6">
+                <ActivityTimeline activities={activities.slice(0, 30)} />
+              </div>
+            </Panel>
+          )}
+        </div>
 
         <div className="space-y-5 lg:col-span-5">
+          <PrazosPanel process={process} />
+
           <Panel>
             <PanelHeader
               title="Tarefas do processo"
@@ -275,8 +299,8 @@ export function ProcessProfile({ id }: { id: string }) {
                 compact
                 title="Nenhuma tarefa vinculada."
                 description={
-                  process.nextDeadline
-                    ? `O próximo prazo é ${fmtDueIn(process.nextDeadline.date)}. Crie uma tarefa para não perdê-lo.`
+                  next
+                    ? `O próximo prazo é ${fmtDueIn(next.fatalDate)}. Crie uma tarefa para não perdê-lo.`
                     : "Crie tarefas para organizar os próximos passos deste processo."
                 }
                 action={
@@ -284,7 +308,20 @@ export function ProcessProfile({ id }: { id: string }) {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => openDialog("task", { processId: process.id, title: process.nextDeadline?.title })}
+                      onClick={() =>
+                        openDialog(
+                          "task",
+                          next && !next.taskId
+                            ? {
+                                processId: process.id,
+                                title: next.description,
+                                date: next.internalDate,
+                                assigneeId: next.responsibleId,
+                                prazoId: next.id,
+                              }
+                            : { processId: process.id },
+                        )
+                      }
                     >
                       <Plus /> Criar tarefa
                     </Button>

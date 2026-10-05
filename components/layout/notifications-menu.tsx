@@ -7,10 +7,10 @@ import * as React from "react"
 import Link from "next/link"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SignalList } from "@/components/shared/signal-list"
-import { officeSignals } from "@/lib/attention"
+import { officeSignals } from "@/lib/dashboard/attention"
 import { useSession } from "@/lib/auth/session"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { fmtRelative } from "@/lib/dates"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { fmtRelative } from "@/lib/core/dates"
 import type { Notification } from "@/types"
 
 const ICONS: Record<Notification["type"], { icon: React.ElementType; cls: string }> = {
@@ -21,9 +21,9 @@ const ICONS: Record<Notification["type"], { icon: React.ElementType; cls: string
 }
 
 export function NotificationsMenu() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { notifications } = data
-  const { markAllNotificationsRead, markNotificationRead } = useDemoActions()
+  const { markAllNotificationsRead, markNotificationRead } = useOfficeActions()
   const { can, user } = useSession()
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
@@ -40,18 +40,18 @@ export function NotificationsMenu() {
             ? `Notificações — ${[unread && `${unread} não lidas`, critical && `${critical} pede${critical > 1 ? "m" : ""} atenção`].filter(Boolean).join(" · ")}`
             : "Notificações"
         }
-        className="relative flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 aria-expanded:bg-accent aria-expanded:text-foreground"
+        className="relative flex size-10 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 aria-expanded:bg-accent aria-expanded:text-foreground"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
         {unread > 0 ? (
-          <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-brand text-[9.5px] font-semibold text-brand-foreground ring-2 ring-background">
+          <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-danger text-[9.5px] font-semibold text-white ring-2 ring-background">
             {unread}
           </span>
         ) : (
           critical > 0 && <span className="absolute top-2 right-2 size-2 rounded-full bg-danger ring-2 ring-background" aria-hidden />
         )}
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className="w-[min(380px,calc(100vw-24px))] gap-0 rounded-[14px] p-0">
+      <PopoverContent align="end" sideOffset={8} className="w-[min(400px,calc(100vw-24px))] gap-0 rounded-card p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <p className="text-[13.5px] font-semibold">Notificações</p>
@@ -115,7 +115,7 @@ export function NotificationsMenu() {
                     }}
                     className="flex w-full items-start gap-3 rounded-[10px] px-2.5 py-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:bg-accent"
                   >
-                    <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[9px]", cfg.cls)}>
+                    <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-control", cfg.cls)}>
                       <Icon className="size-4" />
                     </span>
                     <span className="min-w-0 flex-1">

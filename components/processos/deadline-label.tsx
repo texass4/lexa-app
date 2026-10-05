@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { getNow, diffInDays, fmtDueIn, fmtShortDate, parse } from "@/lib/dates"
+import { getNow, diffInDays, fmtDueIn, fmtShortDate, parse } from "@/lib/core/dates"
 
 export function DeadlineLabel({ date, compact }: { date?: string; compact?: boolean }) {
   if (!date) return <span className="text-[12.5px] text-subtle">—</span>

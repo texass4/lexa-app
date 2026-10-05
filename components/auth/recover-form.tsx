@@ -6,13 +6,17 @@ import { MailCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Field, TextInput } from "@/components/ui/field"
 import { AuthCard, FormError } from "./auth-card"
+import { HoneypotField, useAuthChallenge } from "./use-auth-challenge"
 import { isEmail } from "@/lib/auth/validation"
+import { publicMessage } from "@/lib/core/public-error"
 
 export function RecoverForm() {
   const [email, setEmail] = React.useState("")
   const [sent, setSent] = React.useState(false)
   const [error, setError] = React.useState("")
   const [busy, setBusy] = React.useState(false)
+  const [website, setWebsite] = React.useState("")
+  const proof = useAuthChallenge("recover")
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,15 +26,22 @@ export function RecoverForm() {
     }
     setBusy(true)
     setError("")
-    const res = await fetch("/api/auth/recover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    })
-    setBusy(false)
-    if (!res.ok) {
-      setError("Não foi possível enviar agora. Tente de novo em instantes.")
+    try {
+      const res = await fetch("/api/auth/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, website, ...(await proof()) }),
+      })
+      if (!res.ok) {
+        const { error: message } = await res.json().catch(() => ({ error: "" }))
+        setError(publicMessage(message, "Não foi possível enviar agora. Tente de novo em instantes."))
+        return
+      }
+    } catch (failure) {
+      setError(publicMessage(failure, "Não foi possível enviar agora. Tente de novo em instantes."))
       return
+    } finally {
+      setBusy(false)
     }
     setSent(true)
   }
@@ -59,6 +70,7 @@ export function RecoverForm() {
     <AuthCard title="Recuperar senha" description="Informe o e-mail da sua conta e enviaremos um link para criar uma nova senha." footer={back}>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <FormError>{error}</FormError>
+        <HoneypotField value={website} onChange={setWebsite} />
         <Field label="E-mail" htmlFor="rec-email">
           <TextInput id="rec-email" type="email" autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>

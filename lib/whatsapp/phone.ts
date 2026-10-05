@@ -4,7 +4,7 @@
  * (`(11) 99999-8888`) — `phoneMatchKeys` produz as formas comparáveis dos dois lados.
  */
 
-export const digitsOnly = (value: string) => value.replace(/\D/g, "")
+const digitsOnly = (value: string) => value.replace(/\D/g, "")
 
 /**
  * Número pronto para o WhatsApp, ou null se não parece um telefone.

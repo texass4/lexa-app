@@ -5,9 +5,9 @@ import { Activity, ArrowRight, Bell, Calendar, CircleCheck, Circle, Clock, FileP
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { MovementDetailSheet } from "./movement-detail-sheet"
-import { MOVEMENT_CATEGORY_LABEL, type LexaMovement, type MovementCategory } from "@/lib/services/processes/movement-interpreter"
-import { RECENT_DAYS } from "@/lib/attention"
-import { diffInDays, fmtDayLabel, fmtRelative, getNow, parse } from "@/lib/dates"
+import { MOVEMENT_CATEGORY_LABEL, type LexaMovement, type MovementCategory } from "@/lib/services/processos/movement-interpreter"
+import { RECENT_DAYS } from "@/lib/dashboard/attention"
+import { diffInDays, fmtDayLabel, fmtRelative, getNow, parse } from "@/lib/core/dates"
 
 const ICON: Record<MovementCategory, React.ElementType> = {
   documento: FileText,

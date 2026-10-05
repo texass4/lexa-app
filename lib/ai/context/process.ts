@@ -7,10 +7,12 @@
  */
 
 import { AIError } from "@/lib/ai/errors"
-import { PROCESS_STATUS } from "@/lib/config"
-import { formatCurrency } from "@/lib/format"
-import { isAutoTracked } from "@/lib/services/processes/labels"
-import type { Appointment, Client, LegalDocument, Process, ProcessParty, Task } from "@/types"
+import { PROCESS_STATUS } from "@/lib/core/config"
+import { formatCurrency } from "@/lib/core/format"
+import { isAutoTracked } from "@/lib/services/processos/labels"
+import { prazosOfProcess } from "@/lib/prazos/prazos"
+import { toLocalISO } from "@/lib/core/dates"
+import type { Appointment, Client, LegalDocument, Prazo, Process, ProcessParty, Task } from "@/types"
 import type { AIRepository, Member } from "./repository"
 import {
   type BuiltContext,
@@ -19,6 +21,7 @@ import {
   describeAppointment,
   describeDocument,
   describeMovement,
+  describePrazo,
   describeTask,
   fmtDate,
   fmtDateTime,
@@ -28,15 +31,17 @@ import {
   registerAppointment,
   registerDocument,
   registerMovement,
+  registerPrazo,
   registerTask,
   sortTasks,
   upcoming,
 } from "./shared"
 
 /** Limites de volume — cada item a mais é token pago. */
-export const PROCESS_LIMITS = {
+const PROCESS_LIMITS = {
   movements: 20,
   tasks: 15,
+  prazos: 15,
   appointments: 8,
   documents: 10,
   /** Movimentações vizinhas enviadas ao analisar uma movimentação. */
@@ -47,6 +52,8 @@ export interface ProcessData {
   process: Process
   client: Client | null
   tasks: Task[]
+  /** Prazos cadastrados do processo (a única fonte de prazos). */
+  prazos: Prazo[]
   appointments: Appointment[]
   documents: LegalDocument[]
   members: Member[]
@@ -54,16 +61,18 @@ export interface ProcessData {
   hidden: string[]
 }
 
-export async function loadProcessData(repo: AIRepository, processId: string): Promise<ProcessData> {
+/** Só o que o contexto usa, recortado no banco: tarefas e prazos do processo, compromissos futuros, documentos recentes. */
+export async function loadProcessData(repo: AIRepository, processId: string, now: Date = new Date()): Promise<ProcessData> {
   if (!repo.can("processes.view")) throw new AIError("FORBIDDEN")
   const process = await repo.getProcess(processId)
   if (!process) throw new AIError("NOT_FOUND")
 
-  const [client, tasks, appointments, documents, members] = await Promise.all([
+  const [client, tasks, prazos, appointments, documents, members] = await Promise.all([
     process.clientId ? repo.getClient(process.clientId) : Promise.resolve(null),
-    repo.listTasks(),
-    repo.listAppointments(),
-    repo.listDocuments(),
+    repo.listTasks({ processId: process.id }),
+    repo.listPrazos({ processId: process.id }),
+    repo.listAppointments({ processId: process.id, endsAfter: toLocalISO(now) }),
+    repo.listDocuments({ processId: process.id, limit: PROCESS_LIMITS.documents }),
     repo.listMembers(),
   ])
 
@@ -78,6 +87,7 @@ export async function loadProcessData(repo: AIRepository, processId: string): Pr
     process,
     client,
     tasks: tasks.filter((t) => t.related?.type === "process" && t.related.id === process.id),
+    prazos: prazos.filter((p) => p.processId === process.id),
     appointments: appointments.filter((a) => a.processId === process.id),
     documents: documents.filter((d) => d.processId === process.id),
     members,
@@ -85,12 +95,15 @@ export async function loadProcessData(repo: AIRepository, processId: string): Pr
   }
 }
 
+/** O que a IA recebe quando o escritório não cadastrou prazo — nunca uma data. */
+export const NO_PRAZOS = "nenhum prazo cadastrado na Íntegra para este processo"
+const NO_OPEN_PRAZOS = "nenhum prazo aberto cadastrado na Íntegra para este processo"
+
 const partyNames = (parties?: ProcessParty[]) => parties?.map((p) => (p.role ? `${p.name} (${p.role})` : p.name))
 
 /** Dados de identificação do processo, sem movimentações. */
 function describeProcess(data: ProcessData, now: Date) {
   const { process, client, members } = data
-  const deadline = process.nextDeadline
   return {
     numero: process.number,
     classe: process.className ?? process.type,
@@ -112,8 +125,6 @@ function describeProcess(data: ProcessData, now: Date) {
     polo_ativo: partyNames(process.parties?.active),
     polo_passivo: partyNames(process.parties?.passive),
     valor_da_causa: process.claimValue ? formatCurrency(process.claimValue) : undefined,
-    // Único prazo que existe nos dados: o cadastrado pelo escritório.
-    prazo_cadastrado_no_lexa: deadline?.date ? { data: fmtDate(deadline.date), descricao: deadline.title } : "nenhum prazo cadastrado",
     total_de_movimentacoes: process.movements.length,
     dias_desde_a_ultima_movimentacao: daysSince(process.lastMovementAt || process.movements[0]?.at, now),
   }
@@ -126,6 +137,7 @@ export function buildProcessContext(data: ProcessData, now: Date): BuiltContext 
 
   const movements = newestFirst(process.movements).slice(0, PROCESS_LIMITS.movements)
   const tasks = sortTasks(data.tasks).slice(0, PROCESS_LIMITS.tasks)
+  const prazos = prazosOfProcess(data.prazos, process.id).slice(0, PROCESS_LIMITS.prazos)
   const appointments = upcoming(data.appointments, now).slice(0, PROCESS_LIMITS.appointments)
   const documents = [...data.documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, PROCESS_LIMITS.documents)
 
@@ -134,6 +146,8 @@ export function buildProcessContext(data: ProcessData, now: Date): BuiltContext 
     processo: { ref: processRef, ...describeProcess(data, now) },
     movimentacoes_recentes: movements.map((m) => describeMovement(m, registerMovement(registry, m, process.id))),
     movimentacoes_omitidas: process.movements.length > movements.length ? process.movements.length - movements.length : undefined,
+    // Os únicos prazos que existem: os cadastrados pelo escritório. Sem nenhum, a IA é avisada disso.
+    prazos_do_processo: prazos.length ? prazos.map((p) => describePrazo(p, registerPrazo(registry, p), data.members, now)) : NO_PRAZOS,
     tarefas_do_processo: tasks.map((t) => describeTask(t, registerTask(registry, t), data.members, now)),
     compromissos_futuros: appointments.map((a) => describeAppointment(a, registerAppointment(registry, a))),
     documentos_do_processo: documents.map((d) => describeDocument(d, registerDocument(registry, d))),
@@ -163,6 +177,7 @@ export function buildMovementContext(data: ProcessData, movementId: string, now:
   const after = ordered.slice(Math.max(0, index - 3), index)
 
   const info = describeProcess(data, now)
+  const openPrazos = prazosOfProcess(data.prazos, process.id).filter((p) => p.status === "aberto")
   const context = {
     data_de_hoje: fmtToday(now),
     processo: {
@@ -173,8 +188,10 @@ export function buildMovementContext(data: ProcessData, movementId: string, now:
       grau: info.grau,
       orgao_julgador: info.orgao_julgador,
       situacao_no_escritorio: info.situacao_no_escritorio,
-      prazo_cadastrado_no_lexa: info.prazo_cadastrado_no_lexa,
     },
+    prazos_abertos_do_processo: openPrazos.length
+      ? openPrazos.map((p) => describePrazo(p, registerPrazo(registry, p), data.members, now))
+      : NO_OPEN_PRAZOS,
     movimentacao_analisada: describeMovement(target, targetRef),
     movimentacoes_anteriores: before.map((m) => describeMovement(m, registerMovement(registry, m, process.id))),
     movimentacoes_posteriores: after.map((m) => describeMovement(m, registerMovement(registry, m, process.id))),

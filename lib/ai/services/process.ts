@@ -18,7 +18,7 @@ function assertEnoughData(data: ProcessData) {
 }
 
 export async function summarizeProcess(deps: AIServiceDeps, processId: string): Promise<AIResult<ProcessSummary>> {
-  const data = await loadProcessData(deps.repo, processId)
+  const data = await loadProcessData(deps.repo, processId, nowOf(deps))
   assertEnoughData(data)
   return runStructured({
     deps,
@@ -36,7 +36,7 @@ export async function summarizeProcess(deps: AIServiceDeps, processId: string): 
 }
 
 export async function analyzeMovement(deps: AIServiceDeps, processId: string, movementId: string): Promise<AIResult<MovementAnalysis>> {
-  const data = await loadProcessData(deps.repo, processId)
+  const data = await loadProcessData(deps.repo, processId, nowOf(deps))
   const built = buildMovementContext(data, movementId, nowOf(deps))
   const targetRef = Object.values(built.sources).find((s) => s.kind === "movement" && s.id === movementId)?.ref
   return runStructured({
@@ -48,11 +48,13 @@ export async function analyzeMovement(deps: AIServiceDeps, processId: string, mo
     schema: movementAnalysisSchema,
     finalize: (analysis, sources) => ({ ...analysis, sugestoes_tarefa: withKnownRefs(analysis.sugestoes_tarefa, sources) }),
     alwaysCite: targetRef ? [targetRef] : [],
+    // Uma movimentação, contexto curto: modelo leve.
+    tier: "light",
   })
 }
 
 export async function suggestNextActions(deps: AIServiceDeps, processId: string): Promise<AIResult<NextActions>> {
-  const data = await loadProcessData(deps.repo, processId)
+  const data = await loadProcessData(deps.repo, processId, nowOf(deps))
   assertEnoughData(data)
   return runStructured({
     deps,

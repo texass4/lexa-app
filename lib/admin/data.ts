@@ -8,6 +8,8 @@
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
+import { BRAND } from "@/lib/core/brand"
+import { SYSTEM_ACTOR_ID } from "@/lib/auth/system-actor"
 import { toOrganization, type OrganizationRow, type ProfileRow } from "@/lib/auth/profile"
 import {
   AUDIT_ACTIONS,
@@ -54,7 +56,7 @@ export interface PlanRow {
   updated_at: string
 }
 
-export const planLimits = (row: PlanRow): PlanLimits => ({
+const planLimits = (row: PlanRow): PlanLimits => ({
   users: row.max_users,
   processes: row.max_processes,
   clients: row.max_clients,
@@ -113,7 +115,7 @@ export interface SubscriptionRow {
   created_at: string
 }
 
-export const toSubscription = (row: SubscriptionRow): AdminSubscription => ({
+const toSubscription = (row: SubscriptionRow): AdminSubscription => ({
   status: row.status,
   trialEndsAt: row.trial_ends_at ?? undefined,
   currentPeriodStart: row.current_period_start ?? undefined,
@@ -162,8 +164,7 @@ const toUsage = (row: UsageRow | undefined): UsageSnapshot =>
       }
     : EMPTY_USAGE
 
-const latest = (...dates: (string | undefined)[]) =>
-  dates.filter(Boolean).sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]
+const latest = (...dates: (string | undefined)[]) => dates.filter(Boolean).sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]
 
 type PersonRow = Pick<ProfileRow, "id" | "organization_id" | "role" | "name" | "email" | "active">
 
@@ -269,13 +270,21 @@ export interface AuditQuery {
 }
 
 /** Remove o que tem significado na sintaxe de filtro do PostgREST. */
-const safeTerm = (q: string) => q.replace(/[,()*%\\:"']/g, " ").trim().slice(0, 80)
+const safeTerm = (q: string) =>
+  q
+    .replace(/[,()*%\\:"']/g, " ")
+    .trim()
+    .slice(0, 80)
 
 export async function loadAudit(query: AuditQuery = {}): Promise<{ entries: AuditEntry[]; total: number }> {
   const admin = getSupabaseAdmin()
   const limit = Math.min(Math.max(query.limit ?? 50, 1), 200)
   const offset = Math.max(query.offset ?? 0, 0)
-  let q = admin.from("audit_logs").select("*", { count: "exact" }).order("created_at", { ascending: false }).range(offset, offset + limit - 1)
+  let q = admin
+    .from("audit_logs")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1)
   if (query.from) q = q.gte("created_at", query.from.toISOString())
   if (query.to) q = q.lt("created_at", query.to.toISOString())
   if (query.organizationId) q = q.eq("organization_id", query.organizationId)
@@ -378,6 +387,8 @@ export async function loadCrmActivity(organizationId: string, limit = 25) {
     admin.from("profiles").select("id, name").eq("organization_id", organizationId),
   ])
   const names = new Map(((people ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]))
+  // Registros do monitoramento automático não têm pessoa por trás.
+  names.set(SYSTEM_ACTOR_ID, BRAND.name)
   return ((data ?? []) as unknown as { id: string; created_at: string; type: string | null; actor: string | null }[]).map((a) => ({
     id: a.id,
     at: a.created_at,

@@ -19,13 +19,14 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeadlineLabel } from "./deadline-label"
 import { SignalDot } from "@/components/shared/signal-list"
-import { processSignals, type AttentionSignal } from "@/lib/attention"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { processSignals, type AttentionSignal } from "@/lib/dashboard/attention"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
-import { PROCESS_STATUS } from "@/lib/config"
-import { getNow, diffInDays, parse } from "@/lib/dates"
-import { matches } from "@/lib/format"
-import { getUser } from "@/lib/account"
+import { PROCESS_STATUS } from "@/lib/core/config"
+import { getNow, diffInDays, parse } from "@/lib/core/dates"
+import { matches } from "@/lib/core/format"
+import { getUser } from "@/lib/auth/account"
+import { nextPrazo } from "@/lib/prazos/prazos"
 import type { Process, ProcessStatus } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -53,8 +54,8 @@ function SignalHint({ signal }: { signal?: AttentionSignal }) {
 }
 
 export function ProcessesView() {
-  const data = useDemoData()
-  const { deleteProcess } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteProcess } = useOfficeActions()
   const { openDialog } = useUI()
   const router = useRouter()
   // Os dados vêm do armazenamento do navegador depois da hidratação.
@@ -67,11 +68,27 @@ export function ProcessesView() {
 
   const clientName = React.useCallback((id: string) => data.clients.find((c) => c.id === id)?.name ?? "", [data.clients])
 
-  const test = React.useCallback((f: Filter, p: Process) => {
-    if (f === "todos") return true
-    if (f === "prazos") return !!p.nextDeadline && diffInDays(parse(p.nextDeadline.date), getNow()) <= 7
-    return p.status === f
-  }, [])
+  // Próximo prazo aberto de cada processo (os prazos são a fonte de verdade).
+  const nextOf = React.useMemo(() => {
+    const map = new Map<string, NonNullable<ReturnType<typeof nextPrazo>>>()
+    for (const p of data.processes) {
+      const next = p.status === "concluido" ? undefined : nextPrazo(data.deadlines, p.id)
+      if (next) map.set(p.id, next)
+    }
+    return map
+  }, [data.processes, data.deadlines])
+
+  const test = React.useCallback(
+    (f: Filter, p: Process) => {
+      if (f === "todos") return true
+      if (f === "prazos") {
+        const next = nextOf.get(p.id)
+        return !!next && diffInDays(parse(next.fatalDate), getNow()) <= 7
+      }
+      return p.status === f
+    },
+    [nextOf],
+  )
 
   const rows = React.useMemo(
     () =>
@@ -80,9 +97,9 @@ export function ProcessesView() {
         .sort((a, b) => {
           if (a.status === "concluido" && b.status !== "concluido") return 1
           if (b.status === "concluido" && a.status !== "concluido") return -1
-          return (a.nextDeadline?.date ?? "9999").localeCompare(b.nextDeadline?.date ?? "9999")
+          return (nextOf.get(a.id)?.fatalDate ?? "9999").localeCompare(nextOf.get(b.id)?.fatalDate ?? "9999")
         }),
-    [data.processes, filter, query, test, clientName],
+    [data.processes, filter, query, test, clientName, nextOf],
   )
 
   // O sinal mais importante de cada processo (prazo, movimentação, parado) — sem IA, só dados.
@@ -207,7 +224,7 @@ export function ProcessesView() {
                         </Td>
                         <Td className="text-muted-foreground">{owner.firstName}</Td>
                         <Td>
-                          <DeadlineLabel date={p.status === "concluido" ? undefined : p.nextDeadline?.date} />
+                          <DeadlineLabel date={nextOf.get(p.id)?.fatalDate} />
                         </Td>
                         <Td>
                           <div className="flex items-center justify-end gap-1">
@@ -253,7 +270,7 @@ export function ProcessesView() {
                 <li key={p.id}>
                   <Link
                     href={`/processos/${p.id}`}
-                    className="block rounded-[14px] border border-border bg-card p-4 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="block rounded-card border border-border/90 bg-card p-4 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -270,9 +287,9 @@ export function ProcessesView() {
                       <span>
                         {p.area} · {getUser(p.ownerId).firstName}
                       </span>
-                      {p.nextDeadline && p.status !== "concluido" ? (
+                      {nextOf.get(p.id) ? (
                         <span className="flex items-center gap-1.5">
-                          Prazo <DeadlineLabel date={p.nextDeadline.date} compact />
+                          Prazo <DeadlineLabel date={nextOf.get(p.id)!.fatalDate} compact />
                         </span>
                       ) : (
                         <span className="text-subtle">Sem prazos</span>

@@ -11,45 +11,43 @@ import { LexaTrigger } from "@/components/ai/lexa-trigger"
 import { UserMenu } from "./user-menu"
 import { ROUTE_META } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
-import { useDemoData } from "@/lib/store/demo-store"
-import { getNow, fmtFullDate } from "@/lib/dates"
-import { useIsMac } from "@/lib/hooks"
-import { BRAND } from "@/lib/brand"
+import { useOfficeData } from "@/lib/store/office-store"
+import { useIsMac } from "@/lib/core/hooks"
+import { BRAND } from "@/lib/core/brand"
 
-function useHeaderContext() {
+/** Trilha das telas de detalhe (cliente, processo). As demais têm o título na própria página. */
+function useBreadcrumb() {
   const pathname = usePathname()
-  const data = useDemoData()
+  const data = useOfficeData()
   const [, root, id] = pathname.split("/")
-  const meta = ROUTE_META[`/${root}`] ?? { title: BRAND.name, section: "" }
-
   if (id && root === "clientes") {
     const c = data.clients.find((x) => x.id === id)
-    return { title: c?.name ?? "Cliente", parent: { label: "Clientes", href: "/clientes" } }
+    return { title: c?.name ?? "Cliente", parent: { label: ROUTE_META["/clientes"].title, href: "/clientes" } }
   }
+  if (id === "prazos" && root === "tarefas") return { title: "Prazos", parent: { label: "Tarefas", href: "/tarefas" } }
   if (id && root === "processos") {
     const p = data.processes.find((x) => x.id === id)
-    return { title: p ? `Processo ${p.code}` : "Processo", parent: { label: "Processos", href: "/processos" } }
+    return { title: p ? `Processo ${p.code}` : "Processo", parent: { label: ROUTE_META["/processos"].title, href: "/processos" } }
   }
-  // A data depende do relógio do navegador: só aparece depois da hidratação,
-  // para o HTML do servidor e o do navegador serem iguais.
-  if (root === "dashboard") return { title: meta.title, subtitle: data.hydrated ? fmtFullDate(getNow()) : "" }
-  return { title: meta.title, subtitle: meta.section }
+  return undefined
 }
 
 export function Topbar() {
   const { setCommandOpen, setMobileNavOpen } = useUI()
-  const ctx = useHeaderContext()
+  const crumb = useBreadcrumb()
+  // O Painel tem o próprio botão "Novo" no cabeçalho da página.
+  const onDashboard = usePathname() === "/dashboard"
   const isMac = useIsMac()
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border/80 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
-      <div className="mx-auto flex h-[60px] w-full max-w-[1440px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
+      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 md:h-[72px] lg:gap-5 lg:px-8 xl:px-10">
         {/* Mobile: menu + logo */}
         <button
           type="button"
           onClick={() => setMobileNavOpen(true)}
           aria-label="Abrir menu"
-          className="-ml-1.5 flex size-9 items-center justify-center rounded-[9px] text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
+          className="-ml-1.5 flex size-10 items-center justify-center rounded-control text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
         >
           <Menu className="size-5" strokeWidth={1.8} />
         </button>
@@ -61,57 +59,56 @@ export function Topbar() {
           <Logo size="sm" />
         </Link>
 
-        {/* Desktop: título contextual */}
-        <div className="hidden min-w-0 flex-1 md:block">
-          {"parent" in ctx && ctx.parent ? (
-            <nav aria-label="Trilha" className="flex min-w-0 items-center gap-1.5 text-[14px]">
-              <Link href={ctx.parent.href} className="shrink-0 text-muted-foreground outline-none hover:text-foreground focus-visible:underline">
-                {ctx.parent.label}
+        {/* Desktop: trilha (telas de detalhe) e busca global */}
+        <div className="hidden min-w-0 flex-1 items-center gap-5 md:flex">
+          {crumb && (
+            <nav aria-label="Trilha" className="flex min-w-0 max-w-[45%] shrink-0 items-center gap-1.5 text-[13.5px]">
+              <Link href={crumb.parent.href} className="shrink-0 text-muted-foreground outline-none hover:text-foreground focus-visible:underline">
+                {crumb.parent.label}
               </Link>
               <ChevronRight className="size-3.5 shrink-0 text-subtle" />
-              <span className="truncate font-medium text-foreground">{ctx.title}</span>
+              <span className="min-w-0 truncate font-medium text-foreground">{crumb.title}</span>
             </nav>
-          ) : (
-            <div className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-[14px] font-semibold tracking-[-0.01em] text-foreground">{ctx.title}</span>
-              {"subtitle" in ctx && ctx.subtitle && <span className="truncate text-[12px] text-muted-foreground">{ctx.subtitle}</span>}
-            </div>
           )}
+          <button
+            type="button"
+            onClick={() => setCommandOpen(true)}
+            className="group hidden h-11 min-w-[200px] max-w-[560px] flex-1 items-center gap-2.5 rounded-[12px] border border-border/90 bg-surface px-4 text-[13.5px] text-subtle shadow-xs outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex"
+          >
+            <Search className="size-[17px] text-muted-foreground" strokeWidth={1.8} />
+            <span className="flex-1 truncate text-left">Buscar cliente, processo, documento…</span>
+            <span className="flex items-center gap-0.5">
+              <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+              <Kbd>K</Kbd>
+            </span>
+          </button>
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="group hidden h-9 w-[260px] items-center gap-2 rounded-[9px] border border-border bg-surface px-3 text-[13px] text-subtle shadow-xs outline-none transition-colors hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex xl:w-[300px]"
-          >
-            <Search className="size-4" />
-            <span className="flex-1 text-left">Buscar no escritório…</span>
-            <span className="flex items-center gap-0.5">
-              <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-              <Kbd>K</Kbd>
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCommandOpen(true)}
             aria-label="Buscar"
-            className="flex size-9 items-center justify-center rounded-[9px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:hidden"
+            className="flex size-10 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:hidden"
           >
             <Search className="size-[18px]" strokeWidth={1.8} />
           </button>
           <LexaTrigger />
           <NotificationsMenu />
-          <div className="mx-1 hidden h-5 w-px bg-border md:block" aria-hidden />
+          <div className="mx-1.5 hidden h-7 w-px bg-border md:block" aria-hidden />
           <div className="hidden md:block">
             <UserMenu variant="header" />
           </div>
-          <div className="hidden sm:block">
-            <NewMenu />
-          </div>
-          <div className="sm:hidden">
-            <NewMenu compact />
-          </div>
+          {!onDashboard && (
+            <>
+              <div className="hidden sm:block">
+                <NewMenu />
+              </div>
+              <div className="sm:hidden">
+                <NewMenu compact />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>

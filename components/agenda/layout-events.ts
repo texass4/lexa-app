@@ -1,5 +1,5 @@
 import type { Appointment } from "@/types"
-import { parse } from "@/lib/dates"
+import { parse } from "@/lib/core/dates"
 
 export interface PositionedEvent {
   event: Appointment

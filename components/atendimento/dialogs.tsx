@@ -11,15 +11,17 @@ import { ChoiceChips } from "@/components/ui/choice-chips"
 import { SearchField } from "@/components/ui/search-field"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { useSession } from "@/lib/auth/session"
-import { userTitle } from "@/lib/account"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
-import { PRACTICE_AREAS } from "@/lib/config"
-import { matches } from "@/lib/format"
-import { isEmail, maskDocument, maskPhone } from "@/lib/masks"
+import { userTitle } from "@/lib/auth/account"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { PRACTICE_AREAS } from "@/lib/core/config"
+import { matches } from "@/lib/core/format"
+import { findDuplicateClient, validateDocument } from "@/lib/clientes/clients"
+import { isEmail, maskDocument, maskPhone } from "@/lib/core/masks"
 import { formatPhone, normalizeWhatsAppPhone } from "@/lib/whatsapp/phone"
 import { whatsappApi } from "@/lib/whatsapp/client"
 import type { PracticeArea, WhatsAppContact, WhatsAppConversation } from "@/types"
 import { contactName } from "./parts"
+import { publicMessage } from "@/lib/core/public-error"
 
 /* ------------------------------- Responsável ------------------------------ */
 
@@ -47,7 +49,7 @@ export function AssignDialog({
       onOpenChange(false)
       toast.success(userId ? (userId === user.id ? "Você assumiu a conversa." : "Responsável alterado.") : "Conversa sem responsável.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível alterar o responsável.")
+      toast.error(publicMessage(error, "Não foi possível alterar o responsável."))
     } finally {
       setSaving(null)
     }
@@ -129,7 +131,7 @@ export function NewConversationDialog({
 }
 
 function NewConversationForm({ onClose, onCreated }: { onClose: () => void; onCreated: (c: WhatsAppConversation) => void }) {
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   const [clientId, setClientId] = React.useState("")
   const [phone, setPhone] = React.useState("")
   const [error, setError] = React.useState("")
@@ -150,7 +152,7 @@ function NewConversationForm({ onClose, onCreated }: { onClose: () => void; onCr
       onCreated(conversation)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível iniciar a conversa.")
+      setError(publicMessage(err, "Não foi possível iniciar a conversa."))
     } finally {
       setSaving(false)
     }
@@ -229,8 +231,8 @@ export function ConvertToClientDialog({ open, onOpenChange, contact }: { open: b
 
 function ConvertForm({ contact, onClose }: { contact: WhatsAppContact; onClose: () => void }) {
   const { user, members } = useSession()
-  const { clients } = useDemoData()
-  const { addClient } = useDemoActions()
+  const { clients } = useOfficeData()
+  const { addClient } = useOfficeActions()
   const national = contact.phone.startsWith("55") ? contact.phone.slice(2) : contact.phone
   const [form, setForm] = React.useState({
     kind: "Pessoa física" as (typeof KINDS)[number],
@@ -244,15 +246,18 @@ function ConvertForm({ contact, onClose }: { contact: WhatsAppContact; onClose: 
   const [errors, setErrors] = React.useState<Record<string, string>>({})
   const [saving, setSaving] = React.useState(false)
   const pj = form.kind === "Pessoa jurídica"
+  const noDocument = !form.document.replace(/\D/g, "")
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }))
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const next: Record<string, string> = {}
     if (form.name.trim().length < 3) next.name = pj ? "Informe a razão social." : "Informe o nome completo."
-    const digits = form.document.replace(/\D/g, "")
-    if (digits && digits.length !== (pj ? 14 : 11)) next.document = pj ? "CNPJ deve ter 14 dígitos." : "CPF deve ter 11 dígitos."
-    else if (digits && clients.some((c) => c.document.replace(/\D/g, "") === digits)) next.document = `Já existe um cliente com este ${pj ? "CNPJ" : "CPF"}.`
+    // CPF/CNPJ é opcional: sem ele, a pessoa entra como Contato. O que for digitado precisa ser válido e único.
+    const documentError = validateDocument(pj ? "PJ" : "PF", form.document, { required: false })
+    const duplicate = documentError ? undefined : findDuplicateClient(clients, form.document)
+    if (documentError) next.document = documentError
+    else if (duplicate) next.document = `Já existe um cliente com este ${pj ? "CNPJ" : "CPF"}: ${duplicate.name}.`
     if (form.email && !isEmail(form.email)) next.email = "E-mail inválido."
     setErrors(next)
     if (Object.keys(next).length) return
@@ -272,7 +277,8 @@ function ConvertForm({ contact, onClose }: { contact: WhatsAppContact; onClose: 
     await new Promise((r) => setTimeout(r, 700))
     try {
       await linkWithRetry(contact.id, client.id)
-      toast.success("Cliente cadastrado e vinculado à conversa.", { description: client.name })
+      const label = client.status === "contato" ? "Contato cadastrado e vinculado à conversa." : "Cliente cadastrado e vinculado à conversa."
+      toast.success(label, { description: client.name })
       onClose()
     } catch {
       // O cadastro ficou salvo; só o vínculo falhou — dá para refazer por "Vincular a cliente".
@@ -294,7 +300,7 @@ function ConvertForm({ contact, onClose }: { contact: WhatsAppContact; onClose: 
           <Field label={pj ? "Razão social" : "Nome completo"} htmlFor="cv-name" error={errors.name} className="sm:col-span-2">
             <TextInput id="cv-name" autoFocus value={form.name} aria-invalid={!!errors.name} onChange={(e) => set("name", e.target.value)} />
           </Field>
-          <Field label={pj ? "CNPJ" : "CPF"} htmlFor="cv-doc" error={errors.document} optional>
+          <Field label={pj ? "CNPJ" : "CPF"} htmlFor="cv-doc" error={errors.document} hint={noDocument ? "Sem documento, entra como Contato." : undefined} optional>
             <TextInput id="cv-doc" inputMode="numeric" value={form.document} aria-invalid={!!errors.document} onChange={(e) => set("document", maskDocument(e.target.value))} />
           </Field>
           <Field label="Telefone" htmlFor="cv-phone">
@@ -354,7 +360,7 @@ async function linkWithRetry(contactId: string, clientId: string) {
 /* --------------------------- Vincular a cliente --------------------------- */
 
 export function LinkClientDialog({ open, onOpenChange, contact }: { open: boolean; onOpenChange: (open: boolean) => void; contact: WhatsAppContact }) {
-  const { clients } = useDemoData()
+  const { clients } = useOfficeData()
   const [query, setQuery] = React.useState("")
   const [saving, setSaving] = React.useState<string | null>(null)
   const list = clients.filter((c) => matches(query, c.name, c.document, c.phone, c.email)).slice(0, 50)
@@ -366,7 +372,7 @@ export function LinkClientDialog({ open, onOpenChange, contact }: { open: boolea
       toast.success("Conversa vinculada ao cliente.", { description: name })
       onOpenChange(false)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível vincular.")
+      toast.error(publicMessage(error, "Não foi possível vincular."))
     } finally {
       setSaving(null)
     }

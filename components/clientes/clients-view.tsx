@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowDown, ArrowUp, ChevronRight, Download, Ellipsis, Eye, Plus, Power, Trash2, UsersRound, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronRight, Download, Ellipsis, Eye, Plus, Power, Trash2, Upload, UsersRound, X } from "lucide-react"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -19,16 +19,17 @@ import { TableShell, Td, Th } from "@/components/ui/data-table"
 import { FadeIn } from "@/components/ui/motion"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useClientActions } from "./client-actions"
+import { ImportClientsDialog } from "./import-clients-dialog"
 import { useUI } from "@/lib/store/ui-store"
-import { CLIENT_STATUS, PRACTICE_AREAS } from "@/lib/config"
-import { fmtNumericDate, fmtRelative } from "@/lib/dates"
-import { matches } from "@/lib/format"
-import { getMembers, getUser } from "@/lib/account"
-import { onlyDigits } from "@/lib/clients"
-import { delinquentClientIds, isOverdue, lastActivityByClient, relatedClientId } from "@/lib/selectors"
-import { downloadFile, toCsv } from "@/lib/export"
+import { CLIENT_STATUS, PRACTICE_AREAS } from "@/lib/core/config"
+import { fmtNumericDate, fmtRelative } from "@/lib/core/dates"
+import { matches } from "@/lib/core/format"
+import { getMembers, getUser } from "@/lib/auth/account"
+import { onlyDigits } from "@/lib/clientes/clients"
+import { delinquentClientIds, isOverdue, lastActivityByClient, relatedClientId } from "@/lib/store/selectors"
+import { downloadFile, toCsv } from "@/lib/core/export"
 import type { Client, ClientStatus, PracticeArea } from "@/types"
 import { Can, useSession } from "@/lib/auth/session"
 
@@ -39,6 +40,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "inativo", label: "Inativos" },
   { value: "novo", label: "Novos" },
   { value: "inadimplente", label: "Inadimplentes" },
+  { value: "contato", label: "Contatos" },
 ]
 
 type Links = "" | "com-processos" | "sem-processos" | "tarefas-pendentes" | "tarefas-atrasadas"
@@ -64,14 +66,15 @@ interface Row {
 }
 
 export function ClientsView() {
-  const data = useDemoData()
-  const { deleteClient, retryLoad } = useDemoActions()
+  const data = useOfficeData()
+  const { deleteClient, retryLoad } = useOfficeActions()
   const { toggleActive, deleteDescription } = useClientActions()
   const { openDialog } = useUI()
   const { can } = useSession()
   const router = useRouter()
   const ready = data.hydrated
   const [filter, setFilter] = React.useState<Filter>("todos")
+  const [importing, setImporting] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [ownerId, setOwnerId] = React.useState("")
   const [area, setArea] = React.useState<PracticeArea | "">("")
@@ -242,6 +245,9 @@ export function ClientsView() {
               </Button>
             )}
             <Can permission="clients.edit">
+              <Button variant="secondary" onClick={() => setImporting(true)} disabled={!ready}>
+                <Upload /> Importar
+              </Button>
               <Button onClick={() => openDialog("client")}>
                 <Plus /> Novo cliente
               </Button>
@@ -271,7 +277,7 @@ export function ClientsView() {
             aria-label="Filtrar por responsável"
             value={ownerId}
             onChange={(e) => setOwnerId(e.target.value)}
-            className="h-9 text-[13px] sm:w-44"
+            className="h-9 text-[13px] sm:w-48"
           >
             <option value="">Todos os responsáveis</option>
             {getMembers({ includeInactive: true })
@@ -424,7 +430,7 @@ export function ClientsView() {
                 <li key={c.id}>
                   <Link
                     href={`/clientes/${c.id}`}
-                    className="flex items-center gap-3 rounded-[14px] border border-border bg-card p-3.5 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="flex items-center gap-3 rounded-card border border-border/90 bg-card p-3.5 shadow-card outline-none active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <UserAvatar name={c.name} size="lg" />
                     <div className="min-w-0 flex-1">
@@ -457,6 +463,7 @@ export function ClientsView() {
         </FadeIn>
       )}
 
+      <ImportClientsDialog open={importing} onOpenChange={setImporting} />
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}

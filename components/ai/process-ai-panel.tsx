@@ -10,8 +10,8 @@ import { SignalList } from "@/components/shared/signal-list"
 import { MovementDetailSheet } from "@/components/processos/movement-detail-sheet"
 import { aiApi } from "@/lib/ai/client"
 import type { ActionSuggestion, AIResult, AISource, NextActions, ProcessSummary } from "@/lib/ai/types"
-import type { AttentionSignal } from "@/lib/attention"
-import { interpretMovement, type LexaMovement } from "@/lib/services/processes/movement-interpreter"
+import type { AttentionSignal } from "@/lib/dashboard/attention"
+import { interpretMovement, type LexaMovement } from "@/lib/services/processos/movement-interpreter"
 import { useSession } from "@/lib/auth/session"
 import type { Client, Process } from "@/types"
 import {
@@ -133,7 +133,7 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
           <div className="space-y-5 border-t border-border px-5 pt-4 pb-5">
             {(summary.data || summary.loading) && (next.data || next.loading) && (
               <FilterTabs
-                ariaLabel="Análises da Íntegra IA"
+                ariaLabel="Leituras do processo"
                 layoutId="process-ai-view"
                 value={view}
                 onChange={setView}
@@ -147,7 +147,9 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
             {active.error && <AIErrorNotice error={active.error} onRetry={view === "summary" ? runSummary : runNext} />}
             {active.loading && (
               <AIThinking
-                label={view === "summary" ? `Íntegra IA está analisando o processo ${process.code}…` : "Íntegra IA está verificando o que fazer agora…"}
+                label={
+                  view === "summary" ? `Lendo o processo ${process.code}…` : "Verificando o que fazer agora…"
+                }
                 onCancel={active.cancel}
               />
             )}
@@ -239,7 +241,7 @@ function NextView({
         <AISection title="Pontos de atenção">
           <AttentionList points={n.pontos_atencao} sources={result.sources} onOpen={onOpen} />
         </AISection>
-        <AISection title="Sugestões da Íntegra IA">
+        <AISection title="Próximos passos sugeridos">
           <SuggestionList suggestions={n.sugestoes} sources={result.sources} onOpen={onOpen} onCreate={onCreate} />
           {n.sugestoes.length > 0 && (
             <p className="mt-2 text-[11.5px] text-subtle">

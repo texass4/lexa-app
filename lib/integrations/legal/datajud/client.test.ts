@@ -77,14 +77,24 @@ describe("cliente HTTP da consulta", () => {
     assert.equal(calls.length, 2)
   })
 
-  it("respeita o Retry-After do 429, com teto", async () => {
+  it("respeita o Retry-After do 429: espera o pedido ou desiste, nunca tenta antes", async () => {
     const { client, waits } = harness([json({}, 429, { "retry-after": "3" }), json(trf1Response)])
     await client.searchByNumber(CNJ, "api_publica_trf1")
     assert.equal(Math.floor(waits[0]), 3000)
 
-    const capped = harness([json({}, 429, { "retry-after": "120" }), json(trf1Response)])
-    await capped.client.searchByNumber(CNJ, "api_publica_trf1")
-    assert.ok(capped.waits[0] <= 8_250)
+    // Espera maior que o teto: não tenta de novo e informa quanto a fonte pediu.
+    const long = harness([json({}, 429, { "retry-after": "120" }), json(trf1Response)])
+    await assert.rejects(
+      long.client.searchByNumber(CNJ, "api_publica_trf1"),
+      (error: unknown) => error instanceof LookupError && error.code === "RATE_LIMIT" && error.status === 429 && error.retryAfterMs === 120_000,
+    )
+    assert.equal(long.calls.length, 1)
+    assert.deepEqual(long.waits, [])
+  })
+
+  it("503 informa o status para o backoff do monitoramento", async () => {
+    const { client } = harness([json({}, 503)])
+    await assert.rejects(client.searchByNumber(CNJ, "api_publica_trf1"), (error: unknown) => error instanceof LookupError && error.status === 503)
   })
 
   it("faz no máximo 3 tentativas e desiste com o último erro", async () => {

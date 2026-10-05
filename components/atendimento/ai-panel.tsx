@@ -20,15 +20,16 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { useDemoActions, useDemoData } from "@/lib/store/demo-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { PRIORITY_CONFIG } from "@/lib/config"
-import { addDays, fmtDayLabel, getNow, startOfDay, toLocalISO } from "@/lib/dates"
+import { PRIORITY_CONFIG } from "@/lib/core/config"
+import { addDays, fmtDayLabel, getNow, startOfDay, toLocalISO } from "@/lib/core/dates"
 import { whatsappApi, type AiAction, type AiResponse } from "@/lib/whatsapp/client"
 import type { WhatsAppConversation } from "@/types"
 import { ConfirmActionDialog } from "./dialogs"
 import { draftStore } from "./drafts"
+import { publicMessage } from "@/lib/core/public-error"
 
 const ACTIONS: { action: AiAction; label: string; icon: React.ReactNode; hint: string }[] = [
   { action: "summary", label: "Resumir conversa", icon: <TextQuote />, hint: "Fatos, pedidos e pendências" },
@@ -43,8 +44,8 @@ type Pending = { kind: "note"; text: string } | { kind: "task"; index: number } 
 
 export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppConversation; onUseReply: () => void }) {
   const { can, user } = useSession()
-  const data = useDemoData()
-  const { addTask } = useDemoActions()
+  const data = useOfficeData()
+  const { addTask } = useOfficeActions()
   const { openDialog } = useUI()
   const [configured, setConfigured] = React.useState<boolean | null>(null)
   const [running, setRunning] = React.useState<AiAction | null>(null)
@@ -68,7 +69,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
       const response = await whatsappApi.ai(conversation.id, action)
       setResult({ conversationId: conversation.id, response })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "A Íntegra IA não respondeu.")
+      toast.error(publicMessage(error, "A Íntegra IA não respondeu."))
     } finally {
       setRunning(null)
     }
@@ -79,7 +80,7 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
       await whatsappApi.send(conversation.id, { id: crypto.randomUUID(), type: "note", text: `✨ Íntegra IA\n${text}` })
       toast.success("Nota interna salva na conversa.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível salvar a nota.")
+      toast.error(publicMessage(error, "Não foi possível salvar a nota."))
     }
   }
 
@@ -107,9 +108,9 @@ export function AiPanel({ conversation, onUseReply }: { conversation: WhatsAppCo
         <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-brand/25 bg-brand-soft text-brand-strong">
           <Sparkles className="size-5" />
         </span>
-        <p className="text-[14px] font-semibold">Íntegra IA não configurada</p>
+        <p className="text-[14px] font-semibold">Íntegra IA indisponível</p>
         <p className="mt-1 max-w-[260px] text-[12.5px] leading-relaxed text-muted-foreground">
-          Defina <code className="font-mono">ANTHROPIC_API_KEY</code> no servidor para resumir conversas, sugerir respostas e identificar tarefas.
+          Não foi possível concluir a análise. Tente novamente em instantes. Se continuar, fale com o suporte da Íntegra.
         </p>
       </div>
     )

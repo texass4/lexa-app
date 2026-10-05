@@ -3,7 +3,7 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import type { AISource, AIStatus } from "@/lib/ai/types"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { isAIReady, type SourceHandler } from "./ai-blocks"
 import { AIChatSheet } from "./ai-chat-sheet"
@@ -38,7 +38,7 @@ const LexaAIContext = React.createContext<LexaAIValue | null>(null)
 
 function useRouteContext(): AIContext {
   const pathname = usePathname()
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can } = useSession()
   const [, root, id] = pathname.split("/")
   const process = root === "processos" && id && can("processes.view") ? data.processes.find((p) => p.id === id) : undefined

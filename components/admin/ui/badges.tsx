@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/ui/status-badge"
 import { ORG_STATUS, SUBSCRIPTION_STATUS, type OrgStatus, type SeriesPoint, type SubscriptionStatus } from "@/lib/admin/catalog"
-import { fmtDayLabel } from "@/lib/dates"
+import { fmtDayLabel } from "@/lib/core/dates"
 import type { ChartPoint } from "./charts"
 
 export function OrgStatusBadge({ status, size }: { status: OrgStatus; size?: "sm" | "default" }) {

@@ -23,16 +23,16 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { visibleSections } from "./nav-config"
 import { DIALOG_PERMISSION, useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { useDemoData } from "@/lib/store/demo-store"
-import { normalize } from "@/lib/format"
-import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/config"
-import { fmtShortDate, fmtTime, getNow, parse } from "@/lib/dates"
-import { officeSignals } from "@/lib/attention"
+import { useOfficeData } from "@/lib/store/office-store"
+import { normalize } from "@/lib/core/format"
+import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/core/config"
+import { fmtShortDate, fmtTime, getNow, parse } from "@/lib/core/dates"
+import { officeSignals } from "@/lib/dashboard/attention"
 import { SignalDot } from "@/components/shared/signal-list"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 
 const itemCls =
-  "group flex cursor-pointer items-center gap-3 rounded-[9px] px-2.5 py-2 text-[13px] text-foreground outline-none data-[selected=true]:bg-accent"
+  "group flex cursor-pointer items-center gap-3 rounded-control px-2.5 py-2 text-[13px] text-foreground outline-none data-[selected=true]:bg-accent"
 
 const groupCls =
   "px-1.5 pb-1 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-[10.5px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.1em] [&_[cmdk-group-heading]]:text-subtle"
@@ -70,7 +70,7 @@ export function CommandMenu() {
 
 function CommandContent() {
   const { setCommandOpen, openDialog } = useUI()
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can, user } = useSession()
   const lexa = useLexaAI()
   const router = useRouter()
@@ -127,7 +127,7 @@ function CommandContent() {
         </Command.Empty>
 
         {hasQuery && (
-          <Command.Group heading="Íntegra IA" className={groupCls} forceMount>
+          <Command.Group heading="Conversa" className={groupCls} forceMount>
             <Command.Item
               value={`perguntar integra ${query}`}
               forceMount
@@ -185,7 +185,7 @@ function CommandContent() {
                 </Command.Item>
               ))}
             <Command.Item
-              value="acao perguntar a integra ia"
+              value="acao perguntar a integra ia conversa"
               onSelect={() => {
                 setCommandOpen(false)
                 lexa.open()
@@ -195,7 +195,7 @@ function CommandContent() {
               <span className="flex size-7 items-center justify-center rounded-[8px] border border-brand/25 bg-brand-soft text-brand-strong">
                 <Sparkles className="size-3.5" />
               </span>
-              Perguntar à Íntegra IA
+              Perguntar à Íntegra
               <span className="ml-auto hidden text-[11.5px] text-subtle sm:inline">{lexa.context.subtitle}</span>
             </Command.Item>
           </Command.Group>

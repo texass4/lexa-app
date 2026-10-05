@@ -2,10 +2,10 @@
 
 import Link from "next/link"
 import { ArrowUpRight, Sparkles } from "lucide-react"
-import { useDemoData } from "@/lib/store/demo-store"
+import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
-import { todaysAppointments } from "@/lib/selectors"
-import { addDays, fmtFullDate, fmtStartsIn, fmtTime, getNow, parse, startOfDay } from "@/lib/dates"
+import { todaysAppointments } from "@/lib/store/selectors"
+import { addDays, fmtFullDate, fmtStartsIn, fmtTime, getNow, parse, startOfDay } from "@/lib/core/dates"
 import { officeContext } from "@/components/ai/ai-context"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { useCategoryLookup } from "./use-category"
@@ -15,7 +15,7 @@ import { useCategoryLookup } from "./use-category"
  * compromisso e com quem ele está ligado. Tudo dos compromissos cadastrados.
  */
 export function AgendaToday() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const { can } = useSession()
   const lexa = useLexaAI()
   const lookup = useCategoryLookup()
@@ -31,7 +31,7 @@ export function AgendaToday() {
   return (
     <section
       aria-label="Hoje"
-      className="flex flex-col gap-4 rounded-[14px] border border-border bg-card p-4 shadow-card sm:p-5 lg:flex-row lg:items-center"
+      className="flex flex-col gap-4 rounded-card border border-border/90 bg-card p-4 shadow-card sm:p-5 lg:flex-row lg:items-center"
     >
       <div className="min-w-0 lg:w-[240px] lg:shrink-0">
         <p className="text-[11px] font-medium uppercase tracking-[0.09em] text-brand-strong">Hoje</p>
@@ -88,7 +88,7 @@ export function AgendaToday() {
       <button
         type="button"
         onClick={() => lexa.ask("Quais compromissos exigem preparação?", officeContext("agenda"))}
-        className="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-[9px] border border-brand/25 bg-brand-soft/60 px-3 text-[12.5px] font-medium text-brand-strong outline-none transition-[border-color,background-color] hover:border-brand/50 hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center"
+        className="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-control border border-brand/25 bg-brand-soft/60 px-3 text-[12.5px] font-medium text-brand-strong outline-none transition-[border-color,background-color] hover:border-brand/50 hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center"
       >
         <Sparkles className="size-3.5" /> O que exige preparação?
       </button>

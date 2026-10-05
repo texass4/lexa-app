@@ -1,4 +1,4 @@
-import { Bell, CalendarCheck, CircleDollarSign, FileText, Gavel, ListChecks, RefreshCw, Scale, Signature, UsersRound } from "lucide-react"
+import { Bell, CalendarCheck, CircleDollarSign, FileText, Gavel, Hourglass, ListChecks, RefreshCw, Scale, Signature, UsersRound } from "lucide-react"
 import { cn } from "cn"
 import type { ActivityType } from "@/types"
 
@@ -13,6 +13,7 @@ const MAP: Record<ActivityType, { icon: React.ElementType; cls: string }> = {
   hearing: { icon: Gavel, cls: "text-violet" },
   summons: { icon: Bell, cls: "text-warning" },
   movement: { icon: RefreshCw, cls: "text-info" },
+  deadline: { icon: Hourglass, cls: "text-warning" },
 }
 
 export function ActivityIconGlyph({ type }: { type: ActivityType }) {

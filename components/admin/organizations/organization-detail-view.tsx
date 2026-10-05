@@ -28,7 +28,7 @@ import {
 } from "@/lib/admin/catalog"
 import type { MemberAccess } from "@/lib/auth/profile"
 import { ROLE_LABELS } from "@/lib/auth/permissions"
-import { fmtLongDate, fmtNumericDate, fmtRelative } from "@/lib/dates"
+import { fmtLongDate, fmtNumericDate, fmtRelative } from "@/lib/core/dates"
 import { OrgStatusBadge, SubscriptionBadge } from "../ui/badges"
 import { UsageMeter } from "../ui/usage-meter"
 import { TrendChart } from "../ui/charts"

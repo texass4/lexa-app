@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { cn } from "cn"
-import { fmtDayMonthParts, fmtTime, fmtDayLabel, parse, weekdayShort } from "@/lib/dates"
+import { fmtDayMonthParts, fmtTime, fmtDayLabel, parse, weekdayShort } from "@/lib/core/dates"
 
 export interface TimelineEntry {
   id: string

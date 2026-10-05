@@ -1,12 +1,26 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { RateLimiter, ResultCache } from "../guard"
 import { ROLE_DEFAULTS } from "@/lib/auth/permissions"
 import { createSupabaseRepository } from "../context/repository"
-import { buildProcessContext, loadProcessData } from "../context/process"
+import { NO_PRAZOS, buildProcessContext, loadProcessData } from "../context/process"
+import { loadClientData } from "../context/client"
+import { createSupabaseRepository as repoFor } from "../context/repository"
 import { computeOfficeMetrics, loadOfficeData } from "../context/office"
 import { AIError } from "../errors"
-import { ORG_A, NOW, SECRET_B, fakeSupabase, makeDeps, processA, processB, promptText, seedTables, validSummary } from "../__fixtures__/data"
+import {
+  ORG_A,
+  NOW,
+  SECRET_B,
+  fakeSupabase,
+  makeDeps,
+  paymentActivityA,
+  memoryMeter,
+  processA,
+  processB,
+  promptText,
+  seedTables,
+  validSummary,
+} from "../__fixtures__/data"
 import { analyzeMovement, suggestNextActions, summarizeProcess } from "./process"
 import { summarizeClient } from "./client"
 import { officeOverview } from "./office"
@@ -24,7 +38,13 @@ const failure = async (promise: Promise<unknown>) => {
 const nextActions = {
   pontos_atencao: [{ texto: "Remessa recente sem destino informado.", natureza: "verificacao", refs: ["M1"] }],
   sugestoes: [
-    { titulo: "Verificar destino da remessa", descricao: "Consultar o tribunal.", prioridade: "media", justificativa: "Remessa em 24/09/2026.", refs: ["M1"] },
+    {
+      titulo: "Verificar destino da remessa",
+      descricao: "Consultar o tribunal.",
+      prioridade: "media",
+      justificativa: "Remessa em 24/09/2026.",
+      refs: ["M1"],
+    },
   ],
   informacoes_ausentes: [],
 }
@@ -33,10 +53,20 @@ describe("repositório da IA (isolamento por escritório)", () => {
   it("só devolve registros do escritório de quem chama", async () => {
     const { supabase } = fakeSupabase()
     const repo = createSupabaseRepository(supabase, ORG_A, () => true)
-    assert.deepEqual((await repo.listClients()).map((c) => c.id), ["c_a1"])
-    assert.deepEqual((await repo.listTasks()).map((t) => t.id), ["t_a1"])
-    assert.deepEqual((await repo.listProcessOverviews()).map((p) => p.id), ["p_a1"])
-    assert.deepEqual((await repo.listMembers()).map((m) => m.name), ["Ana Advogada"])
+    assert.deepEqual(await repo.countClients(), { total: 1, active: 1, delinquent: 0 })
+    assert.deepEqual([...(await repo.clientNames(["c_a1", "c_b1"])).keys()], ["c_a1"])
+    assert.deepEqual(
+      (await repo.listTasks()).map((t) => t.id),
+      ["t_a1"],
+    )
+    assert.deepEqual(
+      (await repo.listProcessOverviews()).map((p) => p.id),
+      ["p_a1"],
+    )
+    assert.deepEqual(
+      (await repo.listMembers()).map((m) => m.name),
+      ["Ana Advogada"],
+    )
   })
 
   it("processo de outro escritório não existe para quem pergunta", async () => {
@@ -49,19 +79,54 @@ describe("repositório da IA (isolamento por escritório)", () => {
   it("toda consulta filtra organization_id", async () => {
     const { supabase, queries } = fakeSupabase()
     const repo = createSupabaseRepository(supabase, ORG_A, () => true)
-    await loadOfficeData(repo)
-    await repo.getProcess(processA.id)
+    await loadOfficeData(repo, NOW)
+    await loadProcessData(repo, processA.id, NOW)
+    await loadClientData(repo, "c_a1", NOW)
     assert.ok(queries.length > 5)
-    for (const query of queries) assert.ok(query.filters.some(([col, value]) => col === "organization_id" && value === ORG_A), query.table)
+    for (const query of queries)
+      assert.ok(
+        query.filters.some(([col, value]) => col === "organization_id" && value === ORG_A),
+        query.table,
+      )
   })
 
   it("respeita as permissões do módulo", async () => {
     const { supabase } = fakeSupabase()
     const repo = createSupabaseRepository(supabase, ORG_A, (p) => p === "processes.view")
-    assert.deepEqual(await repo.listInvoices(), [])
+    assert.deepEqual(await repo.listInvoices({ clientId: "c_a1" }), [])
     assert.deepEqual(await repo.listTasks(), [])
     assert.equal(await repo.getClient("c_a1"), null)
     assert.ok(await repo.getProcess(processA.id))
+  })
+
+  it("não lê tabelas inteiras: cada contexto pede ao banco só o seu recorte", async () => {
+    const { supabase, queries } = fakeSupabase()
+    const repo = createSupabaseRepository(supabase, ORG_A, () => true)
+    await loadProcessData(repo, processA.id, NOW)
+    const of = (table: string) => queries.filter((q) => q.table === table)
+    // Processo: tarefas, prazos, compromissos e documentos já filtrados pelo processo; documentos com limite.
+    assert.ok(of("tasks").every((q) => q.filters.some(([col, value]) => col === "data->related->>id" && value === processA.id)))
+    assert.ok(of("deadlines").every((q) => q.filters.some(([col]) => col === "process_id")))
+    assert.ok(
+      of("appointments").every((q) => q.filters.some(([col]) => col === "data->>processId") && q.filters.some(([col]) => col === "data->>end")),
+    )
+    assert.ok(of("documents").every((q) => q.limit === 10))
+
+    queries.length = 0
+    await loadOfficeData(repo, NOW)
+    // Panorama: clientes e documentos só como contagem; tarefas pendentes; prazos abertos; agenda da semana.
+    assert.ok(of("clients").every((q) => q.head || q.filters.some(([col]) => col === "id")))
+    assert.ok(of("documents").every((q) => q.head))
+    assert.ok(of("tasks").every((q) => q.filters.some(([col, value]) => col === "data->>status" && value === "pendente")))
+    assert.ok(of("deadlines").every((q) => q.filters.some(([col, value]) => col === "data->>status" && value === "aberto")))
+    assert.ok(of("appointments").every((q) => q.filters.some(([col]) => col === "data->>start")))
+    assert.ok(of("invoices").every((q) => q.filters.some(([col]) => col === "or")))
+
+    queries.length = 0
+    await loadClientData(repo, "c_a1", NOW)
+    assert.ok(of("invoices").every((q) => q.filters.some(([col, value]) => col === "data->>clientId" && value === "c_a1")))
+    assert.ok(of("activities").every((q) => q.limit === 10))
+    assert.ok(of("tasks").every((q) => q.filters.some(([col]) => col === "or")))
   })
 
   it("listas de processos não trazem o histórico completo", async () => {
@@ -79,7 +144,10 @@ describe("resumo do processo", () => {
 
     assert.equal(calls.length, 1)
     assert.equal(result.data.nivel_confianca, "medio")
-    assert.deepEqual(result.data.movimentacoes_relevantes.map((n) => n.ref), ["M1"])
+    assert.deepEqual(
+      result.data.movimentacoes_relevantes.map((n) => n.ref),
+      ["M1"],
+    )
     assert.deepEqual(result.data.pontos_atencao[0].refs, ["T1"])
     // A fonte exibida vem do banco, não do modelo.
     assert.equal(result.sources.M1.label, "Remessa")
@@ -151,28 +219,73 @@ describe("resumo do processo", () => {
     assert.equal(await failure(summarizeProcess(unknown.deps, processA.id)), "UNEXPECTED")
   })
 
-  it("dois pedidos iguais = uma chamada; o segundo vem do cache", async () => {
-    const { deps, calls } = makeDeps(() => validSummary)
+  it("dois pedidos iguais = uma chamada; o segundo vem do cache e não conta no plano", async () => {
+    const { deps, calls, usage } = makeDeps(() => validSummary)
     const [first, second] = await Promise.all([summarizeProcess(deps, processA.id), summarizeProcess(deps, processA.id)])
     assert.equal(calls.length, 1)
     assert.deepEqual(first.data, second.data)
     const third = await summarizeProcess(deps, processA.id)
     assert.equal(third.cached, true)
     assert.equal(calls.length, 1)
+    assert.deepEqual(
+      usage.map((e) => [e.status, e.context.operation, e.context.userId]),
+      [
+        ["ok", "process.summary", "u_a1"],
+        ["cache", "process.summary", "u_a1"],
+      ],
+    )
   })
 
-  it("limite de uso → RATE_LIMITED antes de chamar o modelo", async () => {
-    const limiter = new RateLimiter()
-    const { deps, calls } = makeDeps(() => nextActions, { limiter })
-    for (let i = 0; i < 8; i++) {
-      deps.cache = new ResultCache()
+  it("dado novo no processo = análise nova (o cache é pelo contexto inteiro)", async () => {
+    const { deps, calls } = makeDeps(() => validSummary)
+    await summarizeProcess(deps, processA.id)
+    deps.now = new Date(NOW.getTime() + 86_400_000) // "data de hoje" faz parte do contexto
+    await summarizeProcess(deps, processA.id)
+    assert.equal(calls.length, 2)
+  })
+
+  it("limite de ritmo → RATE_LIMITED antes de chamar o modelo", async () => {
+    const meter = memoryMeter({ perUserMinute: 3 })
+    const { deps, calls } = makeDeps(() => nextActions, { meter })
+    for (let i = 0; i < 3; i++) {
       // Contexto muda a cada pedido (sem cache) para forçar chamadas reais.
       deps.now = new Date(NOW.getTime() + i * 86_400_000)
       await suggestNextActions(deps, processA.id)
     }
     deps.now = new Date(NOW.getTime() + 9 * 86_400_000)
     assert.equal(await failure(suggestNextActions(deps, processA.id)), "RATE_LIMITED")
-    assert.equal(calls.length, 8)
+    assert.equal(calls.length, 3)
+  })
+
+  it("limite do plano → PLAN_LIMIT, sem chamar o modelo; erro do provedor é registrado", async () => {
+    const meter = memoryMeter({ monthlyLimit: 1 })
+    const failing = makeDeps(
+      () => {
+        throw new AIError("UNAVAILABLE")
+      },
+      { meter },
+    )
+    assert.equal(await failure(summarizeProcess(failing.deps, processA.id)), "UNAVAILABLE")
+    assert.equal(meter.events[0].status, "erro") // erro não conta no plano
+    const { deps, calls } = makeDeps(() => validSummary, { meter })
+    await summarizeProcess(deps, processA.id)
+    deps.now = new Date(NOW.getTime() + 86_400_000)
+    assert.equal(await failure(summarizeProcess(deps, processA.id)), "PLAN_LIMIT")
+    assert.equal(calls.length, 1)
+  })
+
+  it("análise de uma movimentação usa o modelo leve", async () => {
+    const { deps, calls, usage } = makeDeps(() => ({
+      o_que_aconteceu: "Remessa.",
+      o_que_o_registro_informa: [],
+      o_que_nao_e_possivel_concluir: [],
+      pontos_atencao: [],
+      sugestoes_tarefa: [],
+      nivel_confianca: "Médio",
+    }))
+    await analyzeMovement(deps, processA.id, processA.movements[0].id)
+    assert.equal(calls[0].tier, "light")
+    assert.equal(usage[0].model, "fake-flash-lite")
   })
 })
 
@@ -181,7 +294,60 @@ describe("prazos", () => {
     const { deps } = makeDeps(() => validSummary)
     const data = await loadProcessData(deps.repo, processA.id)
     const { context } = buildProcessContext(data, NOW)
-    assert.equal((context.processo as Record<string, unknown>).prazo_cadastrado_no_lexa, "nenhum prazo cadastrado")
+    assert.equal(context.prazos_do_processo, NO_PRAZOS)
+    assert.doesNotMatch(JSON.stringify(context), /prazo_cadastrado_no_lexa/)
+  })
+
+  it("com prazo cadastrado, a IA recebe o prazo real (e só os do próprio escritório e processo)", async () => {
+    const prazo = (organizationId: string, id: string, processId: string, patch: Record<string, unknown> = {}) => ({
+      organization_id: organizationId,
+      id,
+      // Coluna derivada pelo banco (`deadlines_sync_links`), usada no filtro.
+      process_id: processId,
+      data: {
+        id,
+        organizationId,
+        processId,
+        description: `Prazo ${id}`,
+        fatalDate: "2026-10-02",
+        internalDate: "2026-09-30",
+        responsibleId: "u_a1",
+        origin: "intimacao",
+        status: "aberto",
+        taskId: "t_a1",
+        createdById: "u_a1",
+        createdAt: "2026-09-20T10:00:00",
+        ...patch,
+      },
+    })
+    const { supabase } = fakeSupabase({
+      ...seedTables(),
+      deadlines: [
+        prazo(ORG_A, "pz_a1", processA.id),
+        prazo(ORG_A, "pz_a2", processA.id, { status: "cumprido", fatalDate: "2026-09-01", internalDate: "2026-08-30" }),
+        prazo(ORG_A, "pz_outro", "p_outro"),
+        prazo("org-b", "pz_b1", processA.id, { description: SECRET_B }),
+      ],
+    })
+    const repo = repoFor(supabase, ORG_A, () => true)
+    const data = await loadProcessData(repo, processA.id)
+    const { context, sources } = buildProcessContext(data, NOW)
+    const prazos = context.prazos_do_processo as Record<string, unknown>[]
+    assert.deepEqual(
+      prazos.map((p) => [p.descricao, p.situacao, p.data_fatal]),
+      [
+        ["Prazo pz_a1", "Aberto", "02/10/2026"],
+        ["Prazo pz_a2", "Cumprido", "01/09/2026"],
+      ],
+    )
+    assert.equal(prazos[0].dias_ate_a_data_fatal, 6)
+    assert.equal(prazos[0].origem, "Intimação")
+    assert.equal(prazos[0].responsavel, "Ana Advogada")
+    assert.equal(sources[prazos[0].ref as string].kind, "deadline")
+    assert.doesNotMatch(JSON.stringify(context), new RegExp(SECRET_B))
+
+    // Sem permissão de processos, nenhum prazo chega à IA.
+    assert.deepEqual(await repoFor(supabase, ORG_A, () => false).listPrazos(), [])
   })
 
   it("resposta com prazo inventado recebe aviso visível", async () => {
@@ -249,6 +415,47 @@ describe("cliente e escritório", () => {
     assert.equal(result.sources.P1.id, processA.id)
     assert.doesNotMatch(sent, /Honorários iniciais|total_faturado/)
     assert.match(sent, /financeiro/)
+  })
+
+  it("sem Financeiro, nenhuma atividade financeira chega ao contexto do cliente", async () => {
+    const summary = {
+      resumo: "Cliente com um processo ativo.",
+      processos: [],
+      pontos_atencao: [],
+      atividades_recentes: [],
+      pendencias: [],
+      proximas_acoes: [],
+      informacoes_ausentes: [],
+      nivel_confianca: "medio",
+    }
+    // Com Financeiro: o pagamento entra (é dado que a pessoa já pode ver).
+    const owner = makeDeps(() => summary)
+    await summarizeClient(owner.deps, "c_a1")
+    assert.match(promptText(owner.calls[0]), /registrou um pagamento recebido/)
+    assert.match(promptText(owner.calls[0]), /total_faturado/)
+
+    // Sem Financeiro: nem o lançamento, nem a atividade com o valor.
+    const staff = makeDeps(() => summary, { permissions: ROLE_DEFAULTS.staff })
+    await summarizeClient(staff.deps, "c_a1")
+    const sent = promptText(staff.calls[0])
+    assert.doesNotMatch(sent, /pagamento recebido|R\$ 3\.000|Honorários iniciais|total_faturado/)
+    assert.match(sent, /atualizou o cadastro do cliente/)
+  })
+
+  it("o filtro das atividades financeiras vai para o banco, não só para a tela", async () => {
+    const db = fakeSupabase()
+    const repo = createSupabaseRepository(db.supabase, ORG_A, (p) => ROLE_DEFAULTS.staff.includes(p))
+    const activities = await repo.listActivities({ clientId: "c_a1", limit: 10 })
+    assert.ok(activities.every((a) => a.type !== "payment"))
+    assert.ok(activities.length > 0)
+    const query = db.queries.find((q) => q.table === "activities")
+    assert.deepEqual(
+      query?.filters.find(([column]) => column === "data->>type"),
+      ["data->>type", "payment"],
+    )
+
+    const finance = createSupabaseRepository(fakeSupabase().supabase, ORG_A, (p) => ROLE_DEFAULTS.lawyer.includes(p))
+    assert.ok((await finance.listActivities({ clientId: "c_a1", limit: 10 })).some((a) => a.id === paymentActivityA.id))
   })
 
   it("métricas do escritório vêm dos dados, por permissão", async () => {

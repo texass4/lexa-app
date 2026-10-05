@@ -17,7 +17,10 @@ export function attentionItems(orgs: AdminOrganization[], plans: AdminPlan[], no
       tone: "danger",
       count: pastDue.length,
       title: `${pastDue.length} ${pastDue.length === 1 ? "escritório inadimplente" : "escritórios inadimplentes"}`,
-      detail: pastDue.slice(0, 3).map((o) => o.name).join(", "),
+      detail: pastDue
+        .slice(0, 3)
+        .map((o) => o.name)
+        .join(", "),
       href: "/admin/financeiro?assinatura=past_due",
     })
 
@@ -28,7 +31,10 @@ export function attentionItems(orgs: AdminOrganization[], plans: AdminPlan[], no
       tone: "warning",
       count: pending.length,
       title: `${pending.length} ${pending.length === 1 ? "cadastro aguarda" : "cadastros aguardam"} aprovação`,
-      detail: pending.slice(0, 3).map((o) => o.name).join(", "),
+      detail: pending
+        .slice(0, 3)
+        .map((o) => o.name)
+        .join(", "),
       href: "/admin/escritorios?status=pending",
     })
 
@@ -58,7 +64,10 @@ export function attentionItems(orgs: AdminOrganization[], plans: AdminPlan[], no
       tone: "info",
       count: trialEnding.length,
       title: `${trialEnding.length} ${trialEnding.length === 1 ? "teste termina" : "testes terminam"} em até 7 dias`,
-      detail: trialEnding.slice(0, 3).map((o) => o.name).join(", "),
+      detail: trialEnding
+        .slice(0, 3)
+        .map((o) => o.name)
+        .join(", "),
       href: "/admin/escritorios?assinatura=trialing",
     })
 
@@ -69,7 +78,10 @@ export function attentionItems(orgs: AdminOrganization[], plans: AdminPlan[], no
       tone: "neutral",
       count: suspended.length,
       title: `${suspended.length} ${suspended.length === 1 ? "escritório suspenso" : "escritórios suspensos"}`,
-      detail: suspended.slice(0, 3).map((o) => o.name).join(", "),
+      detail: suspended
+        .slice(0, 3)
+        .map((o) => o.name)
+        .join(", "),
       href: "/admin/escritorios?status=suspended",
     })
 

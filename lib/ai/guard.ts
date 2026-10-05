@@ -1,14 +1,14 @@
 /**
- * Proteções de custo da Íntegra IA, em memória do servidor (sem Redis):
+ * Proteções de custo da Íntegra IA.
  *
- * - limite de uso por pessoa e por escritório (janela deslizante);
- * - cache curto de análises idênticas;
- * - deduplicação de pedidos iguais em andamento (dois cliques = uma chamada).
- *
- * Em várias instâncias cada uma tem seu próprio limite — suficiente para a demo.
+ * - Limites: as regras ficam aqui; quem conta e bloqueia é o banco (`ai_reserve`,
+ *   `0013_ia_consumo.sql`), de forma atômica — vale com vários servidores. A memória
+ *   do servidor nunca decide se uma chamada pode acontecer.
+ * - Cache de análises: `AICache` (no Supabase em produção, `lib/ai/cache.ts`), comum
+ *   a todos os servidores. A chave inclui o contexto inteiro: dado novo = análise nova.
+ * - Pedidos iguais ao mesmo tempo (dois cliques) viram uma chamada só (`InFlight`) —
+ *   só uma economia local; o cache e os limites continuam no banco.
  */
-
-import { AIError } from "./errors"
 
 /* ------------------------------ limite de uso ------------------------------ */
 
@@ -17,6 +17,7 @@ export interface RateRule {
   windowMs: number
 }
 
+/** Ritmo máximo (além do limite mensal do plano, que vem do plano do escritório). */
 export const RATE_RULES = {
   user: [
     { limit: 8, windowMs: 60_000 },
@@ -25,87 +26,50 @@ export const RATE_RULES = {
   organization: [{ limit: 200, windowMs: 60 * 60_000 }],
 } satisfies Record<string, RateRule[]>
 
-export class RateLimiter {
-  private readonly hits = new Map<string, number[]>()
+/* ---------------------------------- cache ---------------------------------- */
+
+/** Quanto tempo uma análise idêntica é reaproveitada (o contexto inclui a data de hoje). */
+export const CACHE_TTL_MS = 12 * 60 * 60_000
+
+export interface AICache {
+  get<T>(key: string): Promise<T | undefined>
+  set<T>(key: string, entry: { organizationId: string; operation: string; value: T; ttlMs: number }): Promise<void>
+}
+
+/** Cache em memória — para testes e desenvolvimento sem banco. */
+export class MemoryAICache implements AICache {
+  private readonly entries = new Map<string, { value: unknown; expires: number }>()
   private readonly now: () => number
 
   constructor(now: () => number = Date.now) {
     this.now = now
   }
 
-  /** Registra uma chamada ou lança RATE_LIMITED. Só conta se todas as regras permitirem. */
-  consume(checks: { key: string; rules: RateRule[] }[]) {
-    const now = this.now()
-    for (const { key, rules } of checks) {
-      const list = this.prune(key, rules, now)
-      for (const rule of rules) {
-        const inWindow = list.filter((t) => now - t < rule.windowMs)
-        if (inWindow.length >= rule.limit) {
-          const retryAfter = Math.max(1, Math.ceil((inWindow[0] + rule.windowMs - now) / 1000))
-          throw new AIError("RATE_LIMITED", { retryAfter })
-        }
-      }
-    }
-    for (const { key } of checks) this.hits.set(key, [...(this.hits.get(key) ?? []), now])
+  async get<T>(key: string) {
+    const entry = this.entries.get(key)
+    if (!entry || entry.expires <= this.now()) return undefined
+    return entry.value as T
   }
 
-  private prune(key: string, rules: RateRule[], now: number) {
-    const longest = Math.max(...rules.map((r) => r.windowMs))
-    const list = (this.hits.get(key) ?? []).filter((t) => now - t < longest)
-    if (list.length) this.hits.set(key, list)
-    else this.hits.delete(key)
-    return list
+  async set<T>(key: string, entry: { organizationId: string; operation: string; value: T; ttlMs: number }) {
+    this.entries.set(key, { value: entry.value, expires: this.now() + entry.ttlMs })
   }
 }
 
-/* ---------------------------------- cache ---------------------------------- */
-
-export class ResultCache<T> {
-  private readonly entries = new Map<string, { value: T; expires: number }>()
+/** Uma execução por chave ao mesmo tempo, neste servidor. */
+export class InFlight<T> {
   private readonly pending = new Map<string, Promise<T>>()
-  private readonly ttlMs: number
-  private readonly maxEntries: number
-  private readonly now: () => number
 
-  constructor({ ttlMs = 10 * 60_000, maxEntries = 300, now = Date.now }: { ttlMs?: number; maxEntries?: number; now?: () => number } = {}) {
-    this.ttlMs = ttlMs
-    this.maxEntries = maxEntries
-    this.now = now
-  }
-
-  get(key: string): T | undefined {
-    const entry = this.entries.get(key)
-    if (!entry) return undefined
-    if (entry.expires <= this.now()) {
-      this.entries.delete(key)
-      return undefined
-    }
-    return entry.value
-  }
-
-  /** Executa `produce` uma vez por chave; guarda o resultado só se der certo. */
-  async run(key: string, produce: () => Promise<T>): Promise<T> {
+  run(key: string, produce: () => Promise<T>): Promise<T> {
     const running = this.pending.get(key)
     if (running) return running
-    const promise = produce()
-      .then((value) => {
-        this.set(key, value)
-        return value
-      })
-      .finally(() => this.pending.delete(key))
+    const promise = produce().finally(() => this.pending.delete(key))
     this.pending.set(key, promise)
     return promise
   }
-
-  private set(key: string, value: T) {
-    this.entries.delete(key)
-    this.entries.set(key, { value, expires: this.now() + this.ttlMs })
-    // Map mantém a ordem de inserção: o primeiro é o mais antigo.
-    while (this.entries.size > this.maxEntries) this.entries.delete(this.entries.keys().next().value!)
-  }
 }
 
-/** Hash curto e estável (FNV-1a) — só para chave de cache e log, nunca para segurança. */
+/** Hash curto e estável (FNV-1a) — só para log, nunca para segurança. */
 export function shortHash(text: string) {
   let hash = 0x811c9dc5
   for (let i = 0; i < text.length; i++) {

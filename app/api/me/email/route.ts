@@ -3,13 +3,16 @@ import { createClient } from "@supabase/supabase-js"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { HttpError, readJson, requireMember, route } from "@/lib/auth/server"
 import { isEmail, normalizeEmail } from "@/lib/auth/validation"
+import { enforce, LIMITS } from "@/lib/auth/protection/rate-limit"
 
 /**
- * Troca o e-mail de login. Exige a senha atual — sem provedor de e-mail ainda, é a
- * confirmação de que quem pede é o dono da conta.
+ * Troca o e-mail de login. Exige a senha atual: é a confirmação de que quem pede é o
+ * dono da conta.
  */
 export const PATCH = route(async (request) => {
   const { user } = await requireMember()
+  // Conferência de senha e "e-mail já em uso": com limite, nem adivinhação de senha nem varredura de e-mails.
+  await enforce([LIMITS.emailChangeUser, user.id])
   const body = await readJson<{ email?: string; password?: string }>(request)
   const email = normalizeEmail(body.email ?? "")
   if (!isEmail(email)) throw new HttpError(400, "E-mail inválido.")

@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { initials } from "@/lib/format"
+import { initials } from "@/lib/core/format"
 
 const PALETTE = [
   "bg-[#E8EEFB] text-[#274690] dark:bg-[#16213A] dark:text-[#A9C2FA]",
@@ -35,7 +35,8 @@ export function UserAvatar({
   src?: string
   size?: keyof typeof SIZES
   className?: string
-  tone?: "dark"
+  /** dark: marinho sobre fundo claro; gold: acento dourado sobre a barra lateral. */
+  tone?: "dark" | "gold"
 }) {
   return (
     <span
@@ -43,7 +44,11 @@ export function UserAvatar({
       className={cn(
         "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold tracking-wide",
         SIZES[size],
-        tone === "dark" ? "bg-primary text-primary-foreground" : PALETTE[hash(name) % PALETTE.length],
+        tone === "dark"
+          ? "bg-primary text-primary-foreground"
+          : tone === "gold"
+            ? "bg-[#d6b97f] text-[#0d1b31]"
+            : PALETTE[hash(name) % PALETTE.length],
         className,
       )}
     >

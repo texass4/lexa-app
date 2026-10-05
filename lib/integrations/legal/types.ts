@@ -3,7 +3,7 @@
  * dados processuais (DataJud hoje; Codilo, Judit ou Escavador amanhã).
  *
  * Trocar de fornecedor = escrever outro `ProcessProvider`. O serviço de
- * consulta (`lib/services/processes/lookup-service.ts`), o cache e a interface
+ * consulta (`lib/services/processos/lookup-service.ts`), o cache e a interface
  * não mudam.
  *
  * Regra: nada fora de `lib/integrations/legal/<provider>/` conhece o formato

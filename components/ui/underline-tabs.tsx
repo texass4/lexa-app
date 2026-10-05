@@ -29,7 +29,7 @@ export function UnderlineTabs<T extends string>({
 
   return (
     <div className={cn("-mx-4 overflow-x-auto border-b border-border px-4 no-scrollbar sm:mx-0 sm:px-0", className)}>
-      <div role="tablist" aria-label={ariaLabel} className="flex gap-5">
+      <div role="tablist" aria-label={ariaLabel} className="flex gap-6">
         {tabs.map((tab, i) => {
           const active = tab.value === value
           return (
@@ -42,7 +42,7 @@ export function UnderlineTabs<T extends string>({
               onKeyDown={(e) => onKeyDown(e, i)}
               onClick={() => onChange(tab.value)}
               className={cn(
-                "relative flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-medium outline-none transition-colors focus-visible:text-foreground",
+                "relative flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap text-[13.5px] font-medium outline-none transition-colors focus-visible:text-foreground",
                 active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -50,8 +50,8 @@ export function UnderlineTabs<T extends string>({
               {tab.count !== undefined && (
                 <span
                   className={cn(
-                    "tabular rounded-[5px] px-1.5 py-px text-[11px]",
-                    active ? "bg-foreground text-background" : "bg-surface-muted text-muted-foreground",
+                    "tabular rounded-full px-1.5 py-px text-[11px] font-semibold",
+                    active ? "bg-brand-soft text-brand" : "bg-surface-muted text-muted-foreground",
                   )}
                 >
                   {tab.count}
@@ -61,7 +61,7 @@ export function UnderlineTabs<T extends string>({
                 <motion.span
                   layoutId={layoutId}
                   transition={{ type: "spring", stiffness: 520, damping: 40 }}
-                  className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-foreground"
+                  className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-brand"
                 />
               )}
             </button>

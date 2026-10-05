@@ -2,15 +2,16 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowRight, MapPin } from "lucide-react"
+import { CalendarDays } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
-import { useDemoData } from "@/lib/store/demo-store"
-import { todaysAppointments } from "@/lib/selectors"
+import { useOfficeData } from "@/lib/store/office-store"
+import { todaysAppointments } from "@/lib/store/selectors"
 import { EmptyState } from "@/components/ui/empty-state"
+import { PanelLink } from "./panel-link"
 import { useCategoryLookup } from "@/components/agenda/use-category"
-import { getNow, fmtTime, parse, toLocalISO } from "@/lib/dates"
-import { getUser } from "@/lib/account"
+import { getNow, fmtTime, parse, toLocalISO } from "@/lib/core/dates"
+import { getUser } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 
 function hrefFor(a: Appointment) {
@@ -20,7 +21,7 @@ function hrefFor(a: Appointment) {
 }
 
 export function TodayAgenda() {
-  const data = useDemoData()
+  const data = useOfficeData()
   const lookup = useCategoryLookup()
   const items = todaysAppointments(data)
   const nowIndex = items.findIndex((a) => parse(a.start) > getNow())
@@ -35,15 +36,9 @@ export function TodayAgenda() {
     <Panel className="flex flex-col">
       <PanelHeader
         title="Agenda de hoje"
-        description={items.length ? `${items.length} compromisso${items.length > 1 ? "s" : ""} · escritório` : "Escritório"}
-        action={
-          <Link
-            href="/agenda"
-            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
-          >
-            Agenda <ArrowRight className="size-3.5" />
-          </Link>
-        }
+        icon={<CalendarDays />}
+        description={items.length ? `${items.length} compromisso${items.length > 1 ? "s" : ""} · escritório` : undefined}
+        action={<PanelLink href="/agenda">Ver agenda</PanelLink>}
       />
       {items.length === 0 && <EmptyState compact title="Agenda livre hoje." description="Audiências, reuniões e prazos do dia aparecem aqui." />}
       <ol ref={listRef} className="relative flex-1 px-3 pb-3 thin-scrollbar lg:max-h-[436px] lg:overflow-y-auto">
@@ -52,46 +47,41 @@ export function TodayAgenda() {
           const past = parse(a.end) <= getNow()
           const current = parse(a.start) <= getNow() && parse(a.end) > getNow()
           const processCode = a.processId ? data.processes.find((p) => p.id === a.processId)?.code : undefined
+          const detail = a.location?.split(" — ")[0] || [a.personName, processCode && `Processo ${processCode}`].filter(Boolean).join(" · ")
           return (
             <li key={a.id} data-now={i === nowIndex ? "" : undefined}>
               {i === nowIndex && (
-                <div className="relative my-1.5 flex items-center gap-2 px-2" aria-label={`Agora, ${fmtTime(toLocalISO(getNow()))}`}>
+                <div className="relative my-1 flex items-center gap-2 px-3" aria-label={`Agora, ${fmtTime(toLocalISO(getNow()))}`}>
                   <span className="tabular text-[10.5px] font-semibold text-brand-strong">{fmtTime(toLocalISO(getNow()))}</span>
-                  <span className="size-1.5 rounded-full bg-brand" />
-                  <span className="h-px flex-1 bg-brand/50" />
+                  <span className="h-px flex-1 bg-brand/40" />
                 </div>
               )}
               <Link
                 href={hrefFor(a)}
                 className={cn(
-                  "group flex items-stretch gap-3 rounded-[10px] px-2 py-2 outline-none transition-colors hover:bg-accent focus-visible:bg-accent",
+                  "group grid grid-cols-[72px_14px_minmax(0,1fr)] items-start gap-x-3 rounded-[12px] px-3 py-2.5 outline-none transition-colors hover:bg-accent/70 focus-visible:ring-2 focus-visible:ring-brand/40",
                   past && "opacity-55 hover:opacity-100",
                 )}
               >
-                <span className="tabular w-11 shrink-0 pt-0.5 text-[12.5px] font-medium text-foreground">{fmtTime(a.start)}</span>
-                <span className="w-[3px] shrink-0 rounded-full" style={style.dot} aria-hidden />
-                <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2 pt-0.5">
+                  <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={style.dot} />
+                  <span className="tabular text-[13px] font-semibold text-foreground">{fmtTime(a.start)}</span>
+                </span>
+                <span aria-hidden className="relative flex h-full justify-center pt-1.5">
+                  <span className="size-2 rounded-full ring-2 ring-card" style={style.dot} />
+                  {i < items.length - 1 && <span className="absolute top-4 -bottom-3 w-px bg-border" />}
+                </span>
+                <span className="min-w-0">
                   <span className="flex items-center gap-2">
-                    {category && (
-                      <span className="text-[11px] font-medium uppercase tracking-[0.06em]" style={style.text}>
-                        {category.name}
-                      </span>
+                    <span className="truncate text-[13.5px] font-medium text-foreground">{a.title}</span>
+                    {current && (
+                      <span className="shrink-0 rounded-full bg-brand-soft px-1.5 py-px text-[10px] font-semibold text-brand-strong">AGORA</span>
                     )}
-                    {current && <span className="rounded-[4px] bg-brand-soft px-1 text-[10px] font-semibold text-brand-strong">AGORA</span>}
                   </span>
-                  <span className="mt-0.5 block truncate text-[13.5px] font-medium text-foreground">{a.title}</span>
-                  <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
-                    {[a.personName, processCode && `Processo ${processCode}`, a.area].filter(Boolean).join(" · ")}
-                    {(a.personName || processCode || a.area) && <span className="text-subtle">·</span>}
-                    {getUser(a.ownerId).firstName}
+                  <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+                    {[category?.name, detail, getUser(a.ownerId).firstName].filter(Boolean).join(" · ")}
                   </span>
                 </span>
-                {a.location && (
-                  <span className="hidden shrink-0 items-start gap-1 pt-0.5 text-[11.5px] text-subtle min-[1600px]:flex" title={a.location}>
-                    <MapPin className="mt-px size-3" />
-                    <span className="max-w-[88px] truncate">{a.location.split(" — ")[0]}</span>
-                  </span>
-                )}
               </Link>
             </li>
           )

@@ -1,14 +1,152 @@
-export type AuthLinkKind = "recovery" | "invite"
+import {
+  EmailError,
+  isEmailConfigured,
+  maskEmail,
+  renderAuthEmail,
+  renderAccountExistsEmail,
+  sendEmail,
+  validRecipient,
+  type EmailFailureReason,
+  type AccountExistsEmailInput,
+} from "@/lib/services/email"
 
-const SUBJECT: Record<AuthLinkKind, string> = {
-  recovery: "Redefinir sua senha na Íntegra",
-  invite: "Você foi convidado para a Íntegra",
+/**
+ * E-mails de autenticação (convite, recuperação de senha e confirmação de cadastro) sobre o serviço de e-mail
+ * (`lib/services/email`). Aqui fica só a regra da Íntegra: gerar o link na hora
+ * certa, não gerar dois links seguidos e não deixar falha de envio derrubar a
+ * operação principal — o resultado volta como `EmailResult`, sem lançar.
+ */
+
+export type AuthLinkKind = "recovery" | "invite" | "confirmation"
+
+export type EmailResult =
+  | { ok: true; messageId: string; /** true = já enviado há instantes; nada saiu de novo. */ duplicate?: boolean }
+  | {
+      ok: false
+      reason: EmailFailureReason
+      /** Seguro para mostrar a quem usa a Íntegra. */
+      message: string
+      /** Status HTTP quando o envio é a própria operação (ex.: reenviar convite). */
+      status: number
+    }
+
+const fail = (reason: EmailFailureReason): EmailResult => {
+  const { message, status } = new EmailError(reason)
+  return { ok: false, reason, message, status }
+}
+
+/** O que a API devolve ao navegador sobre um envio: nunca código SMTP nem detalhe técnico. */
+export function emailStatus(result: EmailResult) {
+  return result.ok ? { sent: true } : { sent: false, message: result.message }
+}
+
+/** Pedidos repetidos para a mesma pessoa dentro desta janela reaproveitam o envio anterior. */
+const DEDUPE_WINDOW_MS = 60_000
+const recent = new Map<string, { at: number; result: Promise<EmailResult> }>()
+
+/**
+ * Um envio por chave dentro da janela. Pedidos repetidos recebem o resultado do
+ * primeiro (em andamento ou concluído com sucesso); falhas liberam a chave na hora,
+ * para que dê para tentar de novo. Vale por instância do servidor (memória).
+ */
+function once(key: string, run: () => Promise<EmailResult>, replace = false): Promise<EmailResult> {
+  const now = Date.now()
+  for (const [k, entry] of recent) if (now - entry.at >= DEDUPE_WINDOW_MS) recent.delete(k)
+  const hit = replace ? undefined : recent.get(key)
+  if (hit) return hit.result.then((r) => (r.ok ? { ...r, duplicate: true } : r))
+  const result = run().then(
+    (r) => {
+      if (!r.ok) recent.delete(key)
+      return r
+    },
+    (error) => {
+      recent.delete(key)
+      throw error
+    },
+  )
+  recent.set(key, { at: now, result })
+  return result
+}
+
+export interface AuthLinkInput {
+  to: string
+  kind: AuthLinkKind
+  /**
+   * Gera o link de uso único. Só é chamada se o envio vai acontecer: gerar um link
+   * novo invalida o anterior no Supabase, então pedidos repetidos na mesma janela
+   * reaproveitam o e-mail já enviado em vez de gerar outro.
+   */
+  createLink: () => Promise<string>
+  name?: string
+  organizationName?: string
+  /**
+   * O link acabou de ser criado para um cadastro novo (o anterior, se havia, deixou de
+   * valer): envia mesmo com um envio recente para a mesma pessoa.
+   */
+  replace?: boolean
 }
 
 /**
- * Envio dos links de recuperação e convite. Ainda não há provedor de e-mail: o link
- * sai no terminal do servidor. Para enviar de verdade, troque só esta função.
+ * Convite e recuperação de senha. Sem SMTP configurado: em desenvolvimento o link sai
+ * no terminal (para testar localmente); em produção nada é gerado nem registrado.
  */
-export async function sendAuthLink(email: string, kind: AuthLinkKind, url: string) {
-  console.info(`\n[LEXA · e-mail] ${SUBJECT[kind]}\n  Para: ${email}\n  Link: ${url}\n`)
+export async function sendAuthLink({ to: raw, kind, createLink, name, organizationName, replace = false }: AuthLinkInput): Promise<EmailResult> {
+  if (typeof window !== "undefined") throw new Error("sendAuthLink só pode rodar no servidor.")
+  const to = validRecipient(raw)
+  if (!to) return fail("invalid_recipient")
+  const configured = isEmailConfigured()
+  if (!configured && process.env.NODE_ENV === "production") {
+    console.error("[LEXA · e-mail] SMTP não configurado: o link de acesso não foi gerado. Defina as variáveis SMTP_*.")
+    return fail("not_configured")
+  }
+
+  // Uma chave por pessoa e por token: convite e recuperação usam o mesmo token do
+  // Supabase; a confirmação do cadastro tem o seu (não pode engolir uma recuperação).
+  const token = kind === "confirmation" ? "confirmation" : "password"
+  return once(`auth-link:${token}:${to}`, async () => {
+    let url: string
+    try {
+      url = await createLink()
+    } catch (error) {
+      console.warn("[LEXA · e-mail] Não foi possível gerar o link", { kind, to: maskEmail(to), error: (error as Error)?.message })
+      return fail("unexpected")
+    }
+    const email = renderAuthEmail(kind, { url, name, organizationName })
+    if (!configured) {
+      console.info(
+        `\n[LEXA · e-mail] SMTP não configurado (só em desenvolvimento o link aparece aqui)\n  ${email.subject}\n  Para: ${to}\n  Link: ${url}\n`,
+      )
+      return fail("not_configured")
+    }
+    try {
+      const { messageId } = await sendEmail({ to, ...email })
+      return { ok: true, messageId }
+    } catch (error) {
+      if (error instanceof EmailError) return fail(error.reason)
+      console.error("[LEXA · e-mail] Erro inesperado no envio", { kind, to: maskEmail(to), error: (error as Error)?.message })
+      return fail("unexpected")
+    }
+  }, replace)
+}
+
+/**
+ * Aviso ao dono do e-mail quando alguém pede cadastro com um e-mail que já tem conta
+ * (a tela responde igual nos dois casos). Nunca lança. Sem SMTP, só registra no log.
+ */
+export async function sendAccountExistsEmail(to: string, input: AccountExistsEmailInput): Promise<EmailResult> {
+  if (typeof window !== "undefined") throw new Error("sendAccountExistsEmail só pode rodar no servidor.")
+  const recipient = validRecipient(to)
+  if (!recipient) return fail("invalid_recipient")
+  if (!isEmailConfigured()) {
+    console.info(`[LEXA · e-mail] SMTP não configurado: aviso de conta existente para ${maskEmail(recipient)} não enviado.`)
+    return fail("not_configured")
+  }
+  try {
+    const { messageId } = await sendEmail({ to: recipient, ...renderAccountExistsEmail(input) })
+    return { ok: true, messageId }
+  } catch (error) {
+    if (error instanceof EmailError) return fail(error.reason)
+    console.error("[LEXA · e-mail] Erro inesperado no aviso de conta existente", { to: maskEmail(recipient), error: (error as Error)?.message })
+    return fail("unexpected")
+  }
 }

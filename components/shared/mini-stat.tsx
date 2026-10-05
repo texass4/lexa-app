@@ -16,20 +16,29 @@ export function MiniStat({
   className?: string
 }) {
   return (
-    <div className={cn("min-w-0 rounded-[14px] border border-border bg-card p-4 shadow-card", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[12px] font-medium text-muted-foreground">{label}</span>
-        {icon && <span className="text-subtle [&_svg]:size-4">{icon}</span>}
+    <div className={cn("min-w-0 rounded-card border border-border/90 bg-card p-4 shadow-card sm:p-5", className)}>
+      <div className="flex items-center gap-2.5">
+        {icon && (
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-full [&_svg]:size-4",
+              tone === "danger" ? "bg-danger-soft text-danger" : "bg-brand-soft text-brand",
+            )}
+          >
+            {icon}
+          </span>
+        )}
+        <span className="truncate text-[12.5px] font-medium text-foreground/75">{label}</span>
       </div>
       <p
         className={cn(
-          "tabular mt-2.5 truncate text-[22px] font-semibold leading-none tracking-[-0.025em]",
+          "tabular mt-3.5 truncate text-[24px] font-semibold leading-none tracking-[-0.03em]",
           tone === "danger" ? "text-danger" : tone === "brand" ? "text-brand-strong" : "text-foreground",
         )}
       >
         {value}
       </p>
-      {hint && <p className="mt-2 truncate text-[12px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="mt-2.5 truncate text-[12px] text-muted-foreground">{hint}</p>}
     </div>
   )
 }

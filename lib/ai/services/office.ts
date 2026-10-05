@@ -9,8 +9,8 @@ import type { OfficeOverviewResult } from "@/lib/ai/types"
 import { nowOf, runStructured, withKnownRefs, type AIServiceDeps } from "./run"
 
 export async function officeOverview(deps: AIServiceDeps): Promise<OfficeOverviewResult> {
-  const data = await loadOfficeData(deps.repo)
-  if (!data.clients.length && !data.processes.length && !data.tasks.length && !data.appointments.length && !data.invoices.length) {
+  const data = await loadOfficeData(deps.repo, nowOf(deps))
+  if (!data.clientStats?.total && !data.processes.length && !data.tasks.length && !data.appointments.length && !data.invoices.length) {
     throw new AIError("INSUFFICIENT_DATA")
   }
 

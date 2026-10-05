@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowRight, CircleCheck } from "lucide-react"
 import { cn } from "cn"
 import type { AttentionItem } from "@/lib/admin/catalog"
-import type { Tone } from "@/lib/config"
+import type { Tone } from "@/lib/core/config"
 
 const TONE: Record<Tone, { dot: string; ring: string }> = {
   danger: { dot: "bg-danger", ring: "hover:border-danger/35" },

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next"
-import { BRAND, BRAND_COLORS } from "@/lib/brand"
+import { BRAND, BRAND_COLORS } from "@/lib/core/brand"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

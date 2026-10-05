@@ -18,6 +18,7 @@ import { MESSAGE_SELECT, type MessageRow } from "@/lib/whatsapp/mappers"
 import { providerFor } from "./instances"
 import { touchConversation } from "./inbound"
 import { loadConversation, UUID, type Actor, type LoadedConversation } from "./actor"
+import { publicMessage } from "@/lib/core/public-error"
 
 const BUCKET = "whatsapp"
 const MAX_TEXT = 4096
@@ -119,7 +120,7 @@ async function dispatch(
       p_at: new Date().toISOString(),
     })
   } catch (error) {
-    const reason = error instanceof ZapiError || error instanceof HttpError ? error.message : "Não foi possível enviar a mensagem."
+    const reason = publicMessage(error instanceof ZapiError || error instanceof HttpError ? error.message : "", "Não foi possível enviar a mensagem. Tente novamente.")
     if (error instanceof ZapiError) console.error("[whatsapp] Z-API recusou o envio:", error.status, error.detail)
     else if (!(error instanceof HttpError)) console.error("[whatsapp] Falha no envio:", error)
     await db().from("whatsapp_messages").update({ status: "failed", error: reason, failed_at: new Date().toISOString() }).eq("id", message.id)

@@ -7,7 +7,7 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
-import { LEVEL_LABEL, type AttentionSignal, type SignalLevel } from "@/lib/attention"
+import { LEVEL_LABEL, type AttentionSignal, type SignalLevel } from "@/lib/dashboard/attention"
 
 const DOT: Record<SignalLevel, string> = {
   critical: "bg-danger",
@@ -26,19 +26,39 @@ export function SignalDot({ level, className }: { level: SignalLevel; className?
 }
 
 /** Abre o formulário de tarefa preenchido a partir do sinal — nada é salvo sem confirmação. */
-export function useSignalAction() {
+function useSignalAction() {
   const { openDialog } = useUI()
   const { can } = useSession()
   return (signal: AttentionSignal) => {
     const action = signal.action
     if (action?.type !== "create-task" || !can("tasks.edit")) return undefined
-    return () => openDialog("task", { processId: action.processId, clientId: action.processId ? undefined : action.clientId, title: action.title })
+    return () =>
+      openDialog("task", {
+        processId: action.processId,
+        clientId: action.processId ? undefined : action.clientId,
+        title: action.title,
+        date: action.date,
+        assigneeId: action.assigneeId,
+        prazoId: action.prazoId,
+      })
   }
 }
 
+/** Sinal discreto: a leitura do dado, sem anunciar que existe um modelo por trás. */
+function signalCue(signal: AttentionSignal): string | undefined {
+  if (signal.level === "critical") return "Alta prioridade"
+  if (signal.kind.startsWith("deadline")) return "Possível prazo"
+  if (signal.kind === "process-moved") return signal.level === "warning" ? "Movimentação relevante" : "Movimentação recente"
+  if (signal.action) return "Próximo passo sugerido"
+  if (signal.kind === "process-stale") return "Parado"
+  return undefined
+}
+
 function SignalText({ signal }: { signal: AttentionSignal }) {
+  const cue = signalCue(signal)
   return (
     <>
+      {cue && <span className="mb-0.5 block text-[11px] font-medium tracking-[0.01em] text-subtle">{cue}</span>}
       <span className="block truncate text-[13.5px] font-medium text-foreground">{signal.title}</span>
       {signal.detail && <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">{signal.detail}</span>}
     </>
