@@ -13,7 +13,7 @@ export { escapeHtml, type RenderedEmail } from "./layout"
 export { renderInvitationEmail, type InvitationEmailInput } from "./invitation"
 export { renderPasswordResetEmail, type PasswordResetEmailInput } from "./password-reset"
 export { renderEmailConfirmationEmail, type EmailConfirmationInput } from "./email-confirmation"
-export { renderSignupReceivedEmail, type SignupReceivedEmailInput } from "./signup-received"
+export { renderAccountExistsEmail, type AccountExistsEmailInput } from "./account-exists"
 
 export type AuthEmailKind = "invite" | "recovery" | "confirmation"
 

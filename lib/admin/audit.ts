@@ -3,12 +3,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import type { ProfileRow } from "@/lib/auth/profile"
 import type { AuditSeverity } from "./catalog"
 import { ROLE_LABELS, type Role } from "@/lib/auth/permissions"
+import { clientIp } from "@/lib/auth/protection/client-ip"
 
-/** IP de quem fez a requisição, quando o proxy/CDN informa. */
-function clientIp(request: Request): string | undefined {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-  return forwarded || request.headers.get("x-real-ip") || undefined
-}
 
 export interface AuditInput {
   action: string

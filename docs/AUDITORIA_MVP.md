@@ -223,7 +223,7 @@ Fluxo: login → dashboard → criar cliente → processo → tarefa → abrir p
 |---|---|
 | P0-1 | Atendimento/WhatsApp single-office exposto a todos |
 | P0-2 | Monitoramento/DJEN dependem de cron não versionado; sem indicador de "última verificação" |
-| P0-3 | Signup/recover públicos sem rate limit/CAPTCHA/verificação de e-mail |
+| P0-3 | Signup/recover públicos sem rate limit/CAPTCHA/verificação de e-mail — **corrigido** (migração 0015 + `lib/auth/protection`) |
 | P0-4 | Sem teste automatizado de isolamento entre escritórios (RLS) |
 
 ## 17. P1 — antes/ao iniciar pilotos

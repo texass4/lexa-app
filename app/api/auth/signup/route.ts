@@ -1,13 +1,14 @@
-import { after, NextResponse } from "next/server"
-import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { HttpError, readJson, route, siteUrl } from "@/lib/auth/server"
-import { sendSignupEmail } from "@/lib/auth/mailer"
+import { NextResponse } from "next/server"
+import { HttpError, readJson, route } from "@/lib/auth/server"
 import { isEmail, normalizeEmail, passwordProblem } from "@/lib/auth/validation"
 import { loadSettings } from "@/lib/admin/platform"
-import { resolveDefaultPlan } from "@/lib/admin/plans"
-import { recordAudit } from "@/lib/admin/audit"
+import { requestSignup } from "@/lib/auth/signup"
+import { clientIp } from "@/lib/auth/protection/client-ip"
+import { enforce, LIMITS } from "@/lib/auth/protection/rate-limit"
+import { isHoneypot, requireChallenge, type ProtectedBody } from "@/lib/auth/protection/guard"
+import { atLeast } from "@/lib/auth/protection/timing"
 
-interface Body {
+interface Body extends ProtectedBody {
   name?: string
   email?: string
   password?: string
@@ -15,85 +16,43 @@ interface Body {
   cnpj?: string
 }
 
+/** Todas as respostas levam pelo menos isso: o tempo não denuncia o que aconteceu. */
+const MIN_RESPONSE_MS = 1_200
+
+/** A mesma resposta para e-mail novo, e-mail com conta e robô (campo-isca). */
+const accepted = () => NextResponse.json({ ok: true }, { status: 202 })
+
 /**
- * Cadastro público: cria o escritório (aguardando aprovação do Super Admin) e a
- * conta do Sócio/Proprietário. Nada do escritório fica acessível até a aprovação —
- * `current_org_id()` só devolve escritórios ativos.
+ * Cadastro público. Protegido, nesta ordem: limite por IP e teto geral, campo-isca,
+ * desafio anti-bot (assinado, com prova de trabalho e uso único), limite por e-mail.
+ * Nada do escritório é criado aqui: só depois da confirmação do e-mail
+ * (`lib/auth/signup.ts`). A resposta não revela se o e-mail já tem conta.
  */
-export const POST = route(async (request) => {
-  const body = await readJson<Body>(request)
-  const name = body.name?.trim() ?? ""
-  const email = normalizeEmail(body.email ?? "")
-  const password = body.password ?? ""
-  const officeName = body.officeName?.trim() ?? ""
+export const POST = route((request) =>
+  atLeast(MIN_RESPONSE_MS, async () => {
+    const body = await readJson<Body>(request)
+    const ip = clientIp(request)
+    await enforce([LIMITS.signupIp, ip], [LIMITS.signupIpDay, ip], [LIMITS.signupGlobal, "all"])
+    if (isHoneypot(body)) return accepted()
+    await requireChallenge(body, "signup")
 
-  if (name.length < 3) throw new HttpError(400, "Informe seu nome completo.")
-  if (!isEmail(email)) throw new HttpError(400, "E-mail inválido.")
-  const weak = passwordProblem(password)
-  if (weak) throw new HttpError(400, weak)
-  if (officeName.length < 2) throw new HttpError(400, "Informe o nome do escritório.")
+    const name = typeof body.name === "string" ? body.name.trim() : ""
+    const email = normalizeEmail(typeof body.email === "string" ? body.email : "")
+    const password = typeof body.password === "string" ? body.password : ""
+    const officeName = typeof body.officeName === "string" ? body.officeName.trim() : ""
+    const cnpj = typeof body.cnpj === "string" ? body.cnpj.trim().slice(0, 32) : undefined
 
-  const settings = await loadSettings()
-  if (!settings.general.publicSignup) throw new HttpError(403, "O cadastro de novos escritórios está fechado no momento. Fale com a equipe da Íntegra.")
-  const plan = await resolveDefaultPlan(settings.general.defaultPlan)
-  const status = settings.general.requireApproval ? "pending" : "active"
+    if (name.length < 3 || name.length > 120) throw new HttpError(400, "Informe seu nome completo.")
+    if (!isEmail(email)) throw new HttpError(400, "E-mail inválido.")
+    const weak = passwordProblem(password)
+    if (weak) throw new HttpError(400, weak)
+    if (officeName.length < 2 || officeName.length > 160) throw new HttpError(400, "Informe o nome do escritório.")
 
-  const admin = getSupabaseAdmin()
+    await enforce([LIMITS.signupEmail, email])
+    const settings = await loadSettings()
+    if (!settings.general.publicSignup) throw new HttpError(403, "O cadastro de novos escritórios está fechado no momento. Fale com a equipe da Íntegra.")
 
-  const { data: org, error: orgError } = await admin
-    .from("organizations")
-    .insert({
-      name: officeName,
-      cnpj: body.cnpj?.trim() || null,
-      email,
-      plan,
-      status,
-      approved_at: status === "active" ? new Date().toISOString() : null,
-    })
-    .select("id")
-    .single()
-  if (orgError || !org) throw orgError ?? new Error("Falha ao criar escritório.")
-
-  const { data: created, error: userError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    // A aprovação do escritório é a porta de entrada: a conta nasce com o e-mail já confirmado.
-    email_confirm: true,
-    user_metadata: { name },
-  })
-  if (userError || !created.user) {
-    await admin.from("organizations").delete().eq("id", org.id)
-    if (userError?.code === "email_exists" || /already/i.test(userError?.message ?? "")) {
-      throw new HttpError(409, "Já existe uma conta com este e-mail. Entre ou recupere a senha.")
-    }
-    throw userError ?? new Error("Falha ao criar usuário.")
-  }
-
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: created.user.id,
-    organization_id: org.id,
-    role: "owner",
-    name,
-    email,
-  })
-  if (profileError) {
-    await admin.auth.admin.deleteUser(created.user.id)
-    await admin.from("organizations").delete().eq("id", org.id)
-    throw profileError
-  }
-
-  await recordAudit(request, {
-    action: "organization.signup",
-    actor: { id: created.user.id, name, email, role: "owner" },
-    organizationId: org.id,
-    target: { type: "organization", id: org.id, label: officeName },
-    summary: `${officeName} se cadastrou (${status === "pending" ? "aguardando aprovação" : "ativado automaticamente"}) no plano ${plan}`,
-    metadata: { plan, status },
-  })
-
-  // Depois da resposta: o cadastro não espera o SMTP e não falha por ele.
-  const loginUrl = `${siteUrl(request)}/login`
-  after(() => sendSignupEmail(email, { name, organizationName: officeName, pending: status === "pending", loginUrl }))
-
-  return NextResponse.json({ ok: true, pending: status === "pending" }, { status: 201 })
-})
+    await requestSignup(request, { name, email, password, officeName, cnpj })
+    return accepted()
+  }),
+)

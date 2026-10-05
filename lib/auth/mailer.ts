@@ -3,21 +3,21 @@ import {
   isEmailConfigured,
   maskEmail,
   renderAuthEmail,
-  renderSignupReceivedEmail,
+  renderAccountExistsEmail,
   sendEmail,
   validRecipient,
   type EmailFailureReason,
-  type SignupReceivedEmailInput,
+  type AccountExistsEmailInput,
 } from "@/lib/services/email"
 
 /**
- * E-mails de autenticação (convite e recuperação de senha) sobre o serviço de e-mail
+ * E-mails de autenticação (convite, recuperação de senha e confirmação de cadastro) sobre o serviço de e-mail
  * (`lib/services/email`). Aqui fica só a regra da Íntegra: gerar o link na hora
  * certa, não gerar dois links seguidos e não deixar falha de envio derrubar a
  * operação principal — o resultado volta como `EmailResult`, sem lançar.
  */
 
-export type AuthLinkKind = "recovery" | "invite"
+export type AuthLinkKind = "recovery" | "invite" | "confirmation"
 
 export type EmailResult =
   | { ok: true; messageId: string; /** true = já enviado há instantes; nada saiu de novo. */ duplicate?: boolean }
@@ -49,10 +49,10 @@ const recent = new Map<string, { at: number; result: Promise<EmailResult> }>()
  * primeiro (em andamento ou concluído com sucesso); falhas liberam a chave na hora,
  * para que dê para tentar de novo. Vale por instância do servidor (memória).
  */
-function once(key: string, run: () => Promise<EmailResult>): Promise<EmailResult> {
+function once(key: string, run: () => Promise<EmailResult>, replace = false): Promise<EmailResult> {
   const now = Date.now()
   for (const [k, entry] of recent) if (now - entry.at >= DEDUPE_WINDOW_MS) recent.delete(k)
-  const hit = recent.get(key)
+  const hit = replace ? undefined : recent.get(key)
   if (hit) return hit.result.then((r) => (r.ok ? { ...r, duplicate: true } : r))
   const result = run().then(
     (r) => {
@@ -79,13 +79,18 @@ export interface AuthLinkInput {
   createLink: () => Promise<string>
   name?: string
   organizationName?: string
+  /**
+   * O link acabou de ser criado para um cadastro novo (o anterior, se havia, deixou de
+   * valer): envia mesmo com um envio recente para a mesma pessoa.
+   */
+  replace?: boolean
 }
 
 /**
  * Convite e recuperação de senha. Sem SMTP configurado: em desenvolvimento o link sai
  * no terminal (para testar localmente); em produção nada é gerado nem registrado.
  */
-export async function sendAuthLink({ to: raw, kind, createLink, name, organizationName }: AuthLinkInput): Promise<EmailResult> {
+export async function sendAuthLink({ to: raw, kind, createLink, name, organizationName, replace = false }: AuthLinkInput): Promise<EmailResult> {
   if (typeof window !== "undefined") throw new Error("sendAuthLink só pode rodar no servidor.")
   const to = validRecipient(raw)
   if (!to) return fail("invalid_recipient")
@@ -95,8 +100,10 @@ export async function sendAuthLink({ to: raw, kind, createLink, name, organizati
     return fail("not_configured")
   }
 
-  // Uma chave por pessoa (não por tipo): convite e recuperação usam o mesmo token.
-  return once(`auth-link:${to}`, async () => {
+  // Uma chave por pessoa e por token: convite e recuperação usam o mesmo token do
+  // Supabase; a confirmação do cadastro tem o seu (não pode engolir uma recuperação).
+  const token = kind === "confirmation" ? "confirmation" : "password"
+  return once(`auth-link:${token}:${to}`, async () => {
     let url: string
     try {
       url = await createLink()
@@ -119,29 +126,27 @@ export async function sendAuthLink({ to: raw, kind, createLink, name, organizati
       console.error("[LEXA · e-mail] Erro inesperado no envio", { kind, to: maskEmail(to), error: (error as Error)?.message })
       return fail("unexpected")
     }
-  })
+  }, replace)
 }
 
 /**
- * Aviso de cadastro recebido (cadastro público). Não é link de uso único: a conta já
- * nasce confirmada e o botão leva à tela de entrar. Nunca lança — o cadastro não
- * depende do e-mail. Sem SMTP, só registra no log.
+ * Aviso ao dono do e-mail quando alguém pede cadastro com um e-mail que já tem conta
+ * (a tela responde igual nos dois casos). Nunca lança. Sem SMTP, só registra no log.
  */
-export async function sendSignupEmail(to: string, input: Omit<SignupReceivedEmailInput, "url"> & { loginUrl: string }): Promise<EmailResult> {
-  if (typeof window !== "undefined") throw new Error("sendSignupEmail só pode rodar no servidor.")
+export async function sendAccountExistsEmail(to: string, input: AccountExistsEmailInput): Promise<EmailResult> {
+  if (typeof window !== "undefined") throw new Error("sendAccountExistsEmail só pode rodar no servidor.")
   const recipient = validRecipient(to)
   if (!recipient) return fail("invalid_recipient")
   if (!isEmailConfigured()) {
-    console.info(`[LEXA · e-mail] SMTP não configurado: aviso de cadastro para ${maskEmail(recipient)} não enviado.`)
+    console.info(`[LEXA · e-mail] SMTP não configurado: aviso de conta existente para ${maskEmail(recipient)} não enviado.`)
     return fail("not_configured")
   }
-  const { loginUrl, ...rest } = input
   try {
-    const { messageId } = await sendEmail({ to: recipient, ...renderSignupReceivedEmail({ ...rest, url: loginUrl }) })
+    const { messageId } = await sendEmail({ to: recipient, ...renderAccountExistsEmail(input) })
     return { ok: true, messageId }
   } catch (error) {
     if (error instanceof EmailError) return fail(error.reason)
-    console.error("[LEXA · e-mail] Erro inesperado no aviso de cadastro", { to: maskEmail(recipient), error: (error as Error)?.message })
+    console.error("[LEXA · e-mail] Erro inesperado no aviso de conta existente", { to: maskEmail(recipient), error: (error as Error)?.message })
     return fail("unexpected")
   }
 }

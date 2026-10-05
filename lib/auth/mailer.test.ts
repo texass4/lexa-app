@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { afterEach, beforeEach, describe, it } from "node:test"
 
-import { emailStatus, sendAuthLink, sendSignupEmail } from "./mailer"
+import { emailStatus, sendAccountExistsEmail, sendAuthLink } from "./mailer"
 import { setEmailTransportForTests } from "@/lib/services/email/email-service"
 import { fakeTransport, SMTP_ENV, smtpError } from "@/lib/services/email/testing"
 
@@ -62,21 +62,42 @@ describe("sendAuthLink", () => {
     assert.equal(called, false)
   })
 
-  it("aviso de cadastro: leva à tela de entrar e diz se aguarda aprovação", async () => {
+  it("confirmação não engole a recuperação de senha, e cadastro novo sempre envia o seu link", async () => {
     const sent = fakeTransport()
-    const input = { name: "Ana", organizationName: "Silva <b>Advogados</b>", loginUrl: "https://app.test/login" }
-    assert.equal((await sendSignupEmail("ana@exemplo.com", { ...input, pending: true })).ok, true)
-    assert.equal(sent[0].subject, "Recebemos seu cadastro na Íntegra")
-    assert.match(sent[0].html, /https:\/\/app\.test\/login/)
-    assert.match(sent[0].html, /depois da aprova/)
-    assert.doesNotMatch(sent[0].html, /<b>Advogados/)
-    await sendSignupEmail("ana@exemplo.com", { ...input, pending: false })
-    assert.match(sent[1].text, /Já dá para entrar/)
+    const to = "duo@exemplo.com"
+    await sendAuthLink({ to, kind: "confirmation", createLink: async () => "https://app.test/c1" })
+    const recovery = await sendAuthLink({ to, kind: "recovery", createLink: async () => "https://app.test/r1" })
+    assert.equal(recovery.ok && !recovery.duplicate, true)
+    const repeated = await sendAuthLink({ to, kind: "confirmation", createLink: async () => "https://app.test/c2" })
+    assert.equal(repeated.ok && repeated.duplicate, true)
+    await sendAuthLink({ to, kind: "confirmation", replace: true, createLink: async () => "https://app.test/c3" })
+    assert.deepEqual(
+      sent.map((m) => m.html.match(/app\.test\/(\w+)/)?.[1]),
+      ["c1", "r1", "c3"],
+    )
   })
 
-  it("aviso de cadastro com falha de envio vira resultado, sem lançar", async () => {
+  it("confirmação de cadastro: assunto e link próprios", async () => {
+    const sent = fakeTransport()
+    const result = await sendAuthLink({ to: "nova@exemplo.com", kind: "confirmation", name: "Nova", createLink: async () => "https://app.test/auth/confirm?token_hash=c1&type=email" })
+    assert.equal(result.ok, true)
+    assert.equal(sent[0].subject, "Confirme seu e-mail na Íntegra")
+    assert.match(sent[0].html, /token_hash=c1/)
+  })
+
+  it("aviso de conta existente: entrar e recuperar a senha, sem criar nada", async () => {
+    const sent = fakeTransport()
+    const input = { loginUrl: "https://app.test/login", recoverUrl: "https://app.test/recuperar-senha?x=\"><script>" }
+    assert.equal((await sendAccountExistsEmail("ana@exemplo.com", input)).ok, true)
+    assert.equal(sent[0].subject, "Tentativa de cadastro na Íntegra")
+    assert.match(sent[0].html, /https:\/\/app\.test\/login/)
+    assert.doesNotMatch(sent[0].html, /<script>/)
+    assert.match(sent[0].text, /Nenhuma conta nova foi criada/)
+  })
+
+  it("aviso de conta existente com falha de envio vira resultado, sem lançar", async () => {
     fakeTransport(() => smtpError({ code: "ETIMEDOUT" }))
-    const result = await sendSignupEmail("ana@exemplo.com", { pending: true, loginUrl: "https://app.test/login" })
+    const result = await sendAccountExistsEmail("ana@exemplo.com", { loginUrl: "https://app.test/login", recoverUrl: "https://app.test/r" })
     assert.equal(!result.ok && result.reason, "timeout")
   })
 

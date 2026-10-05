@@ -6,25 +6,37 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Field, TextInput } from "@/components/ui/field"
 import { AuthCard, FormError } from "./auth-card"
+import { ResendConfirmation } from "./resend-confirmation"
 import { getSupabase } from "@/lib/supabase/client"
 import { normalizeEmail, safeNext } from "@/lib/auth/validation"
 import { hardNavigate } from "@/lib/auth/navigate"
+
+const LINK_ERRORS: Record<string, string> = {
+  link: "O link expirou ou já foi usado. Peça um novo.",
+  cadastro: "Seu e-mail foi confirmado, mas não conseguimos concluir o cadastro. Faça o cadastro de novo com o mesmo e-mail: enviaremos outro link para concluir.",
+}
 
 export function LoginForm() {
   const params = useSearchParams()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
-  const [error, setError] = React.useState(params.get("erro") === "link" ? "O link expirou ou já foi usado. Peça um novo." : "")
+  const [error, setError] = React.useState(LINK_ERRORS[params.get("erro") ?? ""] ?? "")
   const [busy, setBusy] = React.useState(false)
+  // E-mail ainda não confirmado: o Supabase só diz isso com a senha certa — não revela conta a quem não tem a senha.
+  const [unconfirmed, setUnconfirmed] = React.useState("")
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError("")
+    setUnconfirmed("")
     const { error: authError } = await getSupabase().auth.signInWithPassword({ email: normalizeEmail(email), password })
     if (authError) {
       setBusy(false)
-      setError("E-mail ou senha incorretos.")
+      if (authError.code === "email_not_confirmed" || /email not confirmed/i.test(authError.message)) {
+        setUnconfirmed(normalizeEmail(email))
+        setError("Confirme seu e-mail para entrar: abra o link que enviamos no cadastro.")
+      } else setError("E-mail ou senha incorretos.")
       return
     }
     // Auditoria de acesso (IP e navegador saem do servidor). Falhar aqui não impede a entrada.
@@ -49,6 +61,7 @@ export function LoginForm() {
     >
       <form onSubmit={submit} className="space-y-4" noValidate>
         <FormError>{error}</FormError>
+        {unconfirmed && <ResendConfirmation email={unconfirmed} />}
         <Field label="E-mail" htmlFor="login-email">
           <TextInput id="login-email" type="email" autoComplete="email" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>

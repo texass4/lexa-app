@@ -6,14 +6,9 @@ import { loadSettings } from "@/lib/admin/platform"
 import { hasPermission, type Permission } from "./permissions"
 import type { ProfileRow } from "./profile"
 
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message)
-  }
-}
+import { HttpError } from "./http-error"
+
+export { HttpError }
 
 interface Caller {
   user: AuthUser
