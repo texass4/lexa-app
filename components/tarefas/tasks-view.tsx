@@ -263,7 +263,7 @@ export function TasksView() {
                     type="button"
                     disabled={!collapsible}
                     onClick={() => setShowDone((v) => !v)}
-                    className="flex items-center gap-2 text-left outline-none disabled:cursor-default"
+                    className="touch-target relative flex items-center gap-2 text-left outline-none disabled:cursor-default"
                   >
                     <h2 className={cn("text-[13px] font-semibold", g.id === "atrasadas" ? "text-danger" : "text-foreground")}>{g.label}</h2>
                     <span className="tabular rounded-[5px] bg-surface-muted px-1.5 text-[11px] font-medium text-muted-foreground">

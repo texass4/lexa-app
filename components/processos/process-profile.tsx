@@ -185,7 +185,7 @@ export function ProcessProfile({ id }: { id: string }) {
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
         {client && (
-          <Link href={`/clientes/${client.id}`} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+          <Link href={`/clientes/${client.id}`} className="touch-target relative rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
             <Tag icon={<UserRound />} className="hover:border-border-strong hover:text-foreground">
               {client.name}
             </Tag>
@@ -465,7 +465,7 @@ export function ProcessProfile({ id }: { id: string }) {
         <Detail label="Área">{process.area}</Detail>
         {client && (
           <Detail label="Cliente">
-            <Link href={`/clientes/${client.id}`} className="inline-flex items-center gap-1 hover:underline">
+            <Link href={`/clientes/${client.id}`} className="touch-target relative inline-flex items-center gap-1 hover:underline">
               {client.name} <ArrowUpRight className="size-3.5 text-subtle" />
             </Link>
           </Detail>

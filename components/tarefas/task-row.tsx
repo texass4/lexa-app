@@ -93,7 +93,7 @@ export function TaskRow({ task, showAssignee = false }: { task: Task; showAssign
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] text-muted-foreground">
           {related && (
             <>
-              <Link href={related.href} className="truncate outline-none hover:text-foreground hover:underline focus-visible:underline">
+              <Link href={related.href} className="truncate outline-none pointer-coarse:-my-2 pointer-coarse:py-2 hover:text-foreground hover:underline focus-visible:underline">
                 {related.label}
               </Link>
               <span className="text-subtle">·</span>

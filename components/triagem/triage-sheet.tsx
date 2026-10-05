@@ -234,7 +234,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
           <dl className="divide-y divide-border">
             <Fact label="Processo">
               {process ? (
-                <Link href={`/processos/${process.id}`} className="hover:underline">
+                <Link href={`/processos/${process.id}`} className="touch-target relative hover:underline">
                   {process.code} · {process.number}
                 </Link>
               ) : (
@@ -243,7 +243,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
             </Fact>
             <Fact label="Cliente">
               {client ? (
-                <Link href={`/clientes/${client.id}`} className="hover:underline">
+                <Link href={`/clientes/${client.id}`} className="touch-target relative hover:underline">
                   {client.name}
                 </Link>
               ) : (
@@ -283,7 +283,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
                   href={source.officialUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-brand-strong hover:underline"
+                  className="touch-target relative inline-flex items-center gap-1.5 text-[12.5px] font-medium text-brand-strong hover:underline"
                 >
                   <ShieldCheck className="size-3.5" /> Certidão no DJEN <ExternalLink className="size-3" />
                 </a>
@@ -293,7 +293,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
                   href={source.documentUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-brand-strong hover:underline"
+                  className="touch-target relative inline-flex items-center gap-1.5 text-[12.5px] font-medium text-brand-strong hover:underline"
                 >
                   Documento na fonte <ExternalLink className="size-3" />
                 </a>

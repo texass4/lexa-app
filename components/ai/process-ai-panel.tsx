@@ -196,7 +196,7 @@ export function ProcessAIPanel({
           <div className="border-t border-border px-5 py-3">
             <Link
               href={`/clientes/${client.id}`}
-              className="inline-flex items-center gap-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:underline"
+              className="touch-target relative inline-flex items-center gap-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:underline"
             >
               Como está o cliente {client.name}? <ArrowUpRight className="size-3.5" />
             </Link>

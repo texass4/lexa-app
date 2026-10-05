@@ -42,7 +42,7 @@ export function FilterTabs<T extends string>({
               aria-selected={active}
               onClick={() => onChange(opt.value)}
               className={cn(
-                "relative inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                "touch-target relative inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-control px-3 pointer-coarse:h-9 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >

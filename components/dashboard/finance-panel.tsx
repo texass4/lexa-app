@@ -103,7 +103,7 @@ export function FinancePanel() {
                 <li key={invoice.id}>
                   <Link
                     href={client ? `/clientes/${client.id}` : "/financeiro"}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] px-2 py-1.5 sm:grid-cols-[minmax(0,1fr)_auto_auto] text-[12.5px] outline-none transition-colors hover:bg-accent/70 focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="touch-target relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] px-2 py-1.5 sm:grid-cols-[minmax(0,1fr)_auto_auto] text-[12.5px] outline-none transition-colors hover:bg-accent/70 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <span aria-hidden className="size-2 shrink-0 rounded-full border border-subtle" />

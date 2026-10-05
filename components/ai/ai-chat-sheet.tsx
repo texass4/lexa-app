@@ -151,7 +151,7 @@ export function AIChatSheet({
                   submit()
                 }
               }}
-              className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-snug outline-none field-sizing-content placeholder:text-subtle disabled:cursor-not-allowed"
+              className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] pointer-coarse:min-h-8 leading-snug outline-none field-sizing-content placeholder:text-subtle disabled:cursor-not-allowed"
             />
             <Button type="submit" size="icon-sm" aria-label="Enviar pergunta" disabled={!draft.trim() || chat.pending || !ready}>
               <ArrowUp />

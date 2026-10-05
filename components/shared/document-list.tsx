@@ -90,23 +90,26 @@ export function DocumentList({ documents, showClient = false }: { documents: Leg
               initial={{ opacity: 0, backgroundColor: "rgba(168,134,85,0.12)" }}
               animate={{ opacity: 1, backgroundColor: "rgba(168,134,85,0)" }}
               transition={{ duration: 0.3, backgroundColor: { duration: 1.6 } }}
-              className="flex items-center gap-3.5 px-4 py-3 sm:px-5"
+              // O nome do arquivo ocupa a linha inteira como área de toque (abre o documento);
+              // cliente, processo e "…" ficam por cima, com área própria.
+              className="relative flex items-center gap-3.5 px-4 py-3 sm:px-5"
             >
               <FileIcon extension={d.extension} />
               <div className="min-w-0 flex-1">
                 <button
                   type="button"
                   onClick={() => openDialog("document-preview", { documentId: d.id })}
-                  className="block max-w-full truncate text-left text-[13.5px] font-medium text-foreground outline-none hover:underline focus-visible:underline"
+                  className="block max-w-full text-left text-[13.5px] font-medium text-foreground outline-none after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline"
                 >
-                  {d.name}
+                  {/* O corte fica no texto: no botão, cortaria também a área que cobre a linha. */}
+                  <span className="block truncate">{d.name}</span>
                 </button>
                 <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12px] text-muted-foreground">
                   <span>{d.kind}</span>
                   {showClient && client && (
                     <>
                       <span className="text-subtle">·</span>
-                      <Link href={`/clientes/${client.id}`} className="hover:text-foreground hover:underline">
+                      <Link href={`/clientes/${client.id}`} className="relative -my-[7px] py-[7px] hover:text-foreground hover:underline">
                         {client.name}
                       </Link>
                     </>
@@ -114,7 +117,7 @@ export function DocumentList({ documents, showClient = false }: { documents: Leg
                   {process && (
                     <>
                       <span className="text-subtle">·</span>
-                      <Link href={`/processos/${process.id}`} className="hover:text-foreground hover:underline">
+                      <Link href={`/processos/${process.id}`} className="relative -my-[7px] py-[7px] hover:text-foreground hover:underline">
                         {process.code}
                       </Link>
                     </>

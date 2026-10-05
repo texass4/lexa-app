@@ -142,7 +142,7 @@ export function AgendaView() {
               type="button"
               aria-label="Período anterior"
               onClick={() => move(-1)}
-              className="flex size-8 items-center justify-center rounded-l-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative flex size-8 items-center justify-center rounded-l-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <ChevronLeft className="size-4" />
             </button>
@@ -151,7 +151,7 @@ export function AgendaView() {
               type="button"
               aria-label="Próximo período"
               onClick={() => move(1)}
-              className="flex size-8 items-center justify-center rounded-r-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative flex size-8 items-center justify-center rounded-r-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <ChevronRight className="size-4" />
             </button>

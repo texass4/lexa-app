@@ -505,7 +505,7 @@ export function EmptyConversation() {
       <p className="mt-2 max-w-sm text-[13.5px] leading-relaxed text-muted-foreground">
         Escolha uma conversa para responder, registrar notas internas e ver processos, tarefas e documentos do cliente — tudo no mesmo lugar.
       </p>
-      <Link href="/clientes" className="mt-5 text-[12.5px] font-medium text-brand-strong underline-offset-4 hover:underline">
+      <Link href="/clientes" className="touch-target relative mt-5 text-[12.5px] font-medium text-brand-strong underline-offset-4 hover:underline">
         Ver clientes do escritório
       </Link>
     </div>

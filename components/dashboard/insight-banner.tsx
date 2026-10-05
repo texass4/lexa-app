@@ -56,7 +56,7 @@ export function InsightBanner({ expanded, onToggle, critical }: { expanded: bool
           onClick={onToggle}
           aria-expanded={expanded}
           aria-controls="painel-atencao"
-          className="group inline-flex shrink-0 items-center gap-1.5 self-start rounded-control px-2 py-1.5 text-[13px] font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center"
+          className="group touch-target relative inline-flex shrink-0 items-center gap-1.5 self-start rounded-control px-2 py-1.5 text-[13px] font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center"
         >
           {expanded ? "Ocultar insights" : "Ver insights"}
           {expanded ? (

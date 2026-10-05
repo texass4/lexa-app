@@ -89,7 +89,7 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                 "group relative flex h-10 min-w-0 flex-1 items-center gap-3 rounded-control px-3 text-[13.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-sidebar-ring/60",
                 active ? "text-sidebar-foreground" : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground",
                 compactCls,
-                child && cn("h-8 text-[13px]", childCls),
+                child && cn("h-8 text-[13px] pointer-coarse:h-10", childCls),
                 withToggle && toggleSpaceCls,
               )}
             />

@@ -58,7 +58,7 @@ function OpenTaskRow({ task }: { task: Task }) {
         {task.title}
       </span>
       <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11.5px] font-medium", badge.cls, done && "opacity-40")}>{badge.label}</span>
-      <span className="hidden w-[150px] shrink-0 truncate text-[12px] text-muted-foreground md:block">
+      <span className="hidden w-[150px] shrink-0 overflow-x-clip text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground md:block">
         {related ? (
           <Link href={related.href} className="touch-target relative outline-none hover:text-foreground hover:underline focus-visible:underline">
             {related.label}

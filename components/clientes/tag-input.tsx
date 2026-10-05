@@ -34,14 +34,14 @@ export function TagInput({
         {value.map((tag) => (
           <span
             key={tag}
-            className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-surface-muted/60 pr-1 pl-2 text-[12px] font-medium"
+            className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-surface-muted/60 pr-1 pl-2 text-[12px] font-medium pointer-coarse:h-8"
           >
             {tag}
             <button
               type="button"
               aria-label={`Remover tag ${tag}`}
               onClick={() => onChange(value.filter((t) => t !== tag))}
-              className="flex size-4 items-center justify-center rounded text-subtle pointer-coarse:size-6 outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="flex size-4 items-center justify-center rounded text-subtle pointer-coarse:size-8 outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <X className="size-3" />
             </button>
@@ -67,7 +67,7 @@ export function TagInput({
             }
           }}
           onBlur={() => draft.trim() && add(draft)}
-          className="h-6 min-w-[120px] flex-1 bg-transparent px-1 text-[14px] outline-none placeholder:text-subtle sm:text-[13.5px]"
+          className="h-6 min-w-[120px] flex-1 bg-transparent px-1 pointer-coarse:h-8 text-[14px] outline-none placeholder:text-subtle sm:text-[13.5px]"
         />
       </div>
       {options.length > 0 && (

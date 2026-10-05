@@ -118,7 +118,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
                 onBeforeAsk()
                 lexa.ask(prompt, aiContext)
               }}
-              className="rounded-[8px] px-2 py-1.5 text-left text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface/80 focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative rounded-[8px] px-2 py-1.5 text-left text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface/80 focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {prompt}
             </button>

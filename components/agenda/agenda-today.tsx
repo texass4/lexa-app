@@ -59,7 +59,7 @@ export function AgendaToday() {
                 {client && can("clients.view") && (
                   <Link
                     href={`/clientes/${client.id}`}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
+                    className="touch-target relative inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
                   >
                     {client.name} <ArrowUpRight className="size-3.5" />
                   </Link>
@@ -67,7 +67,7 @@ export function AgendaToday() {
                 {process && can("processes.view") && (
                   <Link
                     href={`/processos/${process.id}`}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
+                    className="touch-target relative inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
                   >
                     Processo {process.code} <ArrowUpRight className="size-3.5" />
                   </Link>

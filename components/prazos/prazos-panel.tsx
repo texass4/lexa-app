@@ -101,7 +101,7 @@ export function PrazoRow({ prazo, showProcess = false }: { prazo: Prazo; showPro
           {process && (
             <Link
               href={`/processos/${process.id}`}
-              className="mt-0.5 block truncate rounded-sm text-[12px] text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="mt-0.5 block truncate rounded-sm text-[12px] pointer-coarse:-my-2 pointer-coarse:py-2 text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               Processo {process.code}
               {client ? ` · ${client.name}` : ""}

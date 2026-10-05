@@ -219,7 +219,7 @@ export function Composer({
               aria-selected={draft.mode === mode}
               onClick={() => setDraft({ mode })}
               className={cn(
-                "relative inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-2.5 text-[12px] font-medium outline-none pointer-coarse:h-8 transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                "touch-target relative inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-2.5 text-[12px] font-medium outline-none pointer-coarse:h-8 transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 draft.mode === mode ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >

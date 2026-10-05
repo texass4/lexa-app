@@ -40,7 +40,7 @@ export function NotificationsMenu() {
             ? `Notificações — ${[unread && `${unread} não lidas`, critical && `${critical} pede${critical > 1 ? "m" : ""} atenção`].filter(Boolean).join(" · ")}`
             : "Notificações"
         }
-        className="relative flex size-10 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 aria-expanded:bg-accent aria-expanded:text-foreground"
+        className="touch-target relative flex size-9 items-center justify-center rounded-control text-muted-foreground outline-none sm:size-10 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 aria-expanded:bg-accent aria-expanded:text-foreground"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
         {unread > 0 ? (
@@ -67,7 +67,7 @@ export function NotificationsMenu() {
             <button
               type="button"
               onClick={markAllNotificationsRead}
-              className="flex items-center gap-1.5 rounded-[7px] px-2 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative flex items-center gap-1.5 rounded-[7px] px-2 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <CheckCheck className="size-3.5" /> Marcar todas como lidas
             </button>
@@ -85,7 +85,7 @@ export function NotificationsMenu() {
                 <Link
                   href="/dashboard"
                   onClick={() => setOpen(false)}
-                  className="block rounded-md px-2.5 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                  className="touch-target relative block rounded-md px-2.5 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                 >
                   Ver todos no painel ({urgent.length})
                 </Link>

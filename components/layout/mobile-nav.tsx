@@ -26,7 +26,7 @@ export function MobileDrawer() {
             <Logo tone="inverse" subtitle={getOrganization().name} />
             <DialogPrimitive.Close
               aria-label="Fechar menu"
-              className="flex size-9 items-center justify-center rounded-control text-sidebar-muted outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
+              className="touch-target relative flex size-9 items-center justify-center rounded-control text-sidebar-muted outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

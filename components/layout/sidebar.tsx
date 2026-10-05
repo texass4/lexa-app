@@ -30,7 +30,7 @@ export function Sidebar() {
         <Link
           href="/dashboard"
           aria-label={`${BRAND.name} — ir para o painel`}
-          className="rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
+          className="touch-target relative rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
         >
           <Logo collapsed tone="inverse" className={cn(!collapsed && "lg:hidden")} />
           {!collapsed && <Logo tone="inverse" size="lg" subtitle={getOrganization().name} className="max-lg:hidden" />}

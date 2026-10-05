@@ -274,7 +274,7 @@ export function FinanceView() {
                     <div className="min-w-0 flex-1">
                       <Link
                         href={`/clientes/${inv.clientId}?tab=financeiro`}
-                        className="flex items-center gap-2 truncate text-[13.5px] font-medium hover:underline"
+                        className="flex items-center gap-2 truncate text-[13.5px] font-medium hover:underline pointer-coarse:-my-2 pointer-coarse:py-2"
                       >
                         {client && <UserAvatar name={client.name} size="xs" className="max-sm:hidden" />}
                         <span className="truncate">{client?.name}</span>

@@ -40,7 +40,7 @@ export function SideSheet({
             {header}
             <DialogPrimitive.Close
               aria-label="Fechar"
-              className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45"
+              className="touch-target absolute top-3 right-3 flex size-8 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>

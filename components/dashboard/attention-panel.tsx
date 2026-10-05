@@ -100,7 +100,7 @@ function SinceLastVisit() {
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="mt-0.5 flex items-center gap-1 rounded-md px-1 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="touch-target relative mt-0.5 flex items-center gap-1 rounded-md px-1 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           {expanded ? "Mostrar menos" : `Ver mais ${changes.length - CHANGES_VISIBLE}`}
           <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
@@ -148,7 +148,7 @@ export function AttentionPanel({
               type="button"
               onClick={() => setShowAll((v) => !v)}
               aria-expanded={showAll}
-              className="mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {showAll ? "Mostrar só o principal" : `Ver todos (${signals.length})`}
               <ChevronDown className={cn("size-3.5 transition-transform", showAll && "rotate-180")} />

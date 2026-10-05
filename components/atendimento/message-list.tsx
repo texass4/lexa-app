@@ -156,7 +156,7 @@ function Bubble({
               type="button"
               onClick={() => onReply(message)}
               aria-label="Responder esta mensagem"
-              className="flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <Reply className="size-3.5" />
             </button>
@@ -169,7 +169,7 @@ function Bubble({
                 toast.success("Texto copiado.")
               }}
               aria-label="Copiar texto"
-              className="flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 max-md:hidden"
+              className="touch-target relative flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 max-md:hidden"
             >
               <Copy className="size-3.5" />
             </button>

@@ -268,7 +268,7 @@ function EntryText({
 }
 
 const rowButton =
-  "-mx-2 -my-1 block w-[calc(100%+1rem)] rounded-[10px] px-2 py-1 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
+  "-mx-2 -my-1 block w-[calc(100%+1rem)] rounded-[10px] px-2 py-1 text-left pointer-coarse:-my-1.5 pointer-coarse:py-1.5 outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
 
 function SingleEntry({
   movement,
@@ -348,7 +348,7 @@ function ClusterEntry({
         aria-expanded={expanded}
         aria-controls={listId}
         onClick={() => setExpanded((value) => !value)}
-        className="mt-1.5 inline-flex items-center gap-1 rounded-md text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+        className="touch-target relative mt-1.5 inline-flex items-center gap-1 rounded-md text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         {expanded ? "Ocultar" : `Ver ${count} movimentações`}
         <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
