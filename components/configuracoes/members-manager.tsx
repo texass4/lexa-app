@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Ellipsis, KeyRound, MailPlus, Pencil, Power, ShieldCheck, Trash2, UserPlus, UsersRound } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
@@ -459,9 +460,11 @@ export function MembersManager({
         </div>
       ) : (
         <TableShell className="rounded-none border-x-0 border-b-0 shadow-none">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-separate border-spacing-0">
-              <thead>
+          {/* Sem espaço para a tabela (< 768 px), cada pessoa vira um cartão: nome e ações em cima,
+              papel, status e último acesso embaixo — as ações nunca ficam escondidas pela rolagem. */}
+          <div className="@container overflow-x-auto">
+            <table className="w-full border-separate border-spacing-0 @max-3xl:block @3xl:min-w-[760px]">
+              <thead className="@max-3xl:hidden">
                 <tr>
                   <Th>Nome</Th>
                   <Th>Papel</Th>
@@ -471,13 +474,19 @@ export function MembersManager({
                   <Th className="w-10" aria-label="Ações" />
                 </tr>
               </thead>
-              <tbody className="[&_tr:last-child_td]:border-0">
+              <tbody className="[&_tr:last-child_td]:border-0 @max-3xl:block @max-3xl:[&>tr:last-child]:border-0">
                 {members.map((m) => {
                   const self = m.id === currentUserId
                   const status = statusOf(m)
                   return (
-                    <tr key={m.id} className={m.active ? undefined : "opacity-60"}>
-                      <Td>
+                    <tr
+                      key={m.id}
+                      className={cn(
+                        "@max-3xl:grid @max-3xl:grid-cols-[auto_auto_minmax(0,1fr)_auto] @max-3xl:items-center @max-3xl:gap-x-2 @max-3xl:gap-y-2.5 @max-3xl:border-b @max-3xl:border-border/80 @max-3xl:px-5 @max-3xl:py-3.5",
+                        !m.active && "opacity-60",
+                      )}
+                    >
+                      <Td className="@max-3xl:col-span-3 @max-3xl:border-0 @max-3xl:p-0!">
                         <div className="flex items-center gap-3">
                           <UserAvatar name={m.name} src={m.avatarUrl} tone={self ? "dark" : undefined} />
                           <div className="min-w-0">
@@ -491,18 +500,20 @@ export function MembersManager({
                           </div>
                         </div>
                       </Td>
-                      <Td>
+                      <Td className="@max-3xl:row-start-2 @max-3xl:border-0 @max-3xl:p-0!">
                         <StatusBadge tone={m.role === "owner" ? "brand" : "neutral"} dot={false}>
                           {ROLE_LABELS[m.role]}
                         </StatusBadge>
                         {m.permissions && m.role !== "owner" && <p className="mt-1 text-[11px] text-subtle">Permissões personalizadas</p>}
                       </Td>
-                      <Td>
+                      <Td className="@max-3xl:row-start-2 @max-3xl:border-0 @max-3xl:p-0!">
                         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                       </Td>
-                      <Td className="whitespace-nowrap text-muted-foreground">{m.lastSignInAt ? fmtRelative(m.lastSignInAt) : "Nunca entrou"}</Td>
-                      <Td className="tabular whitespace-nowrap text-muted-foreground">{fmtNumericDate(m.createdAt)}</Td>
-                      <Td>
+                      <Td className="whitespace-nowrap text-muted-foreground @max-3xl:row-start-2 @max-3xl:border-0 @max-3xl:p-0! @max-3xl:text-right @max-3xl:text-[12px]">
+                        {m.lastSignInAt ? fmtRelative(m.lastSignInAt) : "Nunca entrou"}
+                      </Td>
+                      <Td className="tabular whitespace-nowrap text-muted-foreground @max-3xl:hidden">{fmtNumericDate(m.createdAt)}</Td>
+                      <Td className="@max-3xl:col-start-4 @max-3xl:row-start-1 @max-3xl:border-0 @max-3xl:p-0!">
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             aria-label={`Ações para ${m.name}`}

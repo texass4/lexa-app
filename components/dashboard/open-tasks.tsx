@@ -54,13 +54,13 @@ function OpenTaskRow({ task }: { task: Task }) {
         disabled={!editable}
         label={done ? `Reabrir: ${task.title}` : `Concluir: ${task.title}`}
       />
-      <span className={cn("min-w-0 flex-1 truncate text-[13.5px] font-medium", done ? "text-subtle line-through" : "text-foreground")}>
+      <span className={cn("min-w-0 flex-1 text-[13.5px] font-medium max-sm:line-clamp-2 sm:truncate", done ? "text-subtle line-through" : "text-foreground")}>
         {task.title}
       </span>
       <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11.5px] font-medium", badge.cls, done && "opacity-40")}>{badge.label}</span>
       <span className="hidden w-[150px] shrink-0 truncate text-[12px] text-muted-foreground md:block">
         {related ? (
-          <Link href={related.href} className="outline-none hover:text-foreground hover:underline focus-visible:underline">
+          <Link href={related.href} className="touch-target relative outline-none hover:text-foreground hover:underline focus-visible:underline">
             {related.label}
           </Link>
         ) : (
@@ -71,7 +71,7 @@ function OpenTaskRow({ task }: { task: Task }) {
       <Link
         href={related?.href ?? "/tarefas"}
         aria-label={`Abrir ${task.title}`}
-        className="shrink-0 rounded-md text-subtle outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+        className="touch-target relative shrink-0 rounded-md text-subtle outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         <ChevronRight className="size-4" />
       </Link>
@@ -154,7 +154,7 @@ export function OpenTasks() {
           aria-pressed={mine}
           onClick={() => setMine((v) => !v)}
           className={cn(
-            "h-7 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+            "touch-target relative h-7 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
             mine ? "border-brand/30 bg-brand-soft text-brand-strong" : "border-border text-muted-foreground hover:text-foreground",
           )}
         >

@@ -83,7 +83,7 @@ function InfoRow({
               () => toast.error("Não foi possível copiar."),
             )
           }}
-          className="flex size-7 items-center justify-center rounded-[7px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/40 group-hover:opacity-100 max-md:opacity-100"
+          className="touch-target relative flex size-7 items-center justify-center rounded-[7px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/40 group-hover:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100"
         >
           <Copy className="size-3.5" />
         </button>
@@ -262,7 +262,7 @@ export function OverviewTab({
                       <button
                         type="button"
                         onClick={() => onNavigate("compromissos")}
-                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                        className="touch-target relative rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                       >
                         Ver todos
                       </button>
@@ -325,7 +325,7 @@ export function OverviewTab({
                       <button
                         type="button"
                         onClick={() => onNavigate("tarefas")}
-                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                        className="touch-target relative rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                       >
                         Ver todas
                       </button>
@@ -360,7 +360,7 @@ export function OverviewTab({
                   <button
                     type="button"
                     onClick={() => onNavigate("timeline")}
-                    className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="touch-target relative rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     Ver timeline
                   </button>

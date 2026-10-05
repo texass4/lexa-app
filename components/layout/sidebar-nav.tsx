@@ -164,7 +164,7 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
                         }
                         disabled={childActive}
                         className={cn(
-                          "absolute top-1/2 right-2 size-5 -translate-y-1/2 items-center justify-center rounded-[6px] text-sidebar-muted/80 outline-none transition-[color,opacity] duration-150",
+                          "touch-target absolute top-1/2 right-2 size-5 -translate-y-1/2 items-center justify-center rounded-[6px] text-sidebar-muted/80 outline-none transition-[color,opacity] duration-150",
                           "hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/60 disabled:cursor-default",
                           "opacity-70 group-hover/row:opacity-100",
                           toggleCls,

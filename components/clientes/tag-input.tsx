@@ -41,7 +41,7 @@ export function TagInput({
               type="button"
               aria-label={`Remover tag ${tag}`}
               onClick={() => onChange(value.filter((t) => t !== tag))}
-              className="flex size-4 items-center justify-center rounded text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="flex size-4 items-center justify-center rounded text-subtle pointer-coarse:size-6 outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <X className="size-3" />
             </button>
@@ -80,7 +80,7 @@ export function TagInput({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => add(tag)}
               className={cn(
-                "inline-flex h-6 items-center gap-1 rounded-md border border-dashed border-border-strong px-1.5 text-[11.5px] font-medium text-muted-foreground outline-none",
+                "inline-flex h-6 items-center gap-1 rounded-md border border-dashed border-border-strong px-1.5 text-[11.5px] font-medium text-muted-foreground outline-none pointer-coarse:h-8 pointer-coarse:px-2.5",
                 "hover:border-solid hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 [&_svg]:size-3",
               )}
             >

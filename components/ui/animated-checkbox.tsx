@@ -29,7 +29,7 @@ export function AnimatedCheckbox({
       }}
       whileTap={disabled ? undefined : { scale: 0.86 }}
       className={cn(
-        "relative flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "touch-target relative flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         checked ? "border-foreground bg-foreground text-background" : "border-border-strong bg-surface hover:border-foreground/40",
         disabled && "cursor-default opacity-60 hover:border-border-strong",
         className,

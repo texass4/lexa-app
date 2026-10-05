@@ -53,7 +53,7 @@ export function Topbar() {
         </button>
         <Link
           href="/dashboard"
-          className="flex items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
+          className="touch-target relative flex items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
           aria-label={`${BRAND.name} — painel`}
         >
           <Logo size="sm" />
@@ -63,7 +63,7 @@ export function Topbar() {
         <div className="hidden min-w-0 flex-1 items-center gap-5 md:flex">
           {crumb && (
             <nav aria-label="Trilha" className="flex min-w-0 max-w-[45%] shrink-0 items-center gap-1.5 text-[13.5px]">
-              <Link href={crumb.parent.href} className="shrink-0 text-muted-foreground outline-none hover:text-foreground focus-visible:underline">
+              <Link href={crumb.parent.href} className="touch-target relative shrink-0 text-muted-foreground outline-none hover:text-foreground focus-visible:underline">
                 {crumb.parent.label}
               </Link>
               <ChevronRight className="size-3.5 shrink-0 text-subtle" />

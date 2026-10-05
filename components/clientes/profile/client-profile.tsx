@@ -52,9 +52,9 @@ function ProfileSkeleton() {
       </div>
       <Skeleton className="h-9 w-full max-w-lg" />
       <SkeletonStats />
-      <div className="grid gap-5 lg:grid-cols-12">
-        <SkeletonCard className="lg:col-span-5" lines={4} />
-        <SkeletonCard className="lg:col-span-7" lines={4} />
+      <div className="grid gap-5 @4xl/main:grid-cols-12">
+        <SkeletonCard className="@4xl/main:col-span-5" lines={4} />
+        <SkeletonCard className="@4xl/main:col-span-7" lines={4} />
       </div>
     </div>
   )

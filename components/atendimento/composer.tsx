@@ -209,8 +209,8 @@ export function Composer({
 
   return (
     <div className={cn("shrink-0 border-t px-3 pt-2.5 pb-3 transition-colors sm:px-4", note ? "border-brand/25 bg-brand-soft/45" : "border-border bg-card")}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex rounded-control border border-border bg-surface-muted/60 p-[2px]">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex shrink-0 rounded-control border border-border bg-surface-muted/60 p-[2px]">
           {(["reply", "note"] as const).map((mode) => (
             <button
               key={mode}
@@ -219,7 +219,7 @@ export function Composer({
               aria-selected={draft.mode === mode}
               onClick={() => setDraft({ mode })}
               className={cn(
-                "relative inline-flex h-6 items-center gap-1.5 rounded-[7px] px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                "relative inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-2.5 text-[12px] font-medium outline-none pointer-coarse:h-8 transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 draft.mode === mode ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -233,7 +233,7 @@ export function Composer({
             </button>
           ))}
         </div>
-        <span className={cn("text-[11.5px]", note ? "text-brand-strong" : "text-subtle")}>
+        <span className={cn("min-w-[9rem] flex-1 text-right text-[11.5px] leading-snug", note ? "text-brand-strong" : "text-subtle")}>
           {note ? "Só a equipe vê. Nunca vai para o WhatsApp." : blocked ? replyDisabledReason : "Enter envia · Shift+Enter quebra a linha"}
         </span>
       </div>

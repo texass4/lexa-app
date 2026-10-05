@@ -13,8 +13,15 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
   return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
 
-function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
-  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+/** Gatilhos com classe própria (ex.: "…" de 24 px) ganham área de toque de 44 px (`touch-target`). */
+function DropdownMenuTrigger({ className, ...props }: MenuPrimitive.Trigger.Props) {
+  return (
+    <MenuPrimitive.Trigger
+      data-slot="dropdown-menu-trigger"
+      className={typeof className === "string" ? cn("touch-target relative", className) : className}
+      {...props}
+    />
+  )
 }
 
 function DropdownMenuContent({

@@ -175,9 +175,9 @@ export function FinanceView() {
       {!ready ? (
         <>
           <SkeletonStats />
-          <div className="grid gap-5 lg:grid-cols-12">
-            <SkeletonCard className="lg:col-span-8" lines={5} />
-            <SkeletonCard className="lg:col-span-4" lines={5} />
+          <div className="grid gap-5 @4xl/main:grid-cols-12">
+            <SkeletonCard className="@4xl/main:col-span-8" lines={5} />
+            <SkeletonCard className="@4xl/main:col-span-4" lines={5} />
           </div>
         </>
       ) : data.invoices.length === 0 ? (
@@ -197,7 +197,7 @@ export function FinanceView() {
         </Panel>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 @4xl/main:grid-cols-4 @4xl/main:gap-5">
             {kpis.map((k, i) => (
               <motion.div
                 key={k.label}
@@ -257,7 +257,7 @@ export function FinanceView() {
                 const status = INVOICE_STATUS[current]
                 const { day, month } = fmtDayMonthParts(inv.dueDate)
                 return (
-                  <li key={inv.id} className="flex items-center gap-3.5 px-4 py-3 sm:px-5">
+                  <li key={inv.id} className="flex items-center gap-3 px-4 py-3 sm:gap-3.5 sm:px-5">
                     <span
                       className={cn(
                         "flex w-11 shrink-0 flex-col items-center rounded-[8px] border py-1",
@@ -293,13 +293,20 @@ export function FinanceView() {
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
+                      {/* Celular: valor e situação abaixo do nome, para o nome não ser cortado. */}
+                      <p className="mt-1 flex items-center gap-2 sm:hidden">
+                        <span className={cn("tabular text-[13.5px] font-semibold", current === "atrasado" && "text-danger")}>{formatCurrency(inv.amount)}</span>
+                        <StatusBadge tone={status.tone} size="sm">
+                          {status.label}
+                        </StatusBadge>
+                      </p>
                     </div>
                     <span className="hidden sm:block">
                       <StatusBadge tone={status.tone} size="sm">
                         {status.label}
                       </StatusBadge>
                     </span>
-                    <span className={cn("tabular w-24 shrink-0 text-right text-[13.5px] font-semibold", current === "atrasado" && "text-danger")}>
+                    <span className={cn("tabular w-24 shrink-0 text-right text-[13.5px] font-semibold max-sm:hidden", current === "atrasado" && "text-danger")}>
                       {formatCurrency(inv.amount)}
                     </span>
                     {can("finance.edit") && current !== "pago" && current !== "cancelado" && (
@@ -349,8 +356,8 @@ export function FinanceView() {
             </ul>
           </Panel>
 
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-            <Panel className="lg:col-span-8">
+          <div className="grid grid-cols-1 gap-5 @4xl/main:grid-cols-12">
+            <Panel className="@4xl/main:col-span-8">
               <PanelHeader
                 title="Receita mensal"
                 description={`${series[0].label} a ${series[series.length - 1].label}`}
@@ -370,7 +377,7 @@ export function FinanceView() {
               </div>
             </Panel>
 
-            <Panel className="lg:col-span-4">
+            <Panel className="@4xl/main:col-span-4">
               <PanelHeader title="Receita por área" description={`Recebido em ${getNow().getFullYear()}`} />
               {byArea.length === 0 && (
                 <EmptyState compact title="Nenhum recebimento neste ano." description="A divisão por área aparece com os primeiros pagamentos." />

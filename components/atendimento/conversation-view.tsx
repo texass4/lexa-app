@@ -294,7 +294,7 @@ export function ConversationView({
           <button
             type="button"
             onClick={onAssign}
-            className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
+            className="touch-target relative inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             {assignee ? <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="xs" /> : <UserRoundCheck className="ml-1 size-3.5 text-subtle" />}
             <span className="max-w-[110px] truncate">{assignee ? assignee.firstName : "Atribuir"}</span>
@@ -411,7 +411,7 @@ export function ConversationView({
       {/* Status e responsável no mobile/tablet */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 lg:hidden">
         <StatusMenu conversation={conversation} onChanged={upsertConversation} disabled={!canEdit} />
-        <button type="button" onClick={onAssign} className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium outline-none">
+        <button type="button" onClick={onAssign} className="touch-target relative inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium outline-none">
           {assignee ? <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="xs" /> : <UserRoundCheck className="ml-1 size-3.5 text-subtle" />}
           {assignee ? assignee.firstName : "Atribuir"}
         </button>

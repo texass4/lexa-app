@@ -202,7 +202,7 @@ export function AgendaView() {
         </div>
       </div>
 
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Categorias">
+      <div className="-mx-4 -my-1.5 flex gap-1.5 overflow-x-auto px-4 py-1.5 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Categorias">
         {legend.map((item) => {
           const off = hidden.has(item.key)
           const count = rangeEvents.filter((e) => legendKey(e) === item.key).length
@@ -213,7 +213,7 @@ export function AgendaView() {
               aria-pressed={!off}
               onClick={() => toggleType(item.key)}
               className={cn(
-                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-brand/40",
+                "touch-target relative inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-all pointer-coarse:h-8 focus-visible:ring-2 focus-visible:ring-brand/40",
                 off ? "border-dashed border-border-strong text-subtle" : "border-border bg-surface text-foreground shadow-xs",
               )}
             >

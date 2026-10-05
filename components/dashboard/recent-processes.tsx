@@ -43,13 +43,17 @@ export function RecentProcesses() {
                     <span className="block truncate text-[12px] text-muted-foreground">
                       {client?.name ?? "Sem cliente"}
                       {prazo && <span className="max-sm:hidden"> · {prazo.description}</span>}
-                      <span className="sm:hidden"> · {RECENT_STATE_LABEL[state]}</span>
+                      <span className="sm:hidden">
+                        {" · "}
+                        {RECENT_STATE_LABEL[state]} · {shortAgo(process.lastMovementAt)}
+                      </span>
                     </span>
                   </span>
                   <span className={cn("hidden shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-medium sm:inline-flex", style.badge)}>
                     {RECENT_STATE_LABEL[state]}
                   </span>
-                  <span className="tabular w-12 shrink-0 text-right text-[12px] text-subtle" title="Desde a última movimentação">
+                  {/* Celular: o tempo vai para a linha de baixo, para o número do processo caber inteiro. */}
+                  <span className="tabular w-12 shrink-0 text-right text-[12px] text-subtle max-sm:hidden" title="Desde a última movimentação">
                     {shortAgo(process.lastMovementAt)}
                   </span>
                   <ChevronRight className="size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />

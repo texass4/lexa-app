@@ -272,7 +272,7 @@ export function ClientsView() {
             className="w-full lg:w-[340px]"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-2 sm:flex sm:flex-wrap sm:items-center">
           <NativeSelect
             aria-label="Filtrar por responsável"
             value={ownerId}
@@ -368,7 +368,8 @@ export function ClientsView() {
       ) : (
         <FadeIn>
           {/* Desktop */}
-          <TableShell className="hidden md:block">
+          {/* Tabela só com espaço para todas as colunas (≥ 896 px de conteúdo); antes disso, a lista em cartões. */}
+          <TableShell className="hidden @4xl/main:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] border-separate border-spacing-0">
                 <thead>
@@ -377,7 +378,7 @@ export function ClientsView() {
                       <button
                         type="button"
                         onClick={() => toggleSort("name")}
-                        className="inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
+                        className="touch-target relative inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
                       >
                         Cliente {sortIcon("name")}
                       </button>
@@ -390,7 +391,7 @@ export function ClientsView() {
                       <button
                         type="button"
                         onClick={() => toggleSort("activity")}
-                        className="inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
+                        className="touch-target relative inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
                       >
                         Última atividade {sortIcon("activity")}
                       </button>
@@ -423,7 +424,7 @@ export function ClientsView() {
           </TableShell>
 
           {/* Mobile */}
-          <ul className="space-y-2.5 md:hidden">
+          <ul className="space-y-2.5 @4xl/main:hidden">
             {visible.map(({ client: c, activeProcesses, lastActivity, delinquent }) => {
               const status = CLIENT_STATUS[c.status]
               return (

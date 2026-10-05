@@ -166,7 +166,8 @@ export function ProcessesView() {
         </TableShell>
       ) : (
         <FadeIn>
-          <TableShell className="hidden md:block">
+          {/* Tabela só com espaço para todas as colunas (≥ 896 px de conteúdo); antes disso, a lista em cartões. */}
+          <TableShell className="hidden @4xl/main:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] border-separate border-spacing-0">
                 <thead>
@@ -263,7 +264,7 @@ export function ProcessesView() {
             </div>
           </TableShell>
 
-          <ul className="space-y-2.5 md:hidden">
+          <ul className="space-y-2.5 @4xl/main:hidden">
             {rows.map((p) => {
               const status = PROCESS_STATUS[p.status]
               return (

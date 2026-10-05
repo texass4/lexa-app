@@ -22,8 +22,8 @@ export function PanelHeader({
       <div className="flex min-w-0 items-center gap-2.5">
         {icon && <span className="text-foreground/80 [&_svg]:size-[17px]">{icon}</span>}
         <div className="min-w-0">
-          <h2 className="truncate text-[15px] font-semibold tracking-[-0.015em] text-foreground">{title}</h2>
-          {description && <p className="mt-1 truncate text-[12.5px] text-muted-foreground">{description}</p>}
+          <h2 className="line-clamp-2 text-[15px] font-semibold tracking-[-0.015em] text-foreground">{title}</h2>
+          {description && <p className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">{description}</p>}
         </div>
       </div>
       {action && <div className="flex shrink-0 items-center gap-1">{action}</div>}

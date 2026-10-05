@@ -127,7 +127,8 @@ export function DocumentsView() {
         </TableShell>
       ) : (
         <FadeIn>
-          <TableShell className="hidden md:block">
+          {/* Tabela só com espaço para todas as colunas (≥ 896 px de conteúdo); antes disso, a lista em cartões. */}
+          <TableShell className="hidden @4xl/main:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] border-separate border-spacing-0">
                 <thead>
@@ -201,7 +202,7 @@ export function DocumentsView() {
               </table>
             </div>
           </TableShell>
-          <div className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card md:hidden">
+          <div className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card @4xl/main:hidden">
             <DocumentList documents={rows} showClient />
           </div>
         </FadeIn>

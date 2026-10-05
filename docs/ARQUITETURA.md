@@ -152,6 +152,11 @@ lexa-app/
 - Permissões na interface: `useSession().can("finance.edit")` ou `<Can permission="finance.edit">`.
 - Visual: reutilize `components/ui` (`PageHeader`, `Panel`, `MetricCard`, `Button`, `StatusBadge`, `FilterTabs`, `DataTable`, `EmptyState`, `Skeleton`, `Modal`, `SideSheet`, `Field`). Cores e raios saem dos tokens (`bg-surface`, `text-muted-foreground`, `rounded-card`, `shadow-card`). Não use cores soltas (`#hex`) nos componentes.
 - Estados obrigatórios em toda lista: carregando (`Skeleton` até `hydrated`), vazio (`EmptyState` com o próximo passo) e erro.
+- Responsividade (testada em 320, 375, 390, 768, 1024, 1280, 1440 e 1920 px):
+  - Divisões da página em colunas e troca tabela ↔ cartões usam a largura do conteúdo, não da janela: `<main>` é o container `@container/main` (`components/layout/app-shell.tsx`). Use `@4xl/main:grid-cols-12` (≥ 896 px de conteúdo) em vez de `lg:` — com a barra lateral aberta em 1024 px, as colunas empilham em vez de espremer.
+  - Tabela larga (`min-w-[860px]`) só aparece com `@4xl/main:block`; antes disso, a mesma lista em cartões (`@4xl/main:hidden`). Ações de cada linha nunca podem ficar escondidas por rolagem horizontal.
+  - Toque: controle menor que 44 px recebe `touch-target` (área de clique ampliada só em telas de toque, sem mudar o visual; o elemento precisa ser `relative`/`absolute`). `Button`, `AnimatedCheckbox`, `ChoiceChips` e gatilhos de `DropdownMenu` já trazem. Quando a área ampliada encostaria em outro link, aumente o controle com `pointer-coarse:` (ex.: `pointer-coarse:h-8`).
+  - No celular, prefira reorganizar a cortar: valor e situação abaixo do nome, rótulo abaixo do ícone (`MetricCard` com `@container`), títulos em até duas linhas (`PanelHeader`).
 
 ### Regras e dados
 

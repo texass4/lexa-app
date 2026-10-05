@@ -442,4 +442,20 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /*
+   * Toque: área de clique de pelo menos 44 px em controles pequenos (caixa de seleção,
+   * ícones, "Ver todos"), sem mudar o visual. Só em telas de toque; com mouse, nada muda.
+   * O elemento precisa estar posicionado (`relative` ou `absolute`).
+   */
+  @media (pointer: coarse) {
+    .touch-target::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
 }

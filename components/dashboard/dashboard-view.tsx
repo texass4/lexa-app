@@ -33,9 +33,9 @@ function DashboardSkeleton() {
       </div>
       <Skeleton className="h-[104px] w-full rounded-card" />
       <SkeletonStats />
-      <div className="grid gap-4 lg:grid-cols-12">
-        <SkeletonCard className="lg:col-span-7" lines={4} />
-        <SkeletonCard className="lg:col-span-5" lines={4} />
+      <div className="grid gap-4 @4xl/main:grid-cols-12">
+        <SkeletonCard className="@4xl/main:col-span-7" lines={4} />
+        <SkeletonCard className="@4xl/main:col-span-5" lines={4} />
       </div>
     </div>
   )
@@ -46,14 +46,14 @@ function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React
   if (!left && !right) return null
   const both = !!left && !!right
   return (
-    <div className="grid gap-4 lg:grid-cols-12 lg:gap-6">
+    <div className="grid gap-4 @4xl/main:grid-cols-12 @4xl/main:gap-6">
       {left && (
-        <FadeIn delay={delay} className={cn("min-w-0 [&>*]:h-full", both ? "lg:col-span-7" : "lg:col-span-12")}>
+        <FadeIn delay={delay} className={cn("min-w-0 [&>*]:h-full", both ? "@4xl/main:col-span-7" : "@4xl/main:col-span-12")}>
           {left}
         </FadeIn>
       )}
       {right && (
-        <FadeIn delay={delay + 0.04} className={cn("min-w-0 [&>*]:h-full", both ? "lg:col-span-5" : "lg:col-span-12")}>
+        <FadeIn delay={delay + 0.04} className={cn("min-w-0 [&>*]:h-full", both ? "@4xl/main:col-span-5" : "@4xl/main:col-span-12")}>
           {right}
         </FadeIn>
       )}

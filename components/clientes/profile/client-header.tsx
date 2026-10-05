@@ -85,7 +85,7 @@ export function ClientHeader({
       <div className="relative p-5 sm:p-7">
         <Link
           href="/clientes"
-          className="mb-5 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:underline md:hidden"
+          className="touch-target relative mb-5 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:underline md:hidden"
         >
           <ArrowLeft className="size-3.5" /> Clientes
         </Link>

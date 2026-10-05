@@ -85,9 +85,9 @@ export function ProcessProfile({ id }: { id: string }) {
           <Skeleton className="h-4 w-60" />
         </div>
         <SkeletonStats />
-        <div className="grid gap-5 lg:grid-cols-12">
-          <SkeletonCard className="lg:col-span-7" lines={5} />
-          <SkeletonCard className="lg:col-span-5" lines={4} />
+        <div className="grid gap-5 @4xl/main:grid-cols-12">
+          <SkeletonCard className="@4xl/main:col-span-7" lines={5} />
+          <SkeletonCard className="@4xl/main:col-span-5" lines={4} />
         </div>
       </div>
     )
@@ -117,15 +117,15 @@ export function ProcessProfile({ id }: { id: string }) {
       <FadeIn>
         <Link
           href="/processos"
-          className="mb-4 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:underline md:hidden"
+          className="touch-target relative mb-4 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:underline md:hidden"
         >
           <ArrowLeft className="size-3.5" /> Processos
         </Link>
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-5 @4xl/main:flex-row @4xl/main:items-end @4xl/main:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-brand-strong">Processo {process.code}</p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <h1 className="break-all font-mono text-[22px] font-medium tracking-[-0.02em] text-foreground sm:text-[28px]">{process.number}</h1>
+              <h1 className="break-all font-mono text-[clamp(18px,5.6vw,22px)] font-medium tracking-[-0.02em] text-foreground sm:text-[28px]">{process.number}</h1>
               <button
                 type="button"
                 aria-label="Copiar número do processo"
@@ -240,8 +240,8 @@ export function ProcessProfile({ id }: { id: string }) {
       {/* `key`: cada processo tem suas próprias análises e conversa — nada vaza entre processos. */}
       <ProcessAIPanel key={process.id} process={process} client={client} signals={processSignals(data, process)} />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <div className="space-y-5 lg:col-span-7">
+      <div className="grid grid-cols-1 gap-5 @4xl/main:grid-cols-12">
+        <div className="min-w-0 space-y-5 @4xl/main:col-span-7">
           <Panel>
             <PanelHeader
               title="Movimentações"
@@ -273,7 +273,7 @@ export function ProcessProfile({ id }: { id: string }) {
           )}
         </div>
 
-        <div className="space-y-5 lg:col-span-5">
+        <div className="min-w-0 space-y-5 @4xl/main:col-span-5">
           <PrazosPanel process={process} />
 
           <Panel>

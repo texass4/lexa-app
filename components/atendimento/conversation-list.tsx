@@ -137,7 +137,7 @@ export function ConversationList({
                 aria-selected={active}
                 onClick={() => onFilterChange(f.value)}
                 className={cn(
-                  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                  "touch-target relative inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40 pointer-coarse:h-8",
                   active
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground",
