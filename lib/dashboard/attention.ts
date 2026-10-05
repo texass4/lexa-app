@@ -21,6 +21,7 @@ import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } fr
 import type { Permission } from "@/lib/auth/permissions"
 import { isFinancialActivity } from "@/lib/financeiro/access"
 import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos/prazos"
+import { prazosByProcess, processesByClient, tasksByRelated } from "@/lib/store/indexes"
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { MONITORING_STALE_AFTER_DAYS } from "@/lib/services/processos/monitoring-policy"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
@@ -185,8 +186,8 @@ function latestMovement(p: Process) {
 function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Process, now: Date = getNow()): AttentionSignal[] {
   const signals: AttentionSignal[] = []
   const base = { href: `/processos/${p.id}`, processId: p.id, clientId: p.clientId, count: 1 }
-  for (const prazo of data.deadlines) {
-    if (prazo.processId !== p.id || !isOpenPrazo(prazo)) continue
+  for (const prazo of prazosByProcess(data.deadlines, p.id)) {
+    if (!isOpenPrazo(prazo)) continue
     const alert = prazoAlert(prazo, now)
     if (alert) {
       signals.push({
@@ -228,7 +229,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
   if (!isActiveProcess(p)) return []
   const signals: AttentionSignal[] = prazoSignals(data, p, now)
   const base = { href: `/processos/${p.id}`, processId: p.id, clientId: p.clientId, count: 1 }
-  const linked = data.tasks.filter((t) => t.related?.type === "process" && t.related.id === p.id)
+  const linked = tasksByRelated(data.tasks, p.id).filter((t) => t.related?.type === "process")
   const pending = linked.filter((t) => t.status === "pendente")
 
   const overdueTasks = pending.filter((t) => isOverdue(t, now))
@@ -279,11 +280,11 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
 
 export function clientSignals(data: AttentionData, client: Client, now: Date = getNow(), can?: AttentionOptions["can"]): AttentionSignal[] {
   const allowed = (p: Permission) => !can || can(p)
-  const processes = allowed("processes.view") ? data.processes.filter((p) => p.clientId === client.id) : []
+  const processes = allowed("processes.view") ? processesByClient(data.processes, client.id) : []
   const signals = processes.flatMap((p) => processSignals(data, p, now))
 
   if (allowed("tasks.view")) {
-    const overdue = data.tasks.filter((t) => t.related?.type === "client" && t.related.id === client.id && isOverdue(t, now))
+    const overdue = tasksByRelated(data.tasks, client.id).filter((t) => t.related?.type === "client" && isOverdue(t, now))
     if (overdue.length) {
       signals.push({
         id: `task-overdue:client:${client.id}`,

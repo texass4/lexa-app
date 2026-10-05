@@ -10,15 +10,18 @@ import {
   diffState,
   fetchManifest,
   initialScopes,
+  loadPage,
   loadScopes,
   orderCollection,
+  pgValue,
+  searchFilter,
+  windowBounds,
   processScopes,
   RECENT_ACTIVITIES,
   RECENT_NOTIFICATIONS,
   removeById,
   upsertById,
   versionValue,
-  wholeCollection,
   type PersistedState,
 } from "./storage"
 
@@ -199,7 +202,6 @@ describe("carga inicial e sob demanda", () => {
     assert.equal(clientScopes("c1", []).find((s) => s.key === "tasks")!.filter?.or, "data->related->>id.eq.c1")
     // Um processo novo do cliente muda a identidade do recorte (nova leitura).
     assert.notEqual(client.find((s) => s.key === "tasks")!.id, clientScopes("c1", ["p1"]).find((s) => s.key === "tasks")!.id)
-    assert.equal(wholeCollection("documents").filter, undefined)
     assert.deepEqual(appointmentsBetween("2026-09-24", "2026-11-09").filter, { gte: [["data->>start", "2026-09-24"]], lt: [["data->>start", "2026-11-09"]] })
   })
 
@@ -217,7 +219,7 @@ describe("carga inicial e sob demanda", () => {
     assert.ok(calls.every((c) => c.columns === "id, data, updated_at"))
     assert.deepEqual(calls[0].ops, ["or data->>status.eq.pendente", "order created_at", "order id", "range 0-999"])
     assert.deepEqual(calls[1].ops, ["eq data->related->>id p1", "order created_at", "order id", "range 0-999"])
-    assert.deepEqual(calls[2].ops, ["order created_at desc", "order id desc", "limit 300"])
+    assert.deepEqual(calls[2].ops, ["order created_at desc", "order id desc", "range 0-299"])
   })
 
   it("a revalidação lê só id e versão, com o mesmo filtro, sempre da tabela", async () => {
@@ -226,5 +228,66 @@ describe("carga inicial e sob demanda", () => {
     assert.deepEqual([...manifest], [["p1", "v1"]])
     assert.equal(calls[0].source, "processes")
     assert.equal(calls[0].columns, "id, updated_at")
+  })
+})
+
+describe("busca e histórico no banco", () => {
+  it("valores com vírgula, ponto, parênteses ou espaço vão entre aspas", () => {
+    assert.equal(pgValue("2026-09-05"), "2026-09-05")
+    assert.equal(pgValue("Documento pessoal"), '"Documento pessoal"')
+    assert.equal(pgValue('a,b.(c)"'), '"a,b.(c)\\""')
+  })
+
+  it("busca sem acento e em minúsculas, como a da tela; vínculos por id", () => {
+    assert.equal(searchFilter("a"), null, "termo curto demais não vai ao banco")
+    assert.deepEqual(searchFilter("  Petição  "), { or: "search.ilike.*peticao*" })
+    assert.deepEqual(searchFilter("ação 50%"), { or: 'search.ilike."*acao 50*"' })
+    assert.deepEqual(searchFilter("cliente", [{ column: "data->>clientId", ids: ["c1", "c2"] }, { column: "x", ids: [] }]), {
+      or: "search.ilike.*cliente*,data->>clientId.in.(c1,c2)",
+    })
+    const many = Array.from({ length: 80 }, (_, i) => `c${i}`)
+    const filter = searchFilter("cliente", [{ column: "data->>clientId", ids: many }])!
+    assert.equal(filter.or!.split(",").length, 1 + 50, "no máximo 50 ids por vínculo")
+  })
+
+  it("janelas da abertura", () => {
+    assert.deepEqual(windowBounds(new Date(2026, 9, 5, 10)), {
+      month: "2026-09-05",
+      appointments: "2026-08-21",
+      documents: "2026-09-21",
+      finance: "2026-01-01",
+    })
+  })
+
+  it("página do histórico: ordem pela coluna da lista (vazios por último) e deslocamento", async () => {
+    const calls: string[][] = []
+    const builder = (ops: string[]) => {
+      const b = {
+        select: () => b,
+        neq: (c: string, v: string) => (ops.push(`neq ${c} ${v}`), b),
+        or: (v: string) => (ops.push(`or ${v}`), b),
+        eq: (c: string, v: string) => (ops.push(`eq ${c} ${v}`), b),
+        lt: (c: string, v: string) => (ops.push(`lt ${c} ${v}`), b),
+        not: (c: string, op: string, v: string) => (ops.push(`not ${c} ${op} ${v}`), b),
+        order: (c: string, o?: { ascending: boolean; nullsFirst?: boolean }) => (ops.push(`order ${c}${o?.ascending === false ? " desc" : ""}${o?.nullsFirst === false ? " nullslast" : ""}`), b),
+        range: (from: number, to: number) => (ops.push(`range ${from}-${to}`), b),
+        then: (resolve: (v: { data: unknown[]; error: null; count: number }) => void) => resolve({ data: [], error: null, count: 7 }),
+      }
+      return b
+    }
+    const supabase = { from: () => { const ops: string[] = []; calls.push(ops); return builder(ops) } } as unknown as Parameters<typeof loadPage>[0]
+    const { total } = await loadPage(
+      supabase,
+      { key: "tasks", id: "x", latest: 50, offset: 100, order: "data->>completedAt", filter: { neq: [["data->>status", "pendente"]], notIn: [["data->>kind", ["Contrato", "Documento pessoal"]]] } },
+      true,
+    )
+    assert.equal(total, 7)
+    assert.deepEqual(calls[0], [
+      "neq data->>status pendente",
+      'not data->>kind in (Contrato,"Documento pessoal")',
+      "order data->>completedAt desc nullslast",
+      "order id desc",
+      "range 100-149",
+    ])
   })
 })

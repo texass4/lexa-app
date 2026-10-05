@@ -10,6 +10,7 @@ import { SignalList } from "@/components/shared/signal-list"
 import { officeSignals } from "@/lib/dashboard/attention"
 import { useSession } from "@/lib/auth/session"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { LimitedList } from "@/components/ui/show-more"
 import { fmtRelative } from "@/lib/core/dates"
 import type { Notification } from "@/types"
 
@@ -29,7 +30,11 @@ export function NotificationsMenu() {
   const [open, setOpen] = React.useState(false)
   const unread = notifications.filter((n) => !n.read).length
   // "Precisa de atenção": os mesmos sinais do painel, só os urgentes e os de verificar.
-  const urgent = data.hydrated ? officeSignals(data, { userId: user.id, can }).filter((s) => s.level === "critical" || s.level === "warning") : []
+  // Recalcula só quando os dados mudam (a barra do topo redesenha em toda tela).
+  const urgent = React.useMemo(
+    () => (data.hydrated ? officeSignals(data, { userId: user.id, can }).filter((s) => s.level === "critical" || s.level === "warning") : []),
+    [data, user.id, can],
+  )
   const critical = urgent.filter((s) => s.level === "critical").length
 
   return (
@@ -100,39 +105,46 @@ export function NotificationsMenu() {
               </p>
             </div>
           )}
-          <ul className={cn("p-1.5", notifications.length === 0 && "hidden")}>
-            {notifications.map((n) => {
-              const cfg = ICONS[n.type]
-              const Icon = cfg.icon
-              return (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      markNotificationRead(n.id)
-                      setOpen(false)
-                      router.push(n.href)
-                    }}
-                    className="flex w-full items-start gap-3 rounded-[10px] px-2.5 py-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:bg-accent"
-                  >
-                    <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-control", cfg.cls)}>
-                      <Icon className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className={cn("truncate text-[13px]", n.read ? "font-medium text-muted-foreground" : "font-semibold text-foreground")}>
-                          {n.title}
+          {/* Até 500 notificações na memória: desenha 50 por vez. */}
+          <LimitedList items={notifications} listKey="notificacoes" className="mt-0 mb-3">
+            {(items) => (
+              <ul className={cn("p-1.5", notifications.length === 0 && "hidden")}>
+                {items.map((n) => {
+                  const cfg = ICONS[n.type]
+                  const Icon = cfg.icon
+                  return (
+                    <li key={n.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          markNotificationRead(n.id)
+                          setOpen(false)
+                          router.push(n.href)
+                        }}
+                        className="flex w-full items-start gap-3 rounded-[10px] px-2.5 py-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:bg-accent"
+                      >
+                        <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-control", cfg.cls)}>
+                          <Icon className="size-4" />
                         </span>
-                        {!n.read && <span className="size-1.5 shrink-0 rounded-full bg-brand" aria-label="Não lida" />}
-                      </span>
-                      <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">{n.description}</span>
-                      <span className="mt-1 block text-[11px] text-subtle">{fmtRelative(n.at)}</span>
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span
+                              className={cn("truncate text-[13px]", n.read ? "font-medium text-muted-foreground" : "font-semibold text-foreground")}
+                            >
+                              {n.title}
+                            </span>
+                            {!n.read && <span className="size-1.5 shrink-0 rounded-full bg-brand" aria-label="Não lida" />}
+                          </span>
+                          <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">{n.description}</span>
+                          <span className="mt-1 block text-[11px] text-subtle">{fmtRelative(n.at)}</span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </LimitedList>
         </div>
       </PopoverContent>
     </Popover>

@@ -9,6 +9,7 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect } from "@/components/ui/field"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { formatFileSize, uid } from "@/lib/core/format"
 import { currentOrgId } from "@/lib/auth/account"
 import { documentRequiredIssue } from "@/lib/clientes/clients"
@@ -101,13 +102,7 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
   }
 
   const processes = data.processes.filter((p) => !clientId || p.clientId === clientId)
-  const contractIssue =
-    kind === "Contrato"
-      ? documentRequiredIssue(
-          data.clients.find((c) => c.id === clientId),
-          "contrato",
-        )
-      : undefined
+  const contractIssue = kind === "Contrato" ? documentRequiredIssue(byId(data.clients, clientId), "contrato") : undefined
 
   return (
     <>

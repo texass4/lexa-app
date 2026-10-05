@@ -24,7 +24,13 @@ import { visibleSections } from "./nav-config"
 import { DIALOG_PERMISSION, useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { useOfficeData } from "@/lib/store/office-store"
-import { useWholeCollection } from "@/lib/store/on-demand"
+import { useDebounced, usePagedHistory } from "@/lib/store/on-demand"
+import { documentSearch, NO_WINDOW } from "@/lib/store/history-lists"
+import { byId } from "@/lib/store/indexes"
+import { searchFilter } from "@/lib/store/storage"
+
+/** Resultados por grupo na busca global. */
+const RESULTS_PER_GROUP = 8
 import { normalize } from "@/lib/core/format"
 import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/core/config"
 import { fmtShortDate, fmtTime, getNow, parse } from "@/lib/core/dates"
@@ -83,13 +89,51 @@ function CommandContent() {
   }
 
   const hasQuery = query.trim().length > 0
-  // Documentos antigos não vêm na abertura: a busca os pede quando a pessoa começa a digitar.
-  useWholeCollection(hasQuery && can("documents.view") ? "documents" : null)
-  const clients = hasQuery ? data.clients : data.clients.slice(0, 3)
-  const processes = hasQuery ? data.processes : data.processes.slice(0, 2)
-  const tasks = hasQuery && can("tasks.view") ? data.tasks.filter((t) => t.status === "pendente") : []
-  const documents = hasQuery && can("documents.view") ? data.documents : []
-  const appointments = hasQuery && can("agenda.view") ? data.appointments.filter((a) => parse(a.end) >= getNow()) : []
+  // Milhares de registros: filtra antes de desenhar (a mesma regra da busca da lista)
+  // e mostra os primeiros de cada grupo — a lista não monta um item por registro.
+  const search = React.useDeferredValue(query)
+  const terms = normalize(search.trim()).split(/\s+/).filter(Boolean)
+  const hit = (...fields: (string | undefined)[]) => {
+    const hay = normalize(fields.filter(Boolean).join(" "))
+    return terms.every((term) => hay.includes(term))
+  }
+  const first = <T,>(list: readonly T[], test: (item: T) => boolean) => {
+    const found: T[] = []
+    for (const item of list) {
+      if (test(item)) found.push(item)
+      if (found.length === RESULTS_PER_GROUP) break
+    }
+    return found
+  }
+  // Documentos antigos não vêm na abertura: a busca procura também no banco quando a pessoa para de digitar.
+  const term = useDebounced(query.trim())
+  const documentList = React.useMemo(() => {
+    const filter = can("documents.view") ? searchFilter(term) : null
+    return filter ? documentSearch(term, filter, null, undefined, RESULTS_PER_GROUP) : null
+  }, [term, can])
+  usePagedHistory(documentList, NO_WINDOW, { auto: true })
+  const clients = hasQuery
+    ? first(data.clients, (c) => hit(`cliente ${c.id} ${c.name}`, c.area, c.email, c.document, c.phone))
+    : data.clients.slice(0, 3)
+  const processes = hasQuery
+    ? first(data.processes, (p) => hit(`processo ${p.id} ${p.number} ${p.code}`, byId(data.clients, p.clientId)?.name, p.type, p.area))
+    : data.processes.slice(0, 2)
+  const tasks =
+    hasQuery && can("tasks.view") ? first(data.tasks, (t) => t.status === "pendente" && hit(`tarefa ${t.id} ${t.title}`, t.description)) : []
+  const documents =
+    hasQuery && can("documents.view")
+      ? first(data.documents, (d) => {
+          const process = byId(data.processes, d.processId)
+          return hit(`documento ${d.id} ${d.name}`, d.kind, byId(data.clients, d.clientId)?.name, process?.code, process?.number)
+        })
+      : []
+  const appointments =
+    hasQuery && can("agenda.view")
+      ? first(
+          data.appointments,
+          (a) => parse(a.end) >= getNow() && hit(`compromisso ${a.id} ${a.title}`, a.personName, a.location, byId(data.clients, a.clientId)?.name),
+        )
+      : []
   // Sem busca: o que merece atenção agora (os mesmos sinais do painel), no máximo três.
   const attention =
     !hasQuery && data.hydrated
@@ -228,7 +272,7 @@ function CommandContent() {
         {processes.length > 0 && (
           <Command.Group heading="Processos" className={groupCls}>
             {processes.map((p) => {
-              const client = data.clients.find((c) => c.id === p.clientId)
+              const client = byId(data.clients, p.clientId)
               return (
                 <Command.Item
                   key={p.id}
@@ -280,8 +324,8 @@ function CommandContent() {
         {documents.length > 0 && (
           <Command.Group heading="Documentos" className={groupCls}>
             {documents.map((d) => {
-              const client = data.clients.find((c) => c.id === d.clientId)
-              const process = data.processes.find((p) => p.id === d.processId)
+              const client = byId(data.clients, d.clientId)
+              const process = byId(data.processes, d.processId)
               return (
                 <Command.Item
                   key={d.id}
@@ -314,7 +358,7 @@ function CommandContent() {
               <Command.Item
                 key={a.id}
                 value={`compromisso ${a.id} ${a.title}`}
-                keywords={[a.personName ?? "", a.location ?? "", data.clients.find((c) => c.id === a.clientId)?.name ?? ""]}
+                keywords={[a.personName ?? "", a.location ?? "", byId(data.clients, a.clientId)?.name ?? ""]}
                 onSelect={() => go(a.processId ? `/processos/${a.processId}` : a.clientId ? `/clientes/${a.clientId}` : "/agenda")}
                 className={itemCls}
               >

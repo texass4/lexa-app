@@ -4,6 +4,7 @@ import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import type { AISource, AIStatus } from "@/lib/ai/types"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useSession } from "@/lib/auth/session"
 import { isAIReady, type SourceHandler } from "./ai-blocks"
 import { AIChatSheet } from "./ai-chat-sheet"
@@ -41,8 +42,8 @@ function useRouteContext(): AIContext {
   const data = useOfficeData()
   const { can } = useSession()
   const [, root, id] = pathname.split("/")
-  const process = root === "processos" && id && can("processes.view") ? data.processes.find((p) => p.id === id) : undefined
-  const client = root === "clientes" && id && can("clients.view") ? data.clients.find((c) => c.id === id) : undefined
+  const process = root === "processos" && id && can("processes.view") ? byId(data.processes, id) : undefined
+  const client = root === "clientes" && id && can("clients.view") ? byId(data.clients, id) : undefined
   const processCode = process?.code
   const clientName = client?.name
   return React.useMemo(() => {

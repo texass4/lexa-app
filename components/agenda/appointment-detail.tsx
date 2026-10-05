@@ -14,6 +14,7 @@ import { NewAppointmentDialog } from "./new-appointment-dialog"
 import { fmtFullDate, fmtTime, parse } from "@/lib/core/dates"
 import { getUser } from "@/lib/auth/account"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import type { Appointment } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -41,8 +42,8 @@ export function AppointmentDetail({ appointment, onClose }: { appointment?: Appo
 
   const { category, style } = lookup(a.categoryId)
   const owner = getUser(a.ownerId)
-  const process = data.processes.find((p) => p.id === a.processId)
-  const client = data.clients.find((c) => c.id === a.clientId)
+  const process = byId(data.processes, a.processId)
+  const client = byId(data.clients, a.clientId)
 
   return (
     <>

@@ -12,6 +12,7 @@ import { UserMenu } from "./user-menu"
 import { ROUTE_META } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useIsMac } from "@/lib/core/hooks"
 import { BRAND } from "@/lib/core/brand"
 
@@ -21,12 +22,12 @@ function useBreadcrumb() {
   const data = useOfficeData()
   const [, root, id] = pathname.split("/")
   if (id && root === "clientes") {
-    const c = data.clients.find((x) => x.id === id)
+    const c = byId(data.clients, id)
     return { title: c?.name ?? "Cliente", parent: { label: ROUTE_META["/clientes"].title, href: "/clientes" } }
   }
   if (id === "prazos" && root === "tarefas") return { title: "Prazos", parent: { label: "Tarefas", href: "/tarefas" } }
   if (id && root === "processos") {
-    const p = data.processes.find((x) => x.id === id)
+    const p = byId(data.processes, id)
     return { title: p ? `Processo ${p.code}` : "Processo", parent: { label: ROUTE_META["/processos"].title, href: "/processos" } }
   }
   return undefined

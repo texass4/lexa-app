@@ -10,7 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { TaskCard } from "./task-card"
+import { LimitedList, type MoreFromServer } from "@/components/ui/show-more"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import { describeRelated } from "@/lib/store/selectors"
 import { CATEGORY_COLORS } from "@/lib/core/config"
@@ -165,7 +167,21 @@ function ColumnHeader({ column, count, canDelete, editable }: { column: TaskColu
  * Quadro Kanban das tarefas, com colunas personalizáveis pelo escritório. Recebe
  * a lista já filtrada por escopo/busca de `TasksView` — o agrupamento aqui é só por coluna.
  */
-export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: string) => void }) {
+export function BoardView({
+  tasks,
+  onOpen,
+  history,
+  columnCount,
+  listKey,
+}: {
+  tasks: Task[]
+  onOpen: (id: string) => void
+  /** Concluídas antigas, lidas do banco na coluna de concluídas. */
+  history: MoreFromServer
+  /** Total da coluna (memória + histórico no banco), quando já contado. */
+  columnCount: (columnId: string, items: Task[], first: boolean) => number | undefined
+  listKey: string
+}) {
   const data = useOfficeData()
   const { ensureDefaultTaskColumns, moveTask, deleteTask } = useOfficeActions()
   const editable = useSession().can("tasks.edit")
@@ -200,7 +216,7 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
 
   /** Soltar numa coluna de concluídas é concluir: confirma e permite desfazer. */
   const move = (taskId: string, columnId: string) => {
-    const task = data.tasks.find((t) => t.id === taskId)
+    const task = byId(data.tasks, taskId)
     const from = task?.columnId ?? firstColumnId
     if (!task || from === columnId) return
     const updated = moveTask(taskId, columnId)
@@ -213,6 +229,7 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
     <div className="flex items-start gap-4 overflow-x-auto pb-2 thin-scrollbar">
       {columns.map((column) => {
         const items = tasks.filter((t) => (t.columnId ?? firstColumnId) === column.id)
+        const total = columnCount(column.id, items, column.id === firstColumnId)
         return (
           <div
             key={column.id}
@@ -233,22 +250,33 @@ export function BoardView({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
               dragOver === column.id ? "border-brand bg-brand-soft/30" : "border-border bg-surface-muted/40",
             )}
           >
-            <ColumnHeader column={column} count={items.length} canDelete={columns.length > 1} editable={editable} />
+            <ColumnHeader column={column} count={total ?? items.length} canDelete={columns.length > 1} editable={editable} />
             <div className="flex-1 space-y-2 overflow-y-auto thin-scrollbar pb-1">
-              {items.length === 0 ? (
+              {items.length === 0 && !total ? (
                 <p className="px-1 py-6 text-center text-[12px] text-subtle">{editable ? "Arraste tarefas para cá" : "Sem tarefas"}</p>
               ) : (
-                items.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    related={describeRelated(data, task.related)}
-                    columns={columns}
-                    onOpen={() => onOpen(task.id)}
-                    onDelete={() => setToDelete(task)}
-                    onMove={(columnId) => move(task.id, columnId)}
-                  />
-                ))
+                // Colunas com centenas de cartões (as concluídas): 50 por vez; as antigas vêm do banco.
+                <LimitedList
+                  items={items}
+                  listKey={`${column.id}|${listKey}`}
+                  server={items.some((t) => t.status === "concluida") || column.isDone ? history : undefined}
+                  total={total}
+                  className="mt-2"
+                >
+                  {(visible) =>
+                    visible.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        related={describeRelated(data, task.related)}
+                        columns={columns}
+                        onOpen={() => onOpen(task.id)}
+                        onDelete={() => setToDelete(task)}
+                        onMove={(columnId) => move(task.id, columnId)}
+                      />
+                    ))
+                  }
+                </LimitedList>
               )}
             </div>
           </div>

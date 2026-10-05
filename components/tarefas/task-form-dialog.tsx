@@ -9,6 +9,7 @@ import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { getMembers, currentUserId } from "@/lib/auth/account"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import type { Priority, RelatedEntity, Task } from "@/types"
 
@@ -108,7 +109,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
 
   const activeClients = data.clients.filter((c) => c.status !== "inativo")
   // Aberta pelo perfil do cliente: o vínculo fica restrito ao cliente e aos processos dele.
-  const scopedClient = !task && !defaults?.processId && defaults?.clientId ? data.clients.find((c) => c.id === defaults.clientId) : undefined
+  const scopedClient = !task && !defaults?.processId && defaults?.clientId ? byId(data.clients, defaults.clientId) : undefined
 
   return (
     <>
@@ -144,7 +145,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
                     .filter((p) => p.status !== "concluido")
                     .map((p) => (
                       <option key={p.id} value={`process:${p.id}`}>
-                        {p.code} — {data.clients.find((c) => c.id === p.clientId)?.name} · {p.type}
+                        {p.code} — {byId(data.clients, p.clientId)?.name} · {p.type}
                       </option>
                     ))}
                 </optgroup>

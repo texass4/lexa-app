@@ -20,7 +20,11 @@ import { TaskFormDialog } from "./task-form-dialog"
 import { BoardView } from "./board-view"
 import { useToggleTask } from "./task-row"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
-import { useWholeCollection } from "@/lib/store/on-demand"
+import { byId } from "@/lib/store/indexes"
+import { useDebounced, useHistoryStats, usePagedHistory } from "@/lib/store/on-demand"
+import { completedKey, completedTasks, taskSearch } from "@/lib/store/history-lists"
+import { searchFilter } from "@/lib/store/storage"
+import { LimitedList } from "@/components/ui/show-more"
 import { useUI } from "@/lib/store/ui-store"
 import { createLocalStore } from "@/lib/core/hooks"
 import { addDays, getNow, monthShort, startOfWeek, weekdayName } from "@/lib/core/dates"
@@ -65,15 +69,13 @@ const isFilter = (value: string | null): value is Filter => !!value && value in 
 
 export function TasksView() {
   const data = useOfficeData()
-  const { deleteTask } = useOfficeActions()
+  const { deleteTask, windowBounds } = useOfficeActions()
   const { openDialog } = useUI()
   const toggle = useToggleTask()
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
-  // A abertura traz as pendentes e as concluídas nos últimos 30 dias; o histórico vem ao abrir Tarefas.
-  const allTasks = useWholeCollection("tasks")
-  const ready = data.hydrated && allTasks
+  const ready = data.hydrated
   const storedView = (React.useSyncExternalStore(viewStore.subscribe, viewStore.get, viewStore.getServer) as ViewMode) || "board"
   // `?filtro=atrasadas` (links de "o que merece atenção") abre a lista já filtrada.
   const filterParam = params.get("filtro")
@@ -84,7 +86,7 @@ export function TasksView() {
   }
 
   const openId = params.get("tarefa")
-  const openTask = openId ? data.tasks.find((t) => t.id === openId) : undefined
+  const openTask = openId ? byId(data.tasks, openId) : undefined
 
   const [filter, setFilter] = React.useState<Filter>(() => (isFilter(filterParam) ? filterParam : "todas"))
   const [lastFilterParam, setLastFilterParam] = React.useState(filterParam)
@@ -105,17 +107,57 @@ export function TasksView() {
     if (openTask && openTask.assigneeId !== currentUserId()) setScope("escritorio")
   }
 
+  // Pendentes e concluídas há até 30 dias estão na memória; as concluídas antes disso
+  // vêm do banco em páginas (e são contadas lá), e a busca procura também nelas.
+  const bounds = windowBounds()
+  const assignee = scope === "minhas" ? currentUserId() : undefined
+  const search = React.useDeferredValue(query)
+  const term = useDebounced(query.trim())
+  const serverSearch = React.useMemo(() => {
+    const related = [...data.clients.filter((c) => matches(term, c.name)), ...data.processes.filter((p) => matches(term, p.number, p.code))].map(
+      (r) => r.id,
+    )
+    return searchFilter(term, [{ column: "data->related->>id", ids: related }])
+  }, [term, data.clients, data.processes])
+  const historyList = React.useMemo(
+    () => (serverSearch ? taskSearch(term, serverSearch, assignee) : completedTasks(bounds, assignee)),
+    [serverSearch, term, bounds, assignee],
+  )
+  const history = usePagedHistory(historyList, bounds.month, { auto: !!serverSearch })
+  const stats = useHistoryStats<{ assignee_id: string | null; column_id: string | null; total: number }[]>("task_history_counts", {
+    p_before: bounds.month,
+  })
+  const historyCount = (columnId?: string) =>
+    stats?.reduce((n, r) => n + ((!assignee || r.assignee_id === assignee) && (!columnId || r.column_id === columnId) ? Number(r.total) : 0), 0)
+  // Concluídas mostradas só até onde a lista está completa (mais recentes primeiro, sem buracos).
+  const shown = (t: Task) => t.status === "pendente" || history.cursor === null || completedKey(t) >= history.cursor
+  const inWindow = (t: Task) => t.status === "pendente" || completedKey(t) >= bounds.month
+
   const scoped = data.tasks.filter((t) => scope === "escritorio" || t.assigneeId === currentUserId())
   const searched = scoped.filter((t) => {
+    if (!shown(t)) return false
     const r = describeRelated(data, t.related)
-    return matches(query, t.title, t.description, r?.label, r?.kind)
+    return matches(search, t.title, t.description, r?.label, r?.kind)
   })
   const visible = searched.filter((t) => FILTER_TEST[filter](t))
 
-  const counts = Object.fromEntries((Object.keys(FILTER_TEST) as Filter[]).map((f) => [f, scoped.filter(FILTER_TEST[f]).length])) as Record<
-    Filter,
-    number
-  >
+  // Contagens: a janela (na memória) mais o histórico (contado no banco).
+  const windowed = scoped.filter(inWindow)
+  const doneTotal = stats ? windowed.filter((t) => t.status === "concluida").length + (historyCount() ?? 0) : undefined
+  const counts = {
+    ...(Object.fromEntries((Object.keys(FILTER_TEST) as Filter[]).map((f) => [f, windowed.filter(FILTER_TEST[f]).length])) as Record<Filter, number>),
+    concluidas: doneTotal,
+    todas: doneTotal === undefined ? undefined : windowed.filter((t) => t.status === "pendente").length + doneTotal,
+  }
+  // Coluna do quadro: as da janela mais as concluídas antigas daquela coluna (sem coluna = a primeira).
+  const columnCount = (columnId: string, items: Task[], first: boolean) => {
+    if (!stats || search) return undefined
+    const extra = stats.reduce(
+      (n, r) => n + ((!assignee || r.assignee_id === assignee) && (r.column_id === columnId || (first && !r.column_id)) ? Number(r.total) : 0),
+      0,
+    )
+    return items.filter(inWindow).length + extra
+  }
 
   const groups = buckets(getNow())
     .map((b) => ({
@@ -128,7 +170,8 @@ export function TasksView() {
             : a.dueAt.localeCompare(c.dueAt) || PRIORITY_CONFIG[a.priority].order - PRIORITY_CONFIG[c.priority].order,
         ),
     }))
-    .filter((g) => g.items.length > 0)
+    // "Concluídas" aparece mesmo sem nenhuma recente: as antigas estão no banco.
+    .filter((g) => g.items.length > 0 || (g.id === "concluidas" && !search && (filter === "todas" || filter === "concluidas") && !!counts.concluidas))
 
   const setOpen = (id?: string) => router.replace(id ? `${pathname}?tarefa=${id}` : pathname, { scroll: false })
 
@@ -218,7 +261,7 @@ export function TasksView() {
       </div>
 
       {view === "board" ? (
-        <BoardView tasks={searched} onOpen={setOpen} />
+        <BoardView tasks={searched} onOpen={setOpen} history={history} columnCount={columnCount} listKey={`${scope}|${search}`} />
       ) : !ready ? (
         <div className="space-y-5">
           {[3, 2].map((n, i) => (
@@ -270,33 +313,43 @@ export function TasksView() {
                   >
                     <h2 className={cn("text-[13px] font-semibold", g.id === "atrasadas" ? "text-danger" : "text-foreground")}>{g.label}</h2>
                     <span className="tabular rounded-[5px] bg-surface-muted px-1.5 text-[11px] font-medium text-muted-foreground">
-                      {g.items.length}
+                      {g.id === "concluidas" && !search ? (counts.concluidas ?? g.items.length) : g.items.length}
                     </span>
                     {collapsible && <ChevronDown className={cn("size-3.5 text-subtle transition-transform", !collapsed && "rotate-180")} />}
                   </button>
                   {g.hint && <span className="text-[12px] text-subtle">{g.hint}</span>}
                 </header>
                 {!collapsed && (
-                  <ul
-                    className={cn(
-                      "overflow-hidden rounded-[14px] border bg-card shadow-card",
-                      g.id === "atrasadas" ? "border-danger/20" : "border-border",
-                    )}
+                  // Muitas tarefas num grupo: desenha 50 por vez; as concluídas antigas vêm do banco.
+                  <LimitedList
+                    items={g.items}
+                    listKey={`${g.id}|${filter}|${scope}|${search}`}
+                    server={g.id === "concluidas" ? history : undefined}
+                    total={g.id === "concluidas" && !search ? counts.concluidas : undefined}
                   >
-                    <AnimatePresence initial={false}>
-                      {g.items.map((t) => (
-                        <TaskItem
-                          key={t.id}
-                          task={t}
-                          related={describeRelated(data, t.related)}
-                          onToggle={() => toggle(t)}
-                          onEdit={() => setEditing(t)}
-                          onOpen={() => setOpen(t.id)}
-                          onDelete={() => setToDelete(t)}
-                        />
-                      ))}
-                    </AnimatePresence>
-                  </ul>
+                    {(items) => (
+                      <ul
+                        className={cn(
+                          "overflow-hidden rounded-[14px] border bg-card shadow-card",
+                          g.id === "atrasadas" ? "border-danger/20" : "border-border",
+                        )}
+                      >
+                        <AnimatePresence initial={false}>
+                          {items.map((t) => (
+                            <TaskItem
+                              key={t.id}
+                              task={t}
+                              related={describeRelated(data, t.related)}
+                              onToggle={() => toggle(t)}
+                              onEdit={() => setEditing(t)}
+                              onOpen={() => setOpen(t.id)}
+                              onDelete={() => setToDelete(t)}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </ul>
+                    )}
+                  </LimitedList>
                 )}
               </section>
             )

@@ -15,6 +15,7 @@ import { getNow, parse } from "@/lib/core/dates"
 import { lookupProcess, type LookupFailure } from "@/lib/services/processos/client"
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import type { PracticeArea, Process, ProcessStatus } from "@/types"
 import { LookupFailed, LookupFound, LookupProgress, summaryFromProcess, summaryFromSheet, type LookupSummary } from "./process-lookup-status"
 import { AUTO_REFRESH_AFTER_MS } from "./use-process-refresh"
@@ -117,10 +118,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
   const linked = lookup.state === "filled" && lookup.cnj === digits ? lookup : null
   const findByCnj = (cnj: string) => data.processes.find((p) => (p.cnj ?? onlyDigits(p.number)) === cnj)
   // Contato sem CPF/CNPJ não pode ter processo vinculado (o banco também recusa, `0010_contacts.sql`).
-  const clientIssue = documentRequiredIssue(
-    data.clients.find((c) => c.id === form.clientId),
-    "processo",
-  )
+  const clientIssue = documentRequiredIssue(byId(data.clients, form.clientId), "processo")
 
   const autofill = async () => {
     // A consulta já salva o processo com o cliente escolhido.
@@ -288,7 +286,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
       }
       if (result.status === "error") return
       onClose()
-      const saved = data.processes.find((p) => p.id === linked.processId)
+      const saved = byId(data.processes, linked.processId)
       if (result.status === "saved" && saved)
         toast.success("Processo salvo.", { description: `${saved.code} · ${patch.type}`, action: open(saved.id) })
       return

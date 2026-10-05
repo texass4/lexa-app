@@ -28,11 +28,14 @@ import { TaskRow } from "@/components/tarefas/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
 import { useProcessRefresh } from "./use-process-refresh"
-import { useProcessDetail } from "@/lib/store/on-demand"
+import { usePagedHistory, useProcessDetail } from "@/lib/store/on-demand"
+import { activitiesOf, activityKey, NO_WINDOW } from "@/lib/store/history-lists"
+import { LimitedList } from "@/components/ui/show-more"
 import { ProcessTriagePanel } from "@/components/triagem/process-triage"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import { PROCESS_STATUS } from "@/lib/core/config"
 import { useCategoryLookup } from "@/components/agenda/use-category"
@@ -89,7 +92,7 @@ export function ProcessProfile({ id }: { id: string }) {
   const router = useRouter()
   const lookup = useCategoryLookup()
   const ready = data.hydrated
-  const process = data.processes.find((p) => p.id === id)
+  const process = byId(data.processes, id)
   const [deleting, setDeleting] = React.useState(false)
   const { can } = useSession()
   const [measure, width] = useElementWidth()
@@ -98,6 +101,10 @@ export function ProcessProfile({ id }: { id: string }) {
   const tabsAnchor = React.useRef<HTMLDivElement>(null)
   // O resumo (listas, Painel) já mostra o topo; o histórico e o que é do processo vêm agora.
   const detail = useProcessDetail(process?.id)
+  // Histórico do escritório no processo: cresce sem limite — vem do banco em páginas.
+  const processId = process?.id
+  const activityList = React.useMemo(() => (processId ? activitiesOf({ processId }) : null), [processId])
+  const activityHistory = usePagedHistory(activityList, NO_WINDOW, { auto: true })
   // Mostra o que está salvo na hora e atualiza em segundo plano quando vencido.
   const refresh = useProcessRefresh(process)
 
@@ -136,7 +143,7 @@ export function ProcessProfile({ id }: { id: string }) {
     )
   }
 
-  const client = data.clients.find((c) => c.id === process.clientId)
+  const client = byId(data.clients, process.clientId)
   const owner = getUser(process.ownerId)
   const status = PROCESS_STATUS[process.status]
   const tasks = data.tasks
@@ -151,7 +158,10 @@ export function ProcessProfile({ id }: { id: string }) {
   const deadlineDiff = next ? diffInDays(parse(next.fatalDate), getNow()) : undefined
   const urgentDeadline = deadlineDiff !== undefined && deadlineDiff <= PRAZO_ALERT_DAYS.soon
   // Timeline do processo: o que a equipe registrou (prazos cumpridos/perdidos, tarefas, documentos…).
-  const activities = data.activities.filter((a) => a.processId === process.id).sort((a, b) => b.at.localeCompare(a.at))
+  const activities = data.activities
+    .filter((a) => a.processId === process.id && (activityHistory.cursor === null || activityKey(a) >= activityHistory.cursor))
+    .sort((a, b) => b.at.localeCompare(a.at))
+  const activityTotal = activityHistory.total ?? activities.length
   // Memoizado por identidade do array dentro do interpretador.
   const movements = interpretMovements(process.movements, process.id)
 
@@ -381,7 +391,9 @@ export function ProcessProfile({ id }: { id: string }) {
     <Panel>
       <PanelHeader title="Histórico do escritório" description="Prazos, tarefas e registros da equipe neste processo" />
       <div className="px-5 pt-2 pb-6 sm:px-6">
-        <ActivityTimeline activities={activities.slice(0, 30)} />
+        <LimitedList items={activities} listKey={process.id} server={activityHistory} total={activityHistory.total}>
+          {(items) => <ActivityTimeline activities={items} />}
+        </LimitedList>
       </div>
     </Panel>
   )
@@ -526,7 +538,7 @@ export function ProcessProfile({ id }: { id: string }) {
     { value: "prazos", label: "Prazos e tarefas", count: openPrazos + pendingTasks },
     { value: "documentos", label: "Documentos", count: documents.length },
     { value: "dados", label: "Dados" },
-    ...(activities.length ? [{ value: "historico" as const, label: "Histórico", count: activities.length }] : []),
+    ...(activityTotal ? [{ value: "historico" as const, label: "Histórico", count: activityTotal }] : []),
   ]
   const current = sections.some((s) => s.value === section) ? section : "movimentacoes"
 

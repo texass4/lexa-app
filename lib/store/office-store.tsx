@@ -19,10 +19,22 @@ import { getSupabase } from "@/lib/supabase/client"
 import { useSession } from "@/lib/auth/session"
 import { withoutFinance } from "@/lib/financeiro/access"
 import { useSplashReady } from "@/components/layout/app-splash"
-import { COLLECTION_LABELS, initialScopes, loadScopes, type Collection, type PersistedState, type Scope, type Snapshot } from "./storage"
-import { OfficeSync, REVALIDATE_AFTER_HIDDEN_MS, type SaveResult, type SyncNotice } from "./office-sync"
+import {
+  COLLECTION_LABELS,
+  fetchAll,
+  fetchStats,
+  initialScopes,
+  loadScopes,
+  windowBounds,
+  type Collection,
+  type PersistedState,
+  type Scope,
+  type Snapshot,
+  type WindowBounds,
+} from "./storage"
+import { OfficeSync, REVALIDATE_AFTER_HIDDEN_MS, type PageState, type PagedList, type SaveResult, type SyncNotice } from "./office-sync"
 
-export type { SaveResult } from "./office-sync"
+export type { PageState, PagedList, SaveResult } from "./office-sync"
 
 /**
  * Store da aplicação, com os dados do escritório de quem está logado — uma cópia
@@ -180,6 +192,16 @@ interface OfficeActions {
   ensureFullProcesses(ids: string[]): Promise<void>
   /** Os dados como estão agora (para quem esperou uma carga sob demanda antes de ler). */
   currentState(): PersistedState
+  /** Início das janelas da abertura: o que é anterior é o histórico (lido em páginas). */
+  windowBounds(): WindowBounds
+  /** Próxima página de uma lista do histórico (ou de uma busca no banco). */
+  loadNextPage<T>(list: PagedList<T>): Promise<void>
+  /** Até onde a lista já foi lida. */
+  pageState(listId: string): PageState | undefined
+  /** Contagens do histórico, calculadas no banco (funções `*_history_*`). */
+  fetchStats<T>(fn: string, args: Record<string, string>): Promise<T>
+  /** A coleção inteira direto do banco, sem passar pelo store (exportar relatório). */
+  fetchAll<T extends { id: string }>(key: Collection): Promise<T[]>
 }
 
 const DataContext = React.createContext<OfficeState | null>(null)
@@ -196,8 +218,13 @@ const base = () => ({ organizationId: account.currentOrgId(), createdAt: nowISO(
  */
 let preloaded: Promise<{ snapshot: Snapshot; scopes: Scope[] }> | null = null
 
+/** Janelas da carga em uso (a mesma data das `initialScopes`). */
+let bounds: WindowBounds = windowBounds(getNow())
+
 function startInitialLoad() {
-  const scopes = initialScopes(getNow())
+  const now = getNow()
+  bounds = windowBounds(now)
+  const scopes = initialScopes(now)
   return loadScopes(getSupabase(), scopes).then((snapshot) => ({ snapshot, scopes }))
 }
 
@@ -1149,6 +1176,11 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
       isLoaded: (scopeId) => sync.isLoaded(scopeId),
       ensureFullProcesses: (ids) => sync.ensureFullProcesses(ids),
       currentState: () => stateRef.current,
+      windowBounds: () => bounds,
+      loadNextPage: (list) => sync.loadNextPage(list),
+      pageState: (listId) => sync.pageState(listId),
+      fetchStats: (fn, args) => fetchStats(getSupabase(), fn, args),
+      fetchAll: (key) => fetchAll(getSupabase(), key),
     }
   }, [sync])
 

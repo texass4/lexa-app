@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import { useOfficeActions, useOfficeData } from "./office-store"
+import { useOfficeActions, useOfficeData, type PagedList } from "./office-store"
 import { getNow } from "@/lib/core/dates"
-import { appointmentsBetween, clientScopes, daysBefore, processScopes, RECENT_APPOINTMENT_DAYS, wholeCollection, type Collection, type Scope } from "./storage"
+import { appointmentsBetween, clientScopes, daysBefore, processScopes, RECENT_APPOINTMENT_DAYS, type Scope } from "./storage"
 
 /**
  * Dados sob demanda. A abertura do Íntegra traz só o que a primeira tela usa
@@ -38,12 +38,6 @@ export function useEnsureScopes(scopes: Scope[] | null): boolean {
   }, [key, ready, ensureScopes])
 
   return ready
-}
-
-/** A coleção inteira (Documentos, Financeiro, Tarefas, Prazos, busca global). */
-export function useWholeCollection(key: Collection | null): boolean {
-  const scopes = React.useMemo(() => (key ? [wholeCollection(key)] : null), [key])
-  return useEnsureScopes(scopes)
 }
 
 /**
@@ -89,4 +83,101 @@ export function useAppointmentsRange(from: string, to: string): boolean {
   const covered = from >= daysBefore(getNow(), RECENT_APPOINTMENT_DAYS)
   const scopes = React.useMemo(() => (covered ? null : [appointmentsBetween(from, to)]), [covered, from, to])
   return useEnsureScopes(scopes)
+}
+
+/**
+ * Lista do histórico lida em páginas (mais recentes primeiro), por cima do que a
+ * abertura já trouxe. Devolve até onde a lista está completa na memória:
+ *
+ * - `cursor`: a tela mostra só os registros com chave de ordem `>= cursor` — mais
+ *   recentes que isso, nada falta (a janela da abertura vai até `boundary`; cada
+ *   página lida avança o cursor). `null` quando não há mais nada no banco.
+ * - `more()`: lê a próxima página. Com `auto`, a primeira é lida ao montar (busca).
+ *
+ * `list` nulo: nada a ler (a tela mostra tudo o que tem).
+ */
+export function usePagedHistory<T>(list: PagedList<T> | null, boundary: string, options: { auto?: boolean } = {}) {
+  const { loadNextPage, pageState } = useOfficeActions()
+  const data = useOfficeData()
+  const [, rerender] = React.useReducer((n: number) => n + 1, 0)
+  const [loading, setLoading] = React.useState<string | null>(null)
+  const state = list ? pageState(list.id) : undefined
+  const listRef = React.useRef(list)
+  React.useEffect(() => {
+    listRef.current = list
+  })
+
+  const more = React.useCallback(() => {
+    const current = listRef.current
+    if (!current) return
+    setLoading(current.id)
+    loadNextPage(current).then(
+      () => {
+        setLoading((id) => (id === current.id ? null : id))
+        rerender()
+      },
+      (error) => {
+        setLoading((id) => (id === current.id ? null : id))
+        console.error("[histórico] Não foi possível carregar:", current.id, error)
+        toast.error("Não foi possível carregar mais registros.", { id: "history", description: "Verifique a conexão e tente de novo." })
+      },
+    )
+  }, [loadNextPage])
+
+  const id = list?.id
+  const auto = !!options.auto && !!id && !state && data.hydrated
+  React.useEffect(() => {
+    if (auto) more()
+  }, [auto, id, more])
+
+  if (!list) return { cursor: null, done: true, total: undefined, loading: false, more }
+  return {
+    cursor: state?.done ? null : (state?.cursor ?? boundary),
+    done: !!state?.done,
+    total: state?.total,
+    loading: loading === list.id || (auto && !state),
+    more,
+  }
+}
+
+const statsCache = new Map<string, unknown>()
+
+/**
+ * Contagens do histórico calculadas no banco (uma consulta por tela). Relidas a cada
+ * vez que a tela abre; enquanto isso, valem as da última vez.
+ */
+export function useHistoryStats<T>(fn: string, args: Record<string, string> | null): T | undefined {
+  const { fetchStats } = useOfficeActions()
+  const key = args ? `${fn}:${JSON.stringify(args)}` : null
+  const [result, setResult] = React.useState<{ key: string; value: T } | null>(null)
+
+  React.useEffect(() => {
+    if (!key || !args) return
+    let alive = true
+    fetchStats<T>(fn, args).then(
+      (value) => {
+        statsCache.set(key, value)
+        if (alive) setResult({ key, value })
+      },
+      (error) => console.error("[histórico] Não foi possível contar:", fn, error),
+    )
+    return () => {
+      alive = false
+    }
+    // `key` resume `fn` e `args`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, fetchStats])
+
+  if (!key) return undefined
+  return result?.key === key ? result.value : (statsCache.get(key) as T | undefined)
+}
+
+/** O valor depois de `ms` sem mudar (busca no banco só quando a pessoa para de digitar). */
+export function useDebounced<T>(value: T, ms = 300): T {
+  const [settled, setSettled] = React.useState(value)
+  React.useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), ms)
+    return () => clearTimeout(timer)
+  }, [value, ms])
+  return settled
 }

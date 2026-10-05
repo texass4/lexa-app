@@ -5,6 +5,7 @@ import { ArrowDownRight, ArrowUpRight, Landmark } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { financeSummary, monthlyRevenue, openReceivables } from "@/lib/store/selectors"
 import { overdueInvoices } from "@/lib/dashboard/dashboard"
 import { formatCurrency } from "@/lib/core/format"
@@ -98,7 +99,7 @@ export function FinancePanel() {
         {late.length ? (
           <ul className="mt-2 space-y-0.5">
             {late.slice(0, 3).map(({ invoice, daysLate }) => {
-              const client = data.clients.find((c) => c.id === invoice.clientId)
+              const client = byId(data.clients, invoice.clientId)
               return (
                 <li key={invoice.id}>
                   <Link

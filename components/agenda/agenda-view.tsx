@@ -14,6 +14,7 @@ import { AgendaList } from "./agenda-list"
 import { AppointmentDetail } from "./appointment-detail"
 import { AgendaToday } from "./agenda-today"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useAppointmentsRange } from "@/lib/store/on-demand"
 import { fmtSlot, moveAppointment, moveToDay } from "@/lib/agenda/agenda"
 import { useUI } from "@/lib/store/ui-store"
@@ -87,7 +88,7 @@ export function AgendaView() {
         ? isSameDay(weekStart, startOfWeek(getNow()))
         : anchor.getMonth() === getNow().getMonth()
 
-  const processCode = (id?: string) => data.processes.find((p) => p.id === id)?.code
+  const processCode = (id?: string) => byId(data.processes, id)?.code
 
   /** Arrastar na agenda: grava o novo horário (mesma duração) e oferece desfazer. */
   const reschedule = async (a: Appointment, next: { start: string; end: string }) => {

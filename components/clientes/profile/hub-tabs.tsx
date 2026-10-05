@@ -23,6 +23,11 @@ import { AppointmentDetail } from "@/components/agenda/appointment-detail"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
+import { usePagedHistory } from "@/lib/store/on-demand"
+import { activitiesOf, activityKey, NO_WINDOW } from "@/lib/store/history-lists"
+import { LimitedList } from "@/components/ui/show-more"
+import { SkeletonCard } from "@/components/ui/skeleton"
 import { nextPrazo } from "@/lib/prazos/prazos"
 import { useUI } from "@/lib/store/ui-store"
 import { describeRelated, type ClientHub } from "@/lib/store/selectors"
@@ -226,7 +231,7 @@ export function AppointmentsTab({ client, hub }: { client: Client; hub: ClientHu
   const row = (a: Appointment) => {
     const { category, style } = lookup(a.categoryId)
     const owner = getUser(a.ownerId)
-    const process = a.processId ? data.processes.find((p) => p.id === a.processId) : undefined
+    const process = a.processId ? byId(data.processes, a.processId) : undefined
     const { day, month } = fmtDayMonthParts(a.start)
     return (
       <li key={a.id}>
@@ -321,32 +326,47 @@ const TIMELINE_GROUPS: Record<Exclude<TimelineFilter, "todos">, { label: string;
 }
 
 /** Timeline do cliente: só eventos registrados de verdade, com quem fez e quando. */
-export function TimelineTab({ hub }: { hub: ClientHub }) {
+export function TimelineTab({ hub, clientId }: { hub: ClientHub; clientId: string }) {
   const [filter, setFilter] = React.useState<TimelineFilter>("todos")
+  const { pageState } = useOfficeActions()
+  // A timeline cresce sem limite: vem do banco em páginas (só o grupo escolhido).
+  const list = React.useMemo(() => activitiesOf({ clientId }, filter === "todos" ? undefined : TIMELINE_GROUPS[filter].types), [clientId, filter])
+  const history = usePagedHistory(list, NO_WINDOW, { auto: true })
+  const allTotal = pageState(activitiesOf({ clientId }).id)?.total
   const inGroup = (a: Activity, f: TimelineFilter) => f === "todos" || TIMELINE_GROUPS[f].types.includes(a.type)
-  const visible = hub.activities.filter((a) => inGroup(a, filter))
+  const visible = hub.activities.filter((a) => inGroup(a, filter) && (history.cursor === null || activityKey(a) >= history.cursor))
   const options = [
-    { value: "todos" as const, label: "Tudo", count: hub.activities.length },
+    { value: "todos" as const, label: "Tudo", count: allTotal },
     ...(Object.keys(TIMELINE_GROUPS) as (keyof typeof TIMELINE_GROUPS)[])
-      .map((key) => ({ value: key, label: TIMELINE_GROUPS[key].label, count: hub.activities.filter((a) => inGroup(a, key)).length }))
-      .filter((o) => o.count > 0),
+      .map((key) => ({
+        value: key,
+        label: TIMELINE_GROUPS[key].label,
+        count: key === filter ? history.total : undefined,
+        loaded: hub.activities.some((a) => inGroup(a, key)),
+      }))
+      .filter((o) => o.loaded || o.value === filter)
+      .map(({ loaded: _loaded, ...o }) => o),
   ]
 
-  const entries = visible.map((a) => {
+  const toEntry = (a: Activity) => {
     const entry = activityToEntry(a)
     // Quem fez: o nome já está na frase quando `actor` existe; senão, vai no detalhe.
     const by = !a.actor && a.actorUserId ? `por ${getUser(a.actorUserId).name}` : undefined
     return { ...entry, detail: [a.detail, by].filter(Boolean).join(" · ") || undefined }
-  })
+  }
 
   return (
     <div className="space-y-4">
-      {hub.activities.length > 0 && (
+      {(hub.activities.length > 0 || filter !== "todos") && (
         <FilterTabs ariaLabel="Filtrar timeline" layoutId="client-timeline-filter" value={filter} onChange={setFilter} options={options} />
       )}
       <Panel className="p-5 sm:p-7">
-        {entries.length ? (
-          <GroupedTimeline entries={entries} />
+        {visible.length === 0 && history.loading ? (
+          <SkeletonCard lines={4} className="border-0 p-0 shadow-none" />
+        ) : visible.length ? (
+          <LimitedList items={visible} listKey={`${clientId}|${filter}`} server={history} total={history.total}>
+            {(items) => <GroupedTimeline entries={items.map(toEntry)} />}
+          </LimitedList>
         ) : (
           <EmptyState
             compact

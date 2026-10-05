@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { CurrencyInput, Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { INVOICE_CATEGORIES } from "@/lib/core/config"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import { formatCurrency } from "@/lib/core/format"
@@ -114,10 +115,7 @@ function InvoiceForm({ invoice, defaults, onClose }: { invoice?: Invoice; defaul
     if (!form.clientId) next.clientId = "Escolha o cliente."
     // Honorários exigem CPF/CNPJ do cliente (vínculo novo ou trocado; o banco também confere).
     else if (!invoice || invoice.clientId !== form.clientId) {
-      const issue = documentRequiredIssue(
-        data.clients.find((c) => c.id === form.clientId),
-        "fatura",
-      )
+      const issue = documentRequiredIssue(byId(data.clients, form.clientId), "fatura")
       if (issue) next.clientId = issue
     }
     if (!form.category) next.category = "Escolha a categoria."

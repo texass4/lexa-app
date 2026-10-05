@@ -19,6 +19,7 @@ import { AppointmentsTab, DocumentsTab, ProcessesTab, TasksTab, TimelineTab } fr
 import { EditClientDialog } from "./edit-client-dialog"
 import { useClientActions } from "@/components/clientes/client-actions"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useClientDetail } from "@/lib/store/on-demand"
 import { clientFinance, clientHub } from "@/lib/store/selectors"
 import { getNow, toLocalISO } from "@/lib/core/dates"
@@ -81,7 +82,7 @@ export function ClientProfile({ id }: { id: string }) {
   const tab: ProfileTab = tabParam && TABS.includes(tabParam) && allowed(tabParam) ? tabParam : "visao-geral"
   const setTab = (t: ProfileTab) => router.replace(t === "visao-geral" ? pathname : `${pathname}?tab=${t}`, { scroll: false })
 
-  const client = data.clients.find((c) => c.id === id)
+  const client = byId(data.clients, id)
   // Recalcula só quando as coleções mudam, não a cada render.
   const hub = React.useMemo(() => clientHub(data, id), [data, id])
   const finance = React.useMemo(() => (can("finance.view") ? clientFinance(data, id) : undefined), [data, id, can])
@@ -166,7 +167,7 @@ export function ClientProfile({ id }: { id: string }) {
                 {tab === "documentos" && <DocumentsTab client={client} hub={hub} />}
                 {tab === "compromissos" && <AppointmentsTab client={client} hub={hub} />}
                 {tab === "financeiro" && finance && <FinanceTab client={client} finance={finance} />}
-                {tab === "timeline" && <TimelineTab hub={hub} />}
+                {tab === "timeline" && <TimelineTab hub={hub} clientId={client.id} />}
               </>
             )}
           </motion.div>

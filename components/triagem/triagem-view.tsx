@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { SkeletonTable } from "@/components/ui/skeleton"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useSession } from "@/lib/auth/session"
 import { getUser } from "@/lib/auth/account"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
@@ -191,8 +192,8 @@ export function TriagemView() {
                 key={i.id}
                 item={i}
                 today={today}
-                processLabel={processLabel(i, data.processes.find((p) => p.id === i.processId)?.code)}
-                clientName={data.clients.find((c) => c.id === (i.clientId ?? data.processes.find((p) => p.id === i.processId)?.clientId))?.name}
+                processLabel={processLabel(i, byId(data.processes, i.processId)?.code)}
+                clientName={data.clients.find((c) => c.id === (i.clientId ?? byId(data.processes, i.processId)?.clientId))?.name}
                 canConfirm={can("processes.edit")}
                 onOpen={() => select(i.id)}
                 onConfirm={() => setConfirming(i)}

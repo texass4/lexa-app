@@ -6,6 +6,7 @@ import { CalendarDays } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { todaysAppointments } from "@/lib/store/selectors"
 import { EmptyState } from "@/components/ui/empty-state"
 import { PanelLink } from "./panel-link"
@@ -46,7 +47,7 @@ export function TodayAgenda() {
           const { category, style } = lookup(a.categoryId)
           const past = parse(a.end) <= getNow()
           const current = parse(a.start) <= getNow() && parse(a.end) > getNow()
-          const processCode = a.processId ? data.processes.find((p) => p.id === a.processId)?.code : undefined
+          const processCode = a.processId ? byId(data.processes, a.processId)?.code : undefined
           const detail = a.location?.split(" — ")[0] || [a.personName, processCode && `Processo ${processCode}`].filter(Boolean).join(" · ")
           return (
             <li key={a.id} data-now={i === nowIndex ? "" : undefined}>

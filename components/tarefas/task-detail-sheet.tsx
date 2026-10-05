@@ -16,6 +16,7 @@ import { isOverdue } from "@/lib/store/selectors"
 import type { Task } from "@/types"
 import { useSession } from "@/lib/auth/session"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { CLIENT_STATUS, PRAZO_STATUS, PROCESS_STATUS } from "@/lib/core/config"
 import { fmtNumericDate, fmtRelative } from "@/lib/core/dates"
 import { nextPrazo, taskPrazo } from "@/lib/prazos/prazos"
@@ -31,12 +32,12 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
   const lexa = useLexaAI()
   const { can } = useSession()
   const related = task.related
-  const process = related?.type === "process" && can("processes.view") ? data.processes.find((p) => p.id === related.id) : undefined
+  const process = related?.type === "process" && can("processes.view") ? byId(data.processes, related.id) : undefined
   const client =
     related?.type === "client" && can("clients.view")
-      ? data.clients.find((c) => c.id === related.id)
+      ? byId(data.clients, related.id)
       : process && can("clients.view")
-        ? data.clients.find((c) => c.id === process.clientId)
+        ? byId(data.clients, process.clientId)
         : undefined
 
   if (!process && !client) {

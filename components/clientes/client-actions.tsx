@@ -40,7 +40,7 @@ export function useClientActions() {
       // movimentações completas dos processos dele.
       const processIds = data.processes.filter((p) => p.clientId === client.id).map((p) => p.id)
       try {
-        await Promise.all([ensureScopes(clientScopes(client.id, processIds)), ensureFullProcesses(processIds)])
+        await Promise.all([ensureScopes(clientScopes(client.id, processIds, { withActivities: true })), ensureFullProcesses(processIds)])
       } catch (error) {
         console.error("[exportação] Não foi possível carregar os dados do cliente:", error)
         toast.error("Não foi possível exportar agora.", { description: "Verifique a conexão e tente de novo." })

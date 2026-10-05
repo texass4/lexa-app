@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { ArrowUpRight, Sparkles } from "lucide-react"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useSession } from "@/lib/auth/session"
 import { todaysAppointments } from "@/lib/store/selectors"
 import { addDays, fmtFullDate, fmtStartsIn, fmtTime, getNow, parse, startOfDay } from "@/lib/core/dates"
@@ -24,8 +25,8 @@ export function AgendaToday() {
   const next = remaining[0]
   const weekEnd = addDays(startOfDay(now), 7)
   const linkedThisWeek = data.appointments.filter((a) => parse(a.start) >= now && parse(a.start) < weekEnd && (a.processId || a.clientId)).length
-  const client = next?.clientId ? data.clients.find((c) => c.id === next.clientId) : undefined
-  const process = next?.processId ? data.processes.find((p) => p.id === next.processId) : undefined
+  const client = next?.clientId ? byId(data.clients, next.clientId) : undefined
+  const process = next?.processId ? byId(data.processes, next.processId) : undefined
   const category = next ? lookup(next.categoryId) : undefined
 
   return (

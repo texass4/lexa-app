@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { TableShell, Td, Th } from "@/components/ui/data-table"
 import { FadeIn } from "@/components/ui/motion"
+import { ShowMore, useRenderLimit } from "@/components/ui/show-more"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeadlineLabel } from "./deadline-label"
@@ -27,6 +28,7 @@ import { getNow, diffInDays, parse } from "@/lib/core/dates"
 import { matches } from "@/lib/core/format"
 import { getUser } from "@/lib/auth/account"
 import { nextPrazo } from "@/lib/prazos/prazos"
+import { byId } from "@/lib/store/indexes"
 import type { Process, ProcessStatus } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -64,9 +66,12 @@ export function ProcessesView() {
   const filterParam = useSearchParams().get("filtro")
   const [filter, setFilter] = React.useState<Filter>(() => (filterParam === "prazos" ? "prazos" : "todos"))
   const [query, setQuery] = React.useState("")
+  // A busca filtra milhares de processos: o campo responde na hora e a lista acompanha.
+  const search = React.useDeferredValue(query)
   const [toDelete, setToDelete] = React.useState<Process | null>(null)
+  const [limit, showMore] = useRenderLimit(`${filter}|${search}`)
 
-  const clientName = React.useCallback((id: string) => data.clients.find((c) => c.id === id)?.name ?? "", [data.clients])
+  const clientName = React.useCallback((id: string) => byId(data.clients, id)?.name ?? "", [data.clients])
 
   // Próximo prazo aberto de cada processo (os prazos são a fonte de verdade).
   const nextOf = React.useMemo(() => {
@@ -93,27 +98,32 @@ export function ProcessesView() {
   const rows = React.useMemo(
     () =>
       data.processes
-        .filter((p) => test(filter, p) && matches(query, p.number, p.code, p.type, p.area, clientName(p.clientId), p.opposingParty))
+        .filter((p) => test(filter, p) && matches(search, p.number, p.code, p.type, p.area, clientName(p.clientId), p.opposingParty))
         .sort((a, b) => {
           if (a.status === "concluido" && b.status !== "concluido") return 1
           if (b.status === "concluido" && a.status !== "concluido") return -1
           return (nextOf.get(a.id)?.fatalDate ?? "9999").localeCompare(nextOf.get(b.id)?.fatalDate ?? "9999")
         }),
-    [data.processes, filter, query, test, clientName, nextOf],
+    [data.processes, filter, search, test, clientName, nextOf],
   )
+  // Desenha os processos aos poucos (a busca e os filtros valem para todos).
+  const visible = React.useMemo(() => rows.slice(0, limit), [rows, limit])
 
-  // O sinal mais importante de cada processo (prazo, movimentação, parado) — sem IA, só dados.
+  // O sinal mais importante de cada processo na tela (prazo, movimentação, parado) — sem IA, só dados.
   const topSignal = React.useMemo(() => {
     const map = new Map<string, AttentionSignal>()
     if (!ready) return map
-    for (const p of data.processes) {
+    for (const p of visible) {
       const first = processSignals(data, p)[0]
       if (first) map.set(p.id, first)
     }
     return map
-  }, [data, ready])
+  }, [data, ready, visible])
 
-  const counts = Object.fromEntries(FILTERS.map((f) => [f.value, data.processes.filter((p) => test(f.value, p)).length])) as Record<Filter, number>
+  const counts = React.useMemo(
+    () => Object.fromEntries(FILTERS.map((f) => [f.value, data.processes.filter((p) => test(f.value, p)).length])) as Record<Filter, number>,
+    [data.processes, test],
+  )
 
   return (
     <div className="space-y-6">
@@ -182,7 +192,7 @@ export function ProcessesView() {
                   </tr>
                 </thead>
                 <tbody className="[&_tr:last-child_td]:border-0">
-                  {rows.map((p) => {
+                  {visible.map((p) => {
                     const status = PROCESS_STATUS[p.status]
                     const owner = getUser(p.ownerId)
                     const client = clientName(p.clientId)
@@ -260,12 +270,15 @@ export function ProcessesView() {
               </table>
             </div>
             <div className="border-t border-border bg-surface-muted/30 px-5 py-2.5 text-[12px] text-muted-foreground">
-              {rows.length} de {data.processes.length} processos · ordenados pelo próximo prazo
+              {visible.length < rows.length
+                ? `${visible.length} de ${rows.length} processos encontrados`
+                : `${rows.length} de ${data.processes.length} processos`}{" "}
+              · ordenados pelo próximo prazo
             </div>
           </TableShell>
 
           <ul className="space-y-2.5 @4xl/main:hidden">
-            {rows.map((p) => {
+            {visible.map((p) => {
               const status = PROCESS_STATUS[p.status]
               return (
                 <li key={p.id}>
@@ -301,6 +314,7 @@ export function ProcessesView() {
               )
             })}
           </ul>
+          {rows.length > visible.length && <ShowMore remaining={rows.length - visible.length} onClick={showMore} />}
         </FadeIn>
       )}
 

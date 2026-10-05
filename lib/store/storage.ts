@@ -17,6 +17,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalize } from "@/lib/core/format"
 import type {
   Activity,
   Appointment,
@@ -206,8 +207,11 @@ export interface ScopeFilter {
   /** Condições em OU (`or` do PostgREST), ex.: `data->>status.eq.pendente,data->>completedAt.gte.2026-01-01`. */
   or?: string
   eq?: [column: string, value: string][]
+  neq?: [column: string, value: string][]
   gte?: [column: string, value: string][]
   lt?: [column: string, value: string][]
+  in?: [column: string, values: string[]][]
+  notIn?: [column: string, values: string[]][]
 }
 
 /** Um recorte de uma coleção: tudo, uma janela de datas, um processo, um cliente. */
@@ -216,8 +220,12 @@ export interface Scope {
   /** Identidade do recorte: a mesma leitura não é feita duas vezes. */
   id: string
   filter?: ScopeFilter
-  /** Só os N registros mais recentes (por `created_at`). */
+  /** Só os N registros mais recentes (por `order`, ou `created_at`). */
   latest?: number
+  /** Coluna da ordem decrescente de `latest` (ex.: `data->>completedAt`); vazios por último. */
+  order?: string
+  /** Com `latest`: quantos pular (página seguinte do histórico). */
+  offset?: number
   /** Visão de onde vêm os dados (ex.: `processes_summary`, sem o histórico de movimentações). */
   view?: string
   /**
@@ -229,34 +237,104 @@ export interface Scope {
 }
 
 /** Lê id + versão (manifesto) ou a linha inteira de um recorte, já com filtro e ordem. */
-function scopedQuery(supabase: SupabaseClient, scope: Scope, columns: string, source: string) {
-  let query = supabase.from(source).select(columns)
+function scopedQuery(supabase: SupabaseClient, scope: Scope, columns: string, source: string, count?: "exact") {
+  let query = supabase.from(source).select(columns, count ? { count } : undefined)
   const { filter } = scope
   if (filter?.or) query = query.or(filter.or)
   for (const [column, value] of filter?.eq ?? []) query = query.eq(column, value)
+  for (const [column, value] of filter?.neq ?? []) query = query.neq(column, value)
   for (const [column, value] of filter?.gte ?? []) query = query.gte(column, value)
   for (const [column, value] of filter?.lt ?? []) query = query.lt(column, value)
-  return scope.latest ? query.order("created_at", { ascending: false }).order("id", { ascending: false }) : query.order("created_at").order("id")
+  for (const [column, values] of filter?.in ?? []) query = query.in(column, values)
+  for (const [column, values] of filter?.notIn ?? []) query = query.not(column, "in", `(${values.map(pgValue).join(",")})`)
+  return scope.latest
+    ? query.order(scope.order ?? "created_at", { ascending: false, nullsFirst: false }).order("id", { ascending: false })
+    : query.order("created_at").order("id")
 }
 
-async function readScope<T>(supabase: SupabaseClient, scope: Scope, columns: string, source: string): Promise<T[]> {
+type Read<T> = { rows: T[]; total?: number }
+
+async function readScope<T>(supabase: SupabaseClient, scope: Scope, columns: string, source: string, withTotal = false): Promise<Read<T>> {
+  const count = withTotal ? ("exact" as const) : undefined
   if (scope.latest) {
-    const { data, error } = await scopedQuery(supabase, scope, columns, source).limit(scope.latest)
+    const from = scope.offset ?? 0
+    const { data, error, count: total } = await scopedQuery(supabase, scope, columns, source, count).range(from, from + scope.latest - 1)
     if (error) throw error
-    return data as T[]
+    return { rows: data as T[], total: total ?? undefined }
   }
-  const rows: T[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await scopedQuery(supabase, scope, columns, source).range(from, from + PAGE - 1)
-    if (error) throw error
-    rows.push(...(data as T[]))
-    if (data.length < PAGE) return rows
+  // Primeira página com o total; as demais em paralelo (não uma depois da outra).
+  const first = await scopedQuery(supabase, scope, columns, source, "exact").range(0, PAGE - 1)
+  if (first.error) throw first.error
+  const rows = [...(first.data as T[])]
+  const total = first.count ?? rows.length
+  if (rows.length < PAGE || total <= PAGE) return { rows, total }
+  const rest = await Promise.all(
+    Array.from({ length: Math.ceil(total / PAGE) - 1 }, (_, i) => scopedQuery(supabase, scope, columns, source).range((i + 1) * PAGE, (i + 2) * PAGE - 1)),
+  )
+  for (const page of rest) {
+    if (page.error) throw page.error
+    rows.push(...(page.data as T[]))
   }
+  // O que entrar enquanto lê chega pelo tempo real (e pela revalidação ao conectar).
+  return { rows: dedupe(rows), total }
+}
+
+/** Páginas lidas em paralelo podem repetir um registro se a lista mudou no meio. */
+function dedupe<T>(rows: T[]): T[] {
+  const seen = new Set<string>()
+  return rows.filter((row) => {
+    const id = (row as { id?: string }).id
+    if (!id) return true
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
 }
 
 /** Linhas de um recorte (com a versão de cada uma). */
-export function loadScope(supabase: SupabaseClient, scope: Scope): Promise<ServerRow[]> {
-  return readScope<ServerRow>(supabase, scope, "id, data, updated_at", scope.view ?? TABLES[scope.key])
+export async function loadScope(supabase: SupabaseClient, scope: Scope): Promise<ServerRow[]> {
+  return (await readScope<ServerRow>(supabase, scope, "id, data, updated_at", scope.view ?? TABLES[scope.key])).rows
+}
+
+/** Uma página de um recorte (`latest` + `offset`), com o total do recorte quando pedido. */
+export function loadPage(supabase: SupabaseClient, scope: Scope, withTotal: boolean): Promise<Read<ServerRow>> {
+  return readScope<ServerRow>(supabase, scope, "id, data, updated_at", scope.view ?? TABLES[scope.key], withTotal)
+}
+
+/** A coleção inteira, direto do banco e sem passar pelo store (ex.: exportar um relatório). */
+export async function fetchAll<T extends Entity>(supabase: SupabaseClient, key: Collection): Promise<T[]> {
+  return (await readScope<ServerRow<T>>(supabase, { key, id: `${key}:exportar` }, "id, data", TABLES[key])).rows.map((row) => row.data)
+}
+
+/** Contagens do histórico (funções `*_history_*` da migração 0017; RLS de quem chama). */
+export async function fetchStats<T>(supabase: SupabaseClient, fn: string, args: Record<string, string>): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, args)
+  if (error) throw error
+  return data as T
+}
+
+/** Valor seguro dentro de `or`/`in` do PostgREST (vírgula, ponto, parênteses e espaço pedem aspas). */
+export function pgValue(value: string): string {
+  return /[,.:()"\\\s]/.test(value) ? `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"` : value
+}
+
+/** Ids no máximo por vínculo na busca no banco (acima disso o termo é genérico demais). */
+const SEARCH_RELATED_MAX = 50
+
+/**
+ * Busca no banco, com a regra da busca da tela (`matches`: sem acento, minúsculas,
+ * trecho): a coluna `search` do registro ou o vínculo com clientes/processos cujo
+ * nome ou número bate com o termo (esses já estão na memória). `null` se o termo é
+ * curto demais para ir ao banco.
+ */
+export function searchFilter(query: string, related: { column: string; ids: string[] }[] = []): ScopeFilter | null {
+  const q = normalize(query.trim()).replace(/[*%]/g, " ").replace(/\s+/g, " ").trim()
+  if (q.length < 2) return null
+  const parts = [`search.ilike.${pgValue(`*${q}*`)}`]
+  for (const { column, ids } of related) {
+    if (ids.length) parts.push(`${column}.in.(${ids.slice(0, SEARCH_RELATED_MAX).map(pgValue).join(",")})`)
+  }
+  return { or: parts.join(",") }
 }
 
 /** `YYYY-MM-DD` de `days` dias antes de `now` (horário local, como as datas guardadas). */
@@ -272,16 +350,36 @@ export const RECENT_NOTIFICATIONS = 500
 export const RECENT_APPOINTMENT_DAYS = 45
 
 /**
+ * Início das janelas da abertura (`YYYY-MM-DD`). O que é anterior a elas é o
+ * histórico, lido em páginas pelas telas (e contado pelas funções `*_history_*`).
+ */
+export interface WindowBounds {
+  /** Tarefas e prazos encerrados, notificações lidas: 30 dias. */
+  month: string
+  appointments: string
+  documents: string
+  /** Receita do Painel e do Financeiro: os últimos 6 meses e o ano corrente. */
+  finance: string
+}
+
+export function windowBounds(now: Date): WindowBounds {
+  const sixMonths = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  return {
+    month: daysBefore(now, 30),
+    appointments: daysBefore(now, RECENT_APPOINTMENT_DAYS),
+    documents: daysBefore(now, 14),
+    finance: daysBefore(sixMonths.getFullYear() < now.getFullYear() ? sixMonths : new Date(now.getFullYear(), 0, 1), 0),
+  }
+}
+
+/**
  * O que a abertura do Íntegra carrega: só o que a primeira tela e a navegação usam.
  * O histórico (tarefas e prazos encerrados há mais de 30 dias, compromissos antigos,
  * documentos, lançamentos antigos, atividades além das recentes, movimentações dos
  * processos) vem sob demanda, quando a pessoa abre a tela ou o registro.
  */
 export function initialScopes(now: Date): Scope[] {
-  const month = daysBefore(now, 30)
-  // Receita do Painel e do Financeiro: os últimos 6 meses e o ano corrente.
-  const sixMonths = new Date(now.getFullYear(), now.getMonth() - 5, 1)
-  const financeFrom = daysBefore(sixMonths.getFullYear() < now.getFullYear() ? sixMonths : new Date(now.getFullYear(), 0, 1), 0)
+  const { month, documents, appointments, finance: financeFrom } = windowBounds(now)
   return [
     { key: "clients", id: "clients" },
     { key: "processes", id: "processes:resumo", view: "processes_summary" },
@@ -289,8 +387,8 @@ export function initialScopes(now: Date): Scope[] {
     { key: "appointmentCategories", id: "appointmentCategories" },
     { key: "tasks", id: "tasks:abertas", filter: { or: `data->>status.eq.pendente,data->>completedAt.gte.${month}` } },
     { key: "deadlines", id: "deadlines:abertos", filter: { or: `data->>status.eq.aberto,data->>closedAt.gte.${month}` } },
-    { key: "appointments", id: "appointments:recentes", filter: { gte: [["data->>start", daysBefore(now, RECENT_APPOINTMENT_DAYS)]] } },
-    { key: "documents", id: "documents:recentes", filter: { gte: [["data->>uploadedAt", daysBefore(now, 14)]] } },
+    { key: "appointments", id: "appointments:recentes", filter: { gte: [["data->>start", appointments]] } },
+    { key: "documents", id: "documents:recentes", filter: { gte: [["data->>uploadedAt", documents]] } },
     {
       key: "invoices",
       id: "invoices:abertos",
@@ -301,10 +399,10 @@ export function initialScopes(now: Date): Scope[] {
   ]
 }
 
-/** A coleção inteira (telas que listam todo o histórico: Documentos, Financeiro, Tarefas, Prazos). */
-export const wholeCollection = (key: Collection): Scope => ({ key, id: `${key}:tudo` })
-
-/** O que um processo mostra além do resumo: tarefas, prazos, documentos, compromissos e atividades dele. */
+/**
+ * O que um processo mostra além do resumo: tarefas, prazos, documentos e compromissos
+ * dele. As atividades (que crescem sem limite) vêm em páginas (`activitiesOf`).
+ */
 export function processScopes(processId: string): Scope[] {
   const byData = (key: Collection): Scope => ({ key, id: `${key}:processo:${processId}`, entity: true, filter: { eq: [["data->>processId", processId]] } })
   return [
@@ -312,12 +410,15 @@ export function processScopes(processId: string): Scope[] {
     { key: "deadlines", id: `deadlines:processo:${processId}`, entity: true, filter: { eq: [["process_id", processId]] } },
     byData("documents"),
     byData("appointments"),
-    byData("activities"),
   ]
 }
 
-/** O que o perfil do cliente mostra: tarefas (dele e dos processos dele), prazos, documentos, compromissos, lançamentos e atividades. */
-export function clientScopes(clientId: string, processIds: string[]): Scope[] {
+/**
+ * O que o perfil do cliente mostra: tarefas (dele e dos processos dele), prazos,
+ * documentos, compromissos e lançamentos. As atividades vêm em páginas na timeline
+ * (`activitiesOf`); `withActivities` traz todas (exportar a ficha do cliente).
+ */
+export function clientScopes(clientId: string, processIds: string[], options: { withActivities?: boolean } = {}): Scope[] {
   const byData = (key: Collection): Scope => ({ key, id: `${key}:cliente:${clientId}`, entity: true, filter: { eq: [["data->>clientId", clientId]] } })
   const related = [`data->related->>id.eq.${clientId}`, ...(processIds.length ? [`data->related->>id.in.(${processIds.join(",")})`] : [])]
   return [
@@ -327,7 +428,7 @@ export function clientScopes(clientId: string, processIds: string[]): Scope[] {
     byData("documents"),
     byData("appointments"),
     byData("invoices"),
-    byData("activities"),
+    ...(options.withActivities ? [byData("activities")] : []),
   ]
 }
 
@@ -359,7 +460,7 @@ export async function loadScopes(supabase: SupabaseClient, scopes: Scope[]): Pro
  * tabela (não da visão) com o mesmo filtro — mostra o que mudou sem baixar os dados.
  */
 export async function fetchManifest(supabase: SupabaseClient, scope: Scope): Promise<Map<string, string>> {
-  const rows = await readScope<{ id: string; updated_at: string }>(supabase, scope, "id, updated_at", TABLES[scope.key])
+  const { rows } = await readScope<{ id: string; updated_at: string }>(supabase, scope, "id, updated_at", TABLES[scope.key])
   return new Map(rows.map((row) => [row.id, row.updated_at]))
 }
 

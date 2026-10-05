@@ -76,6 +76,8 @@ export function ClientsView() {
   const [filter, setFilter] = React.useState<Filter>("todos")
   const [importing, setImporting] = React.useState(false)
   const [query, setQuery] = React.useState("")
+  // A busca percorre milhares de clientes: o campo responde na hora e a lista acompanha.
+  const search = React.useDeferredValue(query)
   const [ownerId, setOwnerId] = React.useState("")
   const [area, setArea] = React.useState<PracticeArea | "">("")
   const [kind, setKind] = React.useState<Client["kind"] | "">("")
@@ -126,7 +128,7 @@ export function ClientsView() {
 
   const searchable = React.useCallback(
     (c: Client) => {
-      const q = query.trim()
+      const q = search.trim()
       if (!q) return true
       const digits = onlyDigits(q)
       if (digits.length >= 3 && digits.length === q.replace(/[\s.\-/()]/g, "").length) {
@@ -135,7 +137,7 @@ export function ClientsView() {
       }
       return matches(q, c.name, c.area, c.email, c.document, c.phone, c.whatsapp, c.contact?.name, processText.get(c.id), ...(c.tags ?? []))
     },
-    [query, processText],
+    [search, processText],
   )
 
   const testStatus = React.useCallback(
@@ -184,7 +186,7 @@ export function ClientsView() {
   }
 
   // Mudou o filtro, volta para a primeira página.
-  const filterKey = [filter, query, ownerId, area, kind, links].join("|")
+  const filterKey = [filter, search, ownerId, area, kind, links].join("|")
   const [lastKey, setLastKey] = React.useState(filterKey)
   if (filterKey !== lastKey) {
     setLastKey(filterKey)

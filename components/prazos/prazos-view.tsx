@@ -17,8 +17,12 @@ import { getMembers } from "@/lib/auth/account"
 import { getNow } from "@/lib/core/dates"
 import { matches } from "@/lib/core/format"
 import { PRAZO_PERIOD_LABEL, daysToPrazo, isOpenPrazo, prazoPeriod, prazoTask, type PrazoPeriod } from "@/lib/prazos/prazos"
-import { useOfficeData } from "@/lib/store/office-store"
-import { useWholeCollection } from "@/lib/store/on-demand"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useDebounced, useHistoryStats, usePagedHistory } from "@/lib/store/on-demand"
+import { closedKey, closedPrazos, prazoSearch } from "@/lib/store/history-lists"
+import { byId } from "@/lib/store/indexes"
+import { searchFilter } from "@/lib/store/storage"
+import { LimitedList } from "@/components/ui/show-more"
 import { useUI } from "@/lib/store/ui-store"
 import type { Prazo } from "@/types"
 import { PrazoRow } from "./prazos-panel"
@@ -38,10 +42,34 @@ export function PrazosView() {
   const [filter, setFilter] = React.useState<Filter>(() => (param && FILTERS.includes(param) ? param : "abertos"))
   const [responsible, setResponsible] = React.useState("")
   const [query, setQuery] = React.useState("")
-  // A abertura traz os prazos abertos e os encerrados nos últimos 30 dias; o histórico vem ao abrir Prazos.
-  const allPrazos = useWholeCollection("deadlines")
+  const { windowBounds } = useOfficeActions()
+  // Abertos e encerrados há até 30 dias estão na memória; os encerrados antes disso vêm
+  // do banco em páginas (e são contados lá), e a busca procura também neles.
+  const bounds = windowBounds()
+  const search = React.useDeferredValue(query)
+  const term = useDebounced(query.trim())
+  const closedFilter = filter === "cumpridos" || filter === "perdidos" ? filter : null
+  const status = closedFilter === "cumpridos" ? "cumprido" : closedFilter === "perdidos" ? "perdido" : null
+  const serverSearch = React.useMemo(() => {
+    const clientOf = (id: string) => byId(data.clients, id)?.name
+    const ids = data.processes.filter((p) => matches(term, p.code, p.number, clientOf(p.clientId))).map((p) => p.id)
+    return searchFilter(term, [{ column: "process_id", ids }])
+  }, [term, data.clients, data.processes])
+  const historyList = React.useMemo(
+    () =>
+      !status
+        ? null
+        : serverSearch
+          ? prazoSearch(term, serverSearch, status, responsible || undefined)
+          : closedPrazos(bounds, status, responsible || undefined),
+    [status, serverSearch, term, bounds, responsible],
+  )
+  const history = usePagedHistory(historyList, bounds.month, { auto: !!serverSearch })
+  const stats = useHistoryStats<{ status: string; responsible_id: string | null; total: number }[]>("deadline_history_counts", {
+    p_before: bounds.month,
+  })
 
-  if (!data.hydrated || !allPrazos) {
+  if (!data.hydrated) {
     return (
       <div className="space-y-6" aria-busy="true" aria-label="Carregando prazos">
         <SkeletonStats />
@@ -51,11 +79,15 @@ export function PrazosView() {
   }
 
   const now = getNow()
-  const processOf = (p: Prazo) => data.processes.find((x) => x.id === p.processId)
-  const clientName = (p: Prazo) => data.clients.find((c) => c.id === processOf(p)?.clientId)?.name
+  const processOf = (p: Prazo) => byId(data.processes, p.processId)
+  const clientName = (p: Prazo) => byId(data.clients, processOf(p)?.clientId)?.name
+  // Encerrados só até onde a lista está completa (mais recentes primeiro, sem buracos).
+  const shown = (p: Prazo) => isOpenPrazo(p) || !status || history.cursor === null || closedKey(p) >= history.cursor
   const scoped = data.deadlines.filter(
     (p) =>
-      (!responsible || p.responsibleId === responsible) && matches(query, p.description, processOf(p)?.code, processOf(p)?.number, clientName(p)),
+      (!responsible || p.responsibleId === responsible) &&
+      shown(p) &&
+      matches(search, p.description, processOf(p)?.code, processOf(p)?.number, clientName(p)),
   )
   const open = scoped.filter(isOpenPrazo)
 
@@ -68,7 +100,16 @@ export function PrazosView() {
     cumpridos: (p) => p.status === "cumprido",
     perdidos: (p) => p.status === "perdido",
   }
-  const count = (f: Filter) => scoped.filter(test[f]).length
+  // Encerrados: os da janela (na memória) mais os antigos (contados no banco). Com busca, os encontrados.
+  const historyCount = (s: "cumprido" | "perdido") =>
+    stats?.reduce((n, r) => n + (r.status === s && (!responsible || r.responsible_id === responsible) ? Number(r.total) : 0), 0)
+  const inWindow = (p: Prazo) => isOpenPrazo(p) || closedKey(p) >= bounds.month
+  const count = (f: Filter) => {
+    if ((f !== "cumpridos" && f !== "perdidos") || search) return scoped.filter(test[f]).length
+    const extra = historyCount(f === "cumpridos" ? "cumprido" : "perdido")
+    if (extra === undefined) return undefined
+    return data.deadlines.filter((p) => (!responsible || p.responsibleId === responsible) && inWindow(p) && test[f](p)).length + extra
+  }
   const visible = scoped.filter(test[filter])
   const closed = filter === "cumpridos" || filter === "perdidos"
 
@@ -80,12 +121,14 @@ export function PrazosView() {
           label: filter === "cumpridos" ? "Cumpridos" : "Perdidos",
           items: [...visible].sort((a, b) => (b.closedAt ?? b.fatalDate).localeCompare(a.closedAt ?? a.fatalDate)),
         },
-      ]
+      ].filter((g) => g.items.length > 0 || (count(filter) ?? 0) > 0)
     : PERIODS.map((period) => ({
         id: period,
         label: PRAZO_PERIOD_LABEL[period],
         items: visible.filter((p) => prazoPeriod(p, now) === period).sort(byFatal),
       })).filter((g) => g.items.length > 0)
+
+  const groupTotal = (group: { items: Prazo[] }) => (closed && !search ? (count(filter) ?? group.items.length) : group.items.length)
 
   const overdue = open.filter((p) => prazoPeriod(p, now) === "vencido").length
   const thisWeek = open.filter((p) => ["hoje", "semana"].includes(prazoPeriod(p, now))).length
@@ -164,12 +207,22 @@ export function PrazosView() {
         <div className="space-y-5">
           {groups.map((group) => (
             <Panel key={group.id}>
-              <PanelHeader title={group.label} description={`${group.items.length} ${group.items.length === 1 ? "prazo" : "prazos"}`} />
-              <ul className="divide-y divide-border px-3 pb-2">
-                {group.items.map((p) => (
-                  <PrazoRow key={p.id} prazo={p} showProcess />
-                ))}
-              </ul>
+              <PanelHeader title={group.label} description={`${groupTotal(group)} ${groupTotal(group) === 1 ? "prazo" : "prazos"}`} />
+              <LimitedList
+                items={group.items}
+                listKey={`${group.id}|${responsible}|${search}`}
+                server={closed ? history : undefined}
+                total={closed && !search ? count(filter) : undefined}
+                className="mb-4"
+              >
+                {(items) => (
+                  <ul className="divide-y divide-border px-3 pb-2">
+                    {items.map((p) => (
+                      <PrazoRow key={p.id} prazo={p} showProcess />
+                    ))}
+                  </ul>
+                )}
+              </LimitedList>
             </Panel>
           ))}
         </div>

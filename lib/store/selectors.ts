@@ -2,12 +2,13 @@ import type { Activity, Appointment, Client, Invoice, InvoiceStatus, LegalDocume
 import type { PersistedState } from "@/lib/store/storage"
 import { getNow, diffInDays, isSameDay, monthName, monthShort, parse, toLocalISO } from "@/lib/core/dates"
 import { nextPrazo } from "@/lib/prazos/prazos"
+import { byId } from "@/lib/store/indexes"
 
 /** O que os seletores precisam do store (o `OfficeState` inteiro também serve). */
 type OfficeState = PersistedState
 
-const findClient = (s: OfficeState, id?: string) => (id ? s.clients.find((c) => c.id === id) : undefined)
-const findProcess = (s: OfficeState, id?: string) => (id ? s.processes.find((p) => p.id === id) : undefined)
+const findClient = (s: OfficeState, id?: string) => byId(s.clients, id)
+const findProcess = (s: OfficeState, id?: string) => byId(s.processes, id)
 
 export function describeRelated(s: OfficeState, related?: RelatedEntity) {
   if (!related) return undefined
@@ -66,7 +67,7 @@ export function delinquentClientIds(invoices: Invoice[], now: Date = getNow()) {
 export function relatedClientId(s: Pick<OfficeState, "processes">, related?: RelatedEntity) {
   if (!related) return undefined
   if (related.type === "client") return related.id
-  return s.processes.find((p) => p.id === related.id)?.clientId || undefined
+  return byId(s.processes, related.id)?.clientId || undefined
 }
 
 export interface ClientHub {
@@ -169,9 +170,13 @@ export function monthlyRevenue(invoices: Invoice[], now: Date = getNow(), months
 }
 
 /** Números do mês atual. `growth` é `undefined` quando não há mês anterior para comparar. */
-export function financeSummary(invoices: Invoice[], now: Date = getNow()) {
+/**
+ * Indicadores do Financeiro e do Painel. `billedBefore`: o faturado anterior aos
+ * lançamentos recebidos (somado no banco), para a inadimplência valer sobre tudo.
+ */
+export function financeSummary(invoices: Invoice[], now: Date = getNow(), options: { billedBefore?: number } = {}) {
   const [previous, current] = monthlyRevenue(invoices, now, 2)
-  const billed = sum(invoices.filter((i) => i.status !== "cancelado"))
+  const billed = sum(invoices.filter((i) => i.status !== "cancelado")) + (options.billedBefore ?? 0)
   const overdue = sum(invoices.filter((i) => invoiceStatus(i, now) === "atrasado"))
   return {
     month: current.label,

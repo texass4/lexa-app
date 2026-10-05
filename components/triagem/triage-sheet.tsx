@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { NativeSelect, TextArea } from "@/components/ui/field"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
 import { getMembers, getUser } from "@/lib/auth/account"
@@ -97,7 +98,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
   const [awaitingProcess, setAwaitingProcess] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
 
-  const process = data.processes.find((p) => p.id === i.processId)
+  const process = byId(data.processes, i.processId)
   const client = data.clients.find((c) => c.id === (i.clientId ?? process?.clientId))
   const prazo = data.deadlines.find((d) => d.id === i.prazoId || d.triageItemId === i.id)
   const responsible = i.responsibleId ? getUser(i.responsibleId) : undefined
@@ -152,7 +153,7 @@ function SheetBody({ item: i }: { item: TriageItem }) {
   }
 
   const linkProcess = (processId: string) => {
-    const target = data.processes.find((p) => p.id === processId)
+    const target = byId(data.processes, processId)
     if (target) void run(() => link(i, target.id, target.clientId || undefined), `Vinculado ao processo ${target.code}.`)
   }
 
@@ -371,7 +372,9 @@ function SheetBody({ item: i }: { item: TriageItem }) {
               {history.map((e) => (
                 <li key={e.id} className="text-[12.5px]">
                   <span className="font-medium">{e.actorId ? getUser(e.actorId).name : "Íntegra"}</span> {ACTION_LABEL[e.action]}
-                  {e.action === "vinculou" && e.detail.processId ? ` ${data.processes.find((p) => p.id === e.detail.processId)?.code ?? ""}` : ""}
+                  {e.action === "vinculou" && typeof e.detail.processId === "string"
+                    ? ` ${byId(data.processes, e.detail.processId)?.code ?? ""}`
+                    : ""}
                   {e.action === "atribuiu" && typeof e.detail.responsibleId === "string" ? ` para ${getUser(e.detail.responsibleId).name}` : ""}
                   {typeof e.detail.note === "string" && e.detail.note ? ` — “${e.detail.note}”` : ""}
                   <span className="text-subtle"> · {fmtDateTime(e.createdAt)}</span>

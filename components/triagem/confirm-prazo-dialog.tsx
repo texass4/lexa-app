@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { AnimatedCheckbox } from "@/components/ui/animated-checkbox"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useSession } from "@/lib/auth/session"
 import { currentUserId, getMembers } from "@/lib/auth/account"
 import { fmtNumericDate } from "@/lib/core/dates"
@@ -45,7 +46,7 @@ function ConfirmForm({ item, onClose }: { item: TriageItem; onClose: () => void 
   const { can } = useSession()
   const canTask = can("tasks.edit")
   const suggested = suggestedDeadline(item)
-  const process = data.processes.find((p) => p.id === item.processId)
+  const process = byId(data.processes, item.processId)
   const federal = /^TRF/i.test(item.tribunal ?? "")
   // Só a intimação tem disponibilização: é dela que as regras contam. Movimentação: data informada.
   const countable = item.kind === "intimacao" && !!item.availableAt

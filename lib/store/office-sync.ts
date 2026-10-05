@@ -36,6 +36,7 @@ import {
   fetchManifest,
   fetchRecords,
   fetchVersions,
+  loadPage,
   insertRecord,
   loadScope,
   loadScopes,
@@ -55,6 +56,29 @@ import {
 } from "./storage"
 
 type Entity = { id: string }
+
+/**
+ * Uma lista do histórico lida em páginas, do mais recente para o mais antigo (ou uma
+ * busca no banco). `scope` traz a coleção, o filtro e a ordem (`order`); `cursor` dá
+ * a chave de ordem de um registro (a mesma coluna de `order`).
+ */
+export interface PagedList<T = Entity> {
+  id: string
+  scope: Omit<Scope, "id" | "latest" | "offset" | "entity">
+  size: number
+  cursor: (item: T) => string
+}
+
+export interface PageState {
+  /** Registros lidos até agora. */
+  loaded: number
+  /** A última página veio incompleta: não há mais nada no banco. */
+  done: boolean
+  /** Chave de ordem do último registro lido: tudo o que é mais recente já está na memória. */
+  cursor?: string
+  /** Total da lista no banco (contado na primeira página). */
+  total?: number
+}
 
 /** Resultado de salvar um registro editado num formulário. */
 export type SaveResult<T> =
@@ -210,6 +234,45 @@ export class OfficeSync<S extends PersistedState> {
         return pending
       }),
     )
+  }
+
+  /** Até onde cada lista paginada do histórico já foi lida (ver `loadNextPage`). */
+  private pages = new Map<string, PageState>()
+
+  pageState(listId: string): PageState | undefined {
+    return this.pages.get(listId)
+  }
+
+  /**
+   * Próxima página de uma lista do histórico (ou de uma busca no banco): os registros
+   * entram no store como os demais e seguem pelo tempo real; a revalidação os confere
+   * pelo id. A primeira página traz também o total da lista.
+   */
+  async loadNextPage<T>(list: PagedList<T>): Promise<void> {
+    await this.hydratedSignal
+    const key = `pagina:${list.id}`
+    const running = this.loading.get(key)
+    if (running) return running
+    const state = this.pages.get(list.id) ?? { loaded: 0, done: false }
+    if (state.done) return
+    const pending = loadPage(
+      this.opts.supabase,
+      { ...list.scope, id: `${list.id}:${state.loaded}`, entity: true, latest: list.size, offset: state.loaded },
+      state.loaded === 0,
+    )
+      .then(({ rows, total }) => {
+        for (const row of rows) this.applyRemote(list.scope.key, row)
+        const last = rows[rows.length - 1]
+        this.pages.set(list.id, {
+          loaded: state.loaded + rows.length,
+          done: rows.length < list.size,
+          cursor: last ? list.cursor(last.data as T) : state.cursor,
+          total: total ?? state.total,
+        })
+      })
+      .finally(() => this.loading.delete(key))
+    this.loading.set(key, pending)
+    return pending
   }
 
   /** Processos completos (com todo o histórico de movimentações), no lugar do resumo. */

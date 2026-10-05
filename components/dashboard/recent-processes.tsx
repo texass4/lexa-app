@@ -6,6 +6,7 @@ import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { EmptyState } from "@/components/ui/empty-state"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { RECENT_STATE_LABEL, recentProcesses, shortAgo, type RecentState } from "@/lib/dashboard/dashboard"
 import { PanelLink } from "./panel-link"
 
@@ -29,7 +30,7 @@ export function RecentProcesses() {
       ) : (
         <ul className="px-3 pb-3">
           {items.map(({ process, state, prazo }) => {
-            const client = data.clients.find((c) => c.id === process.clientId)
+            const client = byId(data.clients, process.clientId)
             const style = STATE_STYLE[state]
             return (
               <li key={process.id}>

@@ -17,6 +17,7 @@ import { fmtDueIn, fmtNumericDate } from "@/lib/core/dates"
 import { PRAZO_ALERT_DAYS } from "@/lib/dashboard/attention"
 import { daysToPrazo, prazoTask, prazosOfProcess } from "@/lib/prazos/prazos"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import type { Prazo, Process } from "@/types"
 
@@ -75,8 +76,8 @@ export function PrazoRow({ prazo, showProcess = false }: { prazo: Prazo; showPro
   const urgent = isOpen && days <= PRAZO_ALERT_DAYS.soon
   const task = prazoTask(prazo, data.tasks)
   const status = PRAZO_STATUS[prazo.status]
-  const process = showProcess ? data.processes.find((p) => p.id === prazo.processId) : undefined
-  const client = process ? data.clients.find((c) => c.id === process.clientId) : undefined
+  const process = showProcess ? byId(data.processes, prazo.processId) : undefined
+  const client = process ? byId(data.clients, process.clientId) : undefined
 
   const close = async (next: "cumprido" | "perdido") => {
     setBusy(true)

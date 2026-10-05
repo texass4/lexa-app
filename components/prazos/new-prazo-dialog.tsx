@@ -14,6 +14,7 @@ import { PRAZO_ORIGIN } from "@/lib/core/config"
 import { fmtNumericDate } from "@/lib/core/dates"
 import { internalAfterFatal, validatePrazo, type PrazoErrors } from "@/lib/prazos/prazos"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import type { PrazoOrigin } from "@/types"
 
 type Defaults = { processId?: string }
@@ -27,7 +28,7 @@ function PrazoForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => 
   const { can } = useSession()
   const canTask = can("tasks.edit")
   // Aberto pelo processo: processo (e cliente) já vêm definidos.
-  const fixedProcess = defaults?.processId ? data.processes.find((p) => p.id === defaults.processId) : undefined
+  const fixedProcess = defaults?.processId ? byId(data.processes, defaults.processId) : undefined
 
   const [form, setForm] = React.useState(() => ({
     processId: fixedProcess?.id ?? "",
@@ -45,8 +46,8 @@ function PrazoForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => 
   type FormState = typeof form
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
 
-  const process = data.processes.find((p) => p.id === form.processId)
-  const client = process ? data.clients.find((c) => c.id === process.clientId) : undefined
+  const process = byId(data.processes, form.processId)
+  const client = process ? byId(data.clients, process.clientId) : undefined
   const needsReason = internalAfterFatal(form)
   const responsible = getMembers().find((m) => m.id === form.responsibleId)
 
@@ -103,7 +104,7 @@ function PrazoForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => 
               {processes.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.code} — {p.number || p.type}
-                  {data.clients.find((c) => c.id === p.clientId) ? ` · ${data.clients.find((c) => c.id === p.clientId)!.name}` : ""}
+                  {byId(data.clients, p.clientId) ? ` · ${byId(data.clients, p.clientId)!.name}` : ""}
                 </option>
               ))}
             </NativeSelect>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { getMembers, currentUserId } from "@/lib/auth/account"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import type { Appointment, Process } from "@/types"
 import { CategoryPicker } from "./category-picker"
@@ -85,7 +86,7 @@ function AppointmentForm({ appointment, defaults, onClose }: { appointment?: App
       setTimeError("O término precisa ser depois do início.")
       return
     }
-    const client = data.clients.find((c) => c.id === form.clientId)
+    const client = byId(data.clients, form.clientId)
     const payload = {
       title: form.title.trim(),
       categoryId: form.categoryId,
