@@ -4,7 +4,8 @@ import * as React from "react"
 import { toast } from "sonner"
 import { useOfficeActions, useOfficeData, type PagedList } from "./office-store"
 import { getNow } from "@/lib/core/dates"
-import { appointmentsBetween, clientScopes, daysBefore, processScopes, RECENT_APPOINTMENT_DAYS, type Scope } from "./storage"
+import { byId } from "./indexes"
+import { appointmentsBetween, clientScopes, daysBefore, processScopes, RECENT_APPOINTMENT_DAYS, type Collection, type Scope } from "./storage"
 
 /**
  * Dados sob demanda. A abertura do Íntegra traz só o que a primeira tela usa
@@ -180,4 +181,45 @@ export function useDebounced<T>(value: T, ms = 300): T {
     return () => clearTimeout(timer)
   }, [value, ms])
   return settled
+}
+
+/**
+ * Formulário de edição aberto sobre um registro que outra pessoa excluiu: avisa na
+ * hora — o formulário pode até fechar sozinho (a tela do registro some), mas a
+ * pessoa sabe o que aconteceu e que nada do que digitou foi gravado. Use no
+ * componente que só existe enquanto o formulário está aberto (ou passe `id`
+ * só quando aberto).
+ */
+export function useRemovedWhileEditing(key: Collection, id: string | undefined) {
+  const data = useOfficeData()
+  const { currentState } = useOfficeActions()
+  const exists = !!id && !!byId(data[key] as { id: string }[], id)
+  const watch = React.useRef<{ id?: string; seen: boolean }>({ seen: false })
+
+  React.useEffect(() => {
+    const current = watch.current
+    if (current.id !== id) watch.current = { id, seen: false }
+    if (!id) return
+    if (exists) watch.current.seen = true
+    else if (watch.current.seen) {
+      watch.current.seen = false
+      notifyRemoved()
+    }
+  }, [id, exists])
+
+  // Saiu da tela junto com o registro (ex.: o perfil do cliente virou "não encontrado").
+  React.useEffect(
+    () => () => {
+      const { id: last, seen } = watch.current
+      if (last && seen && !byId(currentState()[key] as { id: string }[], last)) notifyRemoved()
+    },
+    [key, currentState],
+  )
+}
+
+function notifyRemoved() {
+  toast.error("Este registro foi excluído por outra pessoa.", {
+    id: "record-conflict",
+    description: "O que você estava editando não foi gravado.",
+  })
 }

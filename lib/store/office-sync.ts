@@ -103,6 +103,9 @@ export const REVALIDATE_AFTER_HIDDEN_MS = 3 * 60_000
 const REALTIME_WARNING_AFTER_MS = 30_000
 
 type RowPayload = { organization_id?: string; id?: string; data?: Entity; updated_at?: string }
+/** Linha de `realtime_deletions` (aviso de exclusão, migração 0018). */
+export type DeletionPayload = { organization_id?: string; collection?: string; record_id?: string }
+const COLLECTION_BY_TABLE = new Map<string, Collection>(COLLECTIONS.map((key) => [TABLES[key], key]))
 
 interface Options<S extends PersistedState> {
   supabase: SupabaseClient
@@ -647,6 +650,13 @@ export class OfficeSync<S extends PersistedState> {
     this.applyRemote(key, { id: row.id, data: row.data, updated_at: row.updated_at })
   }
 
+  /** Aviso de exclusão (`realtime_deletions`): tira o registro, se for deste escritório e de uma coleção do store. */
+  onDeletion(row: DeletionPayload | undefined) {
+    if (!this.saved || !row || row.organization_id !== this.opts.organizationId || !row.record_id) return
+    const key = COLLECTION_BY_TABLE.get(row.collection ?? "")
+    if (key) this.removeRemote(key, row.record_id)
+  }
+
   /**
    * Assina as mudanças do escritório. Um canal só, com as 10 coleções; o filtro por
    * escritório vale também para exclusões (sem ele, o Realtime entrega exclusões de
@@ -662,6 +672,10 @@ export class OfficeSync<S extends PersistedState> {
         this.onRealtime(key, payload),
       )
     }
+    // Exclusões chegam como avisos (migração 0018): o DELETE do Realtime não passa pela RLS.
+    channel = channel.on<DeletionPayload>("postgres_changes", { event: "INSERT", schema: "public", table: "realtime_deletions", filter }, (payload) =>
+      this.onDeletion(payload.new as DeletionPayload),
+    )
     let closed = false
     channel.subscribe((status, error) => {
       if (closed) return

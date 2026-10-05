@@ -7,6 +7,7 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useRemovedWhileEditing } from "@/lib/store/on-demand"
 import { byId } from "@/lib/store/indexes"
 import { documentRequiredIssue } from "@/lib/clientes/clients"
 import { ensureExtension } from "@/lib/core/format"
@@ -31,6 +32,7 @@ function EditDocumentForm({ doc, onClose }: { doc: LegalDocument; onClose: () =>
   const [errors, setErrors] = React.useState<{ name?: string; clientId?: string }>({})
   // Versão quando o formulário abriu: se alguém alterou o documento antes, a edição é recusada.
   const [baseVersion, setBaseVersion] = React.useState(() => versionOf("documents", doc.id))
+  useRemovedWhileEditing("documents", doc.id)
   const [saving, setSaving] = React.useState(false)
 
   // Processo sempre do cliente escolhido; escolher o processo traz o cliente dele.

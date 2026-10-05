@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Modal } from "@/components/ui/modal"
 import { ClientForm } from "@/components/clientes/client-form"
 import { useOfficeActions, type SaveOptions, type SaveResult } from "@/lib/store/office-store"
+import { useRemovedWhileEditing } from "@/lib/store/on-demand"
 import type { Client } from "@/types"
 
 export function EditClientDialog({
@@ -38,6 +39,7 @@ function EditClientBody({
 }) {
   const { versionOf } = useOfficeActions()
   const [editing, setEditing] = React.useState(() => ({ client, baseVersion: versionOf("clients", client.id), revision: 0 }))
+  useRemovedWhileEditing("clients", client.id)
   const saving = React.useRef(false)
 
   return (

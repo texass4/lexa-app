@@ -163,7 +163,8 @@ const { addTask, importProcess } = useOfficeActions()
 
 - **Os dados moram no Supabase** — o store é só a cópia local. Cada coleção é uma tabela (`organization_id`, `id`, `data jsonb`, `updated_at`). `lib/store/storage.ts` carrega o que a RLS deixa a pessoa ver (em recortes, abaixo) e grava só o que mudou (`diffState`, comparando por identidade — o store é imutável). A gravação é agrupada (300 ms) e em fila; se o banco recusar (sem permissão, falha), aparece um aviso e a tela recarrega o que está salvo.
 - **Equipe ao mesmo tempo** (`lib/store/office-sync.ts`, a única camada que grava, assina o Realtime e revalida):
-  - *Tempo real*: um canal por escritório, INSERT/UPDATE/DELETE das 10 coleções, sempre com filtro `organization_id=eq.…` (sem ele, o Realtime entrega exclusões de qualquer escritório). Tudo é aplicado por id: o eco da própria gravação não duplica.
+  - *Tempo real*: um canal por escritório, INSERT/UPDATE das coleções, sempre com filtro `organization_id=eq.…`. Tudo é aplicado por id: o eco da própria gravação não duplica.
+  - *Exclusões* (migração `0018`): o Realtime do Supabase não aplica RLS a DELETE, então a publicação não envia DELETE; cada exclusão grava por gatilho um aviso em `realtime_deletions` (coleção + id) que chega como INSERT — pela RLS, só a quem é do escritório e pode ver a coleção (lançamentos e atividades financeiras: `finance.view`). `office-sync`, Triagem e Atendimento tiram o registro ao receber o aviso. Formulário de edição aberto sobre registro excluído por outra pessoa avisa na hora (`useRemovedWhileEditing`). Teste com dois navegadores: `docs/TESTES_MULTIUSUARIO.md`.
   - *Versão*: `updated_at` muda a cada gravação (`bump_row_version`, migração `0006`). Alterar/excluir é `update … where id = … and updated_at = <versão conhecida>` — atômico no banco. Nenhuma linha afetada = outra pessoa gravou antes: a gravação é recusada, aparece "Este registro foi alterado por outra pessoa." e só aquele registro é recarregado.
   - *Formulários de edição* guardam `versionOf(coleção, id)` ao abrir e passam `{ baseVersion }` para a ação (`updateTask`, `updateClient`, `updateProcess`, renomear coluna/categoria), que devolve `SaveResult` (`saved`/`conflict`/`removed`/`error`) depois que o banco confirma. Em `conflict`, o formulário mostra o registro atual.
   - *Revalidação*: ao (re)conectar o Realtime e ao voltar à aba depois de 3 min (`REVALIDATE_AFTER_HIDDEN_MS`), baixa só id + versão dos recortes carregados (o que veio sob demanda é conferido pelo id) e busca apenas o que mudou.
@@ -186,7 +187,7 @@ const { addTask, importProcess } = useOfficeActions()
 - Pessoa e escritório logados: `currentUserId()`, `currentOrgId()`, `getUser(id)`, `getMembers()` (`lib/auth/account.ts`), preenchidos pelo `SessionProvider`. Dentro de componentes, prefira `useSession()`.
 
 Novo campo num cadastro: tipo em `types/index.ts` → formulário → ação no store → exibição (o jsonb não precisa de migração).
-Nova coleção: tipo → `PersistedState` + `TABLES` em `storage.ts` → tabela e políticas na migração.
+Nova coleção: tipo → `PersistedState` + `TABLES` em `storage.ts` → tabela, políticas, publicação do Realtime e gatilho `realtime_deletion` na migração.
 Nova ação de negócio: método em `OfficeActions` + implementação, registrando uma `Activity` quando fizer sentido.
 
 ### Categorias de compromisso

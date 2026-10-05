@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { getMembers, currentUserId } from "@/lib/auth/account"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useRemovedWhileEditing } from "@/lib/store/on-demand"
 import { byId } from "@/lib/store/indexes"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import type { Appointment, Process } from "@/types"
@@ -63,6 +64,7 @@ function initialState(appointment: Appointment | undefined, defaults: Defaults |
 function AppointmentForm({ appointment, defaults, onClose }: { appointment?: Appointment; defaults?: Defaults; onClose: () => void }) {
   const data = useOfficeData()
   const { addAppointment, updateAppointment, versionOf } = useOfficeActions()
+  useRemovedWhileEditing("appointments", appointment?.id)
 
   const [form, setForm] = React.useState(() => initialState(appointment, defaults, data.processes))
   const [error, setError] = React.useState("")

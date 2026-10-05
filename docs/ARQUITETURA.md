@@ -107,7 +107,7 @@ lexa-app/
 │   └── integrations/            legal/ (DataJud, DJEN) · whatsapp/ (Z-API)
 ├── types/                       tipos das entidades
 ├── supabase/
-│   ├── migrations/              SQL do banco em ordem (0001 → 0017): tabelas, RLS, funções, Storage
+│   ├── migrations/              SQL do banco em ordem (0001 → 0018): tabelas, RLS, funções, Storage
 │   └── templates/               e-mails do Supabase Auth (gerados por `npm run email:templates`)
 ├── public/brand/                ícones do manifest, kit da marca (SVG) e fundo da barra lateral
 ├── scripts/                     scripts de e-mail (templates do Supabase, teste de SMTP)
@@ -221,7 +221,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 
 **Novo campo num cadastro**: tipo em `types/index.ts` → formulário → ação no `office-store.tsx` → exibição. O `jsonb` não precisa de migração.
 
-**Nova coleção**: tipo → `PersistedState` e `TABLES` em `lib/store/storage.ts` → tabela, índices e políticas numa nova migração em `supabase/migrations/` (próximo número).
+**Nova coleção**: tipo → `PersistedState` e `TABLES` em `lib/store/storage.ts` → tabela, índices e políticas numa nova migração em `supabase/migrations/` (próximo número), incluindo a tabela na publicação `supabase_realtime` e o gatilho `realtime_deletion` com a permissão de leitura dela (ver `0018_realtime_exclusoes.sql`).
 
 **Nova ação de negócio**: método em `OfficeActions` (`lib/store/office-store.tsx`), registrando uma `Activity` quando fizer sentido.
 

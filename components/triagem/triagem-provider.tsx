@@ -147,6 +147,14 @@ export function TriagemProvider({ children }: { children: React.ReactNode }) {
         const row = payload.new as TriageDbRow
         if (row?.organization_id === organization.id) apply(row)
       })
+      // Exclusões chegam como avisos (migração 0018): o DELETE do Realtime não passa pela RLS.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "realtime_deletions", filter: `organization_id=eq.${organization.id}` }, (payload) => {
+        const row = payload.new as { organization_id?: string; collection?: string; record_id?: string }
+        if (row.organization_id === organization.id && row.collection === "triage_items" && row.record_id) {
+          const id = row.record_id
+          setItems((list) => list.filter((i) => i.id !== id))
+        }
+      })
       .subscribe()
 
     void supabase

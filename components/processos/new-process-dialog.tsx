@@ -15,6 +15,7 @@ import { getNow, parse } from "@/lib/core/dates"
 import { lookupProcess, type LookupFailure } from "@/lib/services/processos/client"
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useRemovedWhileEditing } from "@/lib/store/on-demand"
 import { byId } from "@/lib/store/indexes"
 import type { PracticeArea, Process, ProcessStatus } from "@/types"
 import { LookupFailed, LookupFound, LookupProgress, summaryFromProcess, summaryFromSheet, type LookupSummary } from "./process-lookup-status"
@@ -116,6 +117,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
   const loading = lookup.state === "loading"
   // O vínculo com o processo salvo só vale para o número consultado.
   const linked = lookup.state === "filled" && lookup.cnj === digits ? lookup : null
+  useRemovedWhileEditing("processes", linked?.existed ? linked.processId : undefined)
   const findByCnj = (cnj: string) => data.processes.find((p) => (p.cnj ?? onlyDigits(p.number)) === cnj)
   // Contato sem CPF/CNPJ não pode ter processo vinculado (o banco também recusa, `0010_contacts.sql`).
   const clientIssue = documentRequiredIssue(byId(data.clients, form.clientId), "processo")

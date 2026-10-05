@@ -9,6 +9,7 @@ import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { getMembers, currentUserId } from "@/lib/auth/account"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useRemovedWhileEditing } from "@/lib/store/on-demand"
 import { byId } from "@/lib/store/indexes"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import type { Priority, RelatedEntity, Task } from "@/types"
@@ -66,6 +67,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
   const [error, setError] = React.useState("")
   // Versão da tarefa quando o formulário abriu: se outra pessoa salvar antes, esta edição é recusada.
   const [baseVersion, setBaseVersion] = React.useState(() => (task ? versionOf("tasks", task.id) : null))
+  useRemovedWhileEditing("tasks", task?.id)
   const [saving, setSaving] = React.useState(false)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
