@@ -157,6 +157,7 @@ lexa-app/
   - Tabela larga (`min-w-[860px]`) só aparece com `@4xl/main:block`; antes disso, a mesma lista em cartões (`@4xl/main:hidden`). Ações de cada linha nunca podem ficar escondidas por rolagem horizontal.
   - Toque: controle menor que 44 px recebe `touch-target` (área de clique ampliada só em telas de toque, sem mudar o visual; o elemento precisa ser `relative`/`absolute`). `Button`, `AnimatedCheckbox`, `ChoiceChips` e gatilhos de `DropdownMenu` já trazem. Quando a área ampliada encostaria em outro link, aumente o controle com `pointer-coarse:` (ex.: `pointer-coarse:h-8`).
   - No celular, prefira reorganizar a cortar: valor e situação abaixo do nome, rótulo abaixo do ícone (`MetricCard` com `@container`), títulos em até duas linhas (`PanelHeader`).
+  - Detalhe do processo (`components/processos/process-profile.tsx`): com menos de 896 px de conteúdo, a tela segue "essencial → contexto → detalhes": identificação, prazo/responsável/valor e ações no topo; última movimentação e pontos de atenção (abrem sob demanda); o resto em abas fixas (Movimentações, Prazos e tarefas, Documentos, Dados, Histórico), com a timeline compacta. Os blocos são os mesmos do desktop — só a arrumação muda.
 
 ### Regras e dados
 

@@ -39,6 +39,8 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 /** Movimentações renderizadas por vez — processos antigos passam de centenas. */
 const PAGE_SIZE = 60
+/** No celular a lista começa menor; o restante vem em "Mostrar mais" (nada fica de fora). */
+const COMPACT_PAGE_SIZE = 12
 
 /**
  * Timeline de movimentações do processo.
@@ -46,10 +48,14 @@ const PAGE_SIZE = 60
  * Recebe movimentações já interpretadas (`interpretMovements`), de qualquer
  * provider. Filtro, agrupamento por dia e agrupamento visual acontecem aqui,
  * memoizados; nenhum dado é alterado.
+ *
+ * `compact` (celular): coluna de data estreita, menos espaço entre dias, descrição em até
+ * duas linhas e órgão julgador só no detalhe — tocar na movimentação abre tudo.
  */
-export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
+export function ProcessTimeline({ movements, compact = false }: { movements: LexaMovement[]; compact?: boolean }) {
+  const pageSize = compact ? COMPACT_PAGE_SIZE : PAGE_SIZE
   const [filter, setFilter] = React.useState<Filter>("todas")
-  const [limit, setLimit] = React.useState(PAGE_SIZE)
+  const [limit, setLimit] = React.useState(pageSize)
   const [selected, setSelected] = React.useState<LexaMovement | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
 
@@ -88,13 +94,13 @@ export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
         value={filter}
         onChange={(value) => {
           setFilter(value)
-          setLimit(PAGE_SIZE)
+          setLimit(pageSize)
         }}
         options={FILTERS.filter((f) => f.value === "todas" || counts[f.value] > 0 || f.value === filter).map((f) => ({
           ...f,
           count: counts[f.value],
         }))}
-        className="mb-6"
+        className={compact ? "mb-4" : "mb-6"}
       />
 
       {days.length ? (
@@ -108,6 +114,7 @@ export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
               delay={gi < 8 ? gi * 0.04 : 0}
               newestId={newestId}
               fresh={fresh}
+              compact={compact}
               onOpen={open}
             />
           ))}
@@ -118,8 +125,8 @@ export function ProcessTimeline({ movements }: { movements: LexaMovement[] }) {
 
       {remaining > 0 && (
         <div className="mt-6 flex justify-center">
-          <Button variant="secondary" size="sm" onClick={() => setLimit((current) => current + PAGE_SIZE)}>
-            Mostrar mais {Math.min(PAGE_SIZE, remaining)} de {remaining}
+          <Button variant="secondary" size="sm" onClick={() => setLimit((current) => current + pageSize)}>
+            Mostrar mais {Math.min(pageSize, remaining)} de {remaining}
           </Button>
         </div>
       )}
@@ -138,6 +145,7 @@ function TimelineDayGroup({
   delay,
   newestId,
   fresh,
+  compact,
   onOpen,
 }: {
   date: string
@@ -146,6 +154,7 @@ function TimelineDayGroup({
   delay: number
   newestId?: string
   fresh: boolean
+  compact: boolean
   onOpen: (movement: LexaMovement) => void
 }) {
   const { day, month } = fmtDayMonthParts(date)
@@ -164,21 +173,43 @@ function TimelineDayGroup({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay, ease: [0.22, 1, 0.36, 1] }}
-      className="grid grid-cols-[56px_1fr] gap-x-4 sm:grid-cols-[76px_1fr] sm:gap-x-6"
+      className={cn("grid gap-x-4 sm:gap-x-6", compact ? "grid-cols-[34px_1fr] gap-x-5 sm:grid-cols-[44px_1fr] sm:gap-x-6" : "grid-cols-[56px_1fr] sm:grid-cols-[76px_1fr]")}
     >
       <div className="relative pt-1 text-right">
-        <div className="sticky top-20">
-          <p className="font-display tabular text-[24px] leading-none font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">{day}</p>
+        <div className={compact ? undefined : "sticky top-20"}>
+          <p
+            className={cn(
+              "font-display tabular font-semibold tracking-[-0.02em] text-foreground",
+              // `leading-none` depois do tamanho: o tailwind-merge descarta a altura de linha que vem antes.
+              compact ? "text-[19px] leading-none" : "text-[24px] leading-none sm:text-[26px] sm:leading-none",
+            )}
+          >
+            {day}
+          </p>
           <p className="mt-1 text-[10.5px] font-semibold tracking-[0.14em] text-brand-strong">{month}</p>
           <p className="tabular mt-0.5 text-[11px] capitalize text-subtle">{caption}</p>
         </div>
       </div>
-      <ol className={cn("relative min-w-0 border-l border-border pl-6 sm:pl-7", last ? "pb-2" : "pb-8")}>
+      <ol className={cn("relative min-w-0 border-l border-border pl-6 sm:pl-7", last ? "pb-2" : compact ? "pb-5" : "pb-8")}>
         {items.map((item) =>
           item.type === "single" ? (
-            <SingleEntry key={item.key} movement={item.movement} emphasis={item.movement.id === newestId} fresh={fresh} onOpen={onOpen} />
+            <SingleEntry
+              key={item.key}
+              movement={item.movement}
+              emphasis={item.movement.id === newestId}
+              fresh={fresh}
+              compact={compact}
+              onOpen={onOpen}
+            />
           ) : (
-            <ClusterEntry key={item.key} cluster={item} emphasis={item.movements[0]?.id === newestId} fresh={fresh} onOpen={onOpen} />
+            <ClusterEntry
+              key={item.key}
+              cluster={item}
+              emphasis={item.movements[0]?.id === newestId}
+              fresh={fresh}
+              compact={compact}
+              onOpen={onOpen}
+            />
           ),
         )}
       </ol>
@@ -203,8 +234,23 @@ function EntryIcon({ category, emphasis }: { category: MovementCategory; emphasi
   )
 }
 
-/** Título, descrição legível e órgão julgador — nessa ordem de importância. */
-function EntryText({ title, description, unit, fresh }: { title: string; description?: string; unit?: string; fresh?: boolean }) {
+/**
+ * Título, descrição legível e órgão julgador — nessa ordem de importância. Compacta:
+ * descrição em até duas linhas e sem o órgão (os dois completos no detalhe).
+ */
+function EntryText({
+  title,
+  description,
+  unit,
+  fresh,
+  compact,
+}: {
+  title: string
+  description?: string
+  unit?: string
+  fresh?: boolean
+  compact?: boolean
+}) {
   return (
     <>
       <p className="text-[13.5px] font-medium leading-snug break-words text-foreground">
@@ -213,8 +259,10 @@ function EntryText({ title, description, unit, fresh }: { title: string; descrip
           <span className="ml-2 inline-block rounded-[5px] bg-brand-soft px-1.5 align-[1px] text-[10.5px] font-semibold text-brand-strong">Nova</span>
         )}
       </p>
-      {description && <p className="mt-1 text-[12.5px] leading-snug break-words text-muted-foreground">{description}</p>}
-      {unit && <p className="mt-0.5 text-[12px] leading-snug break-words text-subtle">{unit}</p>}
+      {description && (
+        <p className={cn("mt-1 text-[12.5px] leading-snug break-words text-muted-foreground", compact && "line-clamp-2")}>{description}</p>
+      )}
+      {unit && !compact && <p className="mt-0.5 text-[12px] leading-snug break-words text-subtle">{unit}</p>}
     </>
   )
 }
@@ -226,15 +274,17 @@ function SingleEntry({
   movement,
   emphasis,
   fresh,
+  compact,
   onOpen,
 }: {
   movement: LexaMovement
   emphasis: boolean
   fresh: boolean
+  compact: boolean
   onOpen: (m: LexaMovement) => void
 }) {
   return (
-    <li className="relative pb-5 last:pb-0">
+    <li className={cn("relative last:pb-0", compact ? "pb-3.5" : "pb-5")}>
       <EntryIcon category={movement.category} emphasis={emphasis} />
       <button
         type="button"
@@ -244,7 +294,13 @@ function SingleEntry({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1 pt-0.5">
-            <EntryText title={movement.title} description={movement.description} unit={movement.judicialUnit?.name} fresh={emphasis && fresh} />
+            <EntryText
+              title={movement.title}
+              description={movement.description}
+              unit={movement.judicialUnit?.name}
+              fresh={emphasis && fresh}
+              compact={compact}
+            />
           </div>
           <span className="tabular shrink-0 pt-1 text-[11.5px] text-subtle">{fmtTime(movement.at)}</span>
         </div>
@@ -257,11 +313,13 @@ function ClusterEntry({
   cluster,
   emphasis,
   fresh,
+  compact,
   onOpen,
 }: {
   cluster: TimelineCluster
   emphasis: boolean
   fresh: boolean
+  compact: boolean
   onOpen: (m: LexaMovement) => void
 }) {
   const [expanded, setExpanded] = React.useState(false)
@@ -269,11 +327,17 @@ function ClusterEntry({
   const count = cluster.movements.length
 
   return (
-    <li className="relative pb-5 last:pb-0">
+    <li className={cn("relative last:pb-0", compact ? "pb-3.5" : "pb-5")}>
       <EntryIcon category={cluster.category} emphasis={emphasis} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1 pt-0.5">
-          <EntryText title={cluster.label} description={cluster.description} unit={cluster.judicialUnit?.name} fresh={emphasis && fresh} />
+          <EntryText
+            title={cluster.label}
+            description={cluster.description}
+            unit={cluster.judicialUnit?.name}
+            fresh={emphasis && fresh}
+            compact={compact}
+          />
         </div>
         <span className="tabular shrink-0 pt-1 text-[11.5px] text-subtle">
           {fmtTime(cluster.from)} – {fmtTime(cluster.to)}

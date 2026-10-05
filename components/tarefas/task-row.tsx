@@ -77,7 +77,7 @@ export function TaskRow({ task, showAssignee = false }: { task: Task; showAssign
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            "relative w-fit max-w-full truncate text-[13.5px] font-medium transition-colors duration-200",
+            "relative w-fit max-w-full text-[13.5px] font-medium transition-colors duration-200 max-sm:line-clamp-2 sm:truncate",
             done ? "text-subtle" : "text-foreground",
           )}
         >

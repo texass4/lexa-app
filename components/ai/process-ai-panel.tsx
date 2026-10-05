@@ -3,7 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowUpRight, FileText, ListChecks, MessageSquare } from "lucide-react"
+import { ArrowUpRight, ChevronDown, FileText, ListChecks, MessageSquare } from "lucide-react"
+import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { FilterTabs } from "@/components/ui/filter-tabs"
 import { SignalList } from "@/components/shared/signal-list"
@@ -40,13 +41,28 @@ const SHORTCUTS = PROCESS_PROMPTS.filter((prompt) => !prompt.startsWith("Resuma"
  * Inteligência do processo: o que os dados já mostram (sinais) e, sob demanda,
  * a interpretação da Íntegra IA. Montar com `key={process.id}`: cada processo tem
  * suas próprias análises. Nada é chamado sem clique.
+ *
+ * `compact` (celular): os pontos de atenção e as sugestões de pergunta abrem sob demanda —
+ * prazo, tarefas e última movimentação já estão no topo da tela. Ações e leituras ficam visíveis.
  */
-export function ProcessAIPanel({ process, client, signals }: { process: Process; client?: Client; signals: AttentionSignal[] }) {
+export function ProcessAIPanel({
+  process,
+  client,
+  signals,
+  compact = false,
+}: {
+  process: Process
+  client?: Client
+  signals: AttentionSignal[]
+  compact?: boolean
+}) {
   const lexa = useLexaAI()
   const { status, ready } = lexa
   const summary = useAIAction<AIResult<ProcessSummary>>()
   const next = useAIAction<AIResult<NextActions>>()
   const [view, setView] = React.useState<View>("summary")
+  const [expanded, setExpanded] = React.useState(false)
+  const showDetails = !compact || expanded
   const [movement, setMovement] = React.useState<LexaMovement | null>(null)
   const [movementOpen, setMovementOpen] = React.useState(false)
   const createTask = useCreateTaskFromSuggestion({ processId: process.id })
@@ -105,7 +121,24 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
           </>
         }
       >
-        {signals.length > 0 && (
+        {compact && (signals.length > 0 || ready) && (
+          <div className={cn("px-5", expanded ? "pb-1" : "pb-4")}>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+              className="touch-target relative inline-flex items-center gap-1 rounded-md text-[12.5px] font-medium text-brand-strong outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              {expanded
+                ? "Ocultar detalhes"
+                : signals.length
+                  ? `Ver ${signals.length === 1 ? "o ponto de atenção" : `os ${signals.length} pontos de atenção`}`
+                  : "Ver sugestões de pergunta"}
+              <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
+            </button>
+          </div>
+        )}
+        {showDetails && signals.length > 0 && (
           <div className="px-3 pb-3">
             <SignalList signals={signals} linked={false} />
           </div>
@@ -114,7 +147,7 @@ export function ProcessAIPanel({ process, client, signals }: { process: Process;
           <div className="px-5 pb-5">
             <AIUnavailable status={status} />
           </div>
-        ) : (
+        ) : !showDetails ? null : (
           <div className="flex flex-wrap gap-1.5 border-t border-border px-5 py-3">
             {SHORTCUTS.map((prompt) => (
               <button

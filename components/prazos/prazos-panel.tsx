@@ -93,7 +93,7 @@ export function PrazoRow({ prazo, showProcess = false }: { prazo: Prazo; showPro
         <Hourglass className={cn("mt-0.5 size-4 shrink-0", urgent ? "text-danger" : isOpen ? "text-subtle" : "text-muted-foreground/60")} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className={cn("truncate text-[13.5px] font-medium", !isOpen && "text-muted-foreground")}>{prazo.description}</p>
+            <p className={cn("text-[13.5px] font-medium max-sm:line-clamp-2 sm:truncate", !isOpen && "text-muted-foreground")}>{prazo.description}</p>
             <StatusBadge tone={status.tone} size="sm">
               {status.label}
             </StatusBadge>
@@ -111,7 +111,7 @@ export function PrazoRow({ prazo, showProcess = false }: { prazo: Prazo; showPro
             Fatal em {fmtNumericDate(prazo.fatalDate)}
             {isOpen && ` · ${fmtDueIn(prazo.fatalDate)}`} · interna {fmtNumericDate(prazo.internalDate)}
           </p>
-          <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+          <p className="mt-0.5 text-[12px] text-muted-foreground sm:truncate">
             {prazo.responsibleId ? getUser(prazo.responsibleId).name : "Sem responsável"} · {PRAZO_ORIGIN[prazo.origin]}
             {isOpen && (
               <>
