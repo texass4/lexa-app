@@ -1,7 +1,26 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { compareVersions, diffCollection, diffState, orderCollection, removeById, upsertById, versionValue, type PersistedState } from "./storage"
+import {
+  appointmentsBetween,
+  clientScopes,
+  compareVersions,
+  daysBefore,
+  diffCollection,
+  diffState,
+  fetchManifest,
+  initialScopes,
+  loadScopes,
+  orderCollection,
+  processScopes,
+  RECENT_ACTIVITIES,
+  RECENT_NOTIFICATIONS,
+  removeById,
+  upsertById,
+  versionValue,
+  wholeCollection,
+  type PersistedState,
+} from "./storage"
 
 const empty = (): PersistedState => ({
   clients: [],
@@ -111,5 +130,101 @@ describe("aplicar registros do banco no store", () => {
     const list = removeById([a, { id: "b" }], "b")
     assert.deepEqual(list, [a])
     assert.equal(removeById(list, "b"), list)
+  })
+})
+
+describe("carga inicial e sob demanda", () => {
+  const now = new Date(2026, 9, 5, 10)
+
+  /** Cliente falso: guarda as chamadas de cada leitura e devolve as linhas da tabela. */
+  function fakeSupabase(tables: Record<string, { id: string; data: Record<string, unknown>; updated_at: string; created_at: string }[]>) {
+    const calls: { source: string; columns: string; ops: string[] }[] = []
+    const supabase = {
+      from(source: string) {
+        const call = { source, columns: "", ops: [] as string[] }
+        calls.push(call)
+        const builder = {
+          select(columns: string) {
+            call.columns = columns
+            return builder
+          },
+          or: (value: string) => (call.ops.push(`or ${value}`), builder),
+          eq: (column: string, value: string) => (call.ops.push(`eq ${column} ${value}`), builder),
+          gte: (column: string, value: string) => (call.ops.push(`gte ${column} ${value}`), builder),
+          lt: (column: string, value: string) => (call.ops.push(`lt ${column} ${value}`), builder),
+          in: (column: string, values: string[]) => (call.ops.push(`in ${column} ${values.join(",")}`), builder),
+          order: (column: string, options?: { ascending: boolean }) => (call.ops.push(`order ${column}${options?.ascending === false ? " desc" : ""}`), builder),
+          limit: (n: number) => (call.ops.push(`limit ${n}`), builder),
+          range: (from: number, to: number) => (call.ops.push(`range ${from}-${to}`), builder),
+          then(resolve: (value: { data: unknown[]; error: null }) => void) {
+            resolve({ data: (tables[source] ?? []).slice(0, 1000), error: null })
+          },
+        }
+        return builder
+      },
+    }
+    return { supabase: supabase as unknown as Parameters<typeof loadScopes>[0], calls }
+  }
+
+  it("a abertura lê cada coleção uma vez, com recorte nas que guardam histórico", () => {
+    const scopes = initialScopes(now)
+    assert.deepEqual(
+      [...new Set(scopes.map((s) => s.key))].sort(),
+      ["activities", "appointmentCategories", "appointments", "clients", "deadlines", "documents", "invoices", "notifications", "processes", "taskColumns", "tasks"],
+    )
+    const by = (key: string) => scopes.find((s) => s.key === key)!
+    assert.equal(by("processes").view, "processes_summary")
+    assert.equal(by("tasks").filter?.or, "data->>status.eq.pendente,data->>completedAt.gte.2026-09-05")
+    assert.equal(by("deadlines").filter?.or, "data->>status.eq.aberto,data->>closedAt.gte.2026-09-05")
+    assert.deepEqual(by("appointments").filter?.gte, [["data->>start", "2026-08-21"]])
+    assert.deepEqual(by("documents").filter?.gte, [["data->>uploadedAt", "2026-09-21"]])
+    // Receita do ano e dos últimos 6 meses: de 1º de janeiro (mais antigo que maio).
+    assert.match(by("invoices").filter!.or!, /status\.in\.\(pendente,atrasado\).*dueDate\.gte\.2026-01-01.*paidAt\.gte\.2026-01-01/)
+    assert.equal(by("activities").latest, RECENT_ACTIVITIES)
+    assert.equal(by("notifications").latest, RECENT_NOTIFICATIONS)
+    // Em fevereiro, os 6 meses começam no ano anterior.
+    assert.match(initialScopes(new Date(2026, 1, 10)).find((s) => s.key === "invoices")!.filter!.or!, /dueDate\.gte\.2025-09-01/)
+  })
+
+  it("datas locais, sem fuso", () => {
+    assert.equal(daysBefore(new Date(2026, 0, 2, 23, 30), 3), "2025-12-30")
+  })
+
+  it("processo e cliente pedem só o que é deles", () => {
+    const process = processScopes("p1")
+    assert.ok(process.every((s) => s.entity))
+    assert.deepEqual(process.find((s) => s.key === "deadlines")!.filter?.eq, [["process_id", "p1"]])
+    const client = clientScopes("c1", ["p1", "p2"])
+    assert.equal(client.find((s) => s.key === "tasks")!.filter?.or, "data->related->>id.eq.c1,data->related->>id.in.(p1,p2)")
+    assert.equal(clientScopes("c1", []).find((s) => s.key === "tasks")!.filter?.or, "data->related->>id.eq.c1")
+    // Um processo novo do cliente muda a identidade do recorte (nova leitura).
+    assert.notEqual(client.find((s) => s.key === "tasks")!.id, clientScopes("c1", ["p1"]).find((s) => s.key === "tasks")!.id)
+    assert.equal(wholeCollection("documents").filter, undefined)
+    assert.deepEqual(appointmentsBetween("2026-09-24", "2026-11-09").filter, { gte: [["data->>start", "2026-09-24"]], lt: [["data->>start", "2026-11-09"]] })
+  })
+
+  it("aplica o filtro na consulta (sem select *) e junta recortes que se sobrepõem", async () => {
+    const row = (id: string, createdAt: string) => ({ id, data: { id, createdAt }, updated_at: `2026-10-0${id.length}T00:00:00Z`, created_at: createdAt })
+    const { supabase, calls } = fakeSupabase({ tasks: [row("t1", "2026-01-01"), row("t2", "2026-02-01")], activities: [row("a1", "2026-01-01")] })
+    const snapshot = await loadScopes(supabase, [
+      { key: "tasks", id: "tasks:abertas", filter: { or: "data->>status.eq.pendente" } },
+      { key: "tasks", id: "tasks:processo:p1", entity: true, filter: { eq: [["data->related->>id", "p1"]] } },
+      { key: "activities", id: "activities:recentes", latest: 300 },
+    ])
+    // Os dois recortes trazem as mesmas tarefas: entram uma vez, mais nova no topo.
+    assert.deepEqual(snapshot.state.tasks.map((t) => t.id), ["t2", "t1"])
+    assert.equal(snapshot.versions.tasks.size, 2)
+    assert.ok(calls.every((c) => c.columns === "id, data, updated_at"))
+    assert.deepEqual(calls[0].ops, ["or data->>status.eq.pendente", "order created_at", "order id", "range 0-999"])
+    assert.deepEqual(calls[1].ops, ["eq data->related->>id p1", "order created_at", "order id", "range 0-999"])
+    assert.deepEqual(calls[2].ops, ["order created_at desc", "order id desc", "limit 300"])
+  })
+
+  it("a revalidação lê só id e versão, com o mesmo filtro, sempre da tabela", async () => {
+    const { supabase, calls } = fakeSupabase({ processes: [{ id: "p1", data: {}, updated_at: "v1", created_at: "x" }] })
+    const manifest = await fetchManifest(supabase, { key: "processes", id: "processes:resumo", view: "processes_summary" })
+    assert.deepEqual([...manifest], [["p1", "v1"]])
+    assert.equal(calls[0].source, "processes")
+    assert.equal(calls[0].columns, "id, updated_at")
   })
 })

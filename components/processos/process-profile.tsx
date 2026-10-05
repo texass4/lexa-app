@@ -28,6 +28,7 @@ import { TaskRow } from "@/components/tarefas/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
 import { ProcessTimeline } from "./process-timeline"
 import { useProcessRefresh } from "./use-process-refresh"
+import { useProcessDetail } from "@/lib/store/on-demand"
 import { ProcessTriagePanel } from "@/components/triagem/process-triage"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
@@ -95,6 +96,8 @@ export function ProcessProfile({ id }: { id: string }) {
   const narrow = width !== undefined && width < WIDE_MIN
   const [section, setSection] = React.useState<Section>("movimentacoes")
   const tabsAnchor = React.useRef<HTMLDivElement>(null)
+  // O resumo (listas, Painel) já mostra o topo; o histórico e o que é do processo vêm agora.
+  const detail = useProcessDetail(process?.id)
   // Mostra o que está salvo na hora e atualiza em segundo plano quando vencido.
   const refresh = useProcessRefresh(process)
 
@@ -339,7 +342,9 @@ export function ProcessProfile({ id }: { id: string }) {
       <PanelHeader
         title="Movimentações"
         description={
-          refresh.state.status === "refreshing" ? (
+          !detail.history ? (
+            "Carregando o histórico…"
+          ) : refresh.state.status === "refreshing" ? (
             <span className="inline-flex items-center gap-1.5" role="status">
               <span className="size-1.5 animate-pulse rounded-full bg-brand" aria-hidden />
               Atualizando informações…
@@ -359,7 +364,15 @@ export function ProcessProfile({ id }: { id: string }) {
         }
       />
       <div className={cn("pt-2 pb-6", narrow ? "px-4 sm:px-6" : "px-5 sm:px-6")}>
-        <ProcessTimeline movements={movements} compact={narrow} />
+        {detail.history ? (
+          <ProcessTimeline movements={movements} compact={narrow} />
+        ) : (
+          <div className="space-y-4 py-2" aria-busy="true" aria-label="Carregando movimentações">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        )}
       </div>
     </Panel>
   )
@@ -509,7 +522,7 @@ export function ProcessProfile({ id }: { id: string }) {
   /* --------------------------------- celular --------------------------------- */
 
   const sections: { value: Section; label: string; count?: number }[] = [
-    { value: "movimentacoes", label: "Movimentações", count: process.movements.length },
+    { value: "movimentacoes", label: "Movimentações", count: detail.history ? process.movements.length : undefined },
     { value: "prazos", label: "Prazos e tarefas", count: openPrazos + pendingTasks },
     { value: "documentos", label: "Documentos", count: documents.length },
     { value: "dados", label: "Dados" },

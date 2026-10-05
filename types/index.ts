@@ -214,6 +214,12 @@ export interface Process extends TenantEntity {
   distributedAt: string
   lastMovementAt: string
   movements: ProcessMovement[]
+  /**
+   * Só a movimentação mais recente foi carregada (resumo usado em listas e no Painel,
+   * `processes_summary`). O histórico completo vem ao abrir o processo. Nunca é salvo:
+   * o banco tira a marca e mantém o histórico que já tem (`0016_carga_sob_demanda.sql`).
+   */
+  movementsPartial?: boolean
 
   /* ----- Campos preenchidos por consulta externa (todos opcionais) ----- */
 

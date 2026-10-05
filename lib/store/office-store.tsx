@@ -19,7 +19,7 @@ import { getSupabase } from "@/lib/supabase/client"
 import { useSession } from "@/lib/auth/session"
 import { withoutFinance } from "@/lib/financeiro/access"
 import { useSplashReady } from "@/components/layout/app-splash"
-import { COLLECTION_LABELS, loadState, type Collection, type PersistedState, type Snapshot } from "./storage"
+import { COLLECTION_LABELS, initialScopes, loadScopes, type Collection, type PersistedState, type Scope, type Snapshot } from "./storage"
 import { OfficeSync, REVALIDATE_AFTER_HIDDEN_MS, type SaveResult, type SyncNotice } from "./office-sync"
 
 export type { SaveResult } from "./office-sync"
@@ -172,6 +172,14 @@ interface OfficeActions {
   deleteInvoice(id: string): void
   markNotificationRead(id: string): void
   markAllNotificationsRead(): void
+  /** Carrega recortes que ainda não estão na memória (histórico sob demanda). */
+  ensureScopes(scopes: Scope[]): Promise<void>
+  /** O recorte já foi carregado. */
+  isLoaded(scopeId: string): boolean
+  /** Troca o resumo de processos pelo registro completo (com todas as movimentações). */
+  ensureFullProcesses(ids: string[]): Promise<void>
+  /** Os dados como estão agora (para quem esperou uma carga sob demanda antes de ler). */
+  currentState(): PersistedState
 }
 
 const DataContext = React.createContext<OfficeState | null>(null)
@@ -183,19 +191,25 @@ const base = () => ({ organizationId: account.currentOrgId(), createdAt: nowISO(
 
 /**
  * Primeira carga dos dados, iniciada antes de a sessão terminar de carregar
- * (`SessionProvider`). O store usa esta promessa em vez de abrir outra.
+ * (`SessionProvider`). O store usa esta promessa em vez de abrir outra. Só os recortes
+ * da abertura (`initialScopes`); o histórico vem sob demanda (`ensureScopes`).
  */
-let preloaded: Promise<Snapshot> | null = null
+let preloaded: Promise<{ snapshot: Snapshot; scopes: Scope[] }> | null = null
+
+function startInitialLoad() {
+  const scopes = initialScopes(getNow())
+  return loadScopes(getSupabase(), scopes).then((snapshot) => ({ snapshot, scopes }))
+}
 
 export function preloadOfficeData() {
-  preloaded ??= loadState(getSupabase())
+  preloaded ??= startInitialLoad()
   // Evita "unhandled rejection" se ninguém chegar a consumir (ex.: sem acesso).
   preloaded.catch(() => {})
 }
 
 /** A carga antecipada, ou uma nova. Continua disponível até alguém aplicá-la (StrictMode monta duas vezes). */
 function initialLoad() {
-  preloaded ??= loadState(getSupabase())
+  preloaded ??= startInitialLoad()
   return preloaded
 }
 /** Campos do cadastro com nome legível — para descrever a edição na timeline. */
@@ -528,7 +542,8 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
 
       applyProcessSync(processId, sheet, checkedAt) {
         const current = stateRef.current.processes.find((p) => p.id === processId)
-        if (!current) return { added: 0 }
+        // Só com o histórico completo: comparar com o resumo trataria movimentações antigas como novas.
+        if (!current || current.movementsPartial) return { added: 0 }
 
         const at = checkedAt ? toLocalISO(new Date(checkedAt)) : nowISO()
         const { process: updated, imported } = mergeProcessSheet(current, sheet, at, { newId: () => uid("m") })
@@ -1129,6 +1144,11 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
       markAllNotificationsRead() {
         commit((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }))
       },
+
+      ensureScopes: (scopes) => sync.ensureScopes(scopes),
+      isLoaded: (scopeId) => sync.isLoaded(scopeId),
+      ensureFullProcesses: (ids) => sync.ensureFullProcesses(ids),
+      currentState: () => stateRef.current,
     }
   }, [sync])
 
@@ -1141,7 +1161,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
     }
     // A primeira carga reaproveita a que começou junto com a sessão; novas tentativas buscam de novo.
     initialLoad()
-      .then((snapshot) => {
+      .then(({ snapshot, scopes }) => {
         if (cancelledRef.current) return
         preloaded = null
         // O que foi criado antes de terminar de carregar entra junto (e é gravado a seguir).
@@ -1151,7 +1171,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
           ;(next as unknown as Record<string, unknown>)[key] = mergeById<{ id: string }>(current[key], snapshot.state[key])
         }
         stateRef.current = next
-        sync.hydrate(snapshot)
+        sync.hydrate(snapshot, scopes)
         setState(next)
       })
       .catch((error) => {

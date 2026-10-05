@@ -20,6 +20,7 @@ import { TaskFormDialog } from "./task-form-dialog"
 import { BoardView } from "./board-view"
 import { useToggleTask } from "./task-row"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useWholeCollection } from "@/lib/store/on-demand"
 import { useUI } from "@/lib/store/ui-store"
 import { createLocalStore } from "@/lib/core/hooks"
 import { addDays, getNow, monthShort, startOfWeek, weekdayName } from "@/lib/core/dates"
@@ -70,7 +71,9 @@ export function TasksView() {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
-  const ready = data.hydrated
+  // A abertura traz as pendentes e as concluídas nos últimos 30 dias; o histórico vem ao abrir Tarefas.
+  const allTasks = useWholeCollection("tasks")
+  const ready = data.hydrated && allTasks
   const storedView = (React.useSyncExternalStore(viewStore.subscribe, viewStore.get, viewStore.getServer) as ViewMode) || "board"
   // `?filtro=atrasadas` (links de "o que merece atenção") abre a lista já filtrada.
   const filterParam = params.get("filtro")

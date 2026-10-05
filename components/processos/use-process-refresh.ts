@@ -45,7 +45,8 @@ export function useProcessRefresh(process: Process | undefined) {
   const code = process?.code
   // Qualquer processo com CNJ válido pode ser atualizado à mão (um cadastro manual
   // passa a ser acompanhado); a atualização automática vale só para os acompanhados.
-  const enabled = !!process && can("processes.edit") && hasValidCheckDigits(cnj)
+  // Só com o histórico completo na memória (o resumo das listas traz só a última movimentação).
+  const enabled = !!process && !process.movementsPartial && can("processes.edit") && hasValidCheckDigits(cnj)
   const tracked = isAutoTracked(process?.source?.provider)
 
   const refresh = React.useCallback(

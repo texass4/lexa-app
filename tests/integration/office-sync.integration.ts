@@ -14,7 +14,7 @@ import assert from "node:assert/strict"
 import { after, before, describe, it } from "node:test"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { OfficeSync, type SyncNotice } from "@/lib/store/office-sync"
-import { loadState, type PersistedState } from "@/lib/store/storage"
+import { initialScopes, loadScopes, type PersistedState } from "@/lib/store/storage"
 import type { Process, Task } from "@/types"
 
 const URL = process.env.SUPABASE_URL
@@ -68,9 +68,10 @@ async function open(name: string, email: string, org: string, { realtime = true 
   const state = { current: { hydrated: false } as State }
   const notices: SyncNotice[] = []
   const sync = new OfficeSync<State>({ supabase, organizationId: org, state, render: () => {}, notify: (n) => notices.push(n) })
-  const snapshot = await loadState(supabase)
+  const scopes = initialScopes(new Date())
+  const snapshot = await loadScopes(supabase, scopes)
   state.current = { ...snapshot.state, hydrated: true }
-  sync.hydrate(snapshot)
+  sync.hydrate(snapshot, scopes)
   const session: Session = { name, supabase, org, state, sync, notices }
   opened.push(session)
   if (realtime) {

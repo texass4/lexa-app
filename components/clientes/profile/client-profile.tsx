@@ -19,6 +19,7 @@ import { AppointmentsTab, DocumentsTab, ProcessesTab, TasksTab, TimelineTab } fr
 import { EditClientDialog } from "./edit-client-dialog"
 import { useClientActions } from "@/components/clientes/client-actions"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useClientDetail } from "@/lib/store/on-demand"
 import { clientFinance, clientHub } from "@/lib/store/selectors"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import { ClientAIDock } from "./client-ai-dock"
@@ -69,6 +70,9 @@ export function ClientProfile({ id }: { id: string }) {
   const params = useSearchParams()
   const { can } = useSession()
   const ready = data.hydrated
+  // Cadastro e visão geral na hora; o histórico do cliente (documentos, lançamentos,
+  // atividades, tarefas e prazos encerrados) chega em seguida, numa leitura só por coleção.
+  const related = useClientDetail(id)
   const [editing, setEditing] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -118,7 +122,7 @@ export function ClientProfile({ id }: { id: string }) {
       { value: "visao-geral", label: "Visão geral" },
       { value: "processos", label: "Processos", count: hub.processes.length },
       { value: "tarefas", label: "Tarefas", count: pendingTasks },
-      { value: "documentos", label: "Documentos", count: hub.documents.length },
+      { value: "documentos", label: "Documentos", count: related ? hub.documents.length : undefined },
       { value: "compromissos", label: "Compromissos", count: upcoming },
       { value: "financeiro", label: "Financeiro" },
       { value: "timeline", label: "Timeline" },
@@ -153,11 +157,18 @@ export function ClientProfile({ id }: { id: string }) {
           >
             {tab === "visao-geral" && <OverviewTab client={client} hub={hub} finance={finance} onNavigate={setTab} />}
             {tab === "processos" && <ProcessesTab client={client} hub={hub} />}
-            {tab === "tarefas" && <TasksTab client={client} hub={hub} />}
-            {tab === "documentos" && <DocumentsTab client={client} hub={hub} />}
-            {tab === "compromissos" && <AppointmentsTab client={client} hub={hub} />}
-            {tab === "financeiro" && finance && <FinanceTab client={client} finance={finance} />}
-            {tab === "timeline" && <TimelineTab hub={hub} />}
+            {/* Abas de histórico: esperam o histórico do cliente (não mostram uma lista pela metade). */}
+            {tab !== "visao-geral" && tab !== "processos" && !related ? (
+              <SkeletonCard lines={5} />
+            ) : (
+              <>
+                {tab === "tarefas" && <TasksTab client={client} hub={hub} />}
+                {tab === "documentos" && <DocumentsTab client={client} hub={hub} />}
+                {tab === "compromissos" && <AppointmentsTab client={client} hub={hub} />}
+                {tab === "financeiro" && finance && <FinanceTab client={client} finance={finance} />}
+                {tab === "timeline" && <TimelineTab hub={hub} />}
+              </>
+            )}
           </motion.div>
         </AnimatePresence>
 

@@ -18,6 +18,7 @@ import { getNow } from "@/lib/core/dates"
 import { matches } from "@/lib/core/format"
 import { PRAZO_PERIOD_LABEL, daysToPrazo, isOpenPrazo, prazoPeriod, prazoTask, type PrazoPeriod } from "@/lib/prazos/prazos"
 import { useOfficeData } from "@/lib/store/office-store"
+import { useWholeCollection } from "@/lib/store/on-demand"
 import { useUI } from "@/lib/store/ui-store"
 import type { Prazo } from "@/types"
 import { PrazoRow } from "./prazos-panel"
@@ -37,8 +38,10 @@ export function PrazosView() {
   const [filter, setFilter] = React.useState<Filter>(() => (param && FILTERS.includes(param) ? param : "abertos"))
   const [responsible, setResponsible] = React.useState("")
   const [query, setQuery] = React.useState("")
+  // A abertura traz os prazos abertos e os encerrados nos últimos 30 dias; o histórico vem ao abrir Prazos.
+  const allPrazos = useWholeCollection("deadlines")
 
-  if (!data.hydrated) {
+  if (!data.hydrated || !allPrazos) {
     return (
       <div className="space-y-6" aria-busy="true" aria-label="Carregando prazos">
         <SkeletonStats />

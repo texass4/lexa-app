@@ -7,12 +7,16 @@ import { clientHub } from "@/lib/store/selectors"
 import { downloadFile, fileSlug } from "@/lib/core/export"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import { getUser } from "@/lib/auth/account"
+import { useSession } from "@/lib/auth/session"
+import { withoutFinance } from "@/lib/financeiro/access"
+import { clientScopes } from "@/lib/store/storage"
 import type { Client, ClientStatus } from "@/types"
 
 /** Ações de cliente usadas na lista e no perfil. */
 export function useClientActions() {
   const data = useOfficeData()
-  const { updateClient } = useOfficeActions()
+  const { updateClient, ensureScopes, ensureFullProcesses, currentState } = useOfficeActions()
+  const { can } = useSession()
 
   return {
     /** Desativa (ou reativa) sem apagar nada — com "Desfazer". */
@@ -30,8 +34,20 @@ export function useClientActions() {
      * Baixa a ficha completa do cliente em JSON (portabilidade/LGPD): cadastro e tudo
      * o que está vinculado e que a pessoa logada pode ver. Arquivos não entram, só os dados deles.
      */
-    exportClient(client: Client) {
-      const hub = clientHub(data, client.id)
+    async exportClient(client: Client) {
+      // A abertura traz só resumos e janelas recentes: antes de exportar, busca tudo do
+      // cliente (histórico de tarefas, documentos, lançamentos, atividades) e as
+      // movimentações completas dos processos dele.
+      const processIds = data.processes.filter((p) => p.clientId === client.id).map((p) => p.id)
+      try {
+        await Promise.all([ensureScopes(clientScopes(client.id, processIds)), ensureFullProcesses(processIds)])
+      } catch (error) {
+        console.error("[exportação] Não foi possível carregar os dados do cliente:", error)
+        toast.error("Não foi possível exportar agora.", { description: "Verifique a conexão e tente de novo." })
+        return
+      }
+      const current = withoutFinance(currentState(), can("finance.view"))
+      const hub = clientHub(current, client.id)
       const payload = {
         exportedAt: toLocalISO(getNow()),
         client: { ...client, owner: getUser(client.ownerId).name },
@@ -40,7 +56,7 @@ export function useClientActions() {
         tasks: hub.tasks,
         documents: hub.documents.map((d) => ({ ...d, storagePath: undefined })),
         appointments: hub.appointments,
-        invoices: data.invoices.filter((i) => i.clientId === client.id),
+        invoices: current.invoices.filter((i) => i.clientId === client.id),
         timeline: hub.activities,
       }
       downloadFile(`cliente-${fileSlug(client.name)}.json`, JSON.stringify(payload, null, 2), "application/json")

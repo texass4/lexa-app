@@ -16,6 +16,7 @@ import { NativeSelect } from "@/components/ui/field"
 import { FileIcon } from "@/components/shared/file-icon"
 import { DocumentActions, DocumentList } from "@/components/shared/document-list"
 import { useOfficeData } from "@/lib/store/office-store"
+import { useWholeCollection } from "@/lib/store/on-demand"
 import { useUI } from "@/lib/store/ui-store"
 import { diffInDays, fmtNumericDate, getNow, parse } from "@/lib/core/dates"
 import { RECENT_DAYS } from "@/lib/dashboard/attention"
@@ -38,13 +39,22 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 const MAIN_KINDS: DocumentKind[] = ["Contrato", "Procuração", "Petição", "Documento pessoal", "Laudo"]
 
+/** Documentos desenhados por vez (a busca e os filtros valem para todos). */
+const LIST_PAGE = 50
+
 export function DocumentsView() {
   const data = useOfficeData()
   const { openDialog } = useUI()
-  const ready = data.hydrated
+  // A abertura traz só os documentos recentes; a lista completa vem ao abrir a tela.
+  const allDocuments = useWholeCollection("documents")
+  const ready = data.hydrated && allDocuments
   const [filter, setFilter] = React.useState<Filter>("todos")
   const [clientId, setClientId] = React.useState("")
   const [query, setQuery] = React.useState("")
+  // Desenha a lista aos poucos: escritórios têm milhares de arquivos (busca e filtros valem para todos).
+  const listKey = `${filter}|${clientId}|${query}`
+  const [shown, setShown] = React.useState({ key: listKey, count: LIST_PAGE })
+  const limit = shown.key === listKey ? shown.count : LIST_PAGE
 
   const test = (f: Filter, kind: DocumentKind) => (f === "todos" ? true : f === "outros" ? !MAIN_KINDS.includes(kind) : kind === f)
 
@@ -57,6 +67,8 @@ export function DocumentsView() {
     })
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))
 
+  const visibleRows = rows.slice(0, limit)
+  const hidden = rows.length - visibleRows.length
   const totalSize = data.documents.reduce((acc, d) => acc + d.sizeBytes, 0)
   const isNew = (uploadedAt: string) => diffInDays(getNow(), parse(uploadedAt)) <= RECENT_DAYS
   const fresh = ready ? data.documents.filter((d) => isNew(d.uploadedAt)).length : 0
@@ -66,7 +78,7 @@ export function DocumentsView() {
       <PageHeader
         title="Documentos"
         description={
-          data.documents.length
+          ready && data.documents.length
             ? `${data.documents.length} arquivo${data.documents.length === 1 ? "" : "s"} · ${formatFileSize(totalSize)}${fresh ? ` · ${fresh} novo${fresh === 1 ? "" : "s"} nesta semana` : ""}. Cada documento fica ligado ao cliente e ao processo.`
             : "Contratos, procurações e peças do escritório, ligados a clientes e processos."
         }
@@ -143,7 +155,7 @@ export function DocumentsView() {
                   </tr>
                 </thead>
                 <tbody className="[&_tr:last-child_td]:border-0">
-                  {rows.map((d) => {
+                  {visibleRows.map((d) => {
                     const client = data.clients.find((c) => c.id === d.clientId)
                     const process = data.processes.find((p) => p.id === d.processId)
                     const by = getUser(d.uploadedById)
@@ -203,8 +215,15 @@ export function DocumentsView() {
             </div>
           </TableShell>
           <div className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card @4xl/main:hidden">
-            <DocumentList documents={rows} showClient />
+            <DocumentList documents={visibleRows} showClient />
           </div>
+          {hidden > 0 && (
+            <div className="mt-4 flex justify-center">
+              <Button variant="secondary" size="sm" onClick={() => setShown({ key: listKey, count: limit + LIST_PAGE })}>
+                Mostrar mais {Math.min(LIST_PAGE, hidden)} de {hidden}
+              </Button>
+            </div>
+          )}
         </FadeIn>
       )}
     </div>

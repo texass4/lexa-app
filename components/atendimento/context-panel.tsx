@@ -32,6 +32,7 @@ import { FileIcon } from "@/components/shared/file-icon"
 import { TaskRow } from "@/components/tarefas/task-row"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import { useOfficeData } from "@/lib/store/office-store"
+import { useClientDetail } from "@/lib/store/on-demand"
 import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
 import { getUser } from "@/lib/auth/account"
@@ -385,6 +386,8 @@ export function ContextPanel({
   const lookup = useCategoryLookup()
   const client = conversation.contact.clientId ? data.clients.find((c) => c.id === conversation.contact.clientId) : undefined
   const clientId = client?.id
+  // Tarefas, documentos e compromissos do cliente (a abertura traz só os recentes).
+  useClientDetail(clientId)
 
   const processes = clientId ? data.processes.filter((p) => p.clientId === clientId) : []
   const processIds = new Set(processes.map((p) => p.id))

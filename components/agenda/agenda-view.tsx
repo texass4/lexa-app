@@ -14,6 +14,7 @@ import { AgendaList } from "./agenda-list"
 import { AppointmentDetail } from "./appointment-detail"
 import { AgendaToday } from "./agenda-today"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useAppointmentsRange } from "@/lib/store/on-demand"
 import { fmtSlot, moveAppointment, moveToDay } from "@/lib/agenda/agenda"
 import { useUI } from "@/lib/store/ui-store"
 import { categoryStyle } from "@/lib/core/config"
@@ -29,15 +30,23 @@ const NONE = "__sem_categoria__"
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
+/** `YYYY-MM-DD` no horário local (como as datas dos compromissos). */
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
 export function AgendaView() {
   const data = useOfficeData()
   const { updateAppointment, versionOf } = useOfficeActions()
   const { openDialog } = useUI()
   const { can } = useSession()
   const editable = can("agenda.edit")
-  const ready = data.hydrated
   const [view, setView] = React.useState<View>("semana")
   const [anchor, setAnchor] = React.useState(() => startOfDay(getNow()))
+  // A abertura traz os compromissos a partir de 45 dias atrás; meses anteriores vêm quando a Agenda chega neles.
+  const periodReady = useAppointmentsRange(
+    ymd(addDays(new Date(anchor.getFullYear(), anchor.getMonth(), 1), -7)),
+    ymd(addDays(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1), 8)),
+  )
+  const ready = data.hydrated && periodReady
   const [hidden, setHidden] = React.useState<Set<string>>(new Set())
   const [onlyMine, setOnlyMine] = React.useState(false)
   const [selected, setSelected] = React.useState<Appointment | undefined>()

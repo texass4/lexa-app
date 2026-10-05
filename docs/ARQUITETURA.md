@@ -107,7 +107,7 @@ lexa-app/
 │   └── integrations/            legal/ (DataJud, DJEN) · whatsapp/ (Z-API)
 ├── types/                       tipos das entidades
 ├── supabase/
-│   ├── migrations/              SQL do banco em ordem (0001 → 0013): tabelas, RLS, funções, Storage
+│   ├── migrations/              SQL do banco em ordem (0001 → 0016): tabelas, RLS, funções, Storage
 │   └── templates/               e-mails do Supabase Auth (gerados por `npm run email:templates`)
 ├── public/brand/                ícones do manifest, kit da marca (SVG) e fundo da barra lateral
 ├── scripts/                     scripts de e-mail (templates do Supabase, teste de SMTP)
@@ -205,7 +205,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 ## 6. Dados
 
 - Cada coleção do escritório é uma tabela `(organization_id, id, data jsonb, created_at, updated_at)`. A RLS libera só o escritório da pessoa e só os módulos que ela pode ver.
-- O store carrega as coleções ao entrar, grava só o que mudou (agrupado em 300 ms) e recebe as mudanças da equipe pelo Realtime. Edições conferem a versão (`updated_at`): se outra pessoa gravou antes, a gravação é recusada com aviso.
+- O store carrega na abertura só o que a primeira tela usa (recortes recentes; processos sem o histórico de movimentações) e o resto sob demanda, quando a tela ou o registro é aberto (`lib/store/on-demand.ts`; detalhes em MODULOS.md). Grava só o que mudou (agrupado em 300 ms) e recebe as mudanças da equipe pelo Realtime. Edições conferem a versão (`updated_at`): se outra pessoa gravou antes, a gravação é recusada com aviso.
 - WhatsApp, Triagem, intimações, monitoramento, consumo de IA e Admin têm tabelas próprias (ver as migrações).
 - Arquivos: Storage, em `documents/<organization_id>/…` e `whatsapp/<organization_id>/…`, sempre com URL assinada.
 

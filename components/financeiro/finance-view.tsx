@@ -23,6 +23,7 @@ import { RevenueBarChart } from "./revenue-chart"
 import { NewInvoiceDialog } from "./new-invoice-dialog"
 import { PayInvoiceDialog } from "./pay-invoice-dialog"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useWholeCollection } from "@/lib/store/on-demand"
 import { INVOICE_STATUS } from "@/lib/core/config"
 import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
 import { downloadCSV } from "@/lib/core/csv"
@@ -51,7 +52,9 @@ export function FinanceView() {
   const { can } = useSession()
   const { openDialog } = useUI()
   const { deleteInvoice } = useOfficeActions()
-  const ready = data.hydrated
+  // A abertura traz os lançamentos em aberto e os dos últimos meses; o histórico vem ao abrir o Financeiro.
+  const allInvoices = useWholeCollection("invoices")
+  const ready = data.hydrated && allInvoices
   const open = openReceivables(data)
   // Parcela prevista com vencimento passado já está em atraso, mesmo sem mudar o status salvo.
   const overdue = data.invoices.filter((i) => invoiceStatus(i) === "atrasado").sort((a, b) => a.dueDate.localeCompare(b.dueDate))

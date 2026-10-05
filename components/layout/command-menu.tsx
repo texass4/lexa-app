@@ -24,6 +24,7 @@ import { visibleSections } from "./nav-config"
 import { DIALOG_PERMISSION, useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { useOfficeData } from "@/lib/store/office-store"
+import { useWholeCollection } from "@/lib/store/on-demand"
 import { normalize } from "@/lib/core/format"
 import { CLIENT_STATUS, PROCESS_STATUS } from "@/lib/core/config"
 import { fmtShortDate, fmtTime, getNow, parse } from "@/lib/core/dates"
@@ -82,6 +83,8 @@ function CommandContent() {
   }
 
   const hasQuery = query.trim().length > 0
+  // Documentos antigos não vêm na abertura: a busca os pede quando a pessoa começa a digitar.
+  useWholeCollection(hasQuery && can("documents.view") ? "documents" : null)
   const clients = hasQuery ? data.clients : data.clients.slice(0, 3)
   const processes = hasQuery ? data.processes : data.processes.slice(0, 2)
   const tasks = hasQuery && can("tasks.view") ? data.tasks.filter((t) => t.status === "pendente") : []

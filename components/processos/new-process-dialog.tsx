@@ -84,7 +84,7 @@ const isRecent = (process: Process) => !!process.lastSyncedAt && getNow().getTim
 
 function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?: string; onClose: () => void }) {
   const data = useOfficeData()
-  const { addProcess, importProcess, updateProcess, applyProcessSync, versionOf } = useOfficeActions()
+  const { addProcess, importProcess, updateProcess, applyProcessSync, ensureFullProcesses, versionOf } = useOfficeActions()
   const router = useRouter()
   const initial = () => ({
     number: number ? maskCNJ(number) : "",
@@ -185,6 +185,15 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
 
     if (existing) {
       // Já estava em Processos: atualiza e traz os dados do escritório para o formulário.
+      // As novidades são comparadas com o histórico completo (a lista só tem a mais recente).
+      try {
+        await ensureFullProcesses([existing.id])
+      } catch (error) {
+        console.error("[processo] Não foi possível carregar o histórico:", error)
+        setLookup({ state: "error", title: "Não foi possível consultar o processo", message: "Tente novamente em alguns instantes.", retry: true })
+        return
+      }
+      if (controller.signal.aborted) return
       const baseVersion = versionOf("processes", existing.id)
       const { added } = applyProcessSync(existing.id, found, result.checkedAt)
       fillForm(formFrom(existing))
