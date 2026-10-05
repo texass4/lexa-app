@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 
 import { momentToISO, parseZapiWebhook } from "./webhook"
 import { createZapiClient, ZapiError } from "./client"
+import { isTechnicalMessage } from "@/lib/core/public-error"
 
 const NOW = new Date("2026-09-25T12:00:00.000Z")
 
@@ -147,7 +148,43 @@ describe("cliente da Z-API", () => {
     })
     await assert.rejects(client.sendText({ phone: "1", text: "x" }), (error: unknown) => {
       assert.ok(error instanceof ZapiError)
-      assert.match(error.message, /credenciais/)
+      assert.match(error.message, /Não foi possível conectar ao WhatsApp do escritório/)
+      assert.equal(error.detail, "null not allowed")
+      return true
+    })
+  })
+
+  it("nenhuma falha leva nome do provedor, variável ou código HTTP para a mensagem (só para o log)", async () => {
+    const answers: [number, unknown][] = [
+      [401, { error: "Client-Token F123 not allowed" }],
+      [404, { error: "Instance not found" }],
+      [429, "Too Many Requests"],
+      [500, "<html>Internal Server Error</html>"],
+      [200, { error: "You are not connected" }],
+      [400, { error: "phone invalid" }],
+      [200, {}],
+    ]
+    for (const [status, body] of answers) {
+      const client = createZapiClient(creds, {
+        baseUrl: "https://api.test",
+        fetch: (async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status })) as typeof fetch,
+      })
+      await assert.rejects(client.sendText({ phone: "1", text: "x" }), (error: unknown) => {
+        assert.ok(error instanceof ZapiError)
+        assert.equal(isTechnicalMessage(error.message), false, `${status}: ${error.message}`)
+        return true
+      })
+    }
+    const offline = createZapiClient(creds, {
+      baseUrl: "https://api.test",
+      fetch: (async () => {
+        throw new TypeError("fetch failed")
+      }) as typeof fetch,
+    })
+    await assert.rejects(offline.sendText({ phone: "1", text: "x" }), (error: unknown) => {
+      assert.ok(error instanceof ZapiError)
+      assert.equal(isTechnicalMessage(error.message), false, error.message)
+      assert.match(String(error.detail), /fetch failed/)
       return true
     })
   })

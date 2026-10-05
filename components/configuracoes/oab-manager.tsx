@@ -35,7 +35,10 @@ function useLawyerOabs(userId: string) {
   const load = React.useCallback(async () => {
     const { data, error } = await getSupabase().from("lawyer_oabs").select("*").eq("user_id", userId).order("created_at")
     // Sem a migração 0011: o cadastro de inscrições ainda não existe no banco.
-    if (error) setState({ oabs: [], loading: false, unavailable: true })
+    if (error) {
+      console.warn("[OAB] Não foi possível ler as inscrições (migração 0011 aplicada?):", error)
+      setState({ oabs: [], loading: false, unavailable: true })
+    }
     else setState({ oabs: (data as Row[]).map(toOab), loading: false, unavailable: false })
   }, [userId])
   React.useEffect(() => {
@@ -89,7 +92,7 @@ export function OabManager({ userId, required, canEdit = true }: { userId: strin
   if (unavailable) {
     return (
       <p className="text-[12.5px] text-muted-foreground">
-        O cadastro de inscrições na OAB estará disponível depois da atualização do banco (migração 0011).
+        O cadastro de inscrições na OAB ainda não está disponível para o escritório. Fale com o suporte da Íntegra.
       </p>
     )
   }

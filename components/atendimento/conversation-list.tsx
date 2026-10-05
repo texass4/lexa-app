@@ -170,8 +170,8 @@ export function ConversationList({
           <EmptyState
             compact
             icon={<DatabaseZap />}
-            title="Banco ainda não preparado."
-            description="Rode supabase/migrations/0002_whatsapp.sql no SQL Editor do Supabase para ativar a Central de Atendimento."
+            title="Central de Atendimento indisponível."
+            description="A Central de Atendimento ainda não foi ativada para o escritório. Fale com o suporte da Íntegra."
           />
         ) : status === "error" ? (
           <ErrorState title="Não conseguimos carregar as conversas." onRetry={reload} className="py-12" />

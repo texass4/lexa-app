@@ -15,6 +15,7 @@ import { getSupabase } from "@/lib/supabase/client"
 import { maskPhone } from "@/lib/core/masks"
 import { OabManager } from "./oab-manager"
 import { isEmail, MIN_PASSWORD, passwordProblem } from "@/lib/auth/validation"
+import { OFFLINE_ERROR, publicMessage } from "@/lib/core/public-error"
 
 const AVATAR_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }
 const AVATAR_MAX = 5 * 1024 * 1024
@@ -164,11 +165,12 @@ function EmailForm() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-    })
+    }).catch(() => null)
     setBusy(false)
+    if (!res) return setError(OFFLINE_ERROR)
     if (!res.ok) {
-      const { error: message } = await res.json().catch(() => ({ error: "Não foi possível trocar o e-mail." }))
-      return setError(message)
+      const { error: message } = await res.json().catch(() => ({ error: "" }))
+      return setError(publicMessage(message, "Não foi possível trocar o e-mail. Tente novamente."))
     }
     setPassword("")
     await getSupabase().auth.refreshSession()

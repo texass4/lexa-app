@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { hardNavigate } from "@/lib/auth/navigate"
+import { fallbackForStatus, publicMessage } from "@/lib/core/public-error"
 
 /** Chamada às rotas `/api/admin/*`. Erros do servidor viram `Error` com a mensagem pronta para a tela. */
 export async function adminFetch<T>(url: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
@@ -16,7 +17,7 @@ export async function adminFetch<T>(url: string, method = "GET", body?: unknown,
   if (res.status === 401) {
     hardNavigate(`/login?next=${encodeURIComponent(window.location.pathname)}`)
   }
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? "Não foi possível concluir a ação.")
+  if (!res.ok) throw new Error(publicMessage((data as { error?: string }).error, fallbackForStatus(res.status)))
   return data as T
 }
 

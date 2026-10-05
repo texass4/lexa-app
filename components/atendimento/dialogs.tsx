@@ -21,6 +21,7 @@ import { formatPhone, normalizeWhatsAppPhone } from "@/lib/whatsapp/phone"
 import { whatsappApi } from "@/lib/whatsapp/client"
 import type { PracticeArea, WhatsAppContact, WhatsAppConversation } from "@/types"
 import { contactName } from "./parts"
+import { publicMessage } from "@/lib/core/public-error"
 
 /* ------------------------------- Responsável ------------------------------ */
 
@@ -48,7 +49,7 @@ export function AssignDialog({
       onOpenChange(false)
       toast.success(userId ? (userId === user.id ? "Você assumiu a conversa." : "Responsável alterado.") : "Conversa sem responsável.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível alterar o responsável.")
+      toast.error(publicMessage(error, "Não foi possível alterar o responsável."))
     } finally {
       setSaving(null)
     }
@@ -151,7 +152,7 @@ function NewConversationForm({ onClose, onCreated }: { onClose: () => void; onCr
       onCreated(conversation)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível iniciar a conversa.")
+      setError(publicMessage(err, "Não foi possível iniciar a conversa."))
     } finally {
       setSaving(false)
     }
@@ -371,7 +372,7 @@ export function LinkClientDialog({ open, onOpenChange, contact }: { open: boolea
       toast.success("Conversa vinculada ao cliente.", { description: name })
       onOpenChange(false)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível vincular.")
+      toast.error(publicMessage(error, "Não foi possível vincular."))
     } finally {
       setSaving(null)
     }

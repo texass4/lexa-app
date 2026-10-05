@@ -10,6 +10,7 @@ import { ResendConfirmation } from "./resend-confirmation"
 import { getSupabase } from "@/lib/supabase/client"
 import { normalizeEmail, safeNext } from "@/lib/auth/validation"
 import { hardNavigate } from "@/lib/auth/navigate"
+import { SERVICE_ERROR } from "@/lib/core/public-error"
 
 const LINK_ERRORS: Record<string, string> = {
   link: "O link expirou ou já foi usado. Peça um novo.",
@@ -36,6 +37,11 @@ export function LoginForm() {
       if (authError.code === "email_not_confirmed" || /email not confirmed/i.test(authError.message)) {
         setUnconfirmed(normalizeEmail(email))
         setError("Confirme seu e-mail para entrar: abra o link que enviamos no cadastro.")
+      } else if (authError.status === 429) setError("Muitas tentativas seguidas. Aguarde alguns instantes e tente novamente.")
+      else if (!authError.status || authError.status >= 500) {
+        // Sem resposta do serviço de login (rede ou instabilidade): não é senha errada.
+        console.error("[login]", authError.status, authError.message)
+        setError(SERVICE_ERROR)
       } else setError("E-mail ou senha incorretos.")
       return
     }

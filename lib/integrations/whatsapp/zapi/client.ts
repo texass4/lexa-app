@@ -36,15 +36,17 @@ export function zapiCredentialsFromEnv(): ZapiCredentials | null {
   return { instanceId, token, clientToken: process.env.ZAPI_CLIENT_TOKEN?.trim() || undefined }
 }
 
-/** Mensagem legível para quem está na Íntegra; o detalhe técnico vai para o log. */
+/**
+ * Mensagem para quem está na Íntegra: o que aconteceu e o que fazer, sem nome de
+ * provedor, variável ou código HTTP. O detalhe técnico fica em `detail`, para o log.
+ */
 function userMessage(status: number, detail: string) {
-  if (status === 401 || status === 403 || /client-token|not allowed/i.test(detail))
-    return "A Z-API recusou as credenciais. Confira ZAPI_TOKEN e ZAPI_CLIENT_TOKEN."
-  if (status === 404) return "Instância da Z-API não encontrada. Confira ZAPI_INSTANCE_ID."
-  if (status === 429) return "A Z-API limitou o envio por excesso de requisições. Tente de novo em instantes."
-  if (/not connected|disconnected|restore the session/i.test(detail)) return "O WhatsApp do escritório está desconectado da Z-API."
-  if (status >= 500) return "A Z-API está instável no momento. Tente de novo em instantes."
-  return "A Z-API não aceitou a mensagem."
+  if (status === 401 || status === 403 || status === 404 || /client-token|not allowed/i.test(detail))
+    return "Não foi possível conectar ao WhatsApp do escritório. Fale com o suporte da Íntegra."
+  if (status === 429) return "O WhatsApp limitou os envios por excesso de mensagens. Tente novamente em instantes."
+  if (/not connected|disconnected|restore the session/i.test(detail)) return "O WhatsApp do escritório está desconectado. Reconecte o número para voltar a enviar."
+  if (status >= 500) return "O WhatsApp está instável no momento. Tente novamente em instantes."
+  return "O WhatsApp não aceitou a mensagem. Confira o conteúdo e tente novamente."
 }
 
 type Fetch = typeof fetch
@@ -69,7 +71,7 @@ export function createZapiClient(credentials: ZapiCredentials, options: { baseUr
       })
     } catch (error) {
       const timeout = error instanceof Error && error.name === "TimeoutError"
-      throw new ZapiError(timeout ? "A Z-API demorou demais para responder." : "Não foi possível falar com a Z-API.", 504, String(error))
+      throw new ZapiError(timeout ? "O WhatsApp demorou para responder. Tente novamente em instantes." : "Não foi possível conectar ao WhatsApp. Tente novamente em instantes.", 504, String(error))
     }
 
     const text = await response.text()
@@ -94,7 +96,7 @@ export function createZapiClient(credentials: ZapiCredentials, options: { baseUr
   const send = async (path: string, body: Record<string, unknown>): Promise<SendResult> => {
     const data = await call<{ zaapId?: string; messageId?: string; id?: string }>("POST", path, body)
     const messageId = data?.messageId ?? data?.id
-    if (!messageId) throw new ZapiError("A Z-API não confirmou o envio.", 502, JSON.stringify(data))
+    if (!messageId) throw new ZapiError("O envio não foi confirmado pelo WhatsApp. Tente novamente.", 502, JSON.stringify(data))
     return { messageId, providerId: data.zaapId }
   }
 

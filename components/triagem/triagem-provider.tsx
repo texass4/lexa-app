@@ -157,7 +157,10 @@ export function TriagemProvider({ children }: { children: React.ReactNode }) {
       .limit(1000)
       .then(({ data, error }) => {
         if (cancelled) return
-        if (error) setUnavailable(true)
+        if (error) {
+          console.warn("[triagem] Não foi possível ler as intimações (migração 0012 aplicada?):", error)
+          setUnavailable(true)
+        }
         else for (const row of data as unknown as TriageDbRow[]) apply(row)
         setLoading(false)
       })

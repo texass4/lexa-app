@@ -9,6 +9,7 @@
 import type { LookupFailureReason } from "@/lib/integrations/legal/errors"
 import type { LookupBody } from "./lookup-contract"
 import type { ProcessSheet } from "./sheet"
+import { publicMessage } from "@/lib/core/public-error"
 
 export interface LookupSuccess {
   ok: true
@@ -61,7 +62,7 @@ async function post(url: string, body: unknown, signal?: AbortSignal): Promise<L
   }
 
   if (data?.ok === true && data.sheet) return { ok: true, sheet: data.sheet, checkedAt: data.checkedAt, refreshing: !!data.refreshing }
-  if (data?.ok === false && data.message) return { ok: false, reason: data.reason, message: data.message }
+  if (data?.ok === false && data.message) return { ok: false, reason: data.reason, message: publicMessage(data.message, UNAVAILABLE.message) }
   return UNAVAILABLE
 }
 

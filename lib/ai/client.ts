@@ -15,6 +15,7 @@ import type {
   OfficeOverviewResult,
   ProcessSummary,
 } from "./types"
+import { publicMessage } from "@/lib/core/public-error"
 
 export class AIRequestError extends Error {
   readonly code: string
@@ -43,7 +44,7 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
   const payload = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string; retryAfter?: number } | string } | null
   if (!response.ok) {
     const error = typeof payload?.error === "object" ? payload.error : undefined
-    throw new AIRequestError(error?.code ?? "UNEXPECTED", error?.message ?? GENERIC, error?.retryAfter)
+    throw new AIRequestError(error?.code ?? "UNEXPECTED", publicMessage(error?.message, GENERIC), error?.retryAfter)
   }
   if (!payload) throw new AIRequestError("UNEXPECTED", GENERIC)
   return payload as T

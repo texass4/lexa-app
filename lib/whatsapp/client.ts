@@ -21,6 +21,7 @@ import {
   type TagRow,
 } from "./mappers"
 import type { WhatsAppAttachment, WhatsAppConversation, WhatsAppInstance, WhatsAppMessage, WhatsAppTag } from "@/types"
+import { fallbackForStatus, OFFLINE_ERROR, publicMessage } from "@/lib/core/public-error"
 
 async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   let response: Response
@@ -31,10 +32,10 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     })
   } catch {
-    throw new Error("Sem conexão com a Íntegra. Verifique a internet e tente de novo.")
+    throw new Error(OFFLINE_ERROR)
   }
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error((data as { error?: string }).error ?? "Não foi possível concluir a ação.")
+  if (!response.ok) throw new Error(publicMessage((data as { error?: string }).error, fallbackForStatus(response.status)))
   return data as T
 }
 
@@ -42,7 +43,8 @@ export interface InstanceInfo {
   instance: WhatsAppInstance | null
   live: { connected: boolean; smartphoneConnected?: boolean; error?: string } | null
   canManage: boolean
-  missing: string[]
+  /** A equipe da Íntegra já ativou a conexão deste escritório (credenciais no servidor). */
+  activated: boolean
   webhookUrl: string | null
   webhookHttps: boolean | null
 }

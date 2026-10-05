@@ -15,6 +15,7 @@ import { TYPE_PREVIEW } from "@/lib/whatsapp/config"
 import type { WhatsAppMessage } from "@/types"
 import { AttachmentView } from "./attachment"
 import { DeliveryStatus } from "./parts"
+import { publicMessage } from "@/lib/core/public-error"
 
 /** Texto com os trechos buscados destacados e links clicáveis. */
 function RichText({ text, query }: { text: string; query?: string }) {
@@ -177,7 +178,7 @@ function Bubble({
       </div>
       {message.status === "failed" && (
         <div className="mt-1 flex items-center gap-2 px-1 text-[11.5px] text-danger">
-          <span className="max-w-[320px] truncate">Não enviada{message.error ? ` · ${message.error}` : ""}</span>
+          <span className="max-w-[320px] truncate">Não enviada{failureReason(message.error)}</span>
           <button type="button" onClick={() => onRetry(message)} className="inline-flex items-center gap-1 font-medium underline-offset-2 outline-none hover:underline focus-visible:underline">
             <RotateCw className="size-3" /> Tentar de novo
           </button>
@@ -339,4 +340,10 @@ export function MessageList({
       )}
     </div>
   )
+}
+
+/** Motivo da falha ao lado de "Não enviada" — só se for uma mensagem clara (registros antigos podiam ter detalhe técnico). */
+function failureReason(error: string | undefined | null) {
+  const reason = publicMessage(error, "")
+  return reason ? ` · ${reason}` : ""
 }

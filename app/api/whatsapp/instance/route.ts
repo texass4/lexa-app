@@ -10,7 +10,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { HttpError, readJson, route } from "@/lib/auth/server"
 import { ZapiError } from "@/lib/integrations/whatsapp/zapi/client"
 import { requireActor } from "@/lib/services/whatsapp/actor"
-import { envSetup, instanceForOrg, providerFor, refreshInstanceStatus } from "@/lib/services/whatsapp/instances"
+import { envSetup, instanceForOrg, NOT_ACTIVATED, providerFor, RECEIVING_NOT_ACTIVATED, refreshInstanceStatus } from "@/lib/services/whatsapp/instances"
 import { toInstance } from "@/lib/whatsapp/mappers"
 
 export const runtime = "nodejs"
@@ -23,10 +23,13 @@ function webhookUrl(request: NextRequest) {
   return `${base}/api/whatsapp/webhook?token=${encodeURIComponent(secret)}`
 }
 
+const CHECK_FAILED = "Não foi possível verificar a conexão do WhatsApp. Tente novamente em instantes."
+
 export const GET = route(async (request) => {
   const actor = await requireActor("whatsapp.view")
   const canManage = actor.can("office.manage")
   const setup = envSetup()
+  if (canManage && setup.missing.length) console.warn("[whatsapp] Conexão incompleta. Faltam no ambiente:", setup.missing.join(", "))
   let instance = await instanceForOrg(actor.organizationId)
 
   let live: { connected: boolean; smartphoneConnected?: boolean; error?: string } | null = null
@@ -36,7 +39,8 @@ export const GET = route(async (request) => {
       instance = refreshed.instance
       live = { connected: instance.status === "connected", smartphoneConnected: refreshed.smartphoneConnected }
     } catch (error) {
-      live = { connected: false, error: error instanceof ZapiError || error instanceof HttpError ? error.message : "Não foi possível consultar a Z-API." }
+      if (!(error instanceof ZapiError || error instanceof HttpError)) console.error("[whatsapp] Falha ao consultar a conexão:", error)
+      live = { connected: false, error: error instanceof ZapiError || error instanceof HttpError ? error.message : CHECK_FAILED }
     }
   }
 
@@ -45,8 +49,8 @@ export const GET = route(async (request) => {
     instance: instance ? toInstance(instance) : null,
     live,
     canManage,
-    // Só nomes de variáveis ausentes, nunca valores.
-    missing: canManage ? setup.missing : [],
+    // Só se a ativação está completa: os nomes do que falta ficam no log do servidor.
+    activated: setup.missing.length === 0,
     webhookUrl: url,
     webhookHttps: url ? url.startsWith("https://") : null,
   })
@@ -57,10 +61,16 @@ export const POST = route(async (request) => {
   const { action } = await readJson<{ action?: string }>(request)
   if (action !== "webhooks") throw new HttpError(400, "Ação inválida.")
   const instance = await instanceForOrg(actor.organizationId)
-  if (!instance) throw new HttpError(409, "O WhatsApp do escritório ainda não está configurado no servidor.")
+  if (!instance) throw new HttpError(409, NOT_ACTIVATED)
   const url = webhookUrl(request)
-  if (!url) throw new HttpError(409, "Defina ZAPI_WEBHOOK_SECRET no servidor.")
-  if (!url.startsWith("https://")) throw new HttpError(409, "A Z-API só aceita webhooks HTTPS. Defina ZAPI_WEBHOOK_BASE_URL com o endereço público da Íntegra.")
+  if (!url) {
+    console.error("[whatsapp] ZAPI_WEBHOOK_SECRET não definido: não há como cadastrar o webhook.")
+    throw new HttpError(409, RECEIVING_NOT_ACTIVATED)
+  }
+  if (!url.startsWith("https://")) {
+    console.error("[whatsapp] A Z-API só aceita webhooks HTTPS. Defina ZAPI_WEBHOOK_BASE_URL com o endereço público.")
+    throw new HttpError(409, RECEIVING_NOT_ACTIVATED)
+  }
   try {
     await providerFor(instance).configureWebhooks(url)
   } catch (error) {

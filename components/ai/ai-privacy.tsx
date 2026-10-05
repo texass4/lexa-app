@@ -41,7 +41,7 @@ const FEATURES: [string, string][] = [
   ],
   [
     "Triagem",
-    'Cada evento novo (intimação do DJEN ou movimentação relevante) é interpretado uma vez, automaticamente, no servidor: resumo, "exige ação?" e o prazo escrito no teor. Nenhum prazo é criado sem confirmação.',
+    'Cada evento novo (intimação do DJEN ou movimentação relevante) é interpretado uma vez, automaticamente, pela Íntegra: resumo, "exige ação?" e o prazo escrito no teor. Nenhum prazo é criado sem confirmação.',
   ],
   ["Central de Atendimento", "Resumos e sugestões de resposta das conversas do WhatsApp, quando alguém pede — processados pela Anthropic (Claude)."],
 ]
@@ -105,7 +105,7 @@ export function AIPrivacyCard() {
         </li>
         <li>
           <span className="font-medium text-foreground">Para quê:</span> resumir, apontar o que exige atenção e sugerir próximos passos. A Íntegra
-          registra só a quantidade de uso, tokens e custo — não guarda perguntas nem respostas nesse registro. Análises iguais ficam em cache por até
+          registra só a quantidade de uso e o custo — não guarda perguntas nem respostas nesse registro. Análises iguais ficam guardadas por até
           12 horas, no banco da Íntegra, separadas por escritório.
         </li>
       </ul>

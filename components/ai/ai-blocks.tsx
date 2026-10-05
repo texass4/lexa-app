@@ -124,22 +124,18 @@ export function AIErrorNotice({ error, onRetry, className }: { error: AIRequestE
   )
 }
 
-/** Aviso fixo quando a IA está desligada ou sem chave — nada de resposta simulada. */
+/** Aviso fixo quando a IA está desligada ou sem chave — nada de resposta simulada (o motivo técnico fica no log). */
 export function AIUnavailable({ status, className }: { status: AIStatus; className?: string }) {
   const disabled = !status.enabled
   return (
     <div className={cn("flex items-start gap-3 rounded-[12px] border border-border bg-surface-muted/50 px-3.5 py-3", className)}>
       <Settings2 className="mt-0.5 size-4 shrink-0 text-subtle" />
       <div className="min-w-0 text-[13px] leading-snug">
-        <p className="font-medium text-foreground">{disabled ? "Íntegra IA indisponível" : "Íntegra IA não configurada"}</p>
+        <p className="font-medium text-foreground">Íntegra IA indisponível</p>
         <p className="mt-0.5 text-muted-foreground">
-          {disabled ? (
-            "A Íntegra IA foi desativada neste ambiente (AI_ENABLED=false)."
-          ) : (
-            <>
-              Configure <code className="rounded bg-surface px-1 font-mono text-[12px]">GEMINI_API_KEY</code> no ambiente do servidor.
-            </>
-          )}
+          {disabled
+            ? "A Íntegra IA está desativada no momento. Fale com o suporte da Íntegra para ativá-la."
+            : "Não foi possível concluir a análise. Tente novamente em instantes."}
         </p>
       </div>
     </div>

@@ -44,6 +44,7 @@ import type { Client, WhatsAppConversation } from "@/types"
 import { useInbox } from "./inbox-provider"
 import { ContactAvatar, contactName, TagChip } from "./parts"
 import { ConvertToClientDialog, LinkClientDialog } from "./dialogs"
+import { publicMessage } from "@/lib/core/public-error"
 
 function Section({ title, icon, action, children, count }: { title: string; icon: React.ReactNode; action?: React.ReactNode; count?: number; children: React.ReactNode }) {
   return (
@@ -99,7 +100,7 @@ function ContactCard({ conversation, client }: { conversation: WhatsAppConversat
       await whatsappApi.updateContact(contact.id, { clientId: null })
       toast.success("Contato desvinculado do cliente.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível desvincular.")
+      toast.error(publicMessage(error, "Não foi possível desvincular."))
     }
   }
 
@@ -168,7 +169,7 @@ function ContactCard({ conversation, client }: { conversation: WhatsAppConversat
                       await whatsappApi.updateContact(contact.id, { clientId: suggested.id })
                       toast.success("Conversa vinculada ao cliente.", { description: suggested.name })
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Não foi possível vincular.")
+                      toast.error(publicMessage(error, "Não foi possível vincular."))
                     }
                   }}
                 >
@@ -273,7 +274,7 @@ function Tags({ conversation, onChanged }: { conversation: WhatsAppConversation;
     try {
       onChanged(await whatsappApi.update(conversation.id, has ? { removeTagIds: [tagId] } : { addTagIds: [tagId] }))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível alterar a tag.")
+      toast.error(publicMessage(error, "Não foi possível alterar a tag."))
     }
   }
 
@@ -284,7 +285,7 @@ function Tags({ conversation, onChanged }: { conversation: WhatsAppConversation;
       setQuery("")
       await toggle(tag.id)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível criar a tag.")
+      toast.error(publicMessage(error, "Não foi possível criar a tag."))
     }
   }
 

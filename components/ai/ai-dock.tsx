@@ -40,7 +40,7 @@ export function AIDock({
   const status = lexa.ready
     ? { label: "Online", cls: "bg-success-soft text-success", dot: "bg-success" }
     : lexa.status
-      ? { label: lexa.status.enabled ? "Não configurada" : "Desligada", cls: "bg-surface-muted text-muted-foreground", dot: "bg-subtle" }
+      ? { label: lexa.status.enabled ? "Indisponível" : "Desligada", cls: "bg-surface-muted text-muted-foreground", dot: "bg-subtle" }
       : null
 
   const send = (e: React.FormEvent) => {

@@ -19,6 +19,10 @@ import type { InstanceRow } from "@/lib/whatsapp/mappers"
 
 export type Instance = InstanceRow & { id: string; organization_id: string; external_id: string }
 
+/** Para o escritório: a ativação é feita pela equipe da Íntegra (variáveis do servidor). */
+export const NOT_ACTIVATED = "O WhatsApp do escritório ainda não foi ativado. Fale com o suporte da Íntegra."
+export const RECEIVING_NOT_ACTIVATED = "O recebimento automático de mensagens ainda não foi ativado. Fale com o suporte da Íntegra."
+
 /** O que está configurado no `.env` (sem expor os segredos). */
 export function envSetup() {
   const credentials = zapiCredentialsFromEnv()
@@ -93,8 +97,10 @@ export async function instanceByExternalId(externalId: string): Promise<Instance
 /** Cliente do provedor para a instância. As credenciais só existem no servidor. */
 export function providerFor(instance: Pick<Instance, "external_id">): WhatsAppProvider {
   const credentials = zapiCredentialsFromEnv()
-  if (!credentials || credentials.instanceId !== instance.external_id)
-    throw new HttpError(503, "As credenciais desta conexão do WhatsApp não estão configuradas no servidor.")
+  if (!credentials || credentials.instanceId !== instance.external_id) {
+    console.error("[whatsapp] Sem credenciais da Z-API (ZAPI_INSTANCE_ID/ZAPI_TOKEN) para a instância", instance.external_id)
+    throw new HttpError(503, NOT_ACTIVATED)
+  }
   return createZapiClient(credentials)
 }
 

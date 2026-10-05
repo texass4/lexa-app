@@ -57,6 +57,7 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       const code = (error as { code?: string })?.code
       if (code === "PGRST205" || code === "42P01") {
+        console.warn("[atendimento] Tabelas do WhatsApp ausentes: aplique supabase/migrations/0002_whatsapp.sql.")
         setStatus("missing-schema")
         return
       }

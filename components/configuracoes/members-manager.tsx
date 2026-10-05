@@ -29,15 +29,21 @@ import { UFS } from "@/lib/clientes/clients"
 import { validateOab } from "@/lib/intimacoes/oab"
 import { OabManager } from "./oab-manager"
 import { fmtNumericDate, fmtRelative } from "@/lib/core/dates"
+import { fallbackForStatus, OFFLINE_ERROR, publicMessage } from "@/lib/core/public-error"
 
 async function call<T>(url: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error(OFFLINE_ERROR)
+  }
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error ?? "Não foi possível concluir a ação.")
+  if (!res.ok) throw new Error(publicMessage(data.error, fallbackForStatus(res.status)))
   return data as T
 }
 

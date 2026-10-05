@@ -21,6 +21,7 @@ import type { Tone } from "@/lib/core/config"
 import { whatsappApi, type InstanceInfo } from "@/lib/whatsapp/client"
 import { connectionHealth, connectionProblem, type ConnectionHealth } from "@/lib/whatsapp/connection"
 import { formatPhone } from "@/lib/whatsapp/phone"
+import { publicMessage } from "@/lib/core/public-error"
 
 // Notificações ficam fora até existirem de verdade (envio, canais e preferências salvas).
 const SECTIONS = [
@@ -100,7 +101,7 @@ function WhatsAppCard() {
       .catch(
         (error: unknown) =>
           !cancelled &&
-          setState({ info: null, loading: false, failure: error instanceof Error ? error.message : "Não foi possível verificar a conexão." }),
+          setState({ info: null, loading: false, failure: publicMessage(error, "Não foi possível verificar a conexão.") }),
       )
     return () => {
       cancelled = true

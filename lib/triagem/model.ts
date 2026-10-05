@@ -90,7 +90,7 @@ export function toTriageItem(r: TriageDbRow): TriageItem {
 /* --------------------------------- rótulos --------------------------------- */
 
 export const KIND_LABEL: Record<TriageKind, string> = { intimacao: "Intimação", movimentacao: "Movimentação" }
-export const SOURCE_LABEL: Record<TriageSource, string> = { djen: "DJEN", datajud: "DataJud" }
+export const SOURCE_LABEL: Record<TriageSource, string> = { djen: "DJEN", datajud: "Movimentação do tribunal" }
 
 /** Estado na tela (decidido mostra a decisão). */
 export function stateBadge(item: Pick<TriageItem, "state" | "decision">): { label: string; tone: Tone } {

@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { useAuthChallenge } from "./use-auth-challenge"
+import { publicMessage } from "@/lib/core/public-error"
 
 /**
  * "Reenviar link de confirmação". A resposta do servidor é sempre a mesma (não diz se
@@ -23,13 +24,13 @@ export function ResendConfirmation({ email }: { email: string }) {
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: "" }))
-        setMessage(error || "Não foi possível reenviar agora. Tente de novo em instantes.")
+        setMessage(publicMessage(error, "Não foi possível reenviar agora. Tente de novo em instantes."))
         setState("error")
         return
       }
       setState("sent")
     } catch (failure) {
-      setMessage((failure as Error).message || "Não foi possível reenviar agora. Tente de novo em instantes.")
+      setMessage(publicMessage(failure, "Não foi possível reenviar agora. Tente de novo em instantes."))
       setState("error")
     }
   }

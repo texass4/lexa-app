@@ -26,7 +26,7 @@ export function InsightBanner({ expanded, onToggle, critical }: { expanded: bool
     // Parcelas em atraso só para quem tem o Financeiro.
     can("finance.view") && plural(digest.overdueInvoices, "parcela em atraso", "parcelas em atraso"),
   ].filter((item): item is string => !!item)
-  const aiState = lexa.ready ? "Pronta para ajudar" : lexa.status ? (lexa.status.enabled ? "Ainda não configurada" : "Desligada") : "Verificando…"
+  const aiState = lexa.ready ? "Pronta para ajudar" : lexa.status ? (lexa.status.enabled ? "Indisponível no momento" : "Desligada") : "Verificando…"
 
   return (
     <section aria-label="Resumo do escritório" className="insight-banner relative overflow-hidden rounded-card border border-border/90 shadow-card">

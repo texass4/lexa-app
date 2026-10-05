@@ -17,7 +17,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { cacheKey, databaseCache } from "./cache"
 import { getAIConfig } from "./config"
 import { databaseMeter } from "./metering"
-import { AIError, isAIError } from "./errors"
+import { AIError, CONFIG_ERROR_CODES, isAIError } from "./errors"
 import { getAIProvider } from "./provider"
 import { createSupabaseRepository } from "./context/repository"
 import type { AIServiceDeps } from "./services/run"
@@ -75,6 +75,15 @@ export function aiRoute<C = unknown>(
       if (known.code === "UNEXPECTED") {
         const cause = known.cause as { name?: string; code?: string } | undefined
         console.error("[lexa-ia] erro inesperado:", cause?.code ?? cause?.name ?? "desconhecido")
+      } else if (CONFIG_ERROR_CODES.includes(known.code)) {
+        // A tela mostra só "não foi possível concluir"; quem opera a Íntegra vê a causa aqui.
+        const hint: Record<string, string> = {
+          DISABLED: "AI_ENABLED=false",
+          NOT_CONFIGURED: "GEMINI_API_KEY ausente",
+          INVALID_API_KEY: "GEMINI_API_KEY recusada pelo provedor",
+          MODEL_UNAVAILABLE: "modelo de AI_MODEL/GEMINI_MODEL indisponível para a chave",
+        }
+        console.error("[lexa-ia] configuração:", known.code, hint[known.code] ?? "", known.providerStatus ?? "")
       }
       return aiErrorResponse(known)
     }

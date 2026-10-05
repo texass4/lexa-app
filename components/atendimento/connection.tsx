@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { Skeleton } from "@/components/ui/skeleton"
 import { whatsappApi } from "@/lib/whatsapp/client"
-import { CONNECTION_LABEL as LABEL, connectionHealth, connectionProblem, type ConnectionHealth } from "@/lib/whatsapp/connection"
+import { CHECK_FAILED, CONNECTION_LABEL as LABEL, connectionHealth, connectionProblem, type ConnectionHealth } from "@/lib/whatsapp/connection"
+import { publicMessage } from "@/lib/core/public-error"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import { useInbox } from "./inbox-provider"
 
@@ -63,7 +64,7 @@ export function ConnectionNotice() {
 
 function ConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Conexão com o WhatsApp" description="Z-API · número do escritório" icon={<Smartphone />}>
+    <Modal open={open} onOpenChange={onOpenChange} title="Conexão com o WhatsApp" description="Número do WhatsApp do escritório" icon={<Smartphone />}>
       <ConnectionSetup />
     </Modal>
   )
@@ -93,7 +94,7 @@ function ConnectionSetup() {
     try {
       setQr(await whatsappApi.qrCode())
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível gerar o QR Code.")
+      toast.error(publicMessage(error, "Não foi possível gerar o QR Code. Tente novamente em instantes."))
     } finally {
       setBusy(null)
     }
@@ -103,9 +104,9 @@ function ConnectionSetup() {
     setBusy("webhooks")
     try {
       await whatsappApi.registerWebhooks()
-      toast.success("Webhooks cadastrados na Z-API.", { description: "Mensagens recebidas passam a chegar aqui na hora." })
+      toast.success("Recebimento de mensagens ativado.", { description: "Mensagens recebidas passam a chegar aqui na hora." })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar os webhooks.")
+      toast.error(publicMessage(error, "Não foi possível ativar o recebimento de mensagens. Tente novamente em instantes."))
     } finally {
       setBusy(null)
     }
@@ -113,25 +114,13 @@ function ConnectionSetup() {
 
   return (
     <div className="space-y-5 text-[13.5px]">
-      <Step n={1} title="Credenciais no servidor" done={info.missing.length === 0}>
-        {info.missing.length ? (
-          <>
-            <p className="text-muted-foreground">
-              Preencha no <code className="rounded bg-surface-muted px-1 font-mono text-[12px]">.env.local</code> do servidor e reinicie a Íntegra:
-            </p>
-            <ul className="mt-2 flex flex-wrap gap-1.5">
-              {info.missing.map((name) => (
-                <li key={name} className="rounded-[6px] border border-border bg-surface-muted/60 px-1.5 py-0.5 font-mono text-[11.5px]">
-                  {name}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[12.5px] text-subtle">Os tokens ficam só no servidor — nunca na tela, no navegador ou no repositório.</p>
-          </>
-        ) : (
+      <Step n={1} title="Ativação da conexão" done={info.activated}>
+        {info.activated ? (
           <p className="flex items-center gap-1.5 text-muted-foreground">
-            <ShieldCheck className="size-4 text-success" /> Configuradas no servidor.
+            <ShieldCheck className="size-4 text-success" /> Conexão ativada para o escritório.
           </p>
+        ) : (
+          <p className="text-muted-foreground">A conexão do WhatsApp ainda não foi ativada para o escritório. Fale com o suporte da Íntegra para concluir a ativação.</p>
         )}
       </Step>
 
@@ -144,13 +133,13 @@ function ConnectionSetup() {
         ) : info.instance ? (
           <div className="space-y-3">
             <p className="text-muted-foreground">
-              {info.live?.error ?? "Abra o WhatsApp do escritório › Aparelhos conectados › Conectar aparelho e leia o QR Code."}
+              {info.live?.error ? publicMessage(info.live.error, CHECK_FAILED) : "Abra o WhatsApp do escritório › Aparelhos conectados › Conectar aparelho e leia o QR Code."}
             </p>
             {qr?.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={qr.image} alt="QR Code para conectar o WhatsApp" className="size-56 rounded-[12px] border border-border bg-white p-2" />
             ) : qr?.needsPasskey ? (
-              <p className="text-[12.5px] text-warning">Este aparelho pede confirmação por passkey. Conclua a conexão pelo painel da Z-API.</p>
+              <p className="text-[12.5px] text-warning">Este aparelho pede uma confirmação extra. Fale com o suporte da Íntegra para concluir a conexão.</p>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={loadQr} disabled={busy === "qr"}>
@@ -162,21 +151,21 @@ function ConnectionSetup() {
             </div>
           </div>
         ) : (
-          <p className="text-muted-foreground">Disponível depois das credenciais.</p>
+          <p className="text-muted-foreground">Disponível depois da ativação.</p>
         )}
       </Step>
 
-      <Step n={3} title="Receber mensagens (webhook)" done={false} optional>
+      <Step n={3} title="Receber mensagens na hora" done={false} optional>
         {info.webhookUrl ? (
           <div className="space-y-2.5">
-            <p className="text-muted-foreground">A Z-API avisa a Íntegra a cada mensagem por este endereço (ele leva o segredo do webhook):</p>
+            <p className="text-muted-foreground">O WhatsApp avisa a Íntegra a cada mensagem nova por este endereço. Ele é privado: não compartilhe.</p>
             <div className="flex items-center gap-2 rounded-[10px] border border-border bg-surface-muted/50 py-1.5 pr-1.5 pl-3">
               <Link2 className="size-3.5 shrink-0 text-subtle" />
               <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-muted-foreground">{info.webhookUrl.replace(/token=[^&]+/, "token=••••••")}</span>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                aria-label="Copiar endereço do webhook"
+                aria-label="Copiar endereço"
                 onClick={() => {
                   navigator.clipboard?.writeText(info.webhookUrl!).catch(() => {})
                   toast.success("Endereço copiado.")
@@ -186,17 +175,15 @@ function ConnectionSetup() {
               </Button>
             </div>
             {info.webhookHttps === false ? (
-              <p className="text-[12.5px] text-warning">
-                A Z-API só aceita HTTPS. Em produção, defina <code className="font-mono">ZAPI_WEBHOOK_BASE_URL</code> com o endereço público da Íntegra.
-              </p>
+              <p className="text-[12.5px] text-warning">O recebimento automático ainda não pode ser ativado por aqui. Fale com o suporte da Íntegra.</p>
             ) : (
               <Button variant="secondary" size="sm" onClick={registerWebhooks} disabled={busy === "webhooks" || !info.instance}>
-                Cadastrar automaticamente na Z-API
+                Ativar recebimento automático
               </Button>
             )}
           </div>
         ) : (
-          <p className="text-muted-foreground">Defina ZAPI_WEBHOOK_SECRET no servidor.</p>
+          <p className="text-muted-foreground">O recebimento automático ainda não foi ativado. Fale com o suporte da Íntegra.</p>
         )}
       </Step>
     </div>

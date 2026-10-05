@@ -164,7 +164,11 @@ lexa-app/
 ### Servidor
 
 - Toda Route Handler começa pela guarda certa: `requireMember(permissão)` (escritório), `requireActor` (WhatsApp), `requireAdmin` (Admin), `aiRoute` (IA) ou o segredo da rota (cron e webhook).
-- Erros para o navegador: só mensagem amigável. Detalhe técnico vai para o log.
+- Erros para o navegador: só mensagem clara e orientada à ação, sem variável de ambiente, nome de serviço/provedor, código HTTP, SQL, caminho ou stack. Detalhe técnico vai para o log do servidor (`console.error` com prefixo, ex.: `[whatsapp]`).
+  - `lib/core/public-error.ts` (`publicMessage`, `isTechnicalMessage`) é a rede de segurança: `route()` passa toda `HttpError` por ela (mensagem técnica vira a padrão do status e o original vai para o log) e os clientes de API do navegador (`lib/whatsapp/client.ts`, `lib/ai/client.ts`, `lib/admin/client.ts`, formulários de login/cadastro) também. Ainda assim, escreva a mensagem certa na origem.
+  - Configuração que falta (chave da IA, credenciais do WhatsApp, migração não aplicada) aparece para o escritório como "Fale com o suporte da Íntegra" ou "Tente novamente em instantes"; o diagnóstico com nomes de variáveis fica no log e no Super Admin (Monitoramento e Configurações), que é a tela de quem opera a plataforma.
+  - Exceção consciente: o aviso de privacidade da IA (`components/ai/ai-privacy.tsx`) nomeia os provedores que recebem dados (Google Gemini e Anthropic), por transparência (LGPD).
+  - `lib/core/ui-copy.test.ts` varre o texto das telas do escritório e falha se aparecer detalhe técnico.
 - `service role` (`lib/supabase/admin.ts`) só no servidor e sempre filtrando por `organization_id`.
 - Chaves e segredos só em variáveis de ambiente do servidor (veja `.env.example`).
 

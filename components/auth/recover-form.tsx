@@ -8,6 +8,7 @@ import { Field, TextInput } from "@/components/ui/field"
 import { AuthCard, FormError } from "./auth-card"
 import { HoneypotField, useAuthChallenge } from "./use-auth-challenge"
 import { isEmail } from "@/lib/auth/validation"
+import { publicMessage } from "@/lib/core/public-error"
 
 export function RecoverForm() {
   const [email, setEmail] = React.useState("")
@@ -33,11 +34,11 @@ export function RecoverForm() {
       })
       if (!res.ok) {
         const { error: message } = await res.json().catch(() => ({ error: "" }))
-        setError(message || "Não foi possível enviar agora. Tente de novo em instantes.")
+        setError(publicMessage(message, "Não foi possível enviar agora. Tente de novo em instantes."))
         return
       }
     } catch (failure) {
-      setError((failure as Error).message || "Não foi possível enviar agora. Tente de novo em instantes.")
+      setError(publicMessage(failure, "Não foi possível enviar agora. Tente de novo em instantes."))
       return
     } finally {
       setBusy(false)

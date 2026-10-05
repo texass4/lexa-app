@@ -56,6 +56,7 @@ import { MessageList } from "./message-list"
 import { Composer, type ComposerSubmit } from "./composer"
 import { ConnectionNotice, useConnectionHealth } from "./connection"
 import { ContactAvatar, contactName, useContactClient } from "./parts"
+import { publicMessage } from "@/lib/core/public-error"
 
 const TONE_DOT: Record<string, string> = {
   info: "bg-info",
@@ -71,7 +72,7 @@ function StatusMenu({ conversation, onChanged, disabled }: { conversation: Whats
     try {
       onChanged(await whatsappApi.update(conversation.id, { status }))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível alterar o status.")
+      toast.error(publicMessage(error, "Não foi possível alterar o status."))
     }
   }
   return (
@@ -181,7 +182,7 @@ export function ConversationView({
         return true
       } catch (err) {
         remove(id)
-        toast.error(err instanceof Error ? err.message : "Não foi possível salvar a nota.")
+        toast.error(publicMessage(err, "Não foi possível salvar a nota."))
         return false
       }
     }
@@ -229,7 +230,7 @@ export function ConversationView({
     } catch (err) {
       remove(id)
       setReplyTo(quoted)
-      toast.error(err instanceof Error ? err.message : "Não foi possível enviar.")
+      toast.error(publicMessage(err, "Não foi possível enviar."))
       return false
     } finally {
       if (localUrl) setTimeout(() => URL.revokeObjectURL(localUrl), 60_000)
@@ -244,11 +245,11 @@ export function ConversationView({
       if (sent.status === "failed") toast.error("Ainda não foi possível enviar.", { description: sent.error })
     } catch (err) {
       put(message)
-      toast.error(err instanceof Error ? err.message : "Não foi possível reenviar.")
+      toast.error(publicMessage(err, "Não foi possível reenviar."))
     }
   }
 
-  const replyBlocked = health === "unconfigured" ? "WhatsApp não configurado" : health === "disconnected" ? "WhatsApp desconectado" : health === "error" ? "Z-API indisponível" : undefined
+  const replyBlocked = health === "unconfigured" ? "WhatsApp não configurado" : health === "disconnected" ? "WhatsApp desconectado" : health === "error" ? "Conexão indisponível" : undefined
 
   return (
     <div
@@ -386,7 +387,7 @@ export function ConversationView({
                         try {
                           upsertConversation(await whatsappApi.update(conversation.id, { status: String(value) }))
                         } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Não foi possível alterar o status.")
+                          toast.error(publicMessage(err, "Não foi possível alterar o status."))
                         }
                       }}
                     >

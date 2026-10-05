@@ -166,7 +166,7 @@ export function TriagemView() {
           <EmptyState
             icon={<Inbox />}
             title="Triagem indisponível."
-            description="A Triagem depende da atualização do banco (migração 0012). Fale com a administração da Íntegra."
+            description="A Triagem ainda não foi ativada para o escritório. Fale com o suporte da Íntegra."
           />
         </Panel>
       ) : loading ? (

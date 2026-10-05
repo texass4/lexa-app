@@ -10,6 +10,7 @@ import { HoneypotField, useAuthChallenge } from "./use-auth-challenge"
 import { ResendConfirmation } from "./resend-confirmation"
 import { maskDocument } from "@/lib/core/masks"
 import { isEmail, MIN_PASSWORD, normalizeEmail, passwordProblem } from "@/lib/auth/validation"
+import { publicMessage } from "@/lib/core/public-error"
 
 export function SignupForm() {
   const [form, setForm] = React.useState({ name: "", email: "", password: "", officeName: "", cnpj: "" })
@@ -42,13 +43,13 @@ export function SignupForm() {
       })
       if (!res.ok) {
         const { error: message } = await res.json().catch(() => ({ error: "" }))
-        setError(message || "Não foi possível concluir o cadastro.")
+        setError(publicMessage(message, "Não foi possível concluir o cadastro."))
         return
       }
       // A conta só passa a valer depois da confirmação do e-mail (o link leva para dentro).
       setSentTo(normalizeEmail(form.email))
     } catch (failure) {
-      setError((failure as Error).message || "Não foi possível concluir o cadastro.")
+      setError(publicMessage(failure, "Não foi possível concluir o cadastro."))
     } finally {
       setBusy(false)
     }

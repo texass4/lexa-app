@@ -6,7 +6,7 @@ import { loadSettings } from "@/lib/admin/platform"
 import { hasPermission, type Permission } from "./permissions"
 import type { ProfileRow } from "./profile"
 
-import { HttpError } from "./http-error"
+import { HttpError, toPublicError } from "./http-error"
 
 export { HttpError }
 
@@ -62,19 +62,24 @@ export async function authorizeMember(permission?: Permission): Promise<{ organi
     return { organizationId }
   } catch (error) {
     if (!(error instanceof HttpError)) throw error
-    return { response: NextResponse.json({ ok: false, reason: "forbidden", message: error.message }, { status: error.status }) }
+    const { status, message } = toPublicError(error)
+    return { response: NextResponse.json({ ok: false, reason: "forbidden", message }, { status }) }
   }
 }
 
-/** Transforma `HttpError` em resposta JSON; o resto vira 500 sem vazar detalhes. */
+/**
+ * Transforma `HttpError` em resposta JSON; o resto vira 500 sem vazar detalhes. Nenhuma
+ * mensagem técnica (variável, serviço, SQL, stack) chega ao navegador: o detalhe vai
+ * para o log do servidor e a tela recebe uma mensagem clara (`toPublicError`).
+ */
 export function route<C>(handler: (request: NextRequest, context: C) => Promise<Response>) {
   return async (request: NextRequest, context: C) => {
     try {
       return await handler(request, context)
     } catch (error) {
-      if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status })
-      console.error(error)
-      return NextResponse.json({ error: "Erro inesperado. Tente de novo." }, { status: 500 })
+      const { status, message, logged } = toPublicError(error)
+      if (logged) console.error(`[api] ${request.method} ${request.nextUrl.pathname}`, error)
+      return NextResponse.json({ error: message }, { status })
     }
   }
 }
