@@ -14,13 +14,26 @@ import { PRAZO_ALERT_DAYS } from "@/lib/dashboard/attention"
 import { daysToPrazo, prazoTask, weekPrazos } from "@/lib/prazos/prazos"
 import { Can } from "@/lib/auth/session"
 
+/** Quantos prazos aparecem no Painel; o resto está a um clique, em Prazos. */
+const VISIBLE = 6
+
 /** Prazos abertos que vencem até domingo (e os já vencidos), por responsável. */
 export function WeekPrazos() {
   const { deadlines, processes, tasks } = useOfficeData()
   const { openDialog } = useUI()
   const now = getNow()
-  const groups = weekPrazos(deadlines, now)
-  const total = groups.reduce((acc, g) => acc + g.prazos.length, 0)
+  const all = weekPrazos(deadlines, now)
+  const total = all.reduce((acc, g) => acc + g.prazos.length, 0)
+  // Os mais próximos primeiro, sem perder o agrupamento por responsável.
+  const visible = new Set(
+    all
+      .flatMap((g) => g.prazos)
+      .sort((a, b) => a.fatalDate.localeCompare(b.fatalDate))
+      .slice(0, VISIBLE)
+      .map((p) => p.id),
+  )
+  const groups = all.map((g) => ({ ...g, prazos: g.prazos.filter((p) => visible.has(p.id)) })).filter((g) => g.prazos.length)
+  const hidden = total - groups.reduce((acc, g) => acc + g.prazos.length, 0)
 
   return (
     <Panel>
@@ -38,7 +51,7 @@ export function WeekPrazos() {
               href="/tarefas/prazos"
               className="touch-target relative flex items-center gap-1 rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              Ver todos <ArrowRight className="size-3.5" />
+              {hidden ? `Ver todos (${total})` : "Ver todos"} <ArrowRight className="size-3.5" />
             </Link>
           </>
         }

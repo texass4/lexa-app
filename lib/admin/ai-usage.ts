@@ -148,6 +148,7 @@ export const OPERATION_LABEL: Record<string, string> = {
   "process.next-actions": "Próximos passos",
   "client.summary": "Resumo do cliente",
   "office.overview": "Panorama do escritório",
+  "finance.analysis": "Análise do financeiro",
   "chat.process": "Chat — processo",
   "chat.client": "Chat — cliente",
   "chat.office": "Chat — escritório",

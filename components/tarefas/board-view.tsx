@@ -13,6 +13,7 @@ import { TaskCard } from "./task-card"
 import { LimitedList, type MoreFromServer } from "@/components/ui/show-more"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
+import { completedKey } from "@/lib/store/history-lists"
 import { useUI } from "@/lib/store/ui-store"
 import { describeRelated } from "@/lib/store/selectors"
 import { CATEGORY_COLORS } from "@/lib/core/config"
@@ -167,6 +168,14 @@ function ColumnHeader({ column, count, canDelete, editable }: { column: TaskColu
  * Quadro Kanban das tarefas, com colunas personalizáveis pelo escritório. Recebe
  * a lista já filtrada por escopo/busca de `TasksView` — o agrupamento aqui é só por coluna.
  */
+/**
+ * Ordem dentro da coluna: pendentes pelo vencimento (as atrasadas no topo), depois as
+ * concluídas, das mais recentes (a mesma ordem do histórico que vem do banco).
+ */
+const boardOrder = (a: Task, b: Task) =>
+  Number(a.status === "concluida") - Number(b.status === "concluida") ||
+  (a.status === "concluida" ? completedKey(b).localeCompare(completedKey(a)) : a.dueAt.localeCompare(b.dueAt))
+
 export function BoardView({
   tasks,
   onOpen,
@@ -228,7 +237,7 @@ export function BoardView({
   return (
     <div className="flex items-start gap-4 overflow-x-auto pb-2 thin-scrollbar">
       {columns.map((column) => {
-        const items = tasks.filter((t) => (t.columnId ?? firstColumnId) === column.id)
+        const items = tasks.filter((t) => (t.columnId ?? firstColumnId) === column.id).sort(boardOrder)
         const total = columnCount(column.id, items, column.id === firstColumnId)
         return (
           <div

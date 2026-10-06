@@ -142,6 +142,8 @@ const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
 /** Mês em que a fatura foi (ou deve ser) recebida. */
 const receivedIn = (i: Invoice) => (i.paidAt ?? i.dueDate).slice(0, 7)
+/** Dia (`YYYY-MM-DD`) em que a fatura foi (ou deve ser) recebida. */
+const receivedOn = (i: Invoice) => (i.paidAt ?? i.dueDate).slice(0, 10)
 
 export interface MonthRevenue {
   /** `YYYY-MM` */
@@ -169,8 +171,10 @@ export function monthlyRevenue(invoices: Invoice[], now: Date = getNow(), months
   })
 }
 
-/** Números do mês atual. `growth` é `undefined` quando não há mês anterior para comparar. */
 /**
+ * Números do mês atual. `growth` compara com o mesmo período do mês anterior e é
+ * `undefined` quando não houve recebimento nesse período.
+ *
  * Indicadores do Financeiro e do Painel. `billedBefore`: o faturado anterior aos
  * lançamentos recebidos (somado no banco), para a inadimplência valer sobre tudo.
  */
@@ -178,12 +182,19 @@ export function financeSummary(invoices: Invoice[], now: Date = getNow(), option
   const [previous, current] = monthlyRevenue(invoices, now, 2)
   const billed = sum(invoices.filter((i) => i.status !== "cancelado")) + (options.billedBefore ?? 0)
   const overdue = sum(invoices.filter((i) => invoiceStatus(i, now) === "atrasado"))
+  // Mesmo período do mês anterior (até o mesmo dia): no dia 6, comparar com o mês
+  // anterior inteiro faria qualquer mês parecer uma queda.
+  const lastDay = new Date(now.getFullYear(), now.getMonth(), 0).getDate()
+  const until = `${previous.key}-${String(Math.min(now.getDate(), lastDay)).padStart(2, "0")}`
+  const samePeriod = sum(invoices.filter((i) => i.status === "pago" && receivedIn(i) === previous.key && receivedOn(i) <= until))
   return {
     month: current.label,
     previousMonth: previous.label,
     expected: current.prevista,
     received: current.recebida,
-    growth: previous.recebida > 0 ? ((current.recebida - previous.recebida) / previous.recebida) * 100 : undefined,
+    /** Recebido no mês anterior até o mesmo dia — a base de `growth`. */
+    previousSamePeriod: samePeriod,
+    growth: samePeriod > 0 ? ((current.recebida - samePeriod) / samePeriod) * 100 : undefined,
     /** Percentual do valor faturado que está vencido e não pago. */
     defaultRate: billed > 0 ? (overdue / billed) * 100 : 0,
   }

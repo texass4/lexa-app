@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "cn"
 import { Greeting } from "./greeting"
 import { InsightBanner } from "./insight-banner"
-import { KpiCards } from "./kpi-cards"
+import { KpiStrip } from "./kpi-cards"
 import { RecentProcesses } from "./recent-processes"
 import { TodayAgenda } from "./today-agenda"
 import { OpenTasks } from "./open-tasks"
@@ -19,7 +19,8 @@ import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { OfficeAIPanel } from "@/components/ai/office-ai-panel"
-import { countByLevel, officeSignals } from "@/lib/dashboard/attention"
+import { officeSignals } from "@/lib/dashboard/attention"
+import { useTriagemOptional } from "@/components/triagem/triagem-provider"
 
 const INSIGHTS_KEY = "lexa:dashboard:insights"
 
@@ -31,8 +32,8 @@ function DashboardSkeleton() {
         <Skeleton className="h-10 w-72" />
         <Skeleton className="h-4 w-96 max-w-full" />
       </div>
-      <Skeleton className="h-[104px] w-full rounded-card" />
       <SkeletonStats />
+      <Skeleton className="h-[104px] w-full rounded-card" />
       <div className="grid gap-4 @4xl/main:grid-cols-12">
         <SkeletonCard className="@4xl/main:col-span-7" lines={4} />
         <SkeletonCard className="@4xl/main:col-span-5" lines={4} />
@@ -64,16 +65,21 @@ function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React
 export function DashboardView() {
   const data = useOfficeData()
   const { can, user } = useSession()
+  const triagem = useTriagemOptional()
+  // A lista do que merece atenção começa aberta: é a resposta principal do Painel.
+  // Quem fechar, encontra fechada da próxima vez.
   const [insights, setInsights] = React.useState(() => {
     try {
-      return localStorage.getItem(INSIGHTS_KEY) === "1"
+      return localStorage.getItem(INSIGHTS_KEY) !== "0"
     } catch {
-      return false
+      return true
     }
   })
   if (!data.hydrated) return <DashboardSkeleton />
 
-  const signals = officeSignals(data, { userId: user.id, can })
+  // Triagem entra quando já foi lida (e se está ativa para o escritório).
+  const triage = triagem && !triagem.unavailable ? { items: triagem.items, ready: !triagem.loading } : undefined
+  const signals = officeSignals({ ...data, triage: triage?.ready ? triage.items : undefined }, { userId: user.id, can })
   const empty = data.processes.length === 0 && data.tasks.length === 0 && data.clients.length === 0
   const toggleInsights = () =>
     setInsights((open) => {
@@ -92,8 +98,14 @@ export function DashboardView() {
           <Greeting signals={signals} empty={empty} />
         </FadeIn>
 
+        {!empty && (
+          <FadeIn delay={0.02}>
+            <KpiStrip triage={triage} />
+          </FadeIn>
+        )}
+
         <FadeIn delay={0.04} className="space-y-4">
-          <InsightBanner expanded={insights} onToggle={toggleInsights} critical={countByLevel(signals).critical} />
+          <InsightBanner expanded={insights} onToggle={toggleInsights} />
           <AnimatePresence initial={false}>
             {insights && (
               <motion.div
@@ -110,11 +122,10 @@ export function DashboardView() {
           </AnimatePresence>
         </FadeIn>
 
-        <KpiCards />
-
-        <Row left={can("processes.view") && <RecentProcesses />} right={can("agenda.view") && <TodayAgenda />} delay={0.08} />
+        {/* Do mais urgente ao contexto: prazos e agenda, trabalho do dia, depois o que mudou. */}
+        <Row left={can("processes.view") && <WeekPrazos />} right={can("agenda.view") && <TodayAgenda />} delay={0.08} />
         <Row left={can("tasks.view") && <OpenTasks />} right={can("finance.view") && <FinancePanel />} delay={0.12} />
-        <Row left={can("processes.view") && <WeekPrazos />} right={<RecentActivity />} delay={0.16} />
+        <Row left={can("processes.view") && <RecentProcesses />} right={<RecentActivity />} delay={0.16} />
 
         <FadeIn delay={0.2}>
           <OfficeAIPanel />

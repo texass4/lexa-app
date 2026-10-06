@@ -139,7 +139,8 @@ export function ProcessesView() {
         }
       />
 
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      {/* Até 7 abas com contagem: abaixo de 2xl a busca vai para a linha de baixo, para nenhuma aba ser cortada. */}
+      <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <FilterTabs
           ariaLabel="Filtrar processos"
           layoutId="process-filter"
@@ -150,7 +151,7 @@ export function ProcessesView() {
             count: counts[f.value],
           }))}
         />
-        <SearchField value={query} onChange={setQuery} placeholder="Número, cliente ou parte contrária…" className="w-full xl:w-[300px]" />
+        <SearchField value={query} onChange={setQuery} placeholder="Número, cliente ou parte contrária…" className="w-full sm:max-w-sm 2xl:w-[300px]" />
       </div>
 
       {!ready ? (

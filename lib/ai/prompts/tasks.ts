@@ -47,6 +47,15 @@ Os números em "metricas_calculadas_pelo_lexa" vieram do banco e estão corretos
 - "sugestoes_organizacao": sugestões práticas de organização.
 - "perguntas_para_verificar": perguntas que o advogado deveria se fazer ao revisar os dados.`
 
+export const FINANCE_ANALYSIS_TASK = `Interprete o financeiro do escritório para os sócios, em linguagem direta.
+Os números em "metricas_calculadas_pelo_lexa" e nas listas vieram das faturas registradas e estão corretos: use-os exatamente. Não calcule percentuais, médias, projeções ou totais que não estejam nos dados, e não invente valores, clientes ou datas.
+"recebido_no_mesmo_periodo_do_mes_anterior" é a base justa de comparação com o mês atual (mesmo número de dias); nunca compare o mês atual, incompleto, com o mês anterior inteiro.
+- "leitura": 2 a 4 frases: como está o recebimento do mês, o que está em atraso e o que entra nos próximos 30 dias.
+- "pontos_atencao": o que merece ação (atrasos concentrados, atrasos antigos, vencimentos próximos relevantes), com "natureza" e as referências dos clientes (ex.: C1).
+- "sugestoes": próximos passos práticos (quem cobrar primeiro e por quê, o que conferir). São sugestões: nada é feito sem o advogado.
+- "perguntas_para_verificar": o que conferir antes de agir (ex.: pagamento recebido e ainda não registrado).
+Se não houver atraso nem vencimento próximo, diga isso com clareza, sem criar preocupação.`
+
 export const CHAT_TASK = `Responda às perguntas do usuário sobre os dados da Íntegra desta conversa.
 - Responda de forma direta e curta. Use listas quando ajudar. Markdown simples permitido: **negrito**, listas com "-" e títulos "###". Nada de tabelas ou HTML.
 - Referências como "essa movimentação", "o último registro" ou "esse processo" dizem respeito ao escopo desta conversa.

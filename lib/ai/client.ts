@@ -13,6 +13,7 @@ import type {
   MovementAnalysis,
   NextActions,
   OfficeOverviewResult,
+  FinanceAnalysisResult,
   ProcessSummary,
 } from "./types"
 import { publicMessage } from "@/lib/core/public-error"
@@ -57,6 +58,7 @@ export const aiApi = {
   nextActions: (processId: string, signal?: AbortSignal) => post<AIResult<NextActions>>("/api/ai/process/next-actions", { processId }, signal),
   clientSummary: (clientId: string, signal?: AbortSignal) => post<AIResult<ClientSummary>>("/api/ai/client/summary", { clientId }, signal),
   officeOverview: (signal?: AbortSignal) => post<OfficeOverviewResult>("/api/ai/office/overview", {}, signal),
+  financeAnalysis: (signal?: AbortSignal) => post<FinanceAnalysisResult>("/api/ai/finance/analysis", {}, signal),
   chat: (scope: ChatScope, messages: AIMessage[], signal?: AbortSignal) => post<AIResult<ChatReply>>("/api/ai/chat", { scope, messages }, signal),
 }
 

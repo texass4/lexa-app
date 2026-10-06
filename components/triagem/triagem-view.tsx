@@ -58,23 +58,15 @@ function whyItMatters(item: TriageItem, today: string) {
     if (left === 0) return "Possível prazo para hoje"
     return left === 1 ? "Possível prazo amanhã" : `Possível prazo em ${left} dias`
   }
-  if (action?.value === "sim") return "Pode exigir uma providência"
+  // "Exige ação: Sim" já aparece na linha de baixo.
   if (action?.value === "incerto") return "Ainda não ficou claro se exige providência"
+  // A leitura já disse que não exige ação: nada a acrescentar.
+  if (action?.value === "nao") return undefined
   if (!item.processId && isOpen(item)) return "Ainda sem processo vinculado no escritório"
   if (item.kind === "movimentacao" && isOpen(item)) return "Movimentação que pode pedir leitura"
   return undefined
 }
 
-/** No máximo dois sinais, do mais decisivo ao contexto. */
-function queueCues(item: TriageItem, today: string) {
-  if (!isOpen(item)) return []
-  const cues: string[] = []
-  if (urgencyOf(item, today) === "alta") cues.push("Alta prioridade")
-  if (suggestedDeadline(item)) cues.push("Possível prazo")
-  else if (item.kind === "movimentacao") cues.push("Movimentação relevante")
-  if (requiresAction(item)?.value === "sim") cues.push("Próximo passo sugerido")
-  return cues.slice(0, 2)
-}
 
 /**
  * Triagem jurídica: uma caixa única com os eventos que podem exigir ação — intimações
@@ -238,15 +230,17 @@ function TriageRow({
   const suggested = suggestedDeadline(i)
   const responsible = i.responsibleId ? getUser(i.responsibleId) : undefined
   const badge = stateBadge(i)
-  const cues = queueCues(i, today)
   const why = open ? whyItMatters(i, today) : undefined
+  // O botão principal só propõe confirmar prazo quando há um prazo sugerido para conferir;
+  // sem sugestão (ou "Exige ação: Não"), a decisão é tomada em "Revisar".
+  const confirmable = open && canConfirm && !!i.processId && !!suggested && action?.value !== "nao"
 
   return (
-    <li className="group flex flex-col gap-2 px-4 py-3.5 transition-colors duration-200 hover:bg-accent/45 sm:px-5">
+    <li className="group flex flex-col gap-2 px-4 py-3.5 transition-colors duration-200 hover:bg-accent/45 sm:px-5 lg:flex-row lg:items-center lg:gap-6">
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full flex-col gap-1.5 rounded-[8px] text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+        className="flex w-full min-w-0 flex-1 flex-col gap-1.5 rounded-[8px] text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         <div className="flex flex-wrap items-center gap-2">
           {open && (
@@ -258,19 +252,18 @@ function TriageRow({
           )}
           <span className="text-[13px] font-semibold">{KIND_LABEL[i.kind]}</span>
           <span className="text-[12px] text-subtle">{[SOURCE_LABEL[i.source], i.tribunal].filter(Boolean).join(" · ")}</span>
-          <StatusBadge tone={badge.tone} size="sm">
-            {badge.label}
-          </StatusBadge>
+          {/* Abertos: a aba já diz a situação; decididos mostram a decisão. */}
+          {!open && (
+            <StatusBadge tone={badge.tone} size="sm">
+              {badge.label}
+            </StatusBadge>
+          )}
           {!i.processId && open && (
             <StatusBadge tone="violet" size="sm" dot={false}>
               Não cadastrado
             </StatusBadge>
           )}
-          {cues.map((cue) => (
-            <span key={cue} className="text-[11px] font-medium tracking-[0.01em] text-muted-foreground">
-              {cue}
-            </span>
-          ))}
+          {open && urgency === "alta" && <span className="text-[11px] font-medium tracking-[0.01em] text-danger">Alta prioridade</span>}
         </div>
         <p className="text-[13.5px] font-medium">
           {processLabel}
@@ -305,11 +298,11 @@ function TriageRow({
         </p>
       </button>
       {open && (
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Button size="sm" variant="secondary" onClick={onOpen}>
             Revisar
           </Button>
-          {canConfirm && i.processId && (
+          {confirmable && (
             <Button size="sm" onClick={onConfirm}>
               <Hourglass /> Confirmar prazo
             </Button>

@@ -149,6 +149,36 @@ export interface OfficeOverviewResult extends AIResult<OfficeOverview> {
   metrics: OfficeMetrics
 }
 
+/* ------------------------------- financeiro ------------------------------- */
+
+/** Leitura do financeiro: interpretação dos números calculados — nunca números novos. */
+export interface FinanceAnalysis {
+  leitura: string
+  pontos_atencao: AttentionPoint[]
+  sugestoes: string[]
+  perguntas_para_verificar: string[]
+}
+
+/** Números do financeiro calculados das faturas reais (a IA só interpreta). */
+export interface FinanceMetrics {
+  month: string
+  previousMonth: string
+  receivedThisMonth: number
+  expectedThisMonth: number
+  /** Recebido no mês anterior até o mesmo dia de hoje. */
+  receivedPreviousSamePeriod: number
+  openAmount: number
+  overdueAmount: number
+  overdueInvoices: number
+  clientsWithOverdue: number
+  dueNext30Days: number
+  dueNext30DaysInvoices: number
+}
+
+export interface FinanceAnalysisResult extends AIResult<FinanceAnalysis> {
+  metrics: FinanceMetrics
+}
+
 /* ---------------------------------- chat ---------------------------------- */
 
 export type ChatRole = "user" | "assistant"

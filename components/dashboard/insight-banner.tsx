@@ -12,10 +12,10 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /**
  * Faixa de resumo do topo do Painel. Os números são contagens dos dados reais (não
- * uma análise da IA); "Ver insights" abre a lista do que merece atenção, e o cartão
- * da direita abre a conversa com a Íntegra IA.
+ * uma análise da IA); o botão mostra/oculta a lista do que merece atenção (que já
+ * diz quantos pontos são urgentes), e o cartão da direita abre a Íntegra IA.
  */
-export function InsightBanner({ expanded, onToggle, critical }: { expanded: boolean; onToggle: () => void; critical: number }) {
+export function InsightBanner({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   const data = useOfficeData()
   const lexa = useLexaAI()
   const { can } = useSession()
@@ -40,14 +40,7 @@ export function InsightBanner({ expanded, onToggle, critical }: { expanded: bool
               A {BRAND.name} acompanha {plural(digest.activeProcesses, "processo ativo", "processos ativos")}
             </p>
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Encontrou {found.slice(0, -1).join(", ")} e {found.at(-1)}
-              {critical > 0 && (
-                <>
-                  {" · "}
-                  <span className="font-medium text-danger">{plural(critical, "ponto urgente", "pontos urgentes")}</span>
-                </>
-              )}
-              .
+              Encontrou {found.slice(0, -1).join(", ")} e {found.at(-1)}.
             </p>
           </div>
         </div>
@@ -58,7 +51,7 @@ export function InsightBanner({ expanded, onToggle, critical }: { expanded: bool
           aria-controls="painel-atencao"
           className="group touch-target relative inline-flex shrink-0 items-center gap-1.5 self-start rounded-control px-2 py-1.5 text-[13px] font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center"
         >
-          {expanded ? "Ocultar insights" : "Ver insights"}
+          {expanded ? "Ocultar lista" : "Ver o que merece atenção"}
           {expanded ? (
             <ChevronDown className="size-4 rotate-180 transition-transform" />
           ) : (

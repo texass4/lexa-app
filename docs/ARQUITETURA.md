@@ -150,7 +150,7 @@ lexa-app/
   ```
 - Diálogos globais (criar cliente, tarefa, prazo, compromisso, documento, processo, lançamento): `useUI().openDialog("task", { processId })`.
 - Permissões na interface: `useSession().can("finance.edit")` ou `<Can permission="finance.edit">`.
-- Visual: reutilize `components/ui` (`PageHeader`, `Panel`, `MetricCard`, `Button`, `StatusBadge`, `FilterTabs`, `DataTable`, `EmptyState`, `Skeleton`, `Modal`, `SideSheet`, `Field`). Cores e raios saem dos tokens (`bg-surface`, `text-muted-foreground`, `rounded-card`, `shadow-card`). Não use cores soltas (`#hex`) nos componentes.
+- Visual: reutilize `components/ui` (`PageHeader`, `Panel`, `IndicatorStrip`, `Button`, `StatusBadge`, `FilterTabs`, `DataTable`, `EmptyState`, `Skeleton`, `Modal`, `SideSheet`, `Field`). Cores e raios saem dos tokens (`bg-surface`, `text-muted-foreground`, `rounded-card`, `shadow-card`). Não use cores soltas (`#hex`) nos componentes.
 - Estados obrigatórios em toda lista: carregando (`Skeleton` até `hydrated`), vazio (`EmptyState` com o próximo passo) e erro.
 - Responsividade (testada em 320, 375, 390, 768, 1024, 1280, 1440 e 1920 px):
   - Divisões da página em colunas e troca tabela ↔ cartões usam a largura do conteúdo, não da janela: `<main>` é o container `@container/main` (`components/layout/app-shell.tsx`). Use `@4xl/main:grid-cols-12` (≥ 896 px de conteúdo) em vez de `lg:` — com a barra lateral aberta em 1024 px, as colunas empilham em vez de espremer.
@@ -159,7 +159,7 @@ lexa-app/
     - `touch-target` usa `::after`: num elemento com `truncate`/`overflow-hidden` (ou dentro de um pai que corta), a área é cortada. Nesses casos, corte o texto num `<span>` interno ou amplie com padding só no toque (`pointer-coarse:-my-2 pointer-coarse:py-2`).
     - Quando a área ampliada cobriria o centro de outro controle (vizinhos a menos de ~44 px), aumente o próprio controle com `pointer-coarse:` (ex.: `pointer-coarse:h-8`) em vez de ampliar a área.
     - Linha de lista com uma ação principal (ex.: `DocumentList`): o botão principal cobre a linha inteira (`after:absolute after:inset-0` com a linha `relative`) e os links secundários ficam por cima (`relative`).
-  - No celular, prefira reorganizar a cortar: valor e situação abaixo do nome, rótulo abaixo do ícone (`MetricCard` com `@container`), títulos em até duas linhas (`PanelHeader`).
+  - No celular, prefira reorganizar a cortar: valor e situação abaixo do nome, indicadores em duas colunas (`IndicatorStrip`), títulos em até duas linhas (`PanelHeader`).
   - Detalhe do processo (`components/processos/process-profile.tsx`): com menos de 896 px de conteúdo, a tela segue "essencial → contexto → detalhes": identificação, prazo/responsável/valor e ações no topo; última movimentação e pontos de atenção (abrem sob demanda); o resto em abas fixas (Movimentações, Prazos e tarefas, Documentos, Dados, Histórico), com a timeline compacta. Os blocos são os mesmos do desktop — só a arrumação muda.
 
 ### Regras e dados

@@ -3,27 +3,14 @@
 import * as React from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import {
-  ArrowUpRight,
-  CircleCheck,
-  CircleDollarSign,
-  Download,
-  Ellipsis,
-  Pencil,
-  Plus,
-  Trash2,
-  TrendingUp,
-  TriangleAlert,
-  Wallet,
-  Percent,
-} from "lucide-react"
+import { ArrowDown, ArrowUpRight, CircleCheck, CircleDollarSign, Download, Ellipsis, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
-import { MetricCard } from "@/components/ui/metric-card"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { IndicatorStrip } from "@/components/ui/indicator-strip"
+import { Button } from "@/components/ui/button"
 import { Panel, PanelHeader } from "@/components/ui/panel"
-import { StatusBadge } from "@/components/ui/status-badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -33,6 +20,7 @@ import { SearchField } from "@/components/ui/search-field"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { RevenueBarChart } from "./revenue-chart"
+import { FinanceAIPanel } from "./finance-ai-panel"
 import { NewInvoiceDialog } from "./new-invoice-dialog"
 import { PayInvoiceDialog } from "./pay-invoice-dialog"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
@@ -43,7 +31,7 @@ import { searchFilter } from "@/lib/store/storage"
 import { LimitedList } from "@/components/ui/show-more"
 import { matches } from "@/lib/core/format"
 import { INVOICE_STATUS } from "@/lib/core/config"
-import { fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
+import { addDays, fmtDayMonthParts, fmtDueIn, fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
 import { downloadCSV } from "@/lib/core/csv"
 import { formatCurrency } from "@/lib/core/format"
 import {
@@ -65,6 +53,12 @@ const TABS: { value: InvoiceListTab; label: string }[] = [
   { value: "atraso", label: "Em atraso" },
   { value: "cancelados", label: "Cancelados" },
 ]
+
+/** `?aba=` (links do Painel e de outras telas) → aba aberta. */
+const TAB_PARAM: Record<string, InvoiceListTab> = { receber: "receber", recebidos: "recebidos", atraso: "atraso", atrasados: "atraso", cancelados: "cancelados" }
+
+/** Janela de "próximos recebimentos". */
+const NEXT_DAYS = 30
 
 const EMPTY_TAB: Record<InvoiceListTab, { title: string; description: string }> = {
   receber: { title: "Nada a receber.", description: "Lançamentos previstos e ainda no prazo aparecem aqui." },
@@ -93,7 +87,23 @@ export function FinanceView() {
   const overdueTotal = overdue.reduce((a, i) => a + i.amount, 0)
   const oldest = overdue[0]
   const toReceive = data.invoices.filter((i) => invoiceListTab(i) === "receber")
-  const [tab, setTab] = React.useState<InvoiceListTab>("receber")
+  // Próximos recebimentos: previstos (ainda no prazo) que vencem nos próximos 30 dias.
+  const horizon = toLocalISO(addDays(getNow(), NEXT_DAYS)).slice(0, 10)
+  const nextDue = toReceive.filter((i) => i.dueDate <= horizon)
+  const nextDueTotal = nextDue.reduce((a, i) => a + i.amount, 0)
+  const tabParam = useSearchParams().get("aba")
+  const [tab, setTab] = React.useState<InvoiceListTab>(() => (tabParam && TAB_PARAM[tabParam]) || "receber")
+  // Um link com `?aba=` aberto com a tela já montada também troca a aba.
+  const [lastTabParam, setLastTabParam] = React.useState(tabParam)
+  if (tabParam !== lastTabParam) {
+    setLastTabParam(tabParam)
+    if (tabParam && TAB_PARAM[tabParam]) setTab(TAB_PARAM[tabParam])
+  }
+  const listRef = React.useRef<HTMLElement>(null)
+  const showOverdue = () => {
+    setTab("atraso")
+    listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
   const [query, setQuery] = React.useState("")
   const [editing, setEditing] = React.useState<Invoice | undefined>()
   const [paying, setPaying] = React.useState<Invoice | undefined>()
@@ -191,52 +201,37 @@ export function FinanceView() {
     toast.success("Relatório exportado.", { description: `${file} · ${rows.length} lançamento${rows.length === 1 ? "" : "s"}` })
   }
 
-  // "Como está o dinheiro do escritório?" em uma frase, com os números reais.
-  const headline = !data.invoices.length
-    ? "Honorários previstos, recebidos e em aberto aparecem aqui assim que houver lançamentos."
-    : `${formatCurrency(summary.received)} recebidos de ${formatCurrency(summary.expected)} previstos em ${summary.month.split(" ")[0].toLowerCase()}${
-        overdueTotal > 0 ? ` · ${formatCurrency(overdueTotal)} vencidos` : " · nada vencido"
-      }.`
-
-  const kpis = [
-    { label: "Receita prevista", value: formatCurrency(summary.expected), hint: summary.month, icon: TrendingUp, tone: "brand" as const },
+  const monthName = summary.month.split(" ")[0].toLowerCase()
+  const previousName = summary.previousMonth.split(" ")[0].toLowerCase()
+  // Os números ficam na faixa: cada um responde uma pergunta (entrou? vai entrar? atrasou?).
+  const indicators = [
     {
-      label: "Receita recebida",
+      label: `Recebido em ${monthName}`,
       value: formatCurrency(summary.received),
-      hint:
-        growth === undefined && pct === undefined ? (
-          summary.month
-        ) : (
-          <span>
-            {growth !== undefined && (
-              <>
-                <span className={cn("font-medium", growth >= 0 ? "text-success" : "text-danger")}>
-                  {growth >= 0 ? "+" : ""}
-                  {growth.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
-                </span>{" "}
-                vs. {summary.previousMonth.split(" ")[0].toLowerCase()}
-              </>
-            )}
-            {growth !== undefined && pct !== undefined && " · "}
-            {pct !== undefined && <>{pct}% do previsto</>}
-          </span>
-        ),
-      icon: Wallet,
-      tone: "success" as const,
+      foot:
+        growth !== undefined
+          ? `${growth >= 0 ? "+" : ""}${growth.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% vs. mesmo período de ${previousName}`
+          : pct !== undefined
+            ? `${pct}% do previsto`
+            : "nenhum previsto no mês",
     },
     {
-      label: "Em aberto",
-      value: formatCurrency(open),
-      hint: `${toReceive.length + overdue.length} parcelas a receber`,
-      icon: CircleDollarSign,
-      tone: "warning" as const,
+      label: `Previsto para ${monthName}`,
+      value: formatCurrency(summary.expected),
+      foot: pct !== undefined ? `${pct}% já recebido` : "nenhum vencimento no mês",
     },
     {
-      label: "Inadimplência",
-      value: `${summary.defaultRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`,
-      hint: <span className="text-danger">{formatCurrency(overdueTotal)} vencidos</span>,
-      icon: Percent,
-      tone: "danger" as const,
+      label: `A receber em ${NEXT_DAYS} dias`,
+      value: formatCurrency(nextDueTotal),
+      foot: nextDue.length ? `${nextDue.length} ${nextDue.length === 1 ? "parcela" : "parcelas"} · ${formatCurrency(open)} em aberto` : `${formatCurrency(open)} em aberto`,
+    },
+    {
+      label: "Em atraso",
+      value: formatCurrency(overdueTotal),
+      foot: overdue.length
+        ? `${overdue.length} ${overdue.length === 1 ? "parcela" : "parcelas"} · ${summary.defaultRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de inadimplência`
+        : "nenhuma parcela vencida",
+      alert: overdue.length > 0,
     },
   ]
 
@@ -244,7 +239,7 @@ export function FinanceView() {
     <div className="space-y-6">
       <PageHeader
         title="Financeiro"
-        description={ready ? headline : "Honorários previstos, recebidos e em aberto do escritório."}
+        description="Honorários previstos, recebidos e em aberto do escritório."
         actions={
           <>
             <Button
@@ -288,18 +283,7 @@ export function FinanceView() {
         </Panel>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 @4xl/main:grid-cols-4 @4xl/main:gap-5">
-            {kpis.map((k, i) => (
-              <motion.div
-                key={k.label}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: i * 0.04 }}
-              >
-                <MetricCard label={k.label} value={k.value} foot={k.hint} icon={k.icon} tone={k.tone} />
-              </motion.div>
-            ))}
-          </div>
+          <IndicatorStrip label="Indicadores do financeiro" items={indicators} />
 
           {overdueTotal > 0 && (
             <FadeIn className="flex flex-col gap-3 rounded-[14px] border border-danger/20 bg-danger-soft/60 p-4 sm:flex-row sm:items-center">
@@ -311,17 +295,34 @@ export function FinanceView() {
                   {overdue.length === 1 ? "1 parcela em atraso soma" : `${overdue.length} parcelas em atraso somam`} {formatCurrency(overdueTotal)}
                 </p>
                 <p className="text-[12.5px] text-muted-foreground">
-                  Mais antiga: {clientName(oldest.clientId)} · vencida desde {fmtNumericDate(oldest.dueDate)}
+                  Mais antiga:{" "}
+                  <Link href={`/clientes/${oldest.clientId}?tab=financeiro`} className="font-medium text-foreground underline-offset-2 hover:underline">
+                    {clientName(oldest.clientId)}
+                  </Link>{" "}
+                  · vencida desde {fmtNumericDate(oldest.dueDate)}
                 </p>
               </div>
-              <Link href={`/clientes/${oldest.clientId}?tab=financeiro`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                Abrir cliente <ArrowUpRight />
-              </Link>
+              {tab !== "atraso" && (
+                <Button variant="secondary" size="sm" onClick={showOverdue}>
+                  <ArrowDown /> Ver parcelas em atraso
+                </Button>
+              )}
             </FadeIn>
           )}
 
-          <Panel>
-            <PanelHeader title="Lançamentos" description={needle ? `${listed.length} na busca` : `${counts[tab] ?? listed.length} nesta situação`} />
+          <FinanceAIPanel />
+
+          <Panel ref={listRef} className="scroll-mt-24">
+            <PanelHeader
+              title="Lançamentos"
+              description={
+                needle
+                  ? `${listed.length} na busca`
+                  : tab === "receber" && nextDue.length
+                    ? `${counts.receber} previstos · ${formatCurrency(nextDueTotal)} vencem nos próximos ${NEXT_DAYS} dias`
+                    : `${counts[tab] ?? listed.length} nesta situação`
+              }
+            />
             {/* Abas e busca numa linha própria: no celular as abas rolam sem estourar a largura. */}
             <div className="flex flex-col gap-3 px-5 pb-3.5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
               <FilterTabs
@@ -359,7 +360,6 @@ export function FinanceView() {
                   {visible.map((inv) => {
                     const client = byId(data.clients, inv.clientId)
                     const current = invoiceStatus(inv)
-                    const status = INVOICE_STATUS[current]
                     const { day, month } = fmtDayMonthParts(inv.dueDate)
                     return (
                       <li key={inv.id} className="flex items-center gap-3 px-4 py-3 sm:gap-3.5 sm:px-5">
@@ -401,21 +401,11 @@ export function FinanceView() {
                               .filter(Boolean)
                               .join(" · ")}
                           </p>
-                          {/* Celular: valor e situação abaixo do nome, para o nome não ser cortado. */}
-                          <p className="mt-1 flex items-center gap-2 sm:hidden">
-                            <span className={cn("tabular text-[13.5px] font-semibold", current === "atrasado" && "text-danger")}>
-                              {formatCurrency(inv.amount)}
-                            </span>
-                            <StatusBadge tone={status.tone} size="sm">
-                              {status.label}
-                            </StatusBadge>
+                          {/* Celular: valor abaixo do nome, para o nome não ser cortado. A situação é a da aba. */}
+                          <p className={cn("tabular mt-1 text-[13.5px] font-semibold sm:hidden", current === "atrasado" && "text-danger")}>
+                            {formatCurrency(inv.amount)}
                           </p>
                         </div>
-                        <span className="hidden sm:block">
-                          <StatusBadge tone={status.tone} size="sm">
-                            {status.label}
-                          </StatusBadge>
-                        </span>
                         <span
                           className={cn(
                             "tabular w-24 shrink-0 text-right text-[13.5px] font-semibold max-sm:hidden",

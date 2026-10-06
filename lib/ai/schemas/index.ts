@@ -8,6 +8,7 @@ import type {
   ActionSuggestion,
   AttentionPoint,
   ClientSummary,
+  FinanceAnalysis,
   MovementAnalysis,
   NextActions,
   OfficeOverview,
@@ -87,4 +88,11 @@ export const officeOverviewSchema: Schema<OfficeOverview> = object({
   situacao_financeira: text(undefined, 800),
   sugestoes_organizacao: texts("Sugestões práticas.", 6),
   perguntas_para_verificar: texts("Perguntas para o advogado.", 6),
+})
+
+export const financeAnalysisSchema: Schema<FinanceAnalysis> = object({
+  leitura: string({ max: 900, min: 1 }),
+  pontos_atencao: array(attentionPoint, { max: 6 }),
+  sugestoes: texts("Próximos passos práticos, sem números novos.", 5),
+  perguntas_para_verificar: texts("Perguntas para o advogado conferir.", 4),
 })

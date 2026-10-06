@@ -47,7 +47,9 @@ function useSignalAction() {
 /** Sinal discreto: a leitura do dado, sem anunciar que existe um modelo por trás. */
 function signalCue(signal: AttentionSignal): string | undefined {
   if (signal.level === "critical") return "Alta prioridade"
-  if (signal.kind.startsWith("deadline")) return "Possível prazo"
+  if (signal.kind === "triage-pending") return "Triagem"
+  // Prazo cadastrado: é um prazo, não uma possibilidade (essa leitura é da Triagem).
+  if (signal.kind.startsWith("deadline")) return "Prazo"
   if (signal.kind === "process-moved") return signal.level === "warning" ? "Movimentação relevante" : "Movimentação recente"
   if (signal.action) return "Próximo passo sugerido"
   if (signal.kind === "process-stale") return "Parado"

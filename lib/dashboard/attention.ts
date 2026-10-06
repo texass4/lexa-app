@@ -24,7 +24,8 @@ import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos/prazos"
 import { prazosByProcess, processesByClient, tasksByRelated } from "@/lib/store/indexes"
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { MONITORING_STALE_AFTER_DAYS } from "@/lib/services/processos/monitoring-policy"
-import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
+import { isOpen as isOpenTriage, suggestedDeadline, urgencyOf } from "@/lib/triagem/model"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task, TriageItem } from "@/types"
 
 /** Sem movimentação há mais que isso = processo parado. Também usado pela Íntegra IA. */
 export const STALE_DAYS = 60
@@ -62,6 +63,7 @@ export type SignalKind =
   | "appointment-today"
   | "invoice-overdue"
   | "document-new"
+  | "triage-pending"
 
 export type SignalAction =
   | { type: "open"; label: string; href: string }
@@ -107,6 +109,8 @@ export interface AttentionData {
   documents: LegalDocument[]
   invoices: Invoice[]
   activities?: Activity[]
+  /** Eventos da Triagem (intimações e movimentações) — quando já foram lidos. */
+  triage?: readonly TriageItem[]
 }
 
 export interface AttentionOptions {
@@ -364,6 +368,11 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
     }
   }
 
+  if (allowed("processes.view") && data.triage) {
+    const signal = triageSignal(data.triage, now)
+    if (signal) signals.push(signal)
+  }
+
   if (allowed("tasks.view")) {
     const mine = data.tasks.filter((t) => t.status === "pendente" && (!options.userId || t.assigneeId === options.userId))
     for (const t of mine) {
@@ -461,6 +470,39 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
   signals = group(signals, "deadline-no-task", (n) => plural(n, "prazo sem tarefa", "prazos sem tarefa"), "/tarefas/prazos?filtro=sem-tarefa")
 
   return signals.sort(bySeverity)
+}
+
+/**
+ * Um sinal só para a Triagem: quantos eventos aguardam a decisão do advogado e
+ * quantos trazem possível prazo. Urgente quando algum prazo sugerido vence em até
+ * 5 dias. O prazo só existe depois que o advogado confirma, na própria Triagem.
+ */
+export function triageSignal(items: readonly TriageItem[], now: Date = getNow()): AttentionSignal | undefined {
+  const open = items.filter(isOpenTriage)
+  if (!open.length) return undefined
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  const withDeadline = open.filter((i) => suggestedDeadline(i)).length
+  const high = open.filter((i) => urgencyOf(i, today) === "alta").length
+  const intimacoes = open.filter((i) => i.kind === "intimacao").length
+  return {
+    id: "triage-pending:escritorio",
+    kind: "triage-pending",
+    level: high ? "critical" : "warning",
+    title:
+      intimacoes === open.length
+        ? `${plural(open.length, "intimação aguarda", "intimações aguardam")} revisão na Triagem`
+        : `${plural(open.length, "evento aguarda", "eventos aguardam")} revisão na Triagem`,
+    detail: [withDeadline && plural(withDeadline, "com possível prazo", "com possível prazo"), high && plural(high, "urgente", "urgentes")]
+      .filter(Boolean)
+      .join(" · ") || "Nenhum com prazo sugerido",
+    // Ordena pela data fatal sugerida mais próxima (entre os outros prazos, não depois deles).
+    at: open
+      .map((i) => suggestedDeadline(i)?.fatalDate)
+      .filter((d): d is string => !!d)
+      .sort()[0],
+    href: "/triagem",
+    count: open.length,
+  }
 }
 
 /** Contagem por nível — alimenta a frase de abertura ("3 pontos merecem atenção"). */

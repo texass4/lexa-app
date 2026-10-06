@@ -17,6 +17,7 @@ import {
   urgencyOf,
   type TriageDbRow,
 } from "./model"
+import { triageSignal } from "@/lib/dashboard/attention"
 import { isRelevantMovement, movementTriageItems, RECENT_MOVEMENT_DAYS } from "./sources"
 
 const TODAY = "2026-09-29"
@@ -126,6 +127,21 @@ describe("triagem: o que cada item mostra", () => {
       [done, noAction, review, later, soon].sort(byPriority(TODAY)).map((i) => i.id),
       ["soon", "later", "review", "info", "done"],
     )
+  })
+
+  it("Painel: um sinal só com o que aguarda decisão; urgente com prazo sugerido em até 5 dias", () => {
+    const now = new Date(2026, 8, 29, 10, 0)
+    const done = item({ id: "done", state: "decidido", decision: "sem_prazo" })
+    assert.equal(triageSignal([done], now), undefined)
+    const calm = triageSignal([item({ id: "a" }), item({ id: "b", suggestion }), done], now)!
+    assert.equal(calm.count, 2)
+    assert.equal(calm.level, "warning")
+    assert.equal(calm.title, "2 intimações aguardam revisão na Triagem")
+    assert.equal(calm.detail, "1 com possível prazo")
+    assert.equal(calm.href, "/triagem")
+    const urgent = triageSignal([item({ id: "soon", suggestion: { ...suggestion, fatalDate: "2026-10-02" } })], now)!
+    assert.equal(urgent.level, "critical")
+    assert.equal(urgent.title, "1 intimação aguarda revisão na Triagem")
   })
 })
 

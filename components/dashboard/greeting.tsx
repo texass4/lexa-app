@@ -8,21 +8,17 @@ import { WeatherChip } from "./weather-chip"
 
 const piece = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-/** A frase de abertura é uma leitura do escritório, não um contador. */
+/**
+ * A frase de abertura é uma leitura do escritório, não um contador: quantos pontos
+ * pedem ação hoje e quantos só pedem uma verificação. Os detalhes estão logo abaixo.
+ */
 function statusLine(signals: AttentionSignal[], empty: boolean) {
   if (empty) return "Seu escritório está pronto. Comece cadastrando um cliente ou consultando um processo."
   const { critical, warning } = countByLevel(signals)
-  const moved = signals.filter((s) => s.kind === "process-moved").reduce((acc, s) => acc + s.count, 0)
-  const review = signals.filter((s) => s.kind === "process-moved" && s.level === "warning").reduce((acc, s) => acc + s.count, 0)
-  const parts: string[] = []
-  if (critical) parts.push(piece(critical, "ponto precisa de atenção hoje", "pontos precisam de atenção hoje"))
-  else if (warning) parts.push(`Nada urgente · ${piece(warning, "ponto para verificar", "pontos para verificar")}`)
-  else parts.push("Tudo em dia no escritório")
-  if (moved) {
-    const movement = piece(moved, "movimentação recente", "movimentações recentes")
-    parts.push(review ? `${movement} · ${piece(review, "pode exigir atenção", "podem exigir atenção")}` : movement)
-  }
-  return parts.join(" · ")
+  if (critical && warning) return `${piece(critical, "ponto precisa de atenção hoje", "pontos precisam de atenção hoje")} · ${piece(warning, "para verificar", "para verificar")}`
+  if (critical) return piece(critical, "ponto precisa de atenção hoje", "pontos precisam de atenção hoje")
+  if (warning) return `Nada urgente · ${piece(warning, "ponto para verificar", "pontos para verificar")}`
+  return "Tudo em dia no escritório"
 }
 
 export function Greeting({ signals, empty = false }: { signals: AttentionSignal[]; empty?: boolean }) {

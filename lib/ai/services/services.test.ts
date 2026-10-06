@@ -6,6 +6,7 @@ import { NO_PRAZOS, buildProcessContext, loadProcessData } from "../context/proc
 import { loadClientData } from "../context/client"
 import { createSupabaseRepository as repoFor } from "../context/repository"
 import { computeOfficeMetrics, loadOfficeData } from "../context/office"
+import { computeFinanceMetrics } from "../context/finance"
 import { AIError } from "../errors"
 import {
   ORG_A,
@@ -24,6 +25,7 @@ import {
 import { analyzeMovement, suggestNextActions, summarizeProcess } from "./process"
 import { summarizeClient } from "./client"
 import { officeOverview } from "./office"
+import { financeAnalysis } from "./finance"
 import { chat, trimHistory } from "./chat"
 
 const failure = async (promise: Promise<unknown>) => {
@@ -528,5 +530,58 @@ describe("chat", () => {
     assert.match(sent, /metricas_calculadas_pelo_lexa/)
     assert.match(sent, /processos_ativos/)
     assert.equal(sent.includes(SECRET_B), false)
+  })
+})
+
+describe("análise do financeiro", () => {
+  const analysis = {
+    leitura: "Há R$ 999.999,00 em atraso.",
+    pontos_atencao: [{ texto: "Atraso concentrado.", natureza: "fato", refs: ["C1", "C9"] }],
+    sugestoes: ["Cobrar o cliente com atraso."],
+    perguntas_para_verificar: [],
+  }
+
+  it("números das faturas, não do modelo; só o escritório de quem pergunta", async () => {
+    const { deps, calls } = makeDeps(() => analysis)
+    const result = await financeAnalysis(deps)
+    assert.equal(result.metrics.overdueAmount, 3000)
+    assert.equal(result.metrics.overdueInvoices, 1)
+    assert.equal(result.metrics.clientsWithOverdue, 1)
+    // Referência inventada pelo modelo não chega à tela.
+    assert.deepEqual(result.data.pontos_atencao[0].refs, ["C1"])
+    assert.equal(result.sources.C1.href, "/clientes/c_a1?tab=financeiro")
+    const sent = promptText(calls[0])
+    assert.match(sent, /"em_atraso":"R\$\s3\.000"/)
+    assert.equal(sent.includes(SECRET_B), false)
+    assert.match(sent, /recebido_no_mesmo_periodo_do_mes_anterior/)
+  })
+
+  it("sem permissão do financeiro → FORBIDDEN, sem chamar o modelo", async () => {
+    const { deps, calls } = makeDeps(() => analysis, { permissions: ["processes.view", "clients.view"] })
+    assert.equal(await failure(financeAnalysis(deps)), "FORBIDDEN")
+    assert.equal(calls.length, 0)
+  })
+
+  it("sem lançamentos → INSUFFICIENT_DATA, sem chamar o modelo", async () => {
+    const { deps, calls, db } = makeDeps(() => analysis)
+    db.tables.invoices = []
+    assert.equal(await failure(financeAnalysis(deps)), "INSUFFICIENT_DATA")
+    assert.equal(calls.length, 0)
+  })
+
+  it("próximos 30 dias: só previstas ainda não vencidas", () => {
+    const base = { organizationId: ORG_A, createdAt: "2026-01-01T00:00:00", clientId: "c1", description: "x" }
+    const metrics = computeFinanceMetrics(
+      [
+        { ...base, id: "a", amount: 100, dueDate: "2026-10-10", status: "pendente" },
+        { ...base, id: "b", amount: 200, dueDate: "2026-11-30", status: "pendente" },
+        { ...base, id: "c", amount: 400, dueDate: "2026-09-20", status: "pendente" },
+        { ...base, id: "d", amount: 800, dueDate: "2026-10-01", status: "cancelado" },
+      ],
+      NOW,
+    )
+    assert.equal(metrics.dueNext30Days, 100)
+    assert.equal(metrics.dueNext30DaysInvoices, 1)
+    assert.equal(metrics.overdueAmount, 400)
   })
 })

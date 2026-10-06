@@ -76,7 +76,7 @@ export function FinancePanel() {
                   {growth >= 0 ? <ArrowUpRight className="size-3.5" strokeWidth={2.2} /> : <ArrowDownRight className="size-3.5" strokeWidth={2.2} />}
                   {Math.abs(growth).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
                 </span>{" "}
-                vs. mês anterior
+                vs. mesmo período de {summary.previousMonth.split(" ")[0].toLowerCase()}
               </>
             )}
           </p>
