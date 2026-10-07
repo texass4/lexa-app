@@ -285,7 +285,7 @@ function CommandContent() {
                     <Scale className="size-3.5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-mono text-[12.5px]">{p.number}</span>
+                    <span className="block truncate font-mono text-[12.5px]">{p.number || "Sem número"}</span>
                     <span className="block truncate text-[11.5px] text-muted-foreground">
                       {client?.name} · {p.type}
                     </span>

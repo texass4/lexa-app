@@ -22,6 +22,7 @@ import { fmtNumericDate, fmtRelative } from "@/lib/core/dates"
 import { nextPrazo, taskPrazo } from "@/lib/prazos/prazos"
 import { clientContext, processContext, taskPrompts } from "@/components/ai/ai-context"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
+import { processNumberLabel, processTitle } from "@/lib/processos/label"
 
 /**
  * O que está em volta da tarefa: o processo (prazo, última movimentação) ou o
@@ -65,7 +66,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
         >
           <div className="flex items-center justify-between gap-3">
             <p className="min-w-0 truncate text-[13.5px] font-medium">
-              Processo <span className="font-mono">{process.code}</span> · {process.type}
+              {processTitle(process, client?.name)} <span className="tabular font-normal text-subtle">· {processNumberLabel(process)}</span>
             </p>
             <StatusBadge tone={PROCESS_STATUS[process.status].tone} size="sm">
               {PROCESS_STATUS[process.status].label}

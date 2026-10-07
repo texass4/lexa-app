@@ -4,7 +4,7 @@
  * Somente servidor.
  *
  * - Lista os arquivos pela API do CKAN (`package_show`) e baixa os JSON mensais.
- * - Política de rede igual à das outras fontes oficiais (DJEN, DataJud): tempo máximo
+ * - Política de rede igual à das outras fontes oficiais (DataJud): tempo máximo
  *   por tentativa, poucas tentativas só para falhas passageiras, backoff exponencial,
  *   `Retry-After` respeitado, 429 encerra (quem chama pausa a execução).
  * - O download só segue URLs https do próprio portal (a lista vem da fonte: um link

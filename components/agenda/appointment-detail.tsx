@@ -17,6 +17,7 @@ import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
 import type { Appointment } from "@/types"
 import { Can } from "@/lib/auth/session"
+import { processNumberLabel, processTitle } from "@/lib/processos/label"
 
 function Row({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -115,7 +116,8 @@ export function AppointmentDetail({ appointment, onClose }: { appointment?: Appo
           </Row>
           {process && (
             <Row icon={<span className="font-mono text-[10px] font-bold">#</span>}>
-              <span className="font-mono text-[12.5px]">{process.number}</span>
+              <span className="block">{processTitle(process, byId(data.clients, process.clientId)?.name)}</span>
+              <span className="tabular block text-[12px] text-muted-foreground">{processNumberLabel(process)}</span>
             </Row>
           )}
           {a.notes && (

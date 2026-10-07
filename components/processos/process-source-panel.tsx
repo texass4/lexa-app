@@ -31,6 +31,14 @@ function FactGrid({ facts }: { facts: Fact[] }) {
   )
 }
 
+/** De onde vêm as informações do resumo — o cadastro do escritório nunca é apresentado como dado público. */
+function summaryOrigin(process: Process) {
+  if (process.origin !== "manual") return "Informações públicas do processo."
+  return isAutoTracked(process.source?.provider)
+    ? "Cadastradas pelo escritório e complementadas pela consulta pública."
+    : "Informações cadastradas pelo escritório."
+}
+
 /** Dados que vieram da fonte, já dentro do cadastro do escritório. */
 export function ProcessSummaryPanel({ process }: { process: Process }) {
   const facts: Fact[] = [
@@ -46,7 +54,7 @@ export function ProcessSummaryPanel({ process }: { process: Process }) {
 
   return (
     <Panel>
-      <PanelHeader title="Resumo" description="Informações públicas do processo." />
+      <PanelHeader title="Resumo" description={summaryOrigin(process)} />
       <div className="px-5 pb-5">
         <FactGrid facts={facts} />
       </div>
@@ -119,7 +127,13 @@ export function ProcessSyncPanel({
     <Panel>
       <PanelHeader
         title="Andamento"
-        description={auto ? "Acompanhamento automático das movimentações." : "Processo cadastrado manualmente."}
+        description={
+          process.secret
+            ? "Segredo de justiça: sem consulta pública. As informações são as cadastradas pelo escritório."
+            : auto
+              ? "Acompanhamento automático das movimentações."
+              : "Processo cadastrado pelo escritório."
+        }
         action={
           canRefresh && (
             <Button variant="secondary" size="sm" onClick={onRefresh} disabled={refreshing}>
@@ -134,6 +148,11 @@ export function ProcessSyncPanel({
           <StatusBadge tone={auto ? "brand" : "neutral"} dot={auto}>
             {ORIGIN_LABEL[origin]}
           </StatusBadge>
+          {process.secret && (
+            <StatusBadge tone="warning" dot={false}>
+              Segredo de justiça
+            </StatusBadge>
+          )}
           {process.source?.sourceStatus && <StatusBadge tone="neutral">{process.source.sourceStatus}</StatusBadge>}
         </div>
 

@@ -154,5 +154,6 @@ export const OPERATION_LABEL: Record<string, string> = {
   "chat.process": "Chat — processo",
   "chat.client": "Chat — cliente",
   "chat.office": "Chat — escritório",
-  "triage.interpret": "Triagem automática",
+  // Recurso já removido: o rótulo fica para o histórico de consumo.
+  "triage.interpret": "Triagem automática (descontinuada)",
 }

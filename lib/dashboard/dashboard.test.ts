@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import type { Invoice, Prazo, Process, Task } from "@/types"
-import { dashboardKpis, officeDigest, openTasksByTab, overdueInvoices, recentProcesses, shortAgo } from "@/lib/dashboard/dashboard"
+import { dashboardKpis, officeDigest, openTasksByTab, overdueInvoices, recentMovements, shortAgo } from "@/lib/dashboard/dashboard"
 
 const NOW = new Date(2026, 9, 15, 12, 0) // 15/10/2026, quinta-feira, 12:00
 
@@ -67,28 +67,25 @@ describe("dashboardKpis", () => {
   })
 })
 
-describe("recentProcesses", () => {
-  it("ordena pela movimentação mais recente e dá prioridade ao prazo próximo", () => {
-    const list = recentProcesses(
-      {
-        processes: [
-          process("velho", { lastMovementAt: "2026-08-01T10:00:00" }),
-          process("ontem", { lastMovementAt: "2026-10-14T16:00:00" }),
-          process("semana", { lastMovementAt: "2026-10-10T10:00:00" }),
-          process("com-prazo", { lastMovementAt: "2026-09-20T10:00:00" }),
-          process("concluido", { lastMovementAt: "2026-10-15T11:00:00", status: "concluido" }),
-        ],
-        deadlines: [prazo("p1", "com-prazo", "2026-10-17"), prazo("p2", "velho", "2026-10-16", "cumprido")],
-      },
-      NOW,
+describe("recentMovements", () => {
+  const mov = (id: string, at: string) => ({ id, at, title: id })
+  it("lista a movimentação mais recente de cada processo, da mais nova para a mais antiga", () => {
+    const list = recentMovements(
+      [
+        process("a", { movements: [mov("a-velha", "2026-08-01T10:00:00"), mov("a-nova", "2026-10-14T16:00:00")] }),
+        process("b", { movements: [mov("b1", "2026-10-15T09:00:00")] }),
+        process("sem", { movements: [] }),
+        // O registro do cadastro manual não é movimentação.
+        process("manual", { movements: [{ id: "reg", at: "2026-10-15T11:00:00", title: "Processo cadastrado", kind: "distribution" }] }),
+        process("c", { movements: [mov("c1", "2026-09-20T10:00:00")] }),
+      ],
+      2,
     )
     assert.deepEqual(
-      list.map((r) => [r.process.id, r.state]),
+      list.map((r) => [r.process.id, r.movement.id]),
       [
-        ["ontem", "nova"],
-        ["semana", "movimentacao"],
-        ["com-prazo", "prazo"],
-        ["velho", "sem-novidades"],
+        ["b", "b1"],
+        ["a", "a-nova"],
       ],
     )
   })

@@ -7,10 +7,18 @@ import { ActivityIcon } from "@/components/shared/activity-icon"
 import { EmptyState } from "@/components/ui/empty-state"
 import { useOfficeData } from "@/lib/store/office-store"
 import { fmtActivityTime } from "@/lib/core/dates"
+import { byId } from "@/lib/store/indexes"
+import { humanizeProcessMention, processTitle } from "@/lib/processos/label"
+import type { Activity } from "@/types"
 
 export function RecentActivity({ limit = 7 }: { limit?: number }) {
-  const { activities } = useOfficeData()
+  const { activities, processes, clients } = useOfficeData()
   const items = activities.slice(0, limit)
+  // Registros antigos citam "Processo #103023": na tela, o processo aparece pelo cliente e assunto.
+  const human = (a: Activity, text: string) => {
+    const process = byId(processes, a.processId)
+    return process ? humanizeProcessMention(text, process.code, processTitle(process, byId(clients, process.clientId)?.name)) : text
+  }
 
   return (
     <Panel>
@@ -37,9 +45,9 @@ export function RecentActivity({ limit = 7 }: { limit?: number }) {
                 <div className="min-w-0 flex-1 pt-0.5">
                   <p className="text-[13px] leading-snug text-foreground">
                     {a.actor && <span className="font-semibold">{a.actor} </span>}
-                    <span className={a.actor ? "text-foreground/85" : ""}>{a.message}</span>
+                    <span className={a.actor ? "text-foreground/85" : ""}>{human(a, a.message)}</span>
                   </p>
-                  {a.detail && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{a.detail}</p>}
+                  {a.detail && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{human(a, a.detail)}</p>}
                 </div>
                 <span className="tabular shrink-0 pt-0.5 text-[11.5px] text-subtle">{fmtActivityTime(a.at)}</span>
               </Link>

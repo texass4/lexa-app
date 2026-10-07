@@ -4,7 +4,7 @@
  *
  * - `AI_MODEL`: modelo das análises (resumos, próximos passos, chat, panorama);
  * - `AI_MODEL_LIGHT`: modelo mais barato para operações simples e automáticas
- *   (interpretação da Triagem, análise de uma movimentação). `off` = usa `AI_MODEL`;
+ *   (análise de uma movimentação). `off` = usa `AI_MODEL`;
  * - `AI_FALLBACK_MODEL`: reservas, em ordem, quando o principal está fora.
  *
  * `GEMINI_MODEL` e `GEMINI_FALLBACK_MODEL` continuam aceitos (nomes antigos).

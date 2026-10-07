@@ -48,6 +48,28 @@ describe("aplicar ficha reconsultada", () => {
     assert.equal(again.process.movements, first.process.movements)
   })
 
+  it("cadastro do escritório: a fonte complementa, mas não substitui o que foi preenchido à mão", () => {
+    const manual: Process = {
+      ...base,
+      origin: "manual",
+      source: undefined,
+      className: undefined,
+      tribunal: "TJSC (informado)",
+      degree: "G2",
+      judicialUnit: "Órgão do escritório",
+    }
+    const merged = mergeProcessSheet(manual, sheet, "2026-09-29T08:00:00", { newId }).process
+    assert.equal(merged.tribunal, "TJSC (informado)")
+    assert.equal(merged.degree, "G2")
+    assert.equal(merged.judicialUnit, "Órgão do escritório")
+    // Vazio no cadastro: a fonte preenche.
+    assert.equal(merged.className, sheet.className)
+    assert.equal(merged.origin, "manual")
+    // Importado: a fonte é a referência.
+    const imported = mergeProcessSheet({ ...base, tribunal: "Antigo" }, sheet, "2026-09-29T08:00:00", { newId }).process
+    assert.equal(imported.tribunal, sheet.tribunal ?? "Antigo")
+  })
+
   it("marca a sincronização automática só quando veio do monitoramento", () => {
     assert.equal(mergeProcessSheet(base, sheet, "2026-09-29T08:00:00", { newId }).process.autoSyncedAt, undefined)
     const auto = mergeProcessSheet(base, sheet, "2026-09-29T08:00:00", { newId, automatic: true }).process

@@ -23,6 +23,7 @@ import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, st
 import { currentUserId } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 import { useSession } from "@/lib/auth/session"
+import { processTitle } from "@/lib/processos/label"
 
 type View = "dia" | "semana" | "mes"
 
@@ -88,7 +89,11 @@ export function AgendaView() {
         ? isSameDay(weekStart, startOfWeek(getNow()))
         : anchor.getMonth() === getNow().getMonth()
 
-  const processCode = (id?: string) => byId(data.processes, id)?.code
+  /** "João da Silva — Ação de cobrança" no bloco do compromisso (nunca só o número). */
+  const processLabel = (id?: string) => {
+    const process = byId(data.processes, id)
+    return process ? processTitle(process, byId(data.clients, process.clientId)?.name) : undefined
+  }
 
   /** Arrastar na agenda: grava o novo horário (mesma duração) e oferece desfazer. */
   const reschedule = async (a: Appointment, next: { start: string; end: string }) => {
@@ -120,12 +125,14 @@ export function AgendaView() {
     ...(data.appointments.some((a) => legendKey(a) === NONE) ? [{ key: NONE, name: "Sem categoria", color: undefined }] : []),
   ]
 
+  /** Sem `iso`: o dia em foco, no horário padrão. Com `iso` de um horário da grade: data e hora clicadas. */
   const create = (iso?: string) =>
     openDialog("appointment", {
       date: (iso ?? `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`).slice(
         0,
         10,
       ),
+      time: iso && iso.length >= 16 ? iso.slice(11, 16) : undefined,
     })
 
   return (
@@ -255,7 +262,7 @@ export function AgendaView() {
                     onSelect={setSelected}
                     onCreate={editable ? create : undefined}
                     onMove={moveInGrid}
-                    processCode={processCode}
+                    processLabel={processLabel}
                   />
                 </div>
                 <div className="md:hidden">
@@ -270,7 +277,7 @@ export function AgendaView() {
                 onSelect={setSelected}
                 onCreate={editable ? create : undefined}
                 onMove={moveInGrid}
-                processCode={processCode}
+                processLabel={processLabel}
               />
             )}
             {view === "mes" && (

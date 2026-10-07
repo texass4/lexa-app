@@ -2,18 +2,19 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Scale, WandSparkles } from "lucide-react"
+import { Lock, Scale, WandSparkles } from "lucide-react"
 import { toast } from "sonner"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
-import { CurrencyInput, Field, NativeSelect, TextInput } from "@/components/ui/field"
+import { CurrencyInput, Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
+import { ChoiceChips } from "@/components/ui/choice-chips"
 import { hasValidCheckDigits, maskCNJ, onlyDigits } from "@/lib/processos/cnj"
 import { documentRequiredIssue } from "@/lib/clientes/clients"
 import { PRACTICE_AREAS, PROCESS_STATUS } from "@/lib/core/config"
 import { getMembers, currentUserId } from "@/lib/auth/account"
 import { getNow, parse } from "@/lib/core/dates"
 import { lookupProcess, type LookupFailure } from "@/lib/services/processos/client"
-import { isAutoTracked } from "@/lib/services/processos/labels"
+import { degreeLabel, isAutoTracked } from "@/lib/services/processos/labels"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useRemovedWhileEditing } from "@/lib/store/on-demand"
 import { byId } from "@/lib/store/indexes"
@@ -40,6 +41,7 @@ export function NewProcessDialog({
       title="Novo processo"
       description="Digite o CNJ e use o preenchimento automático, ou cadastre os dados à mão."
       icon={<Scale />}
+      size="lg"
       bare
     >
       <ProcessForm clientId={clientId} number={number} onClose={() => onOpenChange(false)} />
@@ -67,6 +69,11 @@ const ERROR_TITLE: Partial<Record<LookupFailure["reason"], string>> = {
   disabled: "Consulta automática desativada",
 }
 
+/** Graus que o escritório pode informar no cadastro manual (os mesmos códigos da consulta). */
+const DEGREE_OPTIONS = ["G1", "G2", "JE", "TR", "SUP"] as const
+
+const SECRET_OPTIONS = ["Não", "Sim"] as const
+
 /** Campos do formulário a partir de um processo salvo. */
 const pickForm = (existing: Process) => ({
   number: existing.number,
@@ -79,6 +86,10 @@ const pickForm = (existing: Process) => ({
   ownerId: existing.ownerId,
   status: existing.status,
   claimValue: existing.claimValue,
+  tribunal: existing.tribunal ?? "",
+  degree: existing.degree ?? "",
+  secret: !!existing.secret,
+  notes: existing.notes ?? "",
 })
 
 /** Já salvo e atualizado há pouco: não precisa consultar de novo. */
@@ -95,11 +106,17 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
     area: "Cível" as PracticeArea,
     type: "",
     court: "",
-    district: "Comarca da Capital — Florianópolis",
+    // Só a consulta informa a comarca (o tribunal); à mão, nada é presumido.
+    district: "",
     opposingParty: "",
     ownerId: currentUserId(),
     status: "em_andamento" as ProcessStatus,
     claimValue: 0,
+    tribunal: "",
+    degree: "",
+    // Segredo de justiça: cadastro só manual, sem consulta pública.
+    secret: false,
+    notes: "",
   })
   const [form, setForm] = React.useState(initial)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
@@ -123,8 +140,8 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
   const clientIssue = documentRequiredIssue(byId(data.clients, form.clientId), "processo")
 
   const autofill = async () => {
-    // A consulta já salva o processo com o cliente escolhido.
-    if (clientIssue) return
+    // A consulta já salva o processo com o cliente escolhido. Segredo de justiça não está na consulta pública.
+    if (clientIssue || form.secret) return
     if (digits.length !== 20) {
       setErrors((e) => ({ ...e, number: "Digite os 20 dígitos do CNJ para preencher automaticamente." }))
       return
@@ -218,6 +235,10 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
       district: found.tribunal ?? form.district,
       opposingParty: found.parties.passive[0]?.name ?? form.opposingParty,
       area,
+      // Os dados públicos aparecem no formulário (sem edição: vêm da consulta).
+      tribunal: found.tribunal ?? "",
+      degree: found.degree ?? "",
+      secret: false,
     }
     const created = await importProcess(found, {
       clientId: filled.clientId,
@@ -255,8 +276,11 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
     e.preventDefault()
     if (saving) return
     const next: Record<string, string> = {}
-    if (digits.length !== 20) next.number = "Número CNJ deve ter 20 dígitos."
-    if (form.type.trim().length < 3) next.type = "Informe o tipo de ação."
+    // O número é opcional (segredo de justiça, processo ainda sem número); informado, precisa ser um CNJ válido.
+    // Só o formato é conferido: o processo não precisa existir na consulta pública.
+    if (digits.length > 0 && digits.length !== 20) next.number = "O número CNJ tem 20 dígitos. Deixe em branco se ainda não houver número."
+    else if (digits.length === 20 && !hasValidCheckDigits(digits)) next.number = "O dígito verificador não confere. Confira o número do processo."
+    if (form.type.trim().length < 3) next.type = "Informe o tipo de ação ou a classe."
     const duplicate = !linked && digits.length === 20 ? findByCnj(digits) : undefined
     if (duplicate) next.number = `Esse processo já está em Processos (${duplicate.code}). Use “Preencher” para atualizá-lo.`
     setErrors(next)
@@ -277,6 +301,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
         ownerId: form.ownerId,
         status: form.status,
         claimValue: form.claimValue,
+        notes: form.notes.trim() || undefined,
       }
       const result = await updateProcess(linked.processId, patch, { baseVersion: linked.baseVersion })
       setSaving(false)
@@ -294,11 +319,25 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
       return
     }
 
+    // Cadastro manual: salva mesmo sem consulta — o que está aqui é informação do escritório.
     setSaving(true)
     const process = await addProcess({
-      ...form,
-      court: form.court || "A definir",
-      opposingParty: form.opposingParty || "A definir",
+      number: digits.length === 20 ? form.number : "",
+      clientId: form.clientId,
+      area: form.area,
+      type: form.type.trim(),
+      court: form.court.trim() || "A definir",
+      // O órgão informado também é o "órgão julgador" do resumo (e não é trocado pela consulta).
+      judicialUnit: form.court.trim() || undefined,
+      district: form.district,
+      opposingParty: form.opposingParty.trim() || "A definir",
+      ownerId: form.ownerId,
+      status: form.status,
+      claimValue: form.claimValue,
+      tribunal: form.tribunal.trim() || undefined,
+      degree: form.degree || undefined,
+      secret: form.secret || undefined,
+      notes: form.notes.trim() || undefined,
     })
     setSaving(false)
     if (!process) return
@@ -310,7 +349,18 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
     <>
       <ModalBody>
         <form id="process-form" onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2" noValidate>
-          <Field label="Número (CNJ)" htmlFor="proc-number" error={errors.number || undefined} className="sm:col-span-2">
+          <Field
+            label="Número do processo (CNJ)"
+            htmlFor="proc-number"
+            optional
+            error={errors.number || undefined}
+            hint={
+              form.secret
+                ? "Opcional. Informado, só o formato é conferido."
+                : "Opcional. “Preencher” busca os dados públicos pelo número; sem número, cadastre à mão."
+            }
+            className="sm:col-span-2"
+          >
             <div className="flex gap-2">
               <TextInput
                 id="proc-number"
@@ -326,7 +376,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
                 }}
                 onKeyDown={(e) => {
                   // Enter no número consulta, em vez de enviar o formulário incompleto.
-                  if (e.key === "Enter" && digits.length === 20 && lookup.state !== "filled") {
+                  if (e.key === "Enter" && digits.length === 20 && lookup.state !== "filled" && !form.secret) {
                     e.preventDefault()
                     if (!loading) autofill()
                   }
@@ -337,8 +387,10 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
                 variant="secondary"
                 className="shrink-0"
                 onClick={autofill}
-                disabled={loading || digits.length !== 20 || !!clientIssue}
-                title="Buscar as informações do processo e preencher os campos"
+                disabled={loading || digits.length !== 20 || !!clientIssue || form.secret}
+                title={
+                  form.secret ? "Processo em segredo de justiça: sem consulta pública" : "Buscar as informações do processo e preencher os campos"
+                }
               >
                 {loading ? (
                   <span className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-foreground" aria-hidden />
@@ -365,6 +417,31 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
             </div>
           )}
 
+          {/* Consultado: o processo está na consulta pública — não é segredo de justiça. */}
+          {!linked && (
+            <div className="space-y-2 sm:col-span-2">
+              <p className="text-[12.5px] font-medium text-foreground">
+                Segredo de justiça
+              </p>
+              <ChoiceChips
+                ariaLabel="Processo em segredo de justiça"
+                options={SECRET_OPTIONS}
+                value={form.secret ? "Sim" : "Não"}
+                onChange={(v) => {
+                  set("secret", v === "Sim")
+                  if (v === "Sim" && lookup.state === "error") setLookup({ state: "idle" })
+                }}
+              />
+              {form.secret && (
+                <p className="flex items-start gap-2 rounded-[10px] border border-border bg-surface-muted/50 px-3 py-2.5 text-[12.5px] leading-relaxed text-muted-foreground">
+                  <Lock className="mt-0.5 size-3.5 shrink-0 text-subtle" />
+                  Cadastro manual: as informações são as que o escritório preencher. Sem consulta pública, o processo não é atualizado
+                  automaticamente.
+                </p>
+              )}
+            </div>
+          )}
+
           <Field label="Cliente" htmlFor="proc-client" optional error={clientIssue}>
             <NativeSelect id="proc-client" value={form.clientId} aria-invalid={!!clientIssue} onChange={(e) => set("clientId", e.target.value)}>
               <option value="">Sem cliente</option>
@@ -382,7 +459,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Tipo de ação" htmlFor="proc-type" error={errors.type} className="sm:col-span-2">
+          <Field label="Tipo de ação / classe" htmlFor="proc-type" error={errors.type} className="sm:col-span-2">
             <TextInput
               id="proc-type"
               placeholder="Ex.: Ação de indenização por danos morais"
@@ -391,7 +468,30 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
               onChange={(e) => set("type", e.target.value)}
             />
           </Field>
-          <Field label="Vara / Juízo" htmlFor="proc-court" optional>
+          <Field label="Tribunal" htmlFor="proc-tribunal" optional>
+            <TextInput
+              id="proc-tribunal"
+              placeholder="Ex.: TJSC"
+              value={form.tribunal}
+              disabled={!!linked}
+              onChange={(e) => set("tribunal", e.target.value)}
+            />
+          </Field>
+          <Field label="Grau" htmlFor="proc-degree" optional>
+            <NativeSelect id="proc-degree" value={form.degree} disabled={!!linked} onChange={(e) => set("degree", e.target.value)}>
+              <option value="">Não informado</option>
+              {/* Valor vindo da consulta que não está na lista continua visível. */}
+              {form.degree && !DEGREE_OPTIONS.includes(form.degree as (typeof DEGREE_OPTIONS)[number]) && (
+                <option value={form.degree}>{degreeLabel(form.degree)}</option>
+              )}
+              {DEGREE_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {degreeLabel(d)}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Órgão julgador" htmlFor="proc-court" optional>
             <TextInput id="proc-court" placeholder="Ex.: 3ª Vara Cível" value={form.court} onChange={(e) => set("court", e.target.value)} />
           </Field>
           <Field label="Parte contrária" htmlFor="proc-opposing" optional>
@@ -417,6 +517,15 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
           </Field>
           <Field label="Valor da causa" htmlFor="proc-value" optional className="sm:col-span-2">
             <CurrencyInput id="proc-value" value={form.claimValue} onChange={(v) => set("claimValue", v)} />
+          </Field>
+          <Field label="Descrição / observações" htmlFor="proc-notes" optional className="sm:col-span-2">
+            <TextArea
+              id="proc-notes"
+              rows={3}
+              placeholder="Ex.: o que o escritório sabe do caso, de onde vieram as informações."
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+            />
           </Field>
         </form>
       </ModalBody>

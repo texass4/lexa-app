@@ -6,10 +6,8 @@ import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
 import { dashboardKpis, overdueInvoices } from "@/lib/dashboard/dashboard"
 import { daysToPrazo, weekPrazos } from "@/lib/prazos/prazos"
-import { isOpen as isOpenTriage, suggestedDeadline } from "@/lib/triagem/model"
 import { formatCurrency, formatNumber } from "@/lib/core/format"
 import { getNow } from "@/lib/core/dates"
-import type { TriageItem } from "@/types"
 
 type Item = Indicator & { permission: Permission; href: string }
 
@@ -20,15 +18,13 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * resolve. Uma faixa só (não quatro cartões) — os totais do escritório ficam nas
  * próprias telas.
  */
-export function KpiStrip({ triage }: { triage?: { items: readonly TriageItem[]; ready: boolean } }) {
+export function KpiStrip() {
   const data = useOfficeData()
   const { can } = useSession()
   const now = getNow()
   const k = dashboardKpis(data, now)
   const week = weekPrazos(data.deadlines, now).flatMap((g) => g.prazos)
   const overduePrazos = week.filter((p) => daysToPrazo(p, now) < 0).length
-  const openTriage = (triage?.items ?? []).filter(isOpenTriage)
-  const withDeadline = openTriage.filter((i) => suggestedDeadline(i)).length
   const late = overdueInvoices(data.invoices, now)
   const lateTotal = late.reduce((acc, { invoice }) => acc + invoice.amount, 0)
 
@@ -50,14 +46,6 @@ export function KpiStrip({ triage }: { triage?: { items: readonly TriageItem[]; 
       alert: k.tasks.overdue > 0,
     },
     {
-      permission: "processes.view",
-      href: "/triagem",
-      label: "Triagem a revisar",
-      value: triage?.ready ? formatNumber(openTriage.length) : "—",
-      foot: !triage?.ready ? "carregando…" : withDeadline ? `${withDeadline} com possível prazo` : "nenhum com prazo sugerido",
-      alert: withDeadline > 0,
-    },
-    {
       permission: "finance.view",
       href: "/financeiro?aba=atrasados",
       label: "Em atraso",
@@ -66,6 +54,6 @@ export function KpiStrip({ triage }: { triage?: { items: readonly TriageItem[]; 
       alert: late.length > 0,
     },
   ]
-  const shown = all.filter((i) => can(i.permission) && (i.href !== "/triagem" || triage))
+  const shown = all.filter((i) => can(i.permission))
   return <IndicatorStrip label="Indicadores do que pede ação" items={shown} />
 }

@@ -12,6 +12,8 @@ import type { Appointment } from "@/types"
 const START_HOUR = 7
 const END_HOUR = 21
 const HOUR_PX = 60
+/** Início de cada faixa clicável dentro da hora. */
+const SLOT_MINUTES = [0, 30] as const
 
 /** Onde o compromisso arrastado vai cair (dia + minutos do início). */
 type DropPreview = { day: string; startMin: number }
@@ -22,7 +24,7 @@ export function TimeGrid({
   onSelect,
   onCreate,
   onMove,
-  processCode,
+  processLabel,
 }: {
   days: Date[]
   events: Appointment[]
@@ -31,7 +33,7 @@ export function TimeGrid({
   onCreate?: (date: string) => void
   /** Ausente = sem permissão para editar: os compromissos não são arrastáveis. */
   onMove?: (a: Appointment, date: string, startMinutes: number) => void
-  processCode: (id?: string) => string | undefined
+  processLabel: (id?: string) => string | undefined
 }) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
   // Arrastar para remarcar: o compromisso, onde foi agarrado e a posição de destino.
@@ -135,25 +137,34 @@ export function TimeGrid({
                   onMove?.(current.event, dayKey, startMin)
                 }}
               >
-                {hours.map((h, i) => (
-                  <button
-                    key={h}
-                    type="button"
-                    aria-label={`Novo compromisso em ${d.getDate()}/${d.getMonth() + 1} às ${h}:00`}
-                    disabled={!onCreate}
-                    onClick={() => {
-                      const x = new Date(d)
-                      x.setHours(h, 0, 0, 0)
-                      onCreate?.(toLocalISO(x))
-                    }}
-                    className="group absolute inset-x-0 border-t border-border/70 outline-none first:border-t-0 hover:bg-brand-soft/40 focus-visible:bg-brand-soft/50 disabled:cursor-default disabled:hover:bg-transparent"
-                    style={{ top: i * HOUR_PX, height: HOUR_PX }}
-                  >
-                    <span className="absolute top-1 left-2 text-[11px] font-medium text-brand-strong opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-disabled:hidden">
-                      + {String(h).padStart(2, "0")}:00
-                    </span>
-                  </button>
-                ))}
+                {/* Meia em meia hora: o clique abre "Novo compromisso" já no horário clicado (ex.: 14:30). */}
+                {hours.flatMap((h, i) =>
+                  SLOT_MINUTES.map((m) => {
+                    const label = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        aria-label={`Novo compromisso em ${d.getDate()}/${d.getMonth() + 1} às ${label}`}
+                        disabled={!onCreate}
+                        onClick={() => {
+                          const x = new Date(d)
+                          x.setHours(h, m, 0, 0)
+                          onCreate?.(toLocalISO(x))
+                        }}
+                        className={cn(
+                          "group absolute inset-x-0 outline-none hover:bg-brand-soft/40 focus-visible:bg-brand-soft/50 disabled:cursor-default disabled:hover:bg-transparent",
+                          m === 0 && i > 0 && "border-t border-border/70",
+                        )}
+                        style={{ top: i * HOUR_PX + (m / 60) * HOUR_PX, height: HOUR_PX / SLOT_MINUTES.length }}
+                      >
+                        <span className="absolute top-0.5 left-2 text-[11px] font-medium text-brand-strong opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-disabled:hidden">
+                          + {label}
+                        </span>
+                      </button>
+                    )
+                  }),
+                )}
 
                 {today && nowMin >= START_HOUR * 60 && nowMin <= END_HOUR * 60 && (
                   <div
@@ -186,8 +197,8 @@ export function TimeGrid({
                   const height = Math.max(((endMin - startMin) / 60) * HOUR_PX - 2, 22)
                   const compact = height < 40
                   const past = parse(a.end) < getNow()
-                  const code = processCode(a.processId)
-                  const label = code ? `${a.title} · ${code}` : a.title
+                  const process = processLabel(a.processId)
+                  const label = process ? `${a.title} · ${process}` : a.title
                   return (
                     // O arrastar (HTML nativo) fica no invólucro: o `motion.button` usa os eventos de drag para outra coisa.
                     <div

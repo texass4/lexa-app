@@ -92,7 +92,8 @@ export type AppointmentCategoryInput = Pick<AppointmentCategory, "name" | "color
 export type NewProcessInput = Pick<
   Process,
   "number" | "clientId" | "area" | "type" | "court" | "district" | "opposingParty" | "ownerId" | "status" | "claimValue"
->
+> &
+  Partial<Pick<Process, "tribunal" | "degree" | "judicialUnit" | "secret" | "notes">>
 export type NewDocumentInput = Pick<LegalDocument, "name" | "kind" | "clientId" | "processId" | "extension" | "sizeBytes" | "storagePath">
 export type TaskColumnInput = Pick<TaskColumn, "name" | "color" | "isDone">
 
@@ -488,9 +489,13 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
 
       async addProcess(input) {
         const at = nowISO()
+        const digits = input.number.replace(/\D/g, "")
         const draft: Process = {
           ...base(),
           ...input,
+          // Cadastro do escritório: a consulta pública pode complementar, nunca substituir (`process-sync.ts`).
+          origin: "manual",
+          ...(digits.length === 20 ? { cnj: digits } : {}),
           id: uid("p"),
           // O banco gera o código (`0007_process_code.sql`).
           code: "",

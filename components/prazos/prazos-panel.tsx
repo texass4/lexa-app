@@ -20,6 +20,7 @@ import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import type { Prazo, Process } from "@/types"
+import { processTitle } from "@/lib/processos/label"
 
 /** Prazos do processo: abertos primeiro, com cumprir / marcar como perdido. */
 export function PrazosPanel({ process }: { process: Process }) {
@@ -104,8 +105,7 @@ export function PrazoRow({ prazo, showProcess = false }: { prazo: Prazo; showPro
               href={`/processos/${process.id}`}
               className="mt-0.5 block truncate rounded-sm text-[12px] pointer-coarse:-my-2 pointer-coarse:py-2 text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              Processo {process.code}
-              {client ? ` · ${client.name}` : ""}
+              {processTitle(process, client?.name)}
             </Link>
           )}
           <p className={cn("mt-0.5 text-[12px]", urgent ? "font-medium text-danger" : "text-muted-foreground")}>

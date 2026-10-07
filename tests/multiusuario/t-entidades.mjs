@@ -632,7 +632,7 @@ check(
   [...A.frames, ...B.frames].every((f) => f.org === undefined || f.org === alfaOrg),
   `${A.frames.length + B.frames.length} eventos`,
 )
-// Por canal: o mesmo aviso de exclusão chega ao canal do escritório e ao da Triagem (cada um trata a sua coleção).
+// Por canal: o mesmo aviso de exclusão chega aos canais que a assinam (cada um trata a sua coleção).
 const ids = B.frames.filter((f) => f.type === "INSERT").map((f) => `${f.topic.split(":").slice(0, 2).join(":")}|${f.table}:${f.id}`)
 check("Realtime", "nenhum INSERT entregue duas vezes ao mesmo canal de B", ids.length === new Set(ids).size, `${ids.length} inserções recebidas`)
 const dbDuplicates = await Promise.all(

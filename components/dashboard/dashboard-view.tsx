@@ -6,21 +6,18 @@ import { cn } from "cn"
 import { Greeting } from "./greeting"
 import { InsightBanner } from "./insight-banner"
 import { KpiStrip } from "./kpi-cards"
-import { RecentProcesses } from "./recent-processes"
+import { RecentMovements } from "./recent-movements"
 import { TodayAgenda } from "./today-agenda"
 import { OpenTasks } from "./open-tasks"
 import { FinancePanel } from "./finance-panel"
 import { WeekPrazos } from "./week-prazos"
 import { RecentActivity } from "./recent-activity"
 import { AttentionPanel } from "./attention-panel"
-import { OfficeAIDock } from "./office-ai-dock"
 import { FadeIn } from "@/components/ui/motion"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
 import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
-import { OfficeAIPanel } from "@/components/ai/office-ai-panel"
 import { officeSignals } from "@/lib/dashboard/attention"
-import { useTriagemOptional } from "@/components/triagem/triagem-provider"
 
 const INSIGHTS_KEY = "lexa:dashboard:insights"
 
@@ -65,7 +62,6 @@ function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React
 export function DashboardView() {
   const data = useOfficeData()
   const { can, user } = useSession()
-  const triagem = useTriagemOptional()
   // A lista do que merece atenção começa aberta: é a resposta principal do Painel.
   // Quem fechar, encontra fechada da próxima vez.
   const [insights, setInsights] = React.useState(() => {
@@ -77,9 +73,7 @@ export function DashboardView() {
   })
   if (!data.hydrated) return <DashboardSkeleton />
 
-  // Triagem entra quando já foi lida (e se está ativa para o escritório).
-  const triage = triagem && !triagem.unavailable ? { items: triagem.items, ready: !triagem.loading } : undefined
-  const signals = officeSignals({ ...data, triage: triage?.ready ? triage.items : undefined }, { userId: user.id, can })
+  const signals = officeSignals(data, { userId: user.id, can })
   const empty = data.processes.length === 0 && data.tasks.length === 0 && data.clients.length === 0
   const toggleInsights = () =>
     setInsights((open) => {
@@ -92,50 +86,39 @@ export function DashboardView() {
     })
 
   return (
-    <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] 2xl:gap-7">
-      <div className="min-w-0 space-y-6">
-        <FadeIn>
-          <Greeting signals={signals} empty={empty} />
+    <div className="min-w-0 space-y-6">
+      <FadeIn>
+        <Greeting signals={signals} empty={empty} />
+      </FadeIn>
+
+      {!empty && (
+        <FadeIn delay={0.02}>
+          <KpiStrip />
         </FadeIn>
+      )}
 
-        {!empty && (
-          <FadeIn delay={0.02}>
-            <KpiStrip triage={triage} />
-          </FadeIn>
-        )}
+      <FadeIn delay={0.04} className="space-y-4">
+        <InsightBanner expanded={insights} onToggle={toggleInsights} />
+        <AnimatePresence initial={false}>
+          {insights && (
+            <motion.div
+              id="painel-atencao"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              <AttentionPanel signals={signals} empty={empty} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </FadeIn>
 
-        <FadeIn delay={0.04} className="space-y-4">
-          <InsightBanner expanded={insights} onToggle={toggleInsights} />
-          <AnimatePresence initial={false}>
-            {insights && (
-              <motion.div
-                id="painel-atencao"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                // A partir de 1536 px a lista fica na coluna da Íntegra IA, à direita.
-                className="overflow-hidden 2xl:hidden"
-              >
-                <AttentionPanel signals={signals} empty={empty} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </FadeIn>
-
-        {/* Do mais urgente ao contexto: prazos e agenda, trabalho do dia, depois o que mudou. */}
-        <Row left={can("processes.view") && <WeekPrazos />} right={can("agenda.view") && <TodayAgenda />} delay={0.08} />
-        <Row left={can("tasks.view") && <OpenTasks />} right={can("finance.view") && <FinancePanel />} delay={0.12} />
-        <Row left={can("processes.view") && <RecentProcesses />} right={<RecentActivity />} delay={0.16} />
-
-        <FadeIn delay={0.2}>
-          <OfficeAIPanel />
-        </FadeIn>
-      </div>
-
-      <aside className="sticky top-[96px] hidden h-[calc(100dvh-120px)] min-h-[560px] 2xl:block">
-        <OfficeAIDock signals={signals} empty={empty} />
-      </aside>
+      {/* Do mais urgente ao contexto: prazos e agenda, trabalho do dia, depois o que mudou. */}
+      <Row left={can("processes.view") && <WeekPrazos />} right={can("agenda.view") && <TodayAgenda />} delay={0.08} />
+      <Row left={can("tasks.view") && <OpenTasks />} right={can("finance.view") && <FinancePanel />} delay={0.12} />
+      <Row left={can("processes.view") && <RecentMovements />} right={<RecentActivity />} delay={0.16} />
     </div>
   )
 }

@@ -1,14 +1,9 @@
-import type { Metadata } from "next"
-import { Suspense } from "react"
-import { SkeletonTable } from "@/components/ui/skeleton"
-import { TriagemView } from "@/components/triagem/triagem-view"
+import { redirect } from "next/navigation"
 
-export const metadata: Metadata = { title: "Triagem" }
-
+/**
+ * A Triagem saiu do produto. Atividades antigas ainda apontam para cá
+ * (`/triagem?id=…`, `0012_triagem.sql`): o link leva a Processos em vez de quebrar.
+ */
 export default function TriagemPage() {
-  return (
-    <Suspense fallback={<SkeletonTable rows={6} />}>
-      <TriagemView />
-    </Suspense>
-  )
+  redirect("/processos")
 }

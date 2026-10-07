@@ -158,6 +158,9 @@ export function whatsappNumber(client: Pick<Client, "phone" | "whatsapp">) {
   return phone.length === 11 ? phone : ""
 }
 
+/** Central de Atendimento já na conversa do cliente (ou no aviso de que ainda não há uma). */
+export const clientConversationHref = (clientId: string) => `/atendimento?cliente=${encodeURIComponent(clientId)}`
+
 /** Link oficial para abrir a conversa (wa.me). Sem número válido, `undefined`. */
 export function whatsappLink(client: Pick<Client, "phone" | "whatsapp">) {
   const d = whatsappNumber(client)

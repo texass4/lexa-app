@@ -3,6 +3,7 @@ import type { PersistedState } from "@/lib/store/storage"
 import { getNow, diffInDays, isSameDay, monthName, monthShort, parse, toLocalISO } from "@/lib/core/dates"
 import { nextPrazo } from "@/lib/prazos/prazos"
 import { byId } from "@/lib/store/indexes"
+import { processNumberLabel, processTitle } from "@/lib/processos/label"
 
 /** O que os seletores precisam do store (o `OfficeState` inteiro também serve). */
 type OfficeState = PersistedState
@@ -19,7 +20,8 @@ export function describeRelated(s: OfficeState, related?: RelatedEntity) {
   const p = findProcess(s, related.id)
   if (!p) return undefined
   const c = findClient(s, p.clientId)
-  return { label: `Processo ${p.code}`, kind: c?.name ?? "Processo", href: `/processos/${p.id}` }
+  // "João da Silva — Ação de cobrança"; o número fica como informação secundária.
+  return { label: processTitle(p, c?.name), kind: processNumberLabel(p), href: `/processos/${p.id}` }
 }
 
 /**

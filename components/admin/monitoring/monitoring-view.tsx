@@ -12,8 +12,6 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { useAdminData } from "@/lib/admin/client"
 import type { Tone } from "@/lib/core/config"
 import type { MonitorHealth, MonitoringOverview, MonitoringRun } from "@/lib/services/processos/monitor-status"
-import type { RunJob } from "@/lib/services/processos/monitor-store"
-import { FilterTabs } from "@/components/ui/filter-tabs"
 import { AdminHeader } from "../ui/admin-header"
 import { StatCard } from "../ui/stat-card"
 
@@ -91,24 +89,19 @@ const Num = ({ value, tone }: { value: number; tone?: "warning" | "danger" | "su
 
 export function MonitoringView() {
   const { data, error, loading, reload } = useAdminData<MonitoringOverview>("/api/admin/monitoring")
-  // Processos (Etapa 5) ou intimações do DJEN (Etapa 8): mesmo agendador, mesmo registro.
-  const [job, setJob] = React.useState<RunJob>("processos")
-  const djen = job === "intimacoes" ? data?.intimacoes : null
-  const status = djen ? djen.status : data?.status
-  const setup = djen ? djen.setup : data?.setup
-  const runs = data ? data.runs.filter((r) => r.job === job) : []
+  const status = data?.status
+  const setup = data?.setup
+  // Execuções antigas da captura de intimações (já desligada) ficam fora da lista.
+  const runs = data ? data.runs.filter((r) => r.job === "processos") : []
   const health = status ? HEALTH[status.health] : null
   const day = data ? last24h(runs) : null
-  const labels =
-    job === "processos" ? { evaluated: "Avaliados", third: "Do cache", news: "Novidades" } : { evaluated: "OABs", third: "Vinculadas", news: "Novas" }
-  const third = (r: MonitoringRun) => (job === "processos" ? r.fromCache : r.updatedProcesses)
 
   return (
     <div className="space-y-6">
       <AdminHeader
         eyebrow="Sistema"
         title="Monitoramento"
-        description="Atualização automática das movimentações e captura das intimações do DJEN. Cada processo e cada OAB são consultados no máximo uma vez por dia; limite (429) e indisponibilidade (503) da fonte ativam espera automática."
+        description="Atualização automática das movimentações. Cada processo é consultado no máximo uma vez por dia; limite (429) e indisponibilidade (503) da fonte ativam espera automática."
         actions={
           <Button variant="secondary" size="sm" onClick={reload} disabled={loading}>
             <RefreshCw className={cn(loading && "animate-spin")} />
@@ -132,19 +125,6 @@ export function MonitoringView() {
         </div>
       ) : (
         <>
-          {data.intimacoes && (
-            <FilterTabs
-              ariaLabel="Tarefa"
-              layoutId="monitoring-job"
-              value={job}
-              onChange={setJob}
-              className="mx-0 px-0"
-              options={[
-                { value: "processos", label: "Processos (DataJud)" },
-                { value: "intimacoes", label: "Intimações (DJEN)" },
-              ]}
-            />
-          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Estado"
@@ -163,35 +143,21 @@ export function MonitoringView() {
               }
               hintTone={health.tone === "success" ? undefined : health.tone}
             />
-            {djen ? (
-              <StatCard
-                label="OABs cadastradas (ativas)"
-                value={n(djen.oabs.active)}
-                icon={<Gauge />}
-                hint={djen.oabs.failing ? `${n(djen.oabs.failing)} com falha na última consulta` : "Nenhuma com falha na última consulta"}
-                hintTone={djen.oabs.failing ? "warning" : undefined}
-              />
-            ) : (
-              <StatCard
-                label="Processos monitorados"
-                value={n(data.queue.monitored)}
-                icon={<Gauge />}
-                hint={data.queue.failing ? `${n(data.queue.failing)} com falha na última consulta` : "Nenhum com falha na última consulta"}
-                hintTone={data.queue.failing ? "warning" : undefined}
-              />
-            )}
+            <StatCard
+              label="Processos monitorados"
+              value={n(data.queue.monitored)}
+              icon={<Gauge />}
+              hint={data.queue.failing ? `${n(data.queue.failing)} com falha na última consulta` : "Nenhum com falha na última consulta"}
+              hintTone={data.queue.failing ? "warning" : undefined}
+            />
             <StatCard
               label="Consultas à fonte (24 h)"
               value={n(day.queried)}
               icon={<Activity />}
-              hint={
-                djen
-                  ? `${day.runs} ${day.runs === 1 ? "execução" : "execuções"} · cada OAB uma vez por dia`
-                  : `${day.runs} ${day.runs === 1 ? "execução" : "execuções"} · lote de ${data.config.batchSize}, ${data.config.concurrency} por vez`
-              }
+              hint={`${day.runs} ${day.runs === 1 ? "execução" : "execuções"} · lote de ${data.config.batchSize}, ${data.config.concurrency} por vez`}
             />
             <StatCard
-              label={djen ? "Intimações novas (24 h)" : "Novidades (24 h)"}
+              label="Novidades (24 h)"
               value={n(day.newMovements)}
               icon={<TriangleAlert />}
               hint={`${day.errors} erros · ${day.rateLimited} × 429 · ${day.unavailable} × 503`}
@@ -203,41 +169,21 @@ export function MonitoringView() {
             <Panel>
               <PanelHeader
                 title="Configuração"
-                description={
-                  djen
-                    ? "A captura só aparece como ativa quando tudo abaixo está pronto e uma execução foi concluída. O servidor precisa rodar no Brasil: a fonte recusa (403) acessos de outros países."
-                    : "O monitoramento só aparece como ativo quando tudo abaixo está pronto e uma execução foi concluída."
-                }
+                description="O monitoramento só aparece como ativo quando tudo abaixo está pronto e uma execução foi concluída."
               />
               <ul className="divide-y divide-border px-5 pb-3">
-                <SetupCheck
-                  ok={setup.enabled}
-                  label={djen ? "Captura de intimações (DJEN) ligada" : "Consulta automática ligada"}
-                  hint={
-                    djen ? "Admin › Configurações › Recursos — depois de confirmar os termos de uso da fonte." : "Admin › Configurações › Recursos."
-                  }
-                />
+                <SetupCheck ok={setup.enabled} label="Consulta automática ligada" hint="Admin › Configurações › Recursos." />
                 <SetupCheck
                   ok={setup.cronSecret}
                   label="Segredo do agendador (CRON_SECRET)"
                   hint="Variável de ambiente do servidor, com 16 caracteres ou mais."
                 />
-                {!djen && (
-                  <SetupCheck ok={setup.sourceKey} label="Chave da consulta processual (DATAJUD_API_KEY)" hint="Variável de ambiente do servidor." />
-                )}
-                {djen ? (
-                  <SetupCheck
-                    ok={(djen.oabs.active ?? 0) > 0}
-                    label="Advogados com OAB cadastrada"
-                    hint="Configurações › Perfil › Inscrições na OAB (ou pelo Sócio, em Usuários)."
-                  />
-                ) : (
-                  <SetupCheck
-                    ok={data.queue.monitored !== null}
-                    label="Tabelas do monitoramento"
-                    hint="supabase/migrations/0009_process_monitoring.sql aplicada no banco."
-                  />
-                )}
+                <SetupCheck ok={setup.sourceKey} label="Chave da consulta processual (DATAJUD_API_KEY)" hint="Variável de ambiente do servidor." />
+                <SetupCheck
+                  ok={data.queue.monitored !== null}
+                  label="Tabelas do monitoramento"
+                  hint="supabase/migrations/0009_process_monitoring.sql aplicada no banco."
+                />
                 <SetupCheck
                   ok={!!status.lastRunAt}
                   label="Agendador chamando o worker"
@@ -272,7 +218,7 @@ export function MonitoringView() {
                       </StatusBadge>
                     </div>
                     <p className="mt-1 text-[12.5px]">
-                      {r.evaluated} {labels.evaluated.toLowerCase()} · {r.queried} consultados · {r.newMovements} {labels.news.toLowerCase()} ·{" "}
+                      {r.evaluated} avaliados · {r.queried} consultados · {r.newMovements} novidades ·{" "}
                       {r.errors} erros
                       {r.rateLimited ? ` · ${r.rateLimited} × 429` : ""}
                       {r.unavailable ? ` · ${r.unavailable} × 503` : ""}
@@ -288,10 +234,10 @@ export function MonitoringView() {
                       <Th>Início</Th>
                       <Th>Situação</Th>
                       <Th className="text-right">Duração</Th>
-                      <Th className="text-right">{labels.evaluated}</Th>
+                      <Th className="text-right">Avaliados</Th>
                       <Th className="text-right">Consultados</Th>
-                      <Th className="text-right">{labels.third}</Th>
-                      <Th className="text-right">{labels.news}</Th>
+                      <Th className="text-right">Do cache</Th>
+                      <Th className="text-right">Novidades</Th>
                       <Th className="text-right">Erros</Th>
                       <Th className="text-right">429</Th>
                       <Th className="text-right">503</Th>
@@ -315,7 +261,7 @@ export function MonitoringView() {
                           <Num value={r.queried} />
                         </Td>
                         <Td className="text-right">
-                          <Num value={third(r)} />
+                          <Num value={r.fromCache} />
                         </Td>
                         <Td className="text-right">
                           <Num value={r.newMovements} tone="success" />

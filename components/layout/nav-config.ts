@@ -3,7 +3,6 @@ import {
   CalendarDays,
   FolderOpen,
   Hourglass,
-  Inbox,
   LayoutGrid,
   ListChecks,
   MessagesSquare,
@@ -20,7 +19,7 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   /** Contador que só aparece quando pede ação (ver `SidebarNav`). */
-  badgeKey?: "tasks" | "processes" | "prazos" | "triagem" | "agenda"
+  badgeKey?: "tasks" | "processes" | "prazos" | "agenda"
   /** Sem ela, o item some do menu e a rota mostra "sem acesso". */
   permission?: Permission
   /** Telas dentro deste item (abrem pela setinha ao lado dele). */
@@ -35,7 +34,6 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Escritório",
     items: [
-      { href: "/triagem", label: "Triagem", icon: Inbox, badgeKey: "triagem", permission: "processes.view" },
       { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
       { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
       {
@@ -75,7 +73,6 @@ export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/clientes": { title: "Clientes", section: "Escritório" },
   "/atendimento": { title: "Central de atendimento", section: "WhatsApp" },
   "/processos": { title: "Processos", section: "Escritório" },
-  "/triagem": { title: "Triagem", section: "Escritório" },
   "/tarefas": { title: "Tarefas", section: "Escritório" },
   "/tarefas/prazos": { title: "Prazos", section: "Tarefas" },
   "/agenda": { title: "Agenda", section: "Escritório" },

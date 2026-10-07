@@ -1,8 +1,6 @@
 "use client"
 
 import { ArrowRight, ChevronDown, Sparkles } from "lucide-react"
-import { cn } from "cn"
-import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { useOfficeData } from "@/lib/store/office-store"
 import { officeDigest } from "@/lib/dashboard/dashboard"
 import { BRAND } from "@/lib/core/brand"
@@ -13,11 +11,10 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 /**
  * Faixa de resumo do topo do Painel. Os números são contagens dos dados reais (não
  * uma análise da IA); o botão mostra/oculta a lista do que merece atenção (que já
- * diz quantos pontos são urgentes), e o cartão da direita abre a Íntegra IA.
+ * diz quantos pontos são urgentes). A Íntegra IA fica no "Perguntar" do topo.
  */
 export function InsightBanner({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   const data = useOfficeData()
-  const lexa = useLexaAI()
   const { can } = useSession()
   const digest = officeDigest(data)
   const found = [
@@ -26,7 +23,6 @@ export function InsightBanner({ expanded, onToggle }: { expanded: boolean; onTog
     // Parcelas em atraso só para quem tem o Financeiro.
     can("finance.view") && plural(digest.overdueInvoices, "parcela em atraso", "parcelas em atraso"),
   ].filter((item): item is string => !!item)
-  const aiState = lexa.ready ? "Pronta para ajudar" : lexa.status ? (lexa.status.enabled ? "Indisponível no momento" : "Desligada") : "Verificando…"
 
   return (
     <section aria-label="Resumo do escritório" className="insight-banner relative overflow-hidden rounded-card border border-border/90 shadow-card">
@@ -49,7 +45,7 @@ export function InsightBanner({ expanded, onToggle }: { expanded: boolean; onTog
           onClick={onToggle}
           aria-expanded={expanded}
           aria-controls="painel-atencao"
-          className="group touch-target relative inline-flex shrink-0 items-center gap-1.5 self-start rounded-control px-2 py-1.5 text-[13px] font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center 2xl:hidden"
+          className="group touch-target relative inline-flex shrink-0 items-center gap-1.5 self-start rounded-control px-2 py-1.5 text-[13px] font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-brand/40 lg:self-center"
         >
           {expanded ? "Ocultar lista" : "Ver o que merece atenção"}
           {expanded ? (
@@ -57,20 +53,6 @@ export function InsightBanner({ expanded, onToggle }: { expanded: boolean; onTog
           ) : (
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           )}
-        </button>
-        <button
-          type="button"
-          onClick={() => lexa.open()}
-          className="flex shrink-0 items-center gap-3 rounded-[14px] border border-white/60 bg-surface/85 p-3 pr-4 text-left shadow-card outline-none backdrop-blur-sm transition-[box-shadow] hover:shadow-raised focus-visible:ring-2 focus-visible:ring-brand/40 dark:border-border/60 lg:w-[240px]"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Sparkles className="size-[18px]" strokeWidth={1.8} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-semibold leading-snug text-foreground">Sua assistente jurídica</span>
-            <span className="block truncate text-[12px] text-muted-foreground">{aiState}</span>
-          </span>
-          <span aria-hidden className={cn("size-2 shrink-0 self-start rounded-full", lexa.ready ? "bg-success" : "bg-subtle")} />
         </button>
       </div>
     </section>

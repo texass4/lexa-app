@@ -127,6 +127,23 @@ export async function fetchConversation(id: string): Promise<WhatsAppConversatio
   return data ? toConversation(data as ConversationRow) : null
 }
 
+/**
+ * Conversa mais recente com um cliente do escritório (pelo contato vinculado a ele).
+ * `null` quando o cliente ainda não tem conversa.
+ */
+export async function fetchClientConversation(clientId: string): Promise<WhatsAppConversation | null> {
+  const { data, error } = await getSupabase()
+    .from("whatsapp_conversations")
+    .select(CONVERSATION_SELECT.replace("contact:whatsapp_contacts(*)", "contact:whatsapp_contacts!inner(*)"))
+    .eq("contact.client_id", clientId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+  if (error) throw error
+  const row = (data as unknown as ConversationRow[] | null)?.[0]
+  return row ? toConversation(row) : null
+}
+
 export async function fetchTags(): Promise<WhatsAppTag[]> {
   const { data, error } = await getSupabase().from("whatsapp_tags").select("id, name, color").order("name")
   if (error) throw error

@@ -25,9 +25,9 @@ Supabase (RLS isola por escritório e por permissão)
 Servidor (Route Handlers em app/api/*)
   auth/guard (requireMember · requireActor · requireAdmin · aiRoute · segredo)
       ↓
-  lib/services/<domínio>/*             regras de servidor (consulta de processos, e-mail, WhatsApp, triagem…)
+  lib/services/<domínio>/*             regras de servidor (consulta de processos, e-mail, WhatsApp, jurisprudência…)
       ↓
-  lib/integrations/*                   clientes HTTP de terceiros (DataJud, DJEN, Z-API)
+  lib/integrations/*                   clientes HTTP de terceiros (DataJud, Z-API)
 ```
 
 **Princípios**
@@ -44,8 +44,7 @@ Servidor (Route Handlers em app/api/*)
 
 | Página (rota) | Tela (`components/`) | Regras (`lib/`) | Servidor / API |
 |---|---|---|---|
-| Início `/dashboard` | `dashboard/` | `dashboard/dashboard.ts`, `dashboard/attention.ts`, `dashboard/visits.ts` | `api/ai/office/*` (panorama) |
-| Triagem `/triagem` | `triagem/` | `triagem/`, `intimacoes/` | `services/triagem/`, `services/intimacoes/`, `api/cron/process-sync` |
+| Início `/dashboard` | `dashboard/` | `dashboard/dashboard.ts`, `dashboard/attention.ts`, `dashboard/visits.ts`, `processos/label.ts` | `api/ai/office/*` (panorama) |
 | Jurisprudência `/jurisprudencia` | `jurisprudencia/` | — | `services/jurisprudence/`, `api/jurisprudence/*`, `api/cron/jurisprudence-sync`, `ai/services/jurisprudence.ts` |
 | Clientes `/clientes`, `/clientes/[id]` | `clientes/`, `clientes/profile/` | `clientes/clients.ts`, `clientes/client-import.ts` | `api/ai/client/summary` |
 | Atendimento `/atendimento` | `atendimento/` | `whatsapp/` | `services/whatsapp/`, `integrations/whatsapp/`, `api/whatsapp/*` |
@@ -84,7 +83,7 @@ Peças transversais:
 ```
 lexa-app/
 ├── app/                         rotas (só páginas finas, layouts e Route Handlers)
-│   ├── (app)/                   área logada: dashboard, triagem, clientes, atendimento, processos,
+│   ├── (app)/                   área logada: dashboard, clientes, atendimento, processos,
 │   │                            tarefas (+ prazos), agenda, documentos, financeiro, configuracoes
 │   ├── (auth)/                  login, cadastro, recuperar-senha, redefinir-senha
 │   ├── (admin)/admin/           Íntegra Admin (papel conferido no servidor)
@@ -94,18 +93,18 @@ lexa-app/
 │   ├── layout.tsx               raiz: fontes, tema, Providers
 │   └── manifest.ts, icon.svg…   ícones e manifest
 ├── components/
-│   ├── <módulo>/                uma pasta por página: dashboard, triagem, clientes, atendimento,
+│   ├── <módulo>/                uma pasta por página: dashboard, clientes, atendimento,
 │   │                            processos, tarefas, prazos, agenda, documentos, financeiro,
 │   │                            configuracoes, auth, admin
 │   ├── layout/  ai/  shared/  ui/  brand/
 │   └── providers.tsx            tema, stores, toasts e animações
 ├── lib/
 │   ├── <módulo>/                regras puras por página: dashboard, clientes, processos, prazos,
-│   │                            agenda, documentos, financeiro, triagem, intimacoes, whatsapp
+│   │                            agenda, documentos, financeiro, intimacoes (OAB), whatsapp
 │   ├── core/                    utilitários comuns
 │   ├── store/  auth/  ai/  admin/  supabase/
-│   ├── services/                servidor: email, intimacoes, processos, triagem, whatsapp
-│   └── integrations/            legal/ (DataJud, DJEN) · whatsapp/ (Z-API)
+│   ├── services/                servidor: email, jurisprudence, processos, whatsapp
+│   └── integrations/            legal/ (DataJud) · whatsapp/ (Z-API)
 ├── types/                       tipos das entidades
 ├── supabase/
 │   ├── migrations/              SQL do banco em ordem (0001 → 0018): tabelas, RLS, funções, Storage
@@ -198,7 +197,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 | `ai/*` | `aiRoute` | Íntegra IA (medição, limites e cache no banco) |
 | `whatsapp/*` | `requireActor` | Central de Atendimento |
 | `whatsapp/webhook` | segredo do webhook | eventos da Z-API |
-| `cron/process-sync` | `Bearer CRON_SECRET` | monitoramento, captura do DJEN e interpretação da Triagem |
+| `cron/process-sync` | `Bearer CRON_SECRET` | monitoramento das movimentações dos processos |
 | `cron/jurisprudence-sync` | `Bearer CRON_SECRET` | alimenta a base de jurisprudência pelas fontes oficiais (STJ) — 1×/dia; ver `docs/JURISPRUDENCIA.md` |
 | `admin/*` | `requireAdmin` | Íntegra Admin |
 
@@ -208,7 +207,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 
 - Cada coleção do escritório é uma tabela `(organization_id, id, data jsonb, created_at, updated_at)`. A RLS libera só o escritório da pessoa e só os módulos que ela pode ver.
 - O store carrega na abertura só o que a primeira tela usa (recortes recentes; processos sem o histórico de movimentações) e o resto sob demanda, quando a tela ou o registro é aberto (`lib/store/on-demand.ts`); o histórico das listagens vem do banco em páginas de 50, com contagens e busca feitas no banco (`lib/store/history-lists.ts`, migração 0017; detalhes em MODULOS.md). Grava só o que mudou (agrupado em 300 ms) e recebe as mudanças da equipe pelo Realtime. Edições conferem a versão (`updated_at`): se outra pessoa gravou antes, a gravação é recusada com aviso.
-- WhatsApp, Triagem, intimações, monitoramento, consumo de IA e Admin têm tabelas próprias (ver as migrações).
+- WhatsApp, monitoramento, consumo de IA e Admin têm tabelas próprias (ver as migrações). As tabelas da antiga Triagem (`triage_items`, `intimacoes`…) continuam no banco, sem uso, para não apagar dados.
 - Arquivos: Storage, em `documents/<organization_id>/…` e `whatsapp/<organization_id>/…`, sempre com URL assinada.
 
 ---

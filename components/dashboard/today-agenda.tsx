@@ -13,6 +13,7 @@ import { PanelLink } from "./panel-link"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import { getNow, fmtTime, parse, toLocalISO } from "@/lib/core/dates"
 import { getUser } from "@/lib/auth/account"
+import { processSubject, processTitle } from "@/lib/processos/label"
 import type { Appointment } from "@/types"
 
 function hrefFor(a: Appointment) {
@@ -47,8 +48,10 @@ export function TodayAgenda() {
           const { category, style } = lookup(a.categoryId)
           const past = parse(a.end) <= getNow()
           const current = parse(a.start) <= getNow() && parse(a.end) > getNow()
-          const processCode = a.processId ? byId(data.processes, a.processId)?.code : undefined
-          const detail = a.location?.split(" — ")[0] || [a.personName, processCode && `Processo ${processCode}`].filter(Boolean).join(" · ")
+          const process = a.processId ? byId(data.processes, a.processId) : undefined
+          // Com a pessoa já citada, o processo entra só pelo assunto (sem repetir o nome).
+          const processText = process && (a.personName ? processSubject(process) : processTitle(process, byId(data.clients, process.clientId)?.name))
+          const detail = a.location?.split(" — ")[0] || [a.personName, processText].filter(Boolean).join(" · ")
           return (
             <li key={a.id} data-now={i === nowIndex ? "" : undefined}>
               {i === nowIndex && (

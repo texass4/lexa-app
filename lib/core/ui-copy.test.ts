@@ -25,7 +25,6 @@ const SCANNED = [
   "lib/ai/errors.ts",
   "lib/integrations/legal/errors.ts",
   // Rótulos que aparecem nas telas a partir dos dados (origem, status, tipo).
-  "lib/triagem/model.ts",
   "lib/services/processos/labels.ts",
 ]
 const SKIPPED_DIRS = new Set(["components/admin"])

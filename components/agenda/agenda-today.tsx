@@ -10,6 +10,7 @@ import { addDays, fmtFullDate, fmtStartsIn, fmtTime, getNow, parse, startOfDay }
 import { officeContext } from "@/components/ai/ai-context"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { useCategoryLookup } from "./use-category"
+import { processSubject, processTitle } from "@/lib/processos/label"
 
 /**
  * "O que tenho para fazer?" antes do calendário: o que resta hoje, o próximo
@@ -70,7 +71,8 @@ export function AgendaToday() {
                     href={`/processos/${process.id}`}
                     className="touch-target relative inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
                   >
-                    Processo {process.code} <ArrowUpRight className="size-3.5" />
+                    {/* O cliente já aparece ao lado: o processo entra pelo assunto. */}
+                    {client ? processSubject(process) : processTitle(process)} <ArrowUpRight className="size-3.5" />
                   </Link>
                 )}
                 {next.location && <span className="truncate text-subtle">{next.location}</span>}

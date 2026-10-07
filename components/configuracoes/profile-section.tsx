@@ -270,8 +270,8 @@ function OabPanel() {
         title="Inscrições na OAB"
         description={
           lawyer
-            ? "Obrigatória para advogados. Cada inscrição ativa é consultada diariamente no Diário de Justiça Eletrônico Nacional."
-            : "Se você advoga, cadastre suas inscrições para receber as intimações do DJEN."
+            ? "Obrigatória para advogados."
+            : "Se você advoga, cadastre suas inscrições na OAB."
         }
       />
       <div className="px-5 pb-5">

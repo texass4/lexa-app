@@ -23,6 +23,8 @@ export interface DialogDefaults {
   clientId?: string
   processId?: string
   date?: string
+  /** `HH:MM` local — horário clicado na Agenda (o compromisso nasce nesse horário). */
+  time?: string
   /** Coluna do quadro em que a tarefa deve nascer. */
   columnId?: string
   /** Documento a pré-visualizar (`dialog "document-preview"`). */

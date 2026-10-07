@@ -13,8 +13,6 @@ import { isOverdue } from "@/lib/store/selectors"
 import { PRAZO_ALERT_DAYS, isActiveProcess } from "@/lib/dashboard/attention"
 import { daysToPrazo, isOpenPrazo, nextPrazo } from "@/lib/prazos/prazos"
 import { useSession } from "@/lib/auth/session"
-import { useTriagemOptional } from "@/components/triagem/triagem-provider"
-import { isOpen as isOpenTriage } from "@/lib/triagem/model"
 import { useOfficeData } from "@/lib/store/office-store"
 
 /**
@@ -26,7 +24,6 @@ import { useOfficeData } from "@/lib/store/office-store"
 export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | "auto" | "collapsed"; onNavigate?: () => void; layoutId: string }) {
   const pathname = usePathname()
   const data = useOfficeData()
-  const triagem = useTriagemOptional()
   const { can, user } = useSession()
   // Itens com telas internas abertos pela setinha (ex.: Tarefas › Prazos).
   const [open, setOpen] = React.useState<ReadonlySet<string>>(() => new Set())
@@ -51,11 +48,6 @@ export function SidebarNav({ mode, onNavigate, layoutId }: { mode: "expanded" | 
       count: data.deadlines.filter((p) => isOpenPrazo(p) && daysToPrazo(p, now) <= PRAZO_ALERT_DAYS.soon).length,
       urgent: true,
       label: `prazos abertos vencidos ou em até ${PRAZO_ALERT_DAYS.soon} dias`,
-    },
-    triagem: {
-      count: (triagem?.items ?? []).filter((i) => isOpenTriage(i) && i.responsibleId === user.id).length,
-      urgent: true,
-      label: "eventos seus aguardando decisão na Triagem",
     },
     agenda: {
       count: data.appointments.filter((a) => isSameDay(parse(a.start), now) && parse(a.end) > now).length,

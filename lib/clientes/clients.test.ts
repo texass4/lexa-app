@@ -16,6 +16,7 @@ import {
   validateClientForm,
   validateDocument,
   whatsappLink,
+  clientConversationHref,
   documentRequiredIssue,
   hasDocument,
   resolveClientStatus,
@@ -178,6 +179,7 @@ describe("endereço, tags e WhatsApp", () => {
 
   it("WhatsApp: número próprio, ou o celular do cadastro; fixo não abre conversa", () => {
     assert.equal(whatsappLink({ phone: "(48) 99999-0000" }), "https://wa.me/5548999990000")
+    assert.equal(clientConversationHref("c 1"), "/atendimento?cliente=c%201")
     assert.equal(whatsappLink({ phone: "(48) 3222-0000", whatsapp: "(48) 98888-0000" }), "https://wa.me/5548988880000")
     assert.equal(whatsappLink({ phone: "(48) 3222-0000" }), undefined)
     assert.equal(whatsappLink({ phone: "" }), undefined)

@@ -3,7 +3,21 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ArrowUpRight, CalendarPlus, Copy, Ellipsis, FilePlus, Hourglass, ListChecks, Plus, RefreshCw, Scale, Trash2, UserRound } from "lucide-react"
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  CalendarPlus,
+  Copy,
+  Ellipsis,
+  FilePlus,
+  Hourglass,
+  ListChecks,
+  Plus,
+  RefreshCw,
+  Scale,
+  Trash2,
+  UserRound,
+} from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
@@ -31,7 +45,6 @@ import { useProcessRefresh } from "./use-process-refresh"
 import { usePagedHistory, useProcessDetail } from "@/lib/store/on-demand"
 import { activitiesOf, activityKey, NO_WINDOW } from "@/lib/store/history-lists"
 import { LimitedList } from "@/components/ui/show-more"
-import { ProcessTriagePanel } from "@/components/triagem/process-triage"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
 import { ProcessAIDock } from "./process-ai-dock"
@@ -181,26 +194,43 @@ export function ProcessProfile({ id }: { id: string }) {
     <div className="min-w-0">
       <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-brand-strong">Processo {process.code}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3">
-        <h1 className="min-w-0 break-all font-mono text-[clamp(16px,5vw,22px)] font-medium tracking-[-0.02em] text-foreground sm:text-[28px]">
-          {process.number}
-        </h1>
-        <button
-          type="button"
-          aria-label="Copiar número do processo"
-          onClick={() => {
-            navigator.clipboard?.writeText(process.number).catch(() => {})
-            toast.success("Número copiado.", { description: process.number })
-          }}
-          className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
-        >
-          <Copy className="size-4" />
-        </button>
+        {process.number ? (
+          <h1 className="min-w-0 break-all font-mono text-[clamp(16px,5vw,22px)] font-medium tracking-[-0.02em] text-foreground sm:text-[28px]">
+            {process.number}
+          </h1>
+        ) : (
+          // Cadastro manual sem número (ex.: segredo de justiça ainda sem CNJ informado).
+          <h1 className="min-w-0 font-display text-[clamp(18px,5vw,24px)] font-semibold tracking-[-0.02em] text-muted-foreground sm:text-[28px]">
+            Sem número informado
+          </h1>
+        )}
+        {process.number && (
+          <button
+            type="button"
+            aria-label="Copiar número do processo"
+            onClick={() => {
+              navigator.clipboard?.writeText(process.number).catch(() => {})
+              toast.success("Número copiado.", { description: process.number })
+            }}
+            className="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <Copy className="size-4" />
+          </button>
+        )}
       </div>
       <p className="mt-2 font-display text-[19px] leading-snug font-semibold tracking-[-0.015em] text-foreground sm:text-[21px]">{process.type}</p>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+        {process.secret && (
+          <StatusBadge tone="warning" dot={false}>
+            Segredo de justiça
+          </StatusBadge>
+        )}
         {client && (
-          <Link href={`/clientes/${client.id}`} className="touch-target relative rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+          <Link
+            href={`/clientes/${client.id}`}
+            className="touch-target relative rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
             <Tag icon={<UserRound />} className="hover:border-border-strong hover:text-foreground">
               {client.name}
             </Tag>
@@ -280,7 +310,10 @@ export function ProcessProfile({ id }: { id: string }) {
           <DropdownMenuContent align="end" className="w-52 rounded-[10px] p-1">
             <DropdownMenuGroup>
               {canAgenda && (
-                <DropdownMenuItem className="h-9 px-2" onClick={() => openDialog("appointment", { processId: process.id, clientId: process.clientId })}>
+                <DropdownMenuItem
+                  className="h-9 px-2"
+                  onClick={() => openDialog("appointment", { processId: process.id, clientId: process.clientId })}
+                >
                   <CalendarPlus /> Novo compromisso
                 </DropdownMenuItem>
               )}
@@ -490,7 +523,7 @@ export function ProcessProfile({ id }: { id: string }) {
       <PanelHeader title="Detalhes" />
       <dl className="divide-y divide-border px-5 pb-3">
         <Detail label="Juízo">{process.court}</Detail>
-        <Detail label="Comarca">{process.district}</Detail>
+        {process.district && <Detail label="Comarca">{process.district}</Detail>}
         <Detail label="Parte contrária">{process.opposingParty}</Detail>
         <Detail label="Área">{process.area}</Detail>
         {client && (
@@ -498,6 +531,11 @@ export function ProcessProfile({ id }: { id: string }) {
             <Link href={`/clientes/${client.id}`} className="touch-target relative inline-flex items-center gap-1 hover:underline">
               {client.name} <ArrowUpRight className="size-3.5 text-subtle" />
             </Link>
+          </Detail>
+        )}
+        {process.notes && (
+          <Detail label="Observações">
+            <span className="whitespace-pre-line">{process.notes}</span>
           </Detail>
         )}
       </dl>
@@ -527,11 +565,7 @@ export function ProcessProfile({ id }: { id: string }) {
           <DocumentList documents={documents} />
         </div>
       ) : (
-        <EmptyState
-          compact
-          title="Nenhum documento anexado."
-          description="Petições, decisões e comprovantes deste processo ficam reunidos aqui."
-        />
+        <EmptyState compact title="Nenhum documento anexado." description="Petições, decisões e comprovantes deste processo ficam reunidos aqui." />
       )}
     </Panel>
   )
@@ -576,13 +610,19 @@ export function ProcessProfile({ id }: { id: string }) {
       {/* Detalhes, organizados em abas: a timeline completa e o resto do processo a um toque. */}
       <div ref={tabsAnchor} aria-hidden />
       <div className="sticky top-16 z-10 -mx-4 -mt-2 border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-md sm:-mx-6 sm:px-6 md:top-[72px] lg:-mx-8 lg:px-8">
-        <FilterTabs ariaLabel="Seções do processo" layoutId="process-section" value={current} onChange={chooseSection} options={sections} className="mx-0 px-0" />
+        <FilterTabs
+          ariaLabel="Seções do processo"
+          layoutId="process-section"
+          value={current}
+          onChange={chooseSection}
+          options={sections}
+          className="mx-0 px-0"
+        />
       </div>
       <div role="tabpanel" aria-label={sections.find((s) => s.value === current)?.label} className="space-y-5">
         {current === "movimentacoes" && movementsPanel}
         {current === "prazos" && (
           <>
-            <ProcessTriagePanel process={process} />
             <PrazosPanel process={process} />
             {tasksPanel}
             {agendaPanel}
@@ -625,7 +665,6 @@ export function ProcessProfile({ id }: { id: string }) {
       <div className="grid grid-cols-1 gap-5 @4xl/main:grid-cols-12">
         <div className="min-w-0 space-y-5 @4xl/main:col-span-7">
           {movementsPanel}
-          <ProcessTriagePanel process={process} />
           {jurisprudencePanel}
           {historyPanel}
         </div>

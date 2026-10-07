@@ -22,7 +22,7 @@ export const degreeLabel = (degree?: string) => (degree ? (DEGREES[degree.trim()
 /** Origem do dado, sem expor o fornecedor da consulta. */
 export const ORIGIN_LABEL: Record<DataOrigin, string> = {
   datajud: "Consulta automática",
-  manual: "Cadastro manual",
+  manual: "Cadastrado pelo escritório",
 }
 
 /** O processo é acompanhado pela consulta automática? */

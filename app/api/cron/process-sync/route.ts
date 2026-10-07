@@ -1,9 +1,6 @@
 /**
- * GET|POST /api/cron/process-sync — o agendador único da Íntegra:
- *   1. monitoramento automático de processos (Etapa 5) — movimentações relevantes
- *      novas entram na Triagem;
- *   2. captura diária de intimações do DJEN (Etapa 8) — cada uma vira um evento na Triagem;
- *   3. interpretação dos eventos novos da Triagem pela Íntegra IA (uma vez por evento).
+ * GET|POST /api/cron/process-sync — monitoramento automático de processos (Etapa 5):
+ * movimentações novas entram no processo, com uma atividade quando há novidade.
  *
  * Chamada pelo agendador da hospedagem (ex.: a cada hora), nunca pelo navegador.
  * Exige `Authorization: Bearer <CRON_SECRET>` — o mesmo formato que o Vercel Cron
@@ -22,15 +19,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { supabaseLookupStore } from "@/lib/services/processos/lookup-cache"
 import { FRESH_FOR_MS } from "@/lib/services/processos/lookup-service"
 import { runProcessMonitor, type RunRecord } from "@/lib/services/processos/monitor"
-import { hasJobColumn, supabaseMonitorRepository } from "@/lib/services/processos/monitor-store"
-import { captureConfig, runIntimacoesCapture } from "@/lib/services/intimacoes/capture"
-import { supabaseCaptureRepository } from "@/lib/services/intimacoes/capture-store"
-import { runTriageInterpretation, type InterpretSummary } from "@/lib/services/triagem/interpret"
-import { hasTriage, supabaseInterpretRepository } from "@/lib/services/triagem/store"
-import { getAIStatus } from "@/lib/ai/config"
-import { getAIProvider } from "@/lib/ai/provider"
-import { databaseMeter } from "@/lib/ai/metering"
-import { djenClient } from "@/lib/integrations/legal/djen/provider"
+import { supabaseMonitorRepository } from "@/lib/services/processos/monitor-store"
 import { monitorConfig, OFFICE_TIME_ZONE, startOfDayIn } from "@/lib/services/processos/monitoring-policy"
 import { processLookup } from "@/lib/services/processos/process-lookup"
 
@@ -40,9 +29,6 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
 const NO_STORE = { "Cache-Control": "no-store" }
-
-/** A interpretação só começa pedidos novos até aqui (a rota tem teto de `maxDuration`). */
-const INTERPRET_UNTIL_MS = 240_000
 
 /** Segredo curto demais é tratado como ausente. */
 const MIN_SECRET_LENGTH = 16
@@ -65,13 +51,11 @@ async function handle(request: Request) {
     return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401, headers: NO_STORE })
   }
 
-  const started = Date.now()
   const settings = await loadSettings({ fresh: true })
   const maintenance = settings.maintenance.enabled ? "Plataforma em manutenção." : null
   const admin = getSupabaseAdmin()
   const store = supabaseLookupStore(admin)
 
-  // 1. Movimentações dos processos (Etapa 5).
   let run: RunRecord | null = null
   try {
     run = await runProcessMonitor({
@@ -89,45 +73,10 @@ async function handle(request: Request) {
     console.error("[process-monitor] a execução não pôde ser registrada", error)
   }
 
-  // 2. Intimações do DJEN (Etapa 8) — mesmo agendador; cada inscrição uma vez por dia.
-  // Sem as migrações 0011 e 0012, não há onde gravar: a captura fica de fora.
-  const triage = await hasTriage(admin)
-  let intimacoes: RunRecord | null = null
-  if (triage && (await hasJobColumn(admin))) {
-    try {
-      intimacoes = await runIntimacoesCapture({
-        repo: supabaseCaptureRepository(admin),
-        config: captureConfig(),
-        disabledReason: !settings.features.djen ? "A captura de intimações (DJEN) está desativada pela administração." : maintenance,
-        fetchCommunications: (query) => djenClient().listByOab(query),
-      })
-    } catch (error) {
-      console.error("[djen] a execução não pôde ser registrada", error)
-    }
-  }
-
-  // 3. Íntegra IA: resumo, "exige ação?" e prazo lido do teor, uma vez por evento novo.
-  // Sem IA configurada, os eventos seguem na Triagem com o original.
-  let interpretacao: InterpretSummary | null = null
-  const ai = getAIStatus()
-  if (triage && ai.enabled && ai.configured && !maintenance && Date.now() < started + INTERPRET_UNTIL_MS - 30_000) {
-    try {
-      interpretacao = await runTriageInterpretation({
-        repo: supabaseInterpretRepository(admin),
-        provider: getAIProvider(),
-        meter: databaseMeter(),
-        deadline: started + INTERPRET_UNTIL_MS,
-      })
-    } catch (error) {
-      console.error("[triagem-ia] a interpretação não pôde rodar", error)
-    }
-  }
-
-  const failed = !run || run.status === "failed" || (intimacoes?.status === "failed")
-  if (!run && !intimacoes) {
+  if (!run) {
     return NextResponse.json({ ok: false, error: "Falha ao executar o monitoramento." }, { status: 500, headers: NO_STORE })
   }
-  return NextResponse.json({ ok: !failed, run, intimacoes, interpretacao }, { headers: NO_STORE })
+  return NextResponse.json({ ok: run.status !== "failed", run }, { headers: NO_STORE })
 }
 
 export const GET = handle

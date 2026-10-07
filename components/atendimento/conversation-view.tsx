@@ -12,6 +12,7 @@ import {
   FilePlus2,
   Info,
   ListPlus,
+  MessageSquarePlus,
   Scale,
   Search,
   Sparkles,
@@ -23,7 +24,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +50,7 @@ import { SYSTEM_STATUSES, STATUS_TONE, statusOption } from "@/lib/whatsapp/confi
 import { attachmentKindFor } from "@/lib/whatsapp/files"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import { uploadOutgoing, whatsappApi } from "@/lib/whatsapp/client"
-import type { WhatsAppConversation, WhatsAppMessage } from "@/types"
+import type { Client, WhatsAppConversation, WhatsAppMessage } from "@/types"
 import { useInbox } from "./inbox-provider"
 import { useMessages } from "./use-messages"
 import { MessageList } from "./message-list"
@@ -508,6 +509,64 @@ export function EmptyConversation() {
       <Link href="/clientes" className="touch-target relative mt-5 text-[12.5px] font-medium text-brand-strong underline-offset-4 hover:underline">
         Ver clientes do escritório
       </Link>
+    </div>
+  )
+}
+
+/**
+ * Aberto pelo "Conversar pelo WhatsApp" de um cliente que ainda não tem conversa:
+ * diz isso com clareza e oferece iniciar uma (com o cliente já escolhido).
+ */
+export function ClientWithoutConversation({
+  client,
+  loading,
+  onStart,
+  onBack,
+}: {
+  client?: Client
+  loading: boolean
+  onStart: () => void
+  onBack: () => void
+}) {
+  const name = client?.name ?? "Este cliente"
+  const hasPhone = (client?.phone?.replace(/\D/g, "").length ?? 0) >= 10
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center px-2 pt-2 md:hidden">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft /> Conversas
+        </Button>
+      </div>
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center" aria-live="polite">
+        {loading ? (
+          <p className="flex items-center gap-2 text-[13.5px] text-muted-foreground">
+            <span className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-foreground" aria-hidden />
+            Abrindo a conversa de {name}…
+          </p>
+        ) : (
+          <>
+            {client && <UserAvatar name={client.name} size="lg" className="mb-4" />}
+            <h2 className="font-display text-[20px] leading-tight font-semibold tracking-[-0.02em]">{name} ainda não tem conversa</h2>
+            <p className="mt-2 max-w-sm text-[13.5px] leading-relaxed text-muted-foreground">
+              {hasPhone
+                ? "Nenhuma conversa do WhatsApp está vinculada a este cliente. Inicie uma pelo número do cadastro."
+                : "Nenhuma conversa do WhatsApp está vinculada a este cliente, e o cadastro não tem celular."}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {hasPhone && (
+                <Button onClick={onStart}>
+                  <MessageSquarePlus /> Iniciar conversa
+                </Button>
+              )}
+              {client && (
+                <Link href={`/clientes/${client.id}`} className={buttonVariants({ variant: hasPhone ? "ghost" : "secondary" })}>
+                  Ver cadastro do cliente
+                </Link>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

@@ -118,7 +118,7 @@ mesmo se o Realtime estiver atrasado.
    cada exclusão grava, por gatilho, um aviso em `realtime_deletions` (coleção + id). O
    aviso chega como INSERT, que passa pela RLS: só recebe quem é do mesmo escritório **e**
    pode ver a coleção (lançamentos e atividades financeiras exigem `finance.view`). O app
-   (`office-sync`, Triagem, Atendimento) tira o registro ao receber o aviso; quem estava
+   (`office-sync`, Atendimento) tira o registro ao receber o aviso; quem estava
    desconectado se acerta pela revalidação. Avisos com mais de 2 dias são apagados.
 2. **Edição perdida em silêncio quando outra pessoa excluía o registro.** No cliente e no
    documento, o formulário de edição fechava sozinho (a tela do registro virava "não

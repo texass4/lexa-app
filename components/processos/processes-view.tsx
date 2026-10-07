@@ -209,7 +209,7 @@ export function ProcessesView() {
                             onClick={(e) => e.stopPropagation()}
                             className="block font-mono text-[12.5px] font-medium tracking-tight text-foreground outline-none hover:underline focus-visible:underline"
                           >
-                            {p.number}
+                            {p.number || "Sem número"}
                           </Link>
                           <p className="mt-0.5 max-w-[280px] truncate text-[12px] text-muted-foreground">
                             <span className="text-subtle">{p.code}</span> · {p.type}
@@ -243,7 +243,7 @@ export function ProcessesView() {
                             <ChevronRight className="size-4 text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
                             <DropdownMenu>
                               <DropdownMenuTrigger
-                                aria-label={`Ações para o processo ${p.number}`}
+                                aria-label={`Ações para o processo ${p.number || p.code}`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-[8px] text-subtle outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent"
                               >
@@ -289,7 +289,7 @@ export function ProcessesView() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-mono text-[12px] font-medium text-foreground">{p.number}</p>
+                        <p className="truncate font-mono text-[12px] font-medium text-foreground">{p.number || "Sem número"}</p>
                         <p className="mt-1 truncate text-[14px] font-semibold">{clientName(p.clientId) || "Sem cliente"}</p>
                         <p className="truncate text-[12.5px] text-muted-foreground">{p.type}</p>
                         <SignalHint signal={topSignal.get(p.id)} />

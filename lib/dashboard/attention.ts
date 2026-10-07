@@ -24,8 +24,8 @@ import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos/prazos"
 import { prazosByProcess, processesByClient, tasksByRelated } from "@/lib/store/indexes"
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { MONITORING_STALE_AFTER_DAYS } from "@/lib/services/processos/monitoring-policy"
-import { isOpen as isOpenTriage, suggestedDeadline, urgencyOf } from "@/lib/triagem/model"
-import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task, TriageItem } from "@/types"
+import { processTitle } from "@/lib/processos/label"
+import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
 
 /** Sem movimentação há mais que isso = processo parado. Também usado pela Íntegra IA. */
 export const STALE_DAYS = 60
@@ -63,7 +63,6 @@ export type SignalKind =
   | "appointment-today"
   | "invoice-overdue"
   | "document-new"
-  | "triage-pending"
 
 export type SignalAction =
   | { type: "open"; label: string; href: string }
@@ -109,8 +108,6 @@ export interface AttentionData {
   documents: LegalDocument[]
   invoices: Invoice[]
   activities?: Activity[]
-  /** Eventos da Triagem (intimações e movimentações) — quando já foram lidos. */
-  triage?: readonly TriageItem[]
 }
 
 export interface AttentionOptions {
@@ -174,7 +171,8 @@ function dueText(days: number) {
   return `venceu há ${Math.abs(days)} dias`
 }
 
-const processLabel = (p: Process) => `Processo ${p.code}`
+/** "João da Silva — Ação de cobrança" (`lib/processos/label.ts`), nunca só o número. */
+const processLabel = (p: Process, clients: readonly Client[]) => processTitle(p, clients.find((c) => c.id === p.clientId)?.name)
 
 /** Última movimentação já interpretada (título legível + categoria). */
 function latestMovement(p: Process) {
@@ -187,7 +185,7 @@ function latestMovement(p: Process) {
  * Sinais dos prazos abertos de um processo: um alerta por prazo a 5 dias, 2 dias, no
  * dia ou vencido, e "Prazo sem tarefa" para cada prazo aberto sem tarefa vinculada.
  */
-function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Process, now: Date = getNow()): AttentionSignal[] {
+function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks" | "clients">, p: Process, now: Date = getNow()): AttentionSignal[] {
   const signals: AttentionSignal[] = []
   const base = { href: `/processos/${p.id}`, processId: p.id, clientId: p.clientId, count: 1 }
   for (const prazo of prazosByProcess(data.deadlines, p.id)) {
@@ -200,7 +198,7 @@ function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Proce
         kind: alert.kind,
         level: alert.level,
         title: `Prazo ${dueText(alert.days)}`,
-        detail: `${processLabel(p)} · ${prazo.description}`,
+        detail: `${processLabel(p, data.clients)} · ${prazo.description}`,
         at: prazo.fatalDate,
       })
     }
@@ -211,7 +209,7 @@ function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Proce
         kind: "deadline-no-task",
         level: "warning",
         title: "Prazo sem tarefa",
-        detail: `${processLabel(p)} · ${prazo.description} · fatal em ${fmtNumericDate(prazo.fatalDate)}`,
+        detail: `${processLabel(p, data.clients)} · ${prazo.description} · fatal em ${fmtNumericDate(prazo.fatalDate)}`,
         at: prazo.fatalDate,
         action: {
           type: "create-task",
@@ -244,7 +242,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
       kind: "task-overdue",
       level: "critical",
       title: overdueTasks.length === 1 ? "Tarefa atrasada" : plural(overdueTasks.length, "tarefa atrasada", "tarefas atrasadas"),
-      detail: overdueTasks.length === 1 ? overdueTasks[0].title : `${processLabel(p)}`,
+      detail: overdueTasks.length === 1 ? overdueTasks[0].title : processLabel(p, data.clients),
       at: overdueTasks[0].dueAt,
       count: overdueTasks.length,
       href: overdueTasks.length === 1 ? `/tarefas?tarefa=${overdueTasks[0].id}` : base.href,
@@ -260,7 +258,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
       kind: "process-moved",
       level: review ? "warning" : "info",
       title: review ? `Movimentação de ${MOVEMENT_CATEGORY_LABEL[last.category].toLowerCase()} para revisar` : "Nova movimentação",
-      detail: last ? `${processLabel(p)} · ${last.title}` : processLabel(p),
+      detail: last ? `${processLabel(p, data.clients)} · ${last.title}` : processLabel(p, data.clients),
       at: p.lastMovementAt,
       action: last && review ? { type: "create-task", label: "Criar tarefa", processId: p.id, title: `Revisar: ${last.title}` } : undefined,
     })
@@ -272,7 +270,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
       kind: "process-stale",
       level: "warning",
       title: `Sem movimentação há ${since} dias`,
-      detail: `${processLabel(p)} · ${p.type} · ${checkText(p)}`,
+      detail: `${processLabel(p, data.clients)} · ${checkText(p)}`,
       at: p.lastMovementAt,
     })
   }
@@ -366,11 +364,6 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
       // Tarefas atrasadas entram abaixo, pelas da pessoa — não por processo.
       signals.push(...processSignals(data, p, now).filter((s) => s.kind !== "task-overdue"))
     }
-  }
-
-  if (allowed("processes.view") && data.triage) {
-    const signal = triageSignal(data.triage, now)
-    if (signal) signals.push(signal)
   }
 
   if (allowed("tasks.view")) {
@@ -470,39 +463,6 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
   signals = group(signals, "deadline-no-task", (n) => plural(n, "prazo sem tarefa", "prazos sem tarefa"), "/tarefas/prazos?filtro=sem-tarefa")
 
   return signals.sort(bySeverity)
-}
-
-/**
- * Um sinal só para a Triagem: quantos eventos aguardam a decisão do advogado e
- * quantos trazem possível prazo. Urgente quando algum prazo sugerido vence em até
- * 5 dias. O prazo só existe depois que o advogado confirma, na própria Triagem.
- */
-export function triageSignal(items: readonly TriageItem[], now: Date = getNow()): AttentionSignal | undefined {
-  const open = items.filter(isOpenTriage)
-  if (!open.length) return undefined
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-  const withDeadline = open.filter((i) => suggestedDeadline(i)).length
-  const high = open.filter((i) => urgencyOf(i, today) === "alta").length
-  const intimacoes = open.filter((i) => i.kind === "intimacao").length
-  return {
-    id: "triage-pending:escritorio",
-    kind: "triage-pending",
-    level: high ? "critical" : "warning",
-    title:
-      intimacoes === open.length
-        ? `${plural(open.length, "intimação aguarda", "intimações aguardam")} revisão na Triagem`
-        : `${plural(open.length, "evento aguarda", "eventos aguardam")} revisão na Triagem`,
-    detail: [withDeadline && plural(withDeadline, "com possível prazo", "com possível prazo"), high && plural(high, "urgente", "urgentes")]
-      .filter(Boolean)
-      .join(" · ") || "Nenhum com prazo sugerido",
-    // Ordena pela data fatal sugerida mais próxima (entre os outros prazos, não depois deles).
-    at: open
-      .map((i) => suggestedDeadline(i)?.fatalDate)
-      .filter((d): d is string => !!d)
-      .sort()[0],
-    href: "/triagem",
-    count: open.length,
-  }
 }
 
 /** Contagem por nível — alimenta a frase de abertura ("3 pontos merecem atenção"). */

@@ -50,8 +50,7 @@ function useLawyerOabs(userId: string) {
 }
 
 /**
- * Inscrições na OAB (várias por advogado). Cada inscrição ativa é consultada todo dia
- * no DJEN para capturar intimações.
+ * Inscrições na OAB (várias por advogado).
  */
 export function OabManager({ userId, required, canEdit = true }: { userId: string; required?: boolean; canEdit?: boolean }) {
   const { oabs, loading, unavailable, reload } = useLawyerOabs(userId)
@@ -101,7 +100,7 @@ export function OabManager({ userId, required, canEdit = true }: { userId: strin
     <div className="@container space-y-3">
       {required && !loading && !active.length && (
         <p role="status" className="rounded-[10px] border border-warning/25 bg-warning-soft/50 px-3 py-2 text-[12.5px] text-foreground">
-          Obrigatória para advogados: sem uma inscrição ativa, as intimações do DJEN não chegam para você.
+          Obrigatória para advogados: cadastre ao menos uma inscrição ativa.
         </p>
       )}
       {oabs.length > 0 && (

@@ -16,6 +16,7 @@ import { internalAfterFatal, validatePrazo, type PrazoErrors } from "@/lib/prazo
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
 import type { PrazoOrigin } from "@/types"
+import { processNumberLabel, processTitle } from "@/lib/processos/label"
 
 type Defaults = { processId?: string }
 
@@ -103,8 +104,7 @@ function PrazoForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => 
               <option value="">Escolha o processo</option>
               {processes.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.code} — {p.number || p.type}
-                  {byId(data.clients, p.clientId) ? ` · ${byId(data.clients, p.clientId)!.name}` : ""}
+                  {processTitle(p, byId(data.clients, p.clientId)?.name)} · {processNumberLabel(p)}
                 </option>
               ))}
             </NativeSelect>

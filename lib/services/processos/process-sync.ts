@@ -6,6 +6,9 @@
  * - Só entram movimentações novas: a identidade é o hash do conteúdo
  *   (`movements.ts`), então aplicar a mesma ficha duas vezes não duplica nada.
  * - A fonte complementa o cadastro, mas nunca apaga o que já foi preenchido.
+ * - Processo cadastrado pelo escritório (`origin: "manual"`): o que o escritório
+ *   preencheu (tribunal, grau, órgão, classe…) prevalece; a fonte só preenche o que
+ *   estava vazio. Os demais seguem a fonte, que é a referência deles.
  * - `lastSyncedAt` nunca volta no tempo (uma ficha do cache pode ser anterior).
  *
  * Lógica pura: sem React, sem banco.
@@ -37,6 +40,9 @@ const latest = (current: string | undefined, next: string) => (current && curren
  */
 export function mergeProcessSheet(current: Process, sheet: ProcessSheet, checkedAt: string, options: MergeOptions): MergeResult {
   const cnj = current.cnj ?? sheet.cnj
+  // Regra explícita: no cadastro manual, o dado do escritório vence; nos importados, a fonte.
+  const manual = current.origin === "manual"
+  const pick = <T,>(office: T | undefined, source: T | undefined) => (manual ? (office ?? source) : (source ?? office))
   const incoming = toProcessMovements(sheet.movements, sheet.source.provider)
   const { fresh } = diffMovements(collectHashes(cnj, current.movements), incoming)
 
@@ -50,12 +56,12 @@ export function mergeProcessSheet(current: Process, sheet: ProcessSheet, checked
     lastSyncedAt: latest(current.lastSyncedAt, checkedAt),
     ...(options.automatic ? { autoSyncedAt: latest(current.autoSyncedAt, checkedAt) } : {}),
     cnj,
-    tribunal: sheet.tribunal ?? current.tribunal,
-    degree: sheet.degree ?? current.degree,
-    className: sheet.className ?? current.className,
-    subject: sheet.subject ?? current.subject,
-    judicialUnit: sheet.judicialUnit ?? current.judicialUnit,
-    system: sheet.system ?? current.system,
+    tribunal: pick(current.tribunal, sheet.tribunal),
+    degree: pick(current.degree, sheet.degree),
+    className: pick(current.className, sheet.className),
+    subject: pick(current.subject, sheet.subject),
+    judicialUnit: pick(current.judicialUnit, sheet.judicialUnit),
+    system: pick(current.system, sheet.system),
     parties: sheet.parties.active.length || sheet.parties.passive.length || sheet.parties.others.length ? sheet.parties : current.parties,
     source: {
       provider: sheet.source.provider,

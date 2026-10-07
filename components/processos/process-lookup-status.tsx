@@ -116,7 +116,7 @@ export function LookupFailed({ title, message, onRetry }: { title: string; messa
       <CircleAlert className="mt-px size-4 shrink-0 text-danger" />
       <div className="min-w-0 flex-1">
         <p className="text-[12.5px] font-medium text-foreground">{title}</p>
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{message} Se preferir, preencha os campos manualmente.</p>
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{message} Se preferir, preencha os campos manualmente — processos em segredo de justiça não aparecem na consulta pública.</p>
       </div>
       {onRetry && (
         <Button type="button" variant="ghost" size="sm" className="-my-1 shrink-0" onClick={onRetry}>

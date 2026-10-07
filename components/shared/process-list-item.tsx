@@ -26,7 +26,7 @@ export function ProcessListItem({ process: p, nextPrazo }: { process: Process; n
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[13px] font-medium tracking-tight text-foreground">{p.number}</span>
+          <span className="font-mono text-[13px] font-medium tracking-tight text-foreground">{p.number || "Sem número"}</span>
           <span className="text-[11.5px] text-subtle">{p.code}</span>
           {p.tribunal && <span className="text-[11.5px] font-medium text-muted-foreground">· {p.tribunal}</span>}
         </div>
