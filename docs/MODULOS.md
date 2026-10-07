@@ -424,3 +424,15 @@ lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/
 **Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
 
 Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.
+
+## Jurisprudência
+
+`/jurisprudencia` (menu Escritório, exige `processes.view`): pesquisa em linguagem natural
+ou por termos na base indexada de decisões oficiais (hoje STJ — dados abertos), filtros
+(órgão julgador, classe, área, tribunal, grau, assunto, período), ordem por relevância ou
+data, 20 por página; decisão completa num painel lateral com Salvar, Vincular ao processo
+(`processes.edit`), Ver fonte original e Análise da Íntegra (sob demanda). Salvas e
+vínculos são do escritório (RLS). No processo, "Jurisprudência relacionada" (vinculadas +
+pesquisa a partir do processo + análise de semelhança). Vincular registra
+"vinculou uma jurisprudência ao processo." na linha do tempo. Fonte, sincronização, dados,
+variáveis, testes e limitações: `docs/JURISPRUDENCIA.md`. Migração: `0019_jurisprudencia.sql`.

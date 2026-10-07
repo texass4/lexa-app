@@ -56,6 +56,23 @@ Os números em "metricas_calculadas_pelo_lexa" e nas listas vieram das faturas r
 - "perguntas_para_verificar": o que conferir antes de agir (ex.: pagamento recebido e ainda não registrado).
 Se não houver atraso nem vencimento próximo, diga isso com clareza, sem criar preocupação.`
 
+export const JURISPRUDENCE_ANALYSIS_TASK = `Interprete para o advogado a decisão em "decisao" (ref J1). A decisão veio da fonte oficial indicada em "fonte"; você NÃO é a fonte.
+- Use somente o que está em "decisao" (e em "processo_do_escritorio", quando houver). Não invente decisões, números de processo, tribunais, relatores, datas, citações, teses nem resultados.
+- A regra de não citar jurisprudência, súmulas ou leis continua valendo para o seu conhecimento próprio: em "fundamentos_mencionados" entram APENAS dispositivos, súmulas e precedentes que aparecem escritos no texto da decisão, como estão escritos.
+- "resumo": 2 a 4 frases sobre o que foi decidido.
+- "tese_principal": a tese como está na ementa ou na tese jurídica; se não houver, deixe vazio e registre em "informacoes_ausentes".
+- "resultado": o resultado do julgamento (ex.: provido, não provido, conhecido em parte) só se constar do texto; senão, vazio.
+- "pontos_relevantes": pontos da própria decisão.
+- "relevancia_para_pesquisa": por que a decisão se relaciona (ou não) com "pesquisa_do_advogado"; sem pesquisa, por que ela pode ser útil, em termos gerais.
+- "comparacao_com_processo": só se houver "processo_do_escritorio": semelhanças e diferenças com base nos dados dos dois, como possibilidade; sem processo, deixe vazio.
+- "informacoes_ausentes": o que a decisão não informa (ex.: inteiro teor, resultado, partes). Os campos listados em "campos_ausentes" não estão na base.`
+
+export const RELATED_JURISPRUDENCE_TASK = `Compare o processo do escritório ("processo_do_escritorio", ref P1) com as decisões encontradas na pesquisa ("decisoes", refs J1, J2…). As decisões vieram da base oficial; você só interpreta.
+- Use somente os dados enviados. Não invente decisões nem acrescente detalhes que não estão nas ementas.
+- "decisoes": para cada decisão analisada, "ref" (exatamente uma das referências recebidas), "semelhanca" ("alta" só quando o tema central e o contexto fático descritos na ementa coincidem com os dados do processo; "media" quando há tema comum com contexto diferente ou incerto; "baixa" quando a ligação é fraca) e "motivo" em uma frase.
+- "visao_geral": 2 a 3 frases sobre o conjunto, sem números diferentes dos recebidos.
+- "cuidados": limites da comparação (ex.: o processo tem poucos dados; as ementas não trazem os fatos completos; a base contém só o STJ).`
+
 export const CHAT_TASK = `Responda às perguntas do usuário sobre os dados da Íntegra desta conversa.
 - Responda de forma direta e curta. Use listas quando ajudar. Markdown simples permitido: **negrito**, listas com "-" e títulos "###". Nada de tabelas ou HTML.
 - Referências como "essa movimentação", "o último registro" ou "esse processo" dizem respeito ao escopo desta conversa.

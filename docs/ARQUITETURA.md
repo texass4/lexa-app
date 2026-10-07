@@ -46,6 +46,7 @@ Servidor (Route Handlers em app/api/*)
 |---|---|---|---|
 | Início `/dashboard` | `dashboard/` | `dashboard/dashboard.ts`, `dashboard/attention.ts`, `dashboard/visits.ts` | `api/ai/office/*` (panorama) |
 | Triagem `/triagem` | `triagem/` | `triagem/`, `intimacoes/` | `services/triagem/`, `services/intimacoes/`, `api/cron/process-sync` |
+| Jurisprudência `/jurisprudencia` | `jurisprudencia/` | — | `services/jurisprudence/`, `api/jurisprudence/*`, `api/cron/jurisprudence-sync`, `ai/services/jurisprudence.ts` |
 | Clientes `/clientes`, `/clientes/[id]` | `clientes/`, `clientes/profile/` | `clientes/clients.ts`, `clientes/client-import.ts` | `api/ai/client/summary` |
 | Atendimento `/atendimento` | `atendimento/` | `whatsapp/` | `services/whatsapp/`, `integrations/whatsapp/`, `api/whatsapp/*` |
 | Processos `/processos`, `/processos/[id]` | `processos/` | `processos/cnj.ts` | `services/processos/`, `integrations/legal/`, `api/processes/*`, `api/ai/process/*` |
@@ -198,6 +199,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 | `whatsapp/*` | `requireActor` | Central de Atendimento |
 | `whatsapp/webhook` | segredo do webhook | eventos da Z-API |
 | `cron/process-sync` | `Bearer CRON_SECRET` | monitoramento, captura do DJEN e interpretação da Triagem |
+| `cron/jurisprudence-sync` | `Bearer CRON_SECRET` | alimenta a base de jurisprudência pelas fontes oficiais (STJ) — 1×/dia; ver `docs/JURISPRUDENCIA.md` |
 | `admin/*` | `requireAdmin` | Íntegra Admin |
 
 ---

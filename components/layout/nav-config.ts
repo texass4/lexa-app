@@ -1,4 +1,5 @@
 import {
+  BookOpenText,
   CalendarDays,
   FolderOpen,
   Hourglass,
@@ -53,6 +54,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         children: [{ href: "/tarefas/prazos", label: "Prazos", icon: Hourglass, badgeKey: "prazos", permission: "processes.view" }],
       },
       { href: "/agenda", label: "Agenda", icon: CalendarDays, badgeKey: "agenda", permission: "agenda.view" },
+      { href: "/jurisprudencia", label: "Jurisprudência", icon: BookOpenText, permission: "processes.view" },
     ],
   },
   {
@@ -77,6 +79,7 @@ export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/tarefas": { title: "Tarefas", section: "Escritório" },
   "/tarefas/prazos": { title: "Prazos", section: "Tarefas" },
   "/agenda": { title: "Agenda", section: "Escritório" },
+  "/jurisprudencia": { title: "Jurisprudência", section: "Escritório" },
   "/documentos": { title: "Documentos", section: "Gestão" },
   "/financeiro": { title: "Financeiro", section: "Gestão" },
   "/configuracoes": { title: "Configurações", section: "Sistema" },

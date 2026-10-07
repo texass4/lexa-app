@@ -26,6 +26,7 @@ import { analyzeMovement, suggestNextActions, summarizeProcess } from "./process
 import { summarizeClient } from "./client"
 import { officeOverview } from "./office"
 import { financeAnalysis } from "./finance"
+import { analyzeJurisprudence, analyzeRelatedJurisprudence } from "./jurisprudence"
 import { chat, trimHistory } from "./chat"
 
 const failure = async (promise: Promise<unknown>) => {
@@ -583,5 +584,125 @@ describe("análise do financeiro", () => {
     assert.equal(metrics.dueNext30Days, 100)
     assert.equal(metrics.dueNext30DaysInvoices, 1)
     assert.equal(metrics.overdueAmount, 400)
+  })
+})
+
+describe("Análise da Íntegra — jurisprudência", () => {
+  const J1 = "11111111-1111-4111-8111-111111111111"
+  const J2 = "22222222-2222-4222-8222-222222222222"
+  // Decisões da base de TESTE (linhas no formato da tabela `jurisprudence`).
+  const decisionRow = (id: string, patch: Record<string, unknown> = {}) => ({
+    id,
+    provider: "stj",
+    tribunal: "STJ",
+    external_id: id.slice(0, 8),
+    process_number: id === J1 ? "2100001" : "2100002",
+    registry_number: "202501234567",
+    class_code: "REsp",
+    class_name: "RECURSO ESPECIAL",
+    court: "TERCEIRA TURMA",
+    rapporteur: "MINISTRA TESTE",
+    judgment_date: "2025-09-16",
+    publication_date: null,
+    publication: null,
+    decision_type: "ACÓRDÃO",
+    subject: "CONSUMIDOR. NEGATIVAÇÃO INDEVIDA",
+    ementa: "CONSUMIDOR. NEGATIVAÇÃO INDEVIDA. Texto de teste da ementa.",
+    decision_text: null,
+    thesis: null,
+    keywords: null,
+    legislation: [],
+    cited_precedents: null,
+    notes: null,
+    area: "Direito Privado",
+    degree: "Superior",
+    source_url: "https://processo.stj.jus.br/processo/pesquisa/?tipoPesquisa=tipoPesquisaNumeroRegistro&termo=202501234567",
+    raw_reference: { file_url: "https://dadosabertos.web.stj.jus.br/x.json" },
+    updated_at: "2025-10-01T00:00:00Z",
+    ...patch,
+  })
+  const analysis = {
+    resumo: "Decisão sobre negativação indevida.",
+    tese_principal: "",
+    resultado: "",
+    pontos_relevantes: [],
+    fundamentos_mencionados: [],
+    relevancia_para_pesquisa: "Trata do mesmo tema.",
+    comparacao_com_processo: "Comparação que não deveria existir.",
+    informacoes_ausentes: ["texto da decisão"],
+  }
+  const withDecisions = (deps: ReturnType<typeof makeDeps>) => {
+    deps.db.tables.jurisprudence = [decisionRow(J1), decisionRow(J2, { ementa: "PENAL. Outro tema de teste." })] as never
+    return deps
+  }
+
+  it("usa só a decisão da base; sem processo, não há comparação; ausências declaradas", async () => {
+    const { deps, calls } = withDecisions(makeDeps(() => analysis))
+    const result = await analyzeJurisprudence(deps, { jurisprudenceId: J1, query: "negativação sem notificação" })
+    const sent = promptText(calls[0])
+    assert.match(sent, /Texto de teste da ementa/)
+    assert.match(sent, /negativação sem notificação/)
+    assert.match(sent, /campos_ausentes[^\]]*texto da decisão/)
+    assert.equal(sent.includes("Outro tema de teste"), false)
+    assert.equal(sent.includes(SECRET_B), false)
+    assert.equal(result.data.comparacao_com_processo, "")
+    assert.equal(result.sources.J1.id, J1)
+  })
+
+  it("com processo: o processo do escritório entra no contexto", async () => {
+    const { deps, calls } = withDecisions(makeDeps(() => analysis))
+    const result = await analyzeJurisprudence(deps, { jurisprudenceId: J1, processId: processA.id })
+    assert.match(promptText(calls[0]), new RegExp(processA.number))
+    assert.equal(result.data.comparacao_com_processo, "Comparação que não deveria existir.")
+  })
+
+  it("decisão inexistente ou processo de outro escritório → NOT_FOUND, sem chamar o modelo", async () => {
+    const missing = withDecisions(makeDeps(() => analysis))
+    assert.equal(await failure(analyzeJurisprudence(missing.deps, { jurisprudenceId: "33333333-3333-4333-8333-333333333333" })), "NOT_FOUND")
+    assert.equal(await failure(analyzeJurisprudence(missing.deps, { jurisprudenceId: J1, processId: processB.id })), "NOT_FOUND")
+    assert.equal(missing.calls.length, 0)
+  })
+
+  it("sem acesso a processos → FORBIDDEN", async () => {
+    const { deps, calls } = withDecisions(makeDeps(() => analysis, { permissions: ["clients.view"] }))
+    assert.equal(await failure(analyzeJurisprudence(deps, { jurisprudenceId: J1 })), "FORBIDDEN")
+    assert.equal(calls.length, 0)
+  })
+
+  it("IA indisponível: o erro chega como erro (nada de análise simulada)", async () => {
+    const { deps } = withDecisions(
+      makeDeps(() => {
+        throw new AIError("MODEL_UNAVAILABLE")
+      }),
+    )
+    assert.equal(await failure(analyzeJurisprudence(deps, { jurisprudenceId: J1 })), "MODEL_UNAVAILABLE")
+  })
+
+  it("comparação com o processo: referência inventada é descartada; contagem vem das válidas", async () => {
+    const { deps } = withDecisions(
+      makeDeps(() => ({
+        visao_geral: "Uma decisão é muito parecida.",
+        decisoes: [
+          { ref: "J1", semelhanca: "alta", motivo: "Mesmo tema." },
+          { ref: "[j2]", semelhanca: "baixa", motivo: "Outro tema." },
+          { ref: "J9", semelhanca: "alta", motivo: "Decisão inventada." },
+          { ref: "J1", semelhanca: "alta", motivo: "Repetida." },
+        ],
+        cuidados: [],
+      })),
+    )
+    const result = await analyzeRelatedJurisprudence(deps, { processId: processA.id, ids: [J1, J2] })
+    assert.deepEqual(
+      result.data.decisoes.map((d) => d.ref),
+      ["J1", "J2"],
+    )
+    assert.deepEqual(result.counts, { alta: 1, media: 0, baixa: 1 })
+    assert.equal(result.analyzed, 2)
+  })
+
+  it("sem nenhuma decisão válida → INSUFFICIENT_DATA", async () => {
+    const { deps, calls } = withDecisions(makeDeps(() => ({})))
+    assert.equal(await failure(analyzeRelatedJurisprudence(deps, { processId: processA.id, ids: ["44444444-4444-4444-8444-444444444444"] })), "INSUFFICIENT_DATA")
+    assert.equal(calls.length, 0)
   })
 })

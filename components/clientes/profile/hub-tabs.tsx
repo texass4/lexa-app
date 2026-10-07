@@ -318,7 +318,7 @@ type TimelineFilter = "todos" | "cadastro" | "processos" | "tarefas" | "document
 
 const TIMELINE_GROUPS: Record<Exclude<TimelineFilter, "todos">, { label: string; types: ActivityType[] }> = {
   cadastro: { label: "Cadastro", types: ["client", "contract"] },
-  processos: { label: "Processos", types: ["petition", "movement", "hearing", "summons", "deadline"] },
+  processos: { label: "Processos", types: ["petition", "movement", "hearing", "summons", "deadline", "jurisprudence"] },
   tarefas: { label: "Tarefas", types: ["task"] },
   documentos: { label: "Documentos", types: ["document"] },
   agenda: { label: "Agenda", types: ["appointment"] },

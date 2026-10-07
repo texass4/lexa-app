@@ -88,7 +88,7 @@ export interface ChatReply {
 
 /* --------------------------------- fontes --------------------------------- */
 
-export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice"
+export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice" | "jurisprudence"
 
 /**
  * Registro real da Íntegra que o modelo recebeu com uma referência curta ("M3").
@@ -224,3 +224,27 @@ export type AIErrorCode =
   | "BLOCKED"
   | "UNAVAILABLE"
   | "UNEXPECTED"
+
+/* ------------------------------ jurisprudência ----------------------------- */
+
+/** Leitura de UMA decisão real da base. A IA interpreta; não é a fonte. */
+export interface JurisprudenceAnalysis {
+  resumo: string
+  tese_principal: string
+  resultado: string
+  pontos_relevantes: string[]
+  fundamentos_mencionados: string[]
+  relevancia_para_pesquisa: string
+  /** Só quando um processo foi informado. */
+  comparacao_com_processo: string
+  informacoes_ausentes: string[]
+}
+
+export type Similarity = "alta" | "media" | "baixa"
+
+/** Leitura de um conjunto de resultados reais frente a um processo. */
+export interface RelatedJurisprudenceAnalysis {
+  visao_geral: string
+  decisoes: { ref: string; semelhanca: Similarity; motivo: string }[]
+  cuidados: string[]
+}

@@ -508,6 +508,8 @@ export type ActivityType =
   | "summons"
   | "movement"
   | "deadline"
+  /** Jurisprudência vinculada a um processo. */
+  | "jurisprudence"
 
 export interface Activity extends TenantEntity {
   type: ActivityType

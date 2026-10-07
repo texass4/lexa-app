@@ -19,6 +19,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Permission } from "@/lib/auth/permissions"
 import { FINANCIAL_ACTIVITY_TYPES, visibleActivities } from "@/lib/financeiro/access"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, ProcessMovement, Task } from "@/types"
+import { DECISION_COLUMNS, isUuid, toDecision, type DecisionRow } from "@/lib/services/jurisprudence/store"
+import type { JurisprudenceDecision } from "@/lib/services/jurisprudence/types"
 
 /** Processo sem a lista de movimentações (só a mais recente) — para visões de vários processos. */
 export type ProcessOverview = Omit<Process, "movements"> & { lastMovement?: ProcessMovement }
@@ -77,6 +79,8 @@ export interface AIRepository {
   /** As atividades mais recentes do cliente. */
   listActivities(filter: { clientId: string; limit: number }): Promise<Activity[]>
   listMembers(): Promise<Member[]>
+  /** Decisões da base de jurisprudência (pública), pelo id. Exige `processes.view`. */
+  getJurisprudence(ids: string[]): Promise<JurisprudenceDecision[]>
 }
 
 const PAGE = 1000
@@ -293,6 +297,16 @@ export function createSupabaseRepository(supabase: SupabaseClient, organizationI
       const { data, error } = await supabase.from("profiles").select("id,name").eq("organization_id", organizationId)
       if (error) throw error
       return ((data ?? []) as Member[]).map(({ id, name }) => ({ id, name }))
+    },
+
+    async getJurisprudence(ids) {
+      const valid = [...new Set(ids.filter(isUuid))].slice(0, 20)
+      if (!can("processes.view") || !valid.length) return []
+      // Base pública: sem filtro de escritório (a RLS confere que é membro ativo).
+      const { data, error } = await supabase.from("jurisprudence").select(DECISION_COLUMNS).in("id", valid)
+      if (error) throw error
+      const byId = new Map(((data ?? []) as unknown as DecisionRow[]).map((row) => [row.id, toDecision(row)]))
+      return valid.map((id) => byId.get(id)).filter((d): d is JurisprudenceDecision => !!d)
     },
   }
 }

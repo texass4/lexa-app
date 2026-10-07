@@ -9,6 +9,8 @@ import type {
   AttentionPoint,
   ClientSummary,
   FinanceAnalysis,
+  JurisprudenceAnalysis,
+  RelatedJurisprudenceAnalysis,
   MovementAnalysis,
   NextActions,
   OfficeOverview,
@@ -95,4 +97,28 @@ export const financeAnalysisSchema: Schema<FinanceAnalysis> = object({
   pontos_atencao: array(attentionPoint, { max: 6 }),
   sugestoes: texts("Próximos passos práticos, sem números novos.", 5),
   perguntas_para_verificar: texts("Perguntas para o advogado conferir.", 4),
+})
+
+export const jurisprudenceAnalysisSchema: Schema<JurisprudenceAnalysis> = object({
+  resumo: string({ max: 1200, min: 1 }),
+  tese_principal: text("A tese como está na decisão; vazio se não constar.", 900),
+  resultado: text("Resultado do julgamento como consta do texto; vazio se não constar.", 600),
+  pontos_relevantes: texts("Pontos da própria decisão.", 6),
+  fundamentos_mencionados: texts("Somente dispositivos, súmulas ou precedentes que aparecem no texto da decisão.", 8),
+  relevancia_para_pesquisa: text(undefined, 700),
+  comparacao_com_processo: text("Vazio quando nenhum processo foi informado.", 900),
+  informacoes_ausentes: texts("O que a decisão não informa.", 6),
+})
+
+export const relatedJurisprudenceSchema: Schema<RelatedJurisprudenceAnalysis> = object({
+  visao_geral: string({ max: 900, min: 1 }),
+  decisoes: array(
+    object({
+      ref: string({ max: 12, min: 1, description: "Referência existente nos dados, ex.: J1." }),
+      semelhanca: oneOf(["alta", "media", "baixa"] as const),
+      motivo: text(undefined, 400),
+    }),
+    { max: 12 },
+  ),
+  cuidados: texts("Limites da comparação.", 4),
 })

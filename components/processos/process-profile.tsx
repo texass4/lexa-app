@@ -35,6 +35,7 @@ import { ProcessTriagePanel } from "@/components/triagem/process-triage"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
 import { ProcessAIDock } from "./process-ai-dock"
+import { ProcessJurisprudencePanel } from "@/components/jurisprudencia/process-jurisprudence"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
@@ -68,7 +69,7 @@ const WIDE_MIN = 896
 /** Altura do topo fixo (64 px no celular): as abas grudam logo abaixo dele. */
 const STICKY_OFFSET = 64
 
-type Section = "movimentacoes" | "prazos" | "documentos" | "dados" | "historico"
+type Section = "movimentacoes" | "prazos" | "documentos" | "jurisprudencia" | "dados" | "historico"
 
 /**
  * Largura do elemento, medida quando ele entra na tela (ref de callback, antes da
@@ -346,6 +347,8 @@ export function ProcessProfile({ id }: { id: string }) {
   )
 
   const signals = processSignals(data, process)
+  // `key`: a pesquisa e os vínculos são de cada processo.
+  const jurisprudencePanel = <ProcessJurisprudencePanel key={process.id} process={process} />
   /* `key`: cada processo tem suas próprias análises e conversa — nada vaza entre processos. */
   const aiPanel = <ProcessAIPanel key={process.id} process={process} client={client} signals={signals} compact={narrow} docked />
 
@@ -539,6 +542,7 @@ export function ProcessProfile({ id }: { id: string }) {
     { value: "movimentacoes", label: "Movimentações", count: detail.history ? process.movements.length : undefined },
     { value: "prazos", label: "Prazos e tarefas", count: openPrazos + pendingTasks },
     { value: "documentos", label: "Documentos", count: documents.length },
+    { value: "jurisprudencia", label: "Jurisprudência" },
     { value: "dados", label: "Dados" },
     ...(activityTotal ? [{ value: "historico" as const, label: "Histórico", count: activityTotal }] : []),
   ]
@@ -585,6 +589,7 @@ export function ProcessProfile({ id }: { id: string }) {
           </>
         )}
         {current === "documentos" && documentsPanel}
+        {current === "jurisprudencia" && jurisprudencePanel}
         {current === "dados" && (
           <>
             {detailsPanel}
@@ -621,6 +626,7 @@ export function ProcessProfile({ id }: { id: string }) {
         <div className="min-w-0 space-y-5 @4xl/main:col-span-7">
           {movementsPanel}
           <ProcessTriagePanel process={process} />
+          {jurisprudencePanel}
           {historyPanel}
         </div>
 
