@@ -15,7 +15,7 @@ import type { AIContext } from "./ai-context"
 import type { AIChat, ChatEntry } from "./use-ai"
 import { useLexaAI } from "./lexa-ai-provider"
 
-const TOPIC = { office: "o escritório", process: "este processo", client: "este cliente" } as const
+const TOPIC = { office: "o escritório", process: "este processo", client: "este cliente", jurisprudence: "esta decisão" } as const
 
 const CAPABILITIES = ["resumir", "explicar movimentações", "apontar o que merece atenção", "sugerir próximos passos"]
 
@@ -26,7 +26,8 @@ function AnswerActions({ entry, context }: { entry: ChatEntry; context: AIContex
   const { close } = useLexaAI()
   const [copied, setCopied] = React.useState(false)
   const scope = context.scope
-  const canTask = can("tasks.edit") && scope.type !== "office"
+  // Tarefa só nasce de conversa sobre processo ou cliente (decisão e escritório não têm vínculo).
+  const canTask = can("tasks.edit") && (scope.type === "process" || scope.type === "client")
 
   return (
     <div className="flex flex-wrap items-center gap-1 pt-0.5">

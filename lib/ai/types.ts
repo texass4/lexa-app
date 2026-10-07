@@ -188,7 +188,7 @@ export interface AIMessage {
   content: string
 }
 
-export type ChatScope = { type: "process"; id: string } | { type: "client"; id: string } | { type: "office" }
+export type ChatScope = { type: "process"; id: string } | { type: "client"; id: string } | { type: "office" } | { type: "jurisprudence"; id: string }
 
 export const CHAT_LIMITS = {
   /** Mensagens anteriores enviadas ao modelo (o resto fica só na tela). */

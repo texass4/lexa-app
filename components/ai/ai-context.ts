@@ -36,6 +36,15 @@ export const PROCESS_PROMPTS = [
   "O que devo fazer agora?",
   "Explique a última movimentação.",
   "Sugira próximos passos.",
+  "Há jurisprudência relacionada a este processo?",
+]
+
+/** Conversa sobre uma decisão da base de jurisprudência. */
+export const JURISPRUDENCE_PROMPTS = [
+  "Explique esta decisão em linguagem simples.",
+  "Qual é a tese e qual foi o resultado?",
+  "Quais fundamentos aparecem no texto?",
+  "Há decisões semelhantes na base?",
 ]
 
 export const CLIENT_PROMPTS = [
@@ -72,6 +81,15 @@ const SECTION: Record<string, Omit<AIContext, "scope">> = {
     headline: "Pergunte sobre os processos",
     prompts: ["Quais processos estão parados?", "Quais processos tiveram movimentação esta semana?", "Quais prazos vencem nos próximos 7 dias?"],
   },
+  jurisprudencia: {
+    subtitle: "Jurisprudência",
+    headline: "Pergunte à base de jurisprudência",
+    prompts: [
+      "Há jurisprudência sobre negativação indevida sem notificação prévia?",
+      "O que a base tem sobre dano moral por cobrança indevida?",
+      "Quais decisões o escritório salvou?",
+    ],
+  },
   clientes: {
     subtitle: "Clientes do escritório",
     headline: "Pergunte sobre os clientes",
@@ -90,6 +108,10 @@ export function processContext(id: string, code: string): AIContext {
     headline: "O que está acontecendo neste processo?",
     prompts: PROCESS_PROMPTS,
   }
+}
+
+export function jurisprudenceContext(id: string, label: string): AIContext {
+  return { scope: { type: "jurisprudence", id }, subtitle: label, headline: "O que esta decisão diz?", prompts: JURISPRUDENCE_PROMPTS }
 }
 
 export function clientContext(id: string, name: string): AIContext {

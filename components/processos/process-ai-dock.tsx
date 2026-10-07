@@ -1,13 +1,13 @@
 "use client"
 
-import { FileText, History, Lightbulb, ListChecks, MessageSquareText, Sparkles } from "lucide-react"
+import { BookOpenText, FileText, History, Lightbulb, ListChecks, MessageSquareText, Sparkles } from "lucide-react"
 import { AIDock, type DockPrompt } from "@/components/ai/ai-dock"
 import { PROCESS_PROMPTS, processContext } from "@/components/ai/ai-context"
 import { SignalList } from "@/components/shared/signal-list"
 import type { AttentionSignal } from "@/lib/dashboard/attention"
 import type { Process } from "@/types"
 
-const ICONS = [FileText, History, ListChecks, MessageSquareText, Lightbulb]
+const ICONS = [FileText, History, ListChecks, MessageSquareText, Lightbulb, BookOpenText]
 const PROMPTS: DockPrompt[] = PROCESS_PROMPTS.map((label, i) => ({ label, icon: ICONS[i] ?? Sparkles }))
 
 /** Quantos sinais cabem no destaque sem empurrar as sugestões. */

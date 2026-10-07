@@ -28,6 +28,7 @@ import { officeOverview } from "./office"
 import { financeAnalysis } from "./finance"
 import { analyzeJurisprudence, analyzeRelatedJurisprudence } from "./jurisprudence"
 import { chat, trimHistory } from "./chat"
+import { asksForJurisprudence, searchTermsFrom } from "../jurisprudence-intent"
 
 const failure = async (promise: Promise<unknown>) => {
   try {
@@ -703,6 +704,128 @@ describe("Análise da Íntegra — jurisprudência", () => {
   it("sem nenhuma decisão válida → INSUFFICIENT_DATA", async () => {
     const { deps, calls } = withDecisions(makeDeps(() => ({})))
     assert.equal(await failure(analyzeRelatedJurisprudence(deps, { processId: processA.id, ids: ["44444444-4444-4444-8444-444444444444"] })), "INSUFFICIENT_DATA")
+    assert.equal(calls.length, 0)
+  })
+})
+
+describe("conversa da Íntegra com a base de jurisprudência", () => {
+  const J1 = "11111111-1111-4111-8111-111111111111"
+  const J2 = "22222222-2222-4222-8222-222222222222"
+  const row = (id: string, ementa: string) => ({
+    id,
+    provider: "stj",
+    tribunal: "STJ",
+    external_id: id.slice(0, 8),
+    process_number: id === J1 ? "2100001" : "2100002",
+    registry_number: null,
+    class_code: "REsp",
+    class_name: null,
+    court: "TERCEIRA TURMA",
+    rapporteur: "MINISTRA TESTE",
+    judgment_date: "2025-09-16",
+    publication_date: null,
+    publication: null,
+    decision_type: null,
+    subject: "CONSUMIDOR. NEGATIVAÇÃO INDEVIDA",
+    ementa,
+    decision_text: null,
+    thesis: null,
+    keywords: null,
+    legislation: [],
+    cited_precedents: null,
+    notes: null,
+    area: "Direito Privado",
+    degree: "Superior",
+    source_url: null,
+    raw_reference: {},
+    updated_at: "2025-10-01T00:00:00Z",
+  })
+  const setup = (answer: string) => {
+    const built = makeDeps(() => answer)
+    built.db.tables.jurisprudence = [row(J1, "Ementa de teste sobre negativação indevida."), row(J2, "Outra ementa de teste.")] as never
+    const searches: { text: string; filters: object }[] = []
+    built.deps.repo.searchJurisprudence = async (text, filters) => {
+      searches.push({ text, filters })
+      return { decisions: await built.deps.repo.getJurisprudence([J1]), total: 7 }
+    }
+    return { ...built, searches }
+  }
+  const withSource = async <T,>(fn: () => Promise<T>) => {
+    const previous = process.env.JURISPRUDENCIA_FONTES
+    process.env.JURISPRUDENCIA_FONTES = "stj"
+    try {
+      return await fn()
+    } finally {
+      if (previous === undefined) delete process.env.JURISPRUDENCIA_FONTES
+      else process.env.JURISPRUDENCIA_FONTES = previous
+    }
+  }
+
+  it("intenção e termos: só o tema vai para a pesquisa", () => {
+    assert.ok(asksForJurisprudence("Há jurisprudência sobre negativação indevida?"))
+    assert.ok(asksForJurisprudence("O que o STJ decidiu sobre plano de saúde?"))
+    assert.ok(asksForJurisprudence("Existem precedentes para este caso?"))
+    assert.equal(asksForJurisprudence("Resuma este processo."), false)
+    assert.equal(searchTermsFrom("Há jurisprudência sobre negativação indevida?"), "negativação indevida")
+    assert.equal(searchTermsFrom("Existem precedentes para este caso?"), "")
+  })
+
+  it("pergunta com tema: pesquisa na base, cita [J1] e descarta referência inventada", async () => {
+    const { deps, calls, searches } = setup("Há a decisão [J1] da Terceira Turma. Veja também [J9].")
+    const result = await withSource(() => chat(deps, { type: "office" }, [{ role: "user", content: "Há jurisprudência sobre negativação indevida?" }]))
+    assert.equal(searches[0].text, "negativação indevida")
+    const sent = calls[0].system
+    assert.match(sent, /pesquisa_de_jurisprudencia/)
+    assert.match(sent, /Ementa de teste sobre negativação indevida/)
+    assert.match(sent, /"total_na_base":7/)
+    assert.equal(result.data.text.includes("[J9]"), false)
+    assert.equal(result.sources.J1.href, `/jurisprudencia?id=${J1}`)
+  })
+
+  it("no processo, sem tema na pergunta: pesquisa pelo assunto/tipo do processo", async () => {
+    const { deps, searches } = setup("Nada.")
+    await withSource(() => chat(deps, { type: "process", id: processA.id }, [{ role: "user", content: "Existem precedentes para este caso?" }]))
+    assert.equal(searches.length, 1)
+    assert.ok(searches[0].text.length > 3)
+  })
+
+  it("pergunta que não é sobre jurisprudência não pesquisa nada", async () => {
+    const { deps, calls, searches } = setup("Resumo.")
+    await withSource(() => chat(deps, { type: "office" }, [{ role: "user", content: "Quantos processos estão ativos?" }]))
+    assert.equal(searches.length, 0)
+    assert.equal(calls[0].system.includes("termos_pesquisados"), false)
+  })
+
+  it("sem fonte configurada: a conversa é avisada (nada de decisão do conhecimento do modelo)", async () => {
+    const previous = process.env.JURISPRUDENCIA_FONTES
+    delete process.env.JURISPRUDENCIA_FONTES
+    try {
+      const { deps, calls, searches } = setup("Não há base.")
+      await chat(deps, { type: "office" }, [{ role: "user", content: "Há jurisprudência sobre dano moral?" }])
+      assert.equal(searches.length, 0)
+      assert.match(calls[0].system, /ainda não está configurada/)
+    } finally {
+      if (previous !== undefined) process.env.JURISPRUDENCIA_FONTES = previous
+    }
+  })
+
+  it("conversa sobre uma decisão: o contexto é a decisão; 'semelhantes' não inclui ela mesma", async () => {
+    const { deps, calls, searches } = setup("A decisão [J1]…")
+    deps.repo.searchJurisprudence = async (text) => {
+      searches.push({ text, filters: {} })
+      return { decisions: await deps.repo.getJurisprudence([J1, J2]), total: 2 }
+    }
+    await withSource(() => chat(deps, { type: "jurisprudence", id: J1 }, [{ role: "user", content: "Há decisões semelhantes na base?" }]))
+    assert.equal(searches[0].text, "CONSUMIDOR. NEGATIVAÇÃO INDEVIDA")
+    const sent = calls[0].system
+    assert.match(sent, /UMA decisão da base de jurisprudência/)
+    assert.match(sent, /Outra ementa de teste/)
+    assert.match(sent, /"total_na_base":1/)
+  })
+
+  it("decisão inexistente na conversa → NOT_FOUND", async () => {
+    const { deps, calls } = setup("x")
+    assert.equal(await failure(chat(deps, { type: "jurisprudence", id: "33333333-3333-4333-8333-333333333333" }, [{ role: "user", content: "Explique." }])), "NOT_FOUND")
     assert.equal(calls.length, 0)
   })
 })

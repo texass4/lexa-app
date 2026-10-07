@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, FileJson, Link2, Unlink } from "lucide-react"
+import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, FileJson, Link2, MessageSquare, Unlink } from "lucide-react"
+import { jurisprudenceContext } from "@/components/ai/ai-context"
+import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
@@ -49,7 +51,7 @@ export function DecisionSheet({
   if (id && id !== shown) setShown(id)
   return (
     <SideSheet open={!!id} onOpenChange={onOpenChange} title="Decisão" className="sm:w-[640px]">
-      {shown && <SheetBody key={shown} id={shown} processId={processId} query={query} onChange={onChange} />}
+      {shown && <SheetBody key={shown} id={shown} processId={processId} query={query} onChange={onChange} onClose={() => onOpenChange(false)} />}
     </SideSheet>
   )
 }
@@ -88,8 +90,21 @@ function Section({ title, children, collapsible = false }: { title: string; chil
 
 const prose = "text-[13.5px] leading-relaxed whitespace-pre-line text-foreground"
 
-function SheetBody({ id, processId, query, onChange }: { id: string; processId?: string; query?: string; onChange?: (change: DecisionChange) => void }) {
+function SheetBody({
+  id,
+  processId,
+  query,
+  onChange,
+  onClose,
+}: {
+  id: string
+  processId?: string
+  query?: string
+  onChange?: (change: DecisionChange) => void
+  onClose: () => void
+}) {
   const { can } = useSession()
+  const lexa = useLexaAI()
   const data = useOfficeData()
   const [state, setState] = React.useState<{ loading: boolean; error?: string; value?: DecisionResponse }>({ loading: true })
   const [attempt, setAttempt] = React.useState(0)
@@ -210,6 +225,17 @@ function SheetBody({ id, processId, query, onChange }: { id: string; processId?:
               <ExternalLink /> Ver fonte original
             </a>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              // Um painel por vez: fecha a decisão e abre a conversa sobre ela.
+              onClose()
+              lexa.open(jurisprudenceContext(d.id, label))
+            }}
+          >
+            <MessageSquare /> Perguntar sobre esta decisão
+          </Button>
         </div>
       </header>
 

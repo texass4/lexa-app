@@ -112,6 +112,23 @@ relevância para a pesquisa e comparação com o processo — e diz o que não c
 dados. Números de processo, tribunal, relator e datas mostrados na tela vêm da base,
 não do texto do modelo.
 
+### Na conversa da Íntegra IA
+
+* **Pergunta sobre jurisprudência** ("há jurisprudência sobre negativação indevida?", "o que
+  o STJ decidiu sobre…", "existem precedentes para este caso?") → o servidor pesquisa na
+  base (a mesma busca da tela) com os termos da pergunta; sem tema na pergunta, usa o
+  assunto/tipo/classe do processo (ou o assunto da decisão). As 5 primeiras decisões vão
+  para o modelo como `pesquisa_de_jurisprudencia`, com referências [J1]… que viram link
+  para a decisão (`lib/ai/jurisprudence-intent.ts`, `lib/ai/services/chat.ts`).
+* **Conversa do processo** → sempre recebe as decisões vinculadas a ele.
+* **"Quais decisões o escritório salvou?"** → recebe as salvas (RLS do escritório).
+* **Conversa sobre uma decisão** (botão "Perguntar sobre esta decisão" no painel da
+  decisão; escopo `jurisprudence`) → o contexto é a decisão inteira; "há decisões
+  semelhantes?" pesquisa pelo assunto dela, sem repeti-la.
+* Regras: a IA só cita decisões desses dados; referência inexistente é apagada da
+  resposta; sem fonte configurada ou sem resultado, ela diz isso — nunca completa com
+  decisões do próprio conhecimento.
+
 ## 7. Pesquisa a partir do processo
 
 Na página do processo, "Jurisprudência relacionada" mostra as decisões vinculadas e, só

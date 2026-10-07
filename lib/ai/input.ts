@@ -5,6 +5,7 @@ import { CHAT_LIMITS, type AIMessage, type ChatScope } from "./types"
 
 /** Ids internos da Íntegra (`p_<uuid>`, `c_123`). */
 const ID = /^[A-Za-z0-9_-]{1,80}$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const bad = (message: string) => new AIError("BAD_REQUEST", { message })
 
@@ -25,6 +26,7 @@ export function readChatInput(body: unknown): { scope: ChatScope; messages: AIMe
   let parsedScope: ChatScope
   if (scope.type === "office") parsedScope = { type: "office" }
   else if (scope.type === "process" || scope.type === "client") parsedScope = { type: scope.type, id: readId(scope, "id") }
+  else if (scope.type === "jurisprudence" && typeof scope.id === "string" && UUID.test(scope.id)) parsedScope = { type: "jurisprudence", id: scope.id }
   else throw bad("Escopo da conversa inválido.")
 
   if (!Array.isArray(input.messages) || !input.messages.length || input.messages.length > 40) throw bad("Mensagens inválidas.")
@@ -38,8 +40,6 @@ export function readChatInput(body: unknown): { scope: ChatScope; messages: AIMe
   if (last.content.length > CHAT_LIMITS.messageChars) throw bad(`A pergunta pode ter até ${CHAT_LIMITS.messageChars} caracteres.`)
   return { scope: parsedScope, messages }
 }
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Análise de uma decisão: `{ jurisprudenceId, processId?, query? }`. */
 export function readJurisprudenceInput(body: unknown): { jurisprudenceId: string; processId?: string; query?: string } {

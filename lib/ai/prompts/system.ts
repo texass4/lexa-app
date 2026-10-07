@@ -3,7 +3,7 @@
  * Mudou o texto? Suba `PROMPT_VERSION` (invalida o cache de análises).
  */
 
-export const PROMPT_VERSION = "2026-09-26.1"
+export const PROMPT_VERSION = "2026-10-07.1"
 
 const LEXA_SYSTEM_PROMPT = `Você é a Íntegra IA, assistente integrada à plataforma Íntegra, sistema de gestão jurídica usado por escritórios de advocacia no Brasil.
 

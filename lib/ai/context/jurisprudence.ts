@@ -8,6 +8,7 @@
 import { PROCESS_STATUS } from "@/lib/core/config"
 import type { JurisprudenceDecision } from "@/lib/services/jurisprudence/types"
 import type { Process } from "@/types"
+import type { AISources } from "@/lib/ai/types"
 import { type BuiltContext, SourceRegistry, fmtDate, fmtDateTime, fmtToday } from "./shared"
 
 const LIMITS = { decisionText: 12_000, cited: 3_000, relatedEmenta: 2_500, movements: 5 } as const
@@ -104,4 +105,61 @@ export function buildRelatedContext(process: Process, decisions: JurisprudenceDe
     })),
   }
   return { context, sources: registry.sources, basis: "Baseado nas decisões encontradas na base oficial e nos dados do processo." }
+}
+
+/* --------------------------------- conversa -------------------------------- */
+
+export interface ChatJurisprudence {
+  /** Pesquisa feita na base para esta pergunta (ou por que não foi possível). */
+  search?: { query: string; total: number; decisions: JurisprudenceDecision[] } | { unavailable: string }
+  /** Vinculadas ao processo da conversa. */
+  linked?: JurisprudenceDecision[]
+  /** Salvas pelo escritório. */
+  saved?: JurisprudenceDecision[]
+}
+
+const CHAT_EMENTA = 1_500
+
+/**
+ * Bloco de jurisprudência para a conversa: só decisões reais da base, cada uma com uma
+ * referência [J1]… que vira link para a decisão. A mesma decisão em duas listas tem a
+ * mesma referência. Vem com as próprias fontes (prefixo J, sem colisão com o resto).
+ */
+export function jurisprudenceChatSection(input: ChatJurisprudence): { context: Record<string, unknown>; sources: AISources } {
+  const registry = new SourceRegistry()
+  const refs = new Map<string, string>()
+  const describe = (d: JurisprudenceDecision) => {
+    let ref = refs.get(d.id)
+    if (!ref) {
+      ref = registerDecision(registry, d)
+      refs.set(d.id, ref)
+    }
+    return {
+      ref,
+      tribunal: d.tribunal,
+      orgao_julgador: d.court,
+      processo: [d.classCode, d.processNumber].filter(Boolean).join(" ") || undefined,
+      relator: d.rapporteur,
+      data_do_julgamento: fmtDate(d.judgmentDate),
+      assunto: d.subject,
+      ementa: cut(d.ementa, CHAT_EMENTA),
+      tese_juridica: d.thesis,
+      fonte: d.sourceLabel,
+    }
+  }
+  const context: Record<string, unknown> = {}
+  if (input.linked?.length) context.jurisprudencia_vinculada_ao_processo = input.linked.map(describe)
+  if (input.saved?.length) context.jurisprudencia_salva_pelo_escritorio = input.saved.map(describe)
+  if (input.search) {
+    context.pesquisa_de_jurisprudencia =
+      "unavailable" in input.search
+        ? { situacao: input.search.unavailable }
+        : {
+            termos_pesquisados: input.search.query,
+            total_na_base: input.search.total,
+            base: "Somente decisões indexadas pela Íntegra a partir de fontes oficiais (hoje: STJ — Portal de Dados Abertos).",
+            decisoes: input.search.decisions.map(describe),
+          }
+  }
+  return { context, sources: registry.sources }
 }

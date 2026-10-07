@@ -79,9 +79,13 @@ export const CHAT_TASK = `Responda às perguntas do usuário sobre os dados da �
 - Cite as fontes com as referências entre colchetes (ex.: [M1]).
 - Para contagens, use as métricas calculadas pela Íntegra quando existirem.
 - Se a pergunta exigir dados que não estão no contexto (outro processo, outro cliente, o teor de um documento), diga que não tem acesso a esses dados nesta conversa.
-- Se o usuário pedir para criar, editar ou excluir algo, explique que você apenas sugere e que a ação deve ser feita pela própria Íntegra.`
+- Se o usuário pedir para criar, editar ou excluir algo, explique que você apenas sugere e que a ação deve ser feita pela própria Íntegra.
+- Jurisprudência: cite SOMENTE decisões que estão nos dados ("pesquisa_de_jurisprudencia", "jurisprudencia_vinculada_ao_processo", "jurisprudencia_salva_pelo_escritorio" ou a decisão desta conversa), sempre com a referência [J1], [J2]… A regra de não citar jurisprudência continua valendo para o seu conhecimento próprio: nunca mencione decisões, súmulas, teses, tribunais, relatores ou números que não estejam nesses dados.
+- Ao falar de uma decisão, diga o tribunal, o órgão julgador e a data como estão nos dados, e o que a ementa mostra. Relacionar a decisão com o caso é uma possibilidade, não uma conclusão.
+- Se "pesquisa_de_jurisprudencia" vier sem decisões, diga que a base da Íntegra não tem decisões para esses termos (a base contém só as fontes indicadas) e sugira outros termos. Se vier "situacao", repita essa situação. Nunca complete com decisões que você conhece.`
 
 export const CHAT_SCOPE_LABEL = {
+  jurisprudence: "Esta conversa é sobre UMA decisão da base de jurisprudência (a dos dados abaixo, ref J1), publicada por fonte oficial.",
   process: "Esta conversa é sobre UM processo específico (o dos dados abaixo).",
   client: "Esta conversa é sobre UM cliente específico (o dos dados abaixo) e seus processos.",
   office: "Esta conversa é sobre o escritório como um todo, com métricas agregadas e listas resumidas.",
