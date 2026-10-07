@@ -34,6 +34,7 @@ import { LimitedList } from "@/components/ui/show-more"
 import { ProcessTriagePanel } from "@/components/triagem/process-triage"
 import { LatestMovement } from "./latest-movement"
 import { ProcessAIPanel } from "@/components/ai/process-ai-panel"
+import { ProcessAIDock } from "./process-ai-dock"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
@@ -344,8 +345,9 @@ export function ProcessProfile({ id }: { id: string }) {
     </div>
   )
 
+  const signals = processSignals(data, process)
   /* `key`: cada processo tem suas próprias análises e conversa — nada vaza entre processos. */
-  const aiPanel = <ProcessAIPanel key={process.id} process={process} client={client} signals={processSignals(data, process)} compact={narrow} />
+  const aiPanel = <ProcessAIPanel key={process.id} process={process} client={client} signals={signals} compact={narrow} docked />
 
   const movementsPanel = (
     <Panel>
@@ -636,9 +638,15 @@ export function ProcessProfile({ id }: { id: string }) {
     </>
   )
 
+  // A partir de 1536 px, a Íntegra IA fica fixa à direita (como no perfil do cliente).
+  // A largura medida é a da tela toda, então o detalhe mantém as duas colunas ao lado dela.
   return (
-    <div ref={measure} className={narrow ? "space-y-5" : "space-y-6"}>
-      {width === undefined ? null : narrow ? narrowLayout : wideLayout}
+    <div ref={measure} className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] 2xl:gap-7">
+      <div className={cn("min-w-0", narrow ? "space-y-5" : "space-y-6")}>{width === undefined ? null : narrow ? narrowLayout : wideLayout}</div>
+
+      <aside className="sticky top-[96px] hidden h-[calc(100dvh-120px)] min-h-[560px] 2xl:block">
+        <ProcessAIDock key={process.id} process={process} signals={signals} className="h-full" />
+      </aside>
 
       <ConfirmDialog
         open={deleting}

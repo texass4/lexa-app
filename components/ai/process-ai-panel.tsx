@@ -50,11 +50,14 @@ export function ProcessAIPanel({
   client,
   signals,
   compact = false,
+  docked = false,
 }: {
   process: Process
   client?: Client
   signals: AttentionSignal[]
   compact?: boolean
+  /** A página tem a Íntegra IA fixa à direita a partir de 1536 px: lá ficam os sinais e as perguntas. */
+  docked?: boolean
 }) {
   const lexa = useLexaAI()
   const { status, ready } = lexa
@@ -139,7 +142,7 @@ export function ProcessAIPanel({
           </div>
         )}
         {showDetails && signals.length > 0 && (
-          <div className="px-3 pb-3">
+          <div className={cn("px-3 pb-3", docked && "2xl:hidden")}>
             <SignalList signals={signals} linked={false} />
           </div>
         )}
@@ -148,7 +151,7 @@ export function ProcessAIPanel({
             <AIUnavailable status={status} />
           </div>
         ) : !showDetails ? null : (
-          <div className="flex flex-wrap gap-1.5 border-t border-border px-5 py-3">
+          <div className={cn("flex flex-wrap gap-1.5 border-t border-border px-5 py-3", docked && "2xl:hidden")}>
             {SHORTCUTS.map((prompt) => (
               <button
                 key={prompt}
