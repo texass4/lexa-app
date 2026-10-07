@@ -114,7 +114,8 @@ export function DashboardView() {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                className="overflow-hidden"
+                // A partir de 1536 px a lista fica na coluna da Íntegra IA, à direita.
+                className="overflow-hidden 2xl:hidden"
               >
                 <AttentionPanel signals={signals} empty={empty} />
               </motion.div>
@@ -133,7 +134,7 @@ export function DashboardView() {
       </div>
 
       <aside className="sticky top-[96px] hidden h-[calc(100dvh-120px)] min-h-[560px] 2xl:block">
-        <OfficeAIDock />
+        <OfficeAIDock signals={signals} empty={empty} />
       </aside>
     </div>
   )
