@@ -88,7 +88,8 @@ export interface ChatReply {
 
 /* --------------------------------- fontes --------------------------------- */
 
-export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice" | "jurisprudence"
+/** `consulta`: uma fonte da Consulta processual (DataJud, DJEN, cadastro do escritório). */
+export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice" | "jurisprudence" | "consulta"
 
 /**
  * Registro real da Íntegra que o modelo recebeu com uma referência curta ("M3").
@@ -243,6 +244,16 @@ export interface JurisprudenceAnalysis {
 export type Similarity = "alta" | "media" | "baixa"
 
 /** Leitura de um conjunto de resultados reais frente a um processo. */
+/** Resumo da Consulta processual: o que está confirmado, o que é inferência e o que falta. */
+export interface EnrichmentSummary {
+  resumo: string
+  fatos_confirmados: { texto: string; refs: string[] }[]
+  inferencias: { texto: string; refs: string[] }[]
+  /** Preenchido pela Íntegra a partir do relatório (não pelo modelo). */
+  ausentes: string[]
+  cuidados: string[]
+}
+
 export interface RelatedJurisprudenceAnalysis {
   visao_geral: string
   decisoes: { ref: string; semelhanca: Similarity; motivo: string }[]

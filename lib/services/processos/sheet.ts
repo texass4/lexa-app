@@ -41,9 +41,13 @@ export interface ProcessSheet {
   degree?: string
   className?: string
   subject?: string
+  /** Todos os assuntos informados (o primeiro é o principal). Ausente em fichas antigas do cache. */
+  subjects?: string[]
   /** Termo neutro: a fonte não garante que seja uma vara. */
   judicialUnit?: string
   judicialUnitCode?: number
+  /** Código IBGE do município do órgão julgador, quando a fonte informa. */
+  judicialUnitMunicipality?: number
   system?: string
   format?: string
   /** `YYYY-MM-DD` */
@@ -106,8 +110,10 @@ export function buildProcessSheet(external: ExternalProcess): ProcessSheet {
     degree: external.degree,
     className: external.className,
     subject: external.subject,
+    subjects: external.subjects?.length ? external.subjects : undefined,
     judicialUnit: external.judicialUnit?.name,
     judicialUnitCode: external.judicialUnit?.code,
+    judicialUnitMunicipality: external.judicialUnit?.municipalityCode,
     system: external.system,
     format: external.format,
     filedAt: toLocal(external.filedAt)?.slice(0, 10),

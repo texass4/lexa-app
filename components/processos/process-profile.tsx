@@ -10,6 +10,7 @@ import {
   Copy,
   Ellipsis,
   FilePlus,
+  FileSearch,
   Hourglass,
   ListChecks,
   Plus,
@@ -52,6 +53,8 @@ import { ProcessJurisprudencePanel } from "@/components/jurisprudencia/process-j
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
+import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
+import { useStartConsulta } from "./consulta/start-consulta"
 import { PROCESS_STATUS } from "@/lib/core/config"
 import { useCategoryLookup } from "@/components/agenda/use-category"
 import { getNow, diffInDays, fmtDayLabel, fmtDayMonth, fmtDueIn, fmtNumericDate, fmtTime, parse } from "@/lib/core/dates"
@@ -104,6 +107,7 @@ export function ProcessProfile({ id }: { id: string }) {
   const data = useOfficeData()
   const { deleteProcess } = useOfficeActions()
   const { openDialog } = useUI()
+  const consulta = useStartConsulta()
   const router = useRouter()
   const lookup = useCategoryLookup()
   const ready = data.hydrated
@@ -184,6 +188,8 @@ export function ProcessProfile({ id }: { id: string }) {
   const canDocuments = can("documents.edit")
   const canTasks = can("tasks.edit")
   const canProcess = can("processes.edit")
+  const consultaDigits = process.cnj ?? onlyDigits(process.number ?? "")
+  const canConsult = canProcess && consultaDigits.length === 20 && hasValidCheckDigits(consultaDigits)
   const openPrazos = data.deadlines.filter((d) => d.processId === process.id && d.status === "aberto").length
   const pendingTasks = tasks.filter((t) => t.status === "pendente").length
 
@@ -248,6 +254,12 @@ export function ProcessProfile({ id }: { id: string }) {
     </div>
   )
 
+  const consultaItem = (
+    <DropdownMenuItem className="h-9 px-2" disabled={consulta.pending} onClick={() => consulta.start({ processId: process.id })}>
+      <FileSearch /> Consultar processo
+    </DropdownMenuItem>
+  )
+
   const deleteItem = (
     <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setDeleting(true)}>
       <Trash2 /> Excluir processo
@@ -282,6 +294,13 @@ export function ProcessProfile({ id }: { id: string }) {
             <Ellipsis />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 rounded-[10px] p-1">
+            {/* A consulta pública precisa do número CNJ. */}
+            {canConsult && (
+              <>
+                <DropdownMenuGroup>{consultaItem}</DropdownMenuGroup>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuGroup>{deleteItem}</DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -326,6 +345,7 @@ export function ProcessProfile({ id }: { id: string }) {
             {canProcess && (
               <>
                 {(canAgenda || canDocuments) && <DropdownMenuSeparator />}
+                {canConsult && <DropdownMenuGroup>{consultaItem}</DropdownMenuGroup>}
                 <DropdownMenuGroup>{deleteItem}</DropdownMenuGroup>
               </>
             )}
@@ -516,7 +536,15 @@ export function ProcessProfile({ id }: { id: string }) {
     </Panel>
   )
 
-  const syncPanel = <ProcessSyncPanel process={process} state={refresh.state} canRefresh={refresh.enabled} onRefresh={refresh.refresh} />
+  const syncPanel = (
+    <ProcessSyncPanel
+      process={process}
+      state={refresh.state}
+      canRefresh={refresh.enabled}
+      onRefresh={refresh.refresh}
+      onConsult={canConsult && !consulta.pending ? () => consulta.start({ processId: process.id }) : undefined}
+    />
+  )
 
   const detailsPanel = (
     <Panel>

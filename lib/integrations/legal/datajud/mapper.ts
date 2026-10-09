@@ -246,6 +246,7 @@ export function mapSearchResponse(response: DataJudSearchResponse, requestedCnj:
     className: text(source.classe?.nome),
     // A fonte devolve uma lista de assuntos; o primeiro é o principal.
     subject: source.assuntos?.map((a) => text(a?.nome)).find((name): name is string => !!name),
+    subjects: (source.assuntos ?? []).map((a) => text(a?.nome)).filter((name): name is string => !!name),
     system: text(source.sistema?.nome),
     format: text(source.formato?.nome),
     filedAt: isoDate(source.dataAjuizamento),

@@ -38,6 +38,7 @@ const PREFIX: Record<SourceKind, string> = {
   client: "C",
   invoice: "F",
   jurisprudence: "J",
+  consulta: "Q",
 }
 
 /** Distribui referências curtas e registra de onde cada uma veio. */

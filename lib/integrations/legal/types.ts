@@ -54,6 +54,8 @@ export interface ExternalProcess {
 
   className?: string
   subject?: string
+  /** Todos os assuntos, na ordem da fonte (o primeiro é o principal). */
+  subjects?: string[]
 
   system?: string
   /** Eletrônico / físico, quando informado. */

@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronRight, Ellipsis, Eye, Plus, Scale, Trash2 } from "lucide-react"
+import { ChevronRight, Ellipsis, Eye, FileSearch, Plus, Scale, Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { FilterTabs } from "@/components/ui/filter-tabs"
@@ -19,6 +19,7 @@ import { ShowMore, useRenderLimit } from "@/components/ui/show-more"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeadlineLabel } from "./deadline-label"
+import { StartConsultaDialog, useStartConsulta } from "./consulta/start-consulta"
 import { SignalDot } from "@/components/shared/signal-list"
 import { processSignals, type AttentionSignal } from "@/lib/dashboard/attention"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
@@ -31,6 +32,13 @@ import { nextPrazo } from "@/lib/prazos/prazos"
 import { byId } from "@/lib/store/indexes"
 import type { Process, ProcessStatus } from "@/types"
 import { Can } from "@/lib/auth/session"
+import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
+
+/** Processo com número CNJ válido (a consulta pública precisa dele). */
+const hasCnj = (p: Process) => {
+  const digits = p.cnj ?? onlyDigits(p.number ?? "")
+  return digits.length === 20 && hasValidCheckDigits(digits)
+}
 
 type Filter = "todos" | "prazos" | ProcessStatus
 
@@ -58,6 +66,8 @@ function SignalHint({ signal }: { signal?: AttentionSignal }) {
 export function ProcessesView() {
   const data = useOfficeData()
   const { deleteProcess } = useOfficeActions()
+  const consulta = useStartConsulta()
+  const [consultaOpen, setConsultaOpen] = React.useState(false)
   const { openDialog } = useUI()
   const router = useRouter()
   // Os dados vêm do armazenamento do navegador depois da hidratação.
@@ -132,9 +142,14 @@ export function ProcessesView() {
         description="Acompanhe prazos, audiências e movimentações de cada processo do escritório."
         actions={
           <Can permission="processes.edit">
-            <Button onClick={() => openDialog("process")}>
-              <Plus /> Novo processo
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setConsultaOpen(true)}>
+                <FileSearch /> Consultar processo
+              </Button>
+              <Button onClick={() => openDialog("process")}>
+                <Plus /> Novo processo
+              </Button>
+            </div>
           </Can>
         }
       />
@@ -249,12 +264,17 @@ export function ProcessesView() {
                               >
                                 <Ellipsis className="size-4" />
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44 rounded-[10px] p-1" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuContent align="end" className="w-48 rounded-[10px] p-1" onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenuGroup>
                                   <DropdownMenuItem className="h-8 px-2" onClick={() => router.push(`/processos/${p.id}`)}>
                                     <Eye /> Abrir processo
                                   </DropdownMenuItem>
                                   <Can permission="processes.edit">
+                                    {hasCnj(p) && (
+                                      <DropdownMenuItem className="h-8 px-2" disabled={consulta.pending} onClick={() => consulta.start({ processId: p.id })}>
+                                        <FileSearch /> Consultar processo
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem className="h-8 px-2" variant="destructive" onClick={() => setToDelete(p)}>
                                       <Trash2 /> Excluir processo
                                     </DropdownMenuItem>
@@ -319,6 +339,7 @@ export function ProcessesView() {
         </FadeIn>
       )}
 
+      <StartConsultaDialog open={consultaOpen} onOpenChange={setConsultaOpen} />
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={(o) => !o && setToDelete(null)}

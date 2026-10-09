@@ -1,6 +1,6 @@
 "use client"
 
-import { CircleAlert, RefreshCw, ShieldCheck, Users } from "lucide-react"
+import { CircleAlert, FileSearch, RefreshCw, ShieldCheck, Users } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
@@ -113,11 +113,14 @@ export function ProcessSyncPanel({
   state,
   canRefresh,
   onRefresh,
+  onConsult,
 }: {
   process: Process
   state: RefreshState
   canRefresh: boolean
   onRefresh: () => void
+  /** "Consultar processo": relatório completo das fontes (quando o processo tem CNJ). */
+  onConsult?: () => void
 }) {
   const origin = process.source?.provider ?? "manual"
   const auto = isAutoTracked(origin)
@@ -135,11 +138,20 @@ export function ProcessSyncPanel({
               : "Processo cadastrado pelo escritório."
         }
         action={
-          canRefresh && (
-            <Button variant="secondary" size="sm" onClick={onRefresh} disabled={refreshing}>
-              <RefreshCw className={cn(refreshing && "animate-spin")} />
-              {refreshing ? "Atualizando…" : "Atualizar"}
-            </Button>
+          (canRefresh || onConsult) && (
+            <div className="flex flex-wrap gap-2">
+              {onConsult && (
+                <Button variant="ghost" size="sm" onClick={onConsult}>
+                  <FileSearch /> Consultar
+                </Button>
+              )}
+              {canRefresh && (
+                <Button variant="secondary" size="sm" onClick={onRefresh} disabled={refreshing}>
+                  <RefreshCw className={cn(refreshing && "animate-spin")} />
+                  {refreshing ? "Atualizando…" : "Atualizar"}
+                </Button>
+              )}
+            </div>
           )
         }
       />

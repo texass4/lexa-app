@@ -151,6 +151,7 @@ export const OPERATION_LABEL: Record<string, string> = {
   "finance.analysis": "Análise do financeiro",
   "jurisprudence.analysis": "Análise de jurisprudência",
   "jurisprudence.related": "Jurisprudência semelhante ao processo",
+  "consulta.summary": "Resumo da consulta processual",
   "chat.process": "Chat — processo",
   "chat.client": "Chat — cliente",
   "chat.office": "Chat — escritório",

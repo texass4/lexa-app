@@ -198,6 +198,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 | `whatsapp/*` | `requireActor` | Central de Atendimento |
 | `whatsapp/webhook` | segredo do webhook | eventos da Z-API |
 | `cron/process-sync` | `Bearer CRON_SECRET` | monitoramento das movimentações dos processos |
+| `process-enrichment` · `process-enrichment/[id]` | `requireMember` (`processes.edit` para iniciar, `processes.view` para ler) | Consulta processual: inicia a execução (responde na hora, roda com `after`) e devolve etapas/fontes/relatório; ver `docs/CONSULTA_PROCESSUAL.md` |
 | `cron/jurisprudence-sync` | `Bearer CRON_SECRET` | alimenta a base de jurisprudência pelas fontes oficiais (STJ) — 1×/dia; ver `docs/JURISPRUDENCIA.md` |
 | `admin/*` | `requireAdmin` | Íntegra Admin |
 

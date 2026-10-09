@@ -73,6 +73,16 @@ export const RELATED_JURISPRUDENCE_TASK = `Compare o processo do escritório ("p
 - "visao_geral": 2 a 3 frases sobre o conjunto, sem números diferentes dos recebidos.
 - "cuidados": limites da comparação (ex.: o processo tem poucos dados; as ementas não trazem os fatos completos; a base contém só o STJ).`
 
+export const ENRICHMENT_SUMMARY_TASK = `Resuma para o advogado o resultado da Consulta processual nos dados abaixo. As informações vieram das fontes listadas em "fontes" (refs Q1, Q2…) e da base de jurisprudência (refs J1, J2…); você só organiza o que está lá.
+- Use SOMENTE os dados enviados. Não invente datas, decisões, partes, valores, nomes, órgãos ou números.
+- "fatos_confirmados": só o que está escrito nos dados, cada item com a referência da fonte de onde veio. Quando duas fontes divergem ("divergencia": true), diga que divergem e cite as duas; não escolha uma.
+- "inferencias": leituras possíveis (ex.: o que a última movimentação sugere), sempre como possibilidade ("pode indicar", "sugere"), nunca como fato.
+- Magistrado: só existe se estiver em "magistrado.mencoes", e é uma MENÇÃO numa comunicação publicada naquela data, com o papel escrito no texto. Nunca diga que alguém é o juiz responsável atual, nem deduza o juiz pelo nome da vara ou do órgão julgador. Sem menções, diga que o magistrado não foi identificado pelas fontes.
+- Jurisprudência: cite só as decisões dos dados, com a referência; relacioná-las ao caso é possibilidade, não conclusão.
+- "ausentes": as informações de "informacoes_indisponiveis" e o que mais faltar nos dados, em poucas palavras.
+- "cuidados": limites (ex.: a consulta pública não traz os autos; fonte não respondeu; sigilo).
+- "resumo": 2 a 4 frases, sem números diferentes dos recebidos.`
+
 export const CHAT_TASK = `Responda às perguntas do usuário sobre os dados da Íntegra desta conversa.
 - Responda de forma direta e curta. Use listas quando ajudar. Markdown simples permitido: **negrito**, listas com "-" e títulos "###". Nada de tabelas ou HTML.
 - Referências como "essa movimentação", "o último registro" ou "esse processo" dizem respeito ao escopo desta conversa.

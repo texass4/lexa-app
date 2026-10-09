@@ -53,6 +53,7 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 | `/clientes`, `/clientes/[id]` | `components/clientes/…` |
 | `/atendimento` (`?c=<conversa>` · `?cliente=<id>` abre a conversa mais recente do cliente) | `components/atendimento/atendimento-view.tsx` |
 | `/processos`, `/processos/[id]` | `components/processos/processes-view.tsx`, `process-profile.tsx` |
+| `/processos/consulta` (`?execucao=<id>`) | `components/processos/consulta/consulta-view.tsx` (Consulta processual) |
 | `/triagem` | redireciona para `/processos` (a Triagem foi removida; links antigos de atividades não quebram) |
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
@@ -67,7 +68,7 @@ Menu lateral e título do header: `components/layout/nav-config.ts`. Barra infer
 
 Não há processos fictícios. Todo processo vem da consulta automática ou de cadastro manual.
 
-**Regra de interface:** o usuário vê "Íntegra → processos → informações". Nome da fonte (DataJud), status HTTP, códigos internos, JSON e mensagens de erro técnicas **nunca** aparecem na tela — ficam nos logs do servidor (`[process-lookup] …`). Rótulos neutros em `lib/services/processos/labels.ts` (ex.: origem `datajud` → "Consulta automática").
+**Regra de interface:** o usuário vê "Íntegra → processos → informações". Nome da fonte (DataJud), status HTTP, códigos internos, JSON e mensagens de erro técnicas **nunca** aparecem na tela (exceção deliberada: o relatório da Consulta processual nomeia a fonte oficial de cada dado — é procedência, pedida pelo produto; continua sem status HTTP nem detalhe técnico) — ficam nos logs do servidor (`[process-lookup] …`). Rótulos neutros em `lib/services/processos/labels.ts` (ex.: origem `datajud` → "Consulta automática").
 
 **Consultar** — "Novo processo" → digitar o CNJ → **Preencher** (ou Enter):
 
@@ -76,6 +77,8 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 3. A ficha é salva na hora (`importProcess`). Se o CNJ já existe, é atualizado (`applyProcessSync`), nunca duplicado.
 
 **Cadastrar à mão** — o mesmo "Novo processo", sem depender da consulta (processos em segredo de justiça não estão nela): cliente, número (opcional; informado, só o formato e o dígito verificador do CNJ são conferidos — não precisa existir na consulta), tipo de ação/classe, área, tribunal, grau, órgão julgador, parte contrária, responsável, status, valor da causa, descrição/observações e **segredo de justiça (Sim/Não)**. Salva mesmo se a consulta não encontrou o processo ou estava fora do ar. O processo nasce com `origin: "manual"` ("Cadastrado pelo escritório" no perfil; o resumo diz "Informações cadastradas pelo escritório"). Em segredo de justiça (`secret`), "Preencher" e "Atualizar" ficam desligados e o processo nunca entra no monitoramento automático (que só pega processos importados da consulta). Se um cadastro manual com CNJ for atualizado depois, a regra de `mergeProcessSheet` é explícita: o que o escritório preencheu (tribunal, grau, órgão, classe…) prevalece e a fonte só completa o que estava vazio; as movimentações públicas entram normalmente.
+
+**Consultar processo** — workflow que reúne DataJud, comunicações oficiais (DJEN, desligada por padrão), jurisprudência e o cadastro do escritório num relatório com a fonte e a data de cada dado, magistrado só por menção explícita em publicação oficial, e "Não disponível na fonte consultada" para o resto. Execução no servidor com etapas visíveis, registrada em `process_enrichment_runs` (migração 0020). Detalhes, fontes, custos e limitações: `docs/CONSULTA_PROCESSUAL.md`.
 
 **Abrir um processo** — `use-process-refresh.ts`: o que está salvo aparece imediatamente; se a última consulta não é de hoje (mesma regra do monitoramento, `monitoring-policy.ts › isCheckDue`), uma atualização roda em segundo plano ("Atualizando informações…"), sem bloquear a página. Continua mesmo se a pessoa sair da tela. Só movimentações novas entram (hash em `movements.ts`; a regra de mescla é `process-sync.ts › mergeProcessSheet`, a mesma do servidor).
 

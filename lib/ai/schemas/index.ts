@@ -8,6 +8,7 @@ import type {
   ActionSuggestion,
   AttentionPoint,
   ClientSummary,
+  EnrichmentSummary,
   FinanceAnalysis,
   JurisprudenceAnalysis,
   RelatedJurisprudenceAnalysis,
@@ -108,6 +109,20 @@ export const jurisprudenceAnalysisSchema: Schema<JurisprudenceAnalysis> = object
   relevancia_para_pesquisa: text(undefined, 700),
   comparacao_com_processo: text("Vazio quando nenhum processo foi informado.", 900),
   informacoes_ausentes: texts("O que a decisão não informa.", 6),
+})
+
+export const enrichmentSummarySchema: Schema<EnrichmentSummary> = object({
+  resumo: string({ max: 900, min: 1, description: "2 a 4 frases sobre o que a consulta encontrou." }),
+  fatos_confirmados: array(object({ texto: text(undefined, 400), refs }), {
+    description: "Só o que está nos dados, cada um com a referência da fonte (Q1, Q2, J1…).",
+    max: 10,
+  }),
+  inferencias: array(object({ texto: text(undefined, 400), refs }), {
+    description: "Leituras possíveis a partir dos dados, sempre apresentadas como possibilidade.",
+    max: 5,
+  }),
+  ausentes: texts("Informações que nenhuma fonte trouxe.", 12),
+  cuidados: texts("Limites da consulta.", 4),
 })
 
 export const relatedJurisprudenceSchema: Schema<RelatedJurisprudenceAnalysis> = object({
