@@ -120,6 +120,8 @@ describe("Gemini — transcrição rápida", () => {
     for (const [model, thinking] of [
       ["gemini-2.5-flash", { thinkingBudget: 0 }],
       ["gemini-3-flash-preview", { thinkingLevel: "MINIMAL" }],
+      ["gemini-3.5-flash", { thinkingLevel: "MINIMAL" }],
+      ["gemini-3.8-flash", { thinkingLevel: "LOW" }],
     ] as const) {
       const { sent, client } = capture()
       const provider = new GeminiProvider({ apiKey: "k", model, lightModel: model, timeoutMs: 45_000, client })
@@ -151,5 +153,39 @@ describe("Gemini — transcrição rápida", () => {
     } finally {
       AbortSignal.timeout = original
     }
+  })
+})
+
+describe("Gemini — modelos atuais", () => {
+  const replying = (fail: Record<string, number>) => {
+    const sent: { model: string; config: { temperature?: number } }[] = []
+    const client: GeminiClientLike = {
+      models: {
+        async generateContent(params) {
+          sent.push(params as never)
+          const status = fail[params.model]
+          if (status) throw Object.assign(new Error(`status ${status}`), { status })
+          return { text: "ok", candidates: [{ finishReason: "STOP" }] }
+        },
+      },
+    }
+    return { sent, client }
+  }
+  const request = { system: "S", messages: [{ role: "user" as const, content: "Oi" }], temperature: 0.3 }
+
+  it("principal retirado da chave (404) sem reserva configurado: o leve responde", async () => {
+    const { sent, client } = replying({ "gemini-2.5-flash": 404 })
+    const provider = new GeminiProvider({ apiKey: "k", model: "gemini-2.5-flash", lightModel: "gemini-3.5-flash-lite", timeoutMs: 5_000, client, retryDelayMs: 0 })
+    const result = await provider.generateText(request)
+    assert.deepEqual(sent.map((p) => p.model), ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+    assert.equal(result.usage?.model, "gemini-3.5-flash-lite")
+  })
+
+  it("família 3 fica na temperatura padrão do Google; 2.5 mantém a pedida", async () => {
+    const { sent, client } = replying({})
+    await new GeminiProvider({ apiKey: "k", model: "gemini-3.5-flash", timeoutMs: 5_000, client }).generateText(request)
+    await new GeminiProvider({ apiKey: "k", model: "gemini-2.5-flash", timeoutMs: 5_000, client }).generateText(request)
+    assert.equal(sent[0].config.temperature, undefined)
+    assert.equal(sent[1].config.temperature, 0.3)
   })
 })

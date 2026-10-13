@@ -53,13 +53,22 @@ function thinkingFor(model: string) {
   return undefined
 }
 
-/** Transcrever não pede raciocínio: desliga onde dá (2.5 Flash) ou usa o nível mínimo (família 3). */
+/**
+ * Transcrever não pede raciocínio: desliga onde dá (2.5 Flash) ou usa o nível mínimo
+ * (Flash 3 a 3.5). Versões mais novas podem recusar o mínimo — ficam no "low".
+ */
 function minimalThinking(model: string) {
   if (/-lite\b/.test(model)) return undefined
   if (/^gemini-2\.5-flash/.test(model)) return { thinkingBudget: 0 }
-  if (/^gemini-3.*flash/.test(model)) return { thinkingLevel: ThinkingLevel.MINIMAL }
+  if (/^gemini-3(\.[0-5])?-flash/.test(model)) return { thinkingLevel: ThinkingLevel.MINIMAL }
   return thinkingFor(model)
 }
+
+/**
+ * A família 3 foi ajustada para a temperatura padrão (1.0): o Google desaconselha baixar,
+ * porque pode causar repetição e respostas piores. Nas anteriores, a nossa (baixa) vale.
+ */
+const temperatureFor = (model: string, requested?: number) => (/^gemini-3/.test(model) ? undefined : (requested ?? DEFAULT_TEMPERATURE))
 
 /** Teto de uma transcrição: fala rápida fica bem abaixo de 8 tokens por segundo. */
 const transcriptTokens = (seconds: number) => Math.min(1024, 128 + Math.ceil(seconds * 8))
@@ -146,9 +155,14 @@ export class GeminiProvider implements AIProvider {
     const timeout = AbortSignal.timeout(request.timeoutMs ?? this.timeoutMs)
     const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
     // Leve: se o modelo leve falhar, o principal responde (mais caro, mas o evento não fica sem análise).
+    // Principal sem reserva configurado: o leve é o reserva (ex.: modelo retirado da chave → 404).
     const first = this.modelFor(request.tier)
     const chain =
-      first !== this.model ? [first, this.model] : this.fallbackModels.length ? [this.model, ...this.fallbackModels] : [this.model, this.model]
+      first !== this.model
+        ? [first, this.model]
+        : this.fallbackModels.length
+          ? [this.model, ...this.fallbackModels]
+          : [this.model, this.lightModel]
 
     for (let i = 0; ; i++) {
       const model = chain[i]
@@ -182,7 +196,7 @@ export class GeminiProvider implements AIProvider {
         })),
       config: {
         systemInstruction: request.system,
-        temperature: request.temperature ?? DEFAULT_TEMPERATURE,
+        temperature: temperatureFor(model, request.temperature),
         maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
         thinkingConfig: request.reasoning === "minimal" ? minimalThinking(model) : thinkingFor(model),
         abortSignal: signal,

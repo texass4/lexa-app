@@ -15,9 +15,9 @@ import { AIError } from "./errors"
 import type { AIStatus } from "./types"
 
 /** Modelo padrão das análises. Troque por `AI_MODEL` sem mexer no código. */
-export const DEFAULT_AI_MODEL = "gemini-2.5-flash"
+export const DEFAULT_AI_MODEL = "gemini-3.5-flash"
 /** Modelo padrão das operações simples. Troque por `AI_MODEL_LIGHT`. */
-export const DEFAULT_AI_LIGHT_MODEL = "gemini-2.5-flash-lite"
+export const DEFAULT_AI_LIGHT_MODEL = "gemini-3.5-flash-lite"
 
 /** Tempo máximo de uma chamada ao modelo. */
 const DEFAULT_AI_TIMEOUT_MS = 45_000
