@@ -7,7 +7,7 @@
 
 import { GoogleGenAI, ThinkingLevel, type GenerateContentParameters } from "@google/genai"
 import { AIError } from "./errors"
-import type { AIProvider, AIProviderResult, AIRequest, AIUsage } from "./provider"
+import type { AIProvider, AIProviderResult, AIRequest, AITranscriptionRequest, AIUsage } from "./provider"
 import type { JsonSchema } from "./schema"
 
 /** O pedaço do SDK que usamos — permite testar sem rede. */
@@ -96,11 +96,31 @@ export class GeminiProvider implements AIProvider {
   }
 
   /**
+   * Áudio → texto com o mesmo modelo multimodal (o áudio vai como `inlineData`, em
+   * memória; nada é enviado à File API nem guardado). Vai pelo nível pedido (o leve,
+   * em geral) com o mesmo raciocínio mínimo e as mesmas reservas das outras chamadas.
+   */
+  async transcribe(request: AITranscriptionRequest): Promise<AIProviderResult<string>> {
+    const contents = [
+      {
+        role: "user",
+        parts: [{ inlineData: { mimeType: request.mimeType, data: Buffer.from(request.audio).toString("base64") } }, { text: request.prompt }],
+      },
+    ]
+    const { response, model } = await this.call(
+      { system: request.system, messages: [], temperature: 0, maxOutputTokens: 2048, signal: request.signal, tier: request.tier },
+      {},
+      contents,
+    )
+    return { value: readText(response), usage: usage(response, model) }
+  }
+
+  /**
    * Tenta o modelo principal e, se ele estiver sobrecarregado (503), sem cota (429)
    * ou indisponível (404), os reservas em ordem. Sem reserva, repete o principal uma
    * vez. Todas as tentativas dividem o mesmo tempo máximo.
    */
-  private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}) {
+  private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}, contents?: GenerateContentParameters["contents"]) {
     const timeout = AbortSignal.timeout(this.timeoutMs)
     const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
     // Leve: se o modelo leve falhar, o principal responde (mais caro, mas o evento não fica sem análise).
@@ -111,7 +131,7 @@ export class GeminiProvider implements AIProvider {
     for (let i = 0; ; i++) {
       const model = chain[i]
       try {
-        return { response: await this.attempt(model, request, extra, signal), model }
+        return { response: await this.attempt(model, request, extra, signal, contents), model }
       } catch (error) {
         if (request.signal?.aborted) throw new AIError("CANCELLED", { cause: error })
         if (timeout.aborted) throw new AIError("TIMEOUT", { cause: error })
@@ -123,13 +143,21 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
-  private attempt(model: string, request: AIRequest, extra: GenerateContentParameters["config"], signal: AbortSignal) {
+  private attempt(
+    model: string,
+    request: AIRequest,
+    extra: GenerateContentParameters["config"],
+    signal: AbortSignal,
+    contents?: GenerateContentParameters["contents"],
+  ) {
     return this.client.models.generateContent({
       model,
-      contents: request.messages.map((message) => ({
-        role: message.role === "assistant" ? "model" : "user",
-        parts: [{ text: message.content }],
-      })),
+      contents:
+        contents ??
+        request.messages.map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }],
+        })),
       config: {
         systemInstruction: request.system,
         temperature: request.temperature ?? DEFAULT_TEMPERATURE,

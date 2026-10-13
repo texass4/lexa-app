@@ -377,11 +377,11 @@ lib/ai/services/*  →  services/run.ts      cache no banco (cache.ts) + pedido 
 lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai; modelo por nível (standard/light)
 ```
 
-**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `finance/analysis` (exige `finance.view`; números das faturas calculados por `computeFinanceMetrics`, a IA só interpreta) · `chat`, `GET /api/ai/status` (ligada/configurada; não chama o modelo) e `GET /api/ai/usage` (uso do mês contra o plano). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
+**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `finance/analysis` (exige `finance.view`; números das faturas calculados por `computeFinanceMetrics`, a IA só interpreta) · `chat`, `transcribe` (áudio → texto, veja "Conversa por voz"), `GET /api/ai/status` (ligada/configurada; não chama o modelo) e `GET /api/ai/usage` (uso do mês contra o plano). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
 
 **Modelo reserva** — `AI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva, repete o principal uma vez. O log (`model`) mostra quem respondeu.
 
-**Trocar de provedor** — implemente `AIProvider` (`generateText` e `generateJSON`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
+**Trocar de provedor** — implemente `AIProvider` (`generateText`, `generateJSON` e, para a voz, `transcribe`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
 
 **Regras do modelo** — prompt único em `lib/ai/prompts/system.ts` (fato × inferência × limitação; sem prazos, jurisprudência ou fatos inventados; dados tratados como dados). Mudou o texto? Suba `PROMPT_VERSION`. Instruções de cada funcionalidade em `prompts/tasks.ts`; formato das respostas em `schemas/`.
 
@@ -403,9 +403,14 @@ lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/
 
 **Camada na interface** — há um único painel de conversa, em `LexaAIProvider` (`components/ai/lexa-ai-provider.tsx`, montado no `AppShell`). O contexto vem da rota: `/processos/[id]` → processo, `/clientes/[id]` → cliente, o resto → escritório, com perguntas próprias de cada tela (`components/ai/ai-context.ts`). Abra com `useLexaAI().open()` ou envie uma pergunta com `ask(prompt, contexto?)` — sempre a partir de um clique. A conversa pertence ao contexto (`key` do escopo): trocar de processo começa outra. Uma tela que quer tratar as fontes citadas (ex.: abrir a movimentação ali mesmo) usa `useAISourceHandler`. Gatilhos: botão "IA" no topo, Ctrl K ("Perguntar à Íntegra: …"), assistente lateral do Painel e do cliente, painel do Processo, detalhe da tarefa e Agenda.
 
+**Conversa por voz** — botão de microfone ao lado de "Enviar" (só aparece com a IA pronta). Fluxo: clique → o navegador pede o microfone (nunca antes do clique) → grava (`MediaRecorder`, até 60 s, indicador "Gravando · m:ss" com Cancelar/Concluir) → o próprio navegador converte para WAV PCM 16 bits mono 16 kHz (`components/ai/use-voice-input.ts` + `lib/ai/audio.ts`) → `POST /api/ai/transcribe` (corpo `audio/wav` bruto) → o texto entra no campo, somado ao que já estava digitado, para revisar e enviar pelo fluxo normal — nunca é enviado sozinho. Não usamos `SpeechRecognition` do navegador: não existe no Firefox, é parcial no Safari e, no Chrome, manda o áudio a um serviço fora do aviso de privacidade.
+- **Servidor** (`app/api/ai/transcribe/route.ts` → `lib/ai/services/transcribe.ts`): exige sessão e IA ligada; recusa tipo diferente de `audio/wav`, mais de ~1,9 MB, e lê o cabeçalho de verdade (`inspectWav`: PCM, mono, 16 kHz, 16 bits, 0,5–61 s) antes de chamar o modelo; 30 transcrições por pessoa a cada 10 min. A transcrição passa pela reserva e pelo consumo como qualquer chamada (operação `voice.transcribe`, modelo leve, mesmos reservas).
+- **Provedor**: `GeminiProvider.transcribe` envia o WAV como `inlineData` no `generateContent` (WAV é formato de áudio documentado da API; WebM/Opus não é garantido, por isso a conversão). Nada vai à File API, nada é gravado: o áudio existe só na memória do pedido. Outro provedor implementa `transcribe` em `AIProvider`; sem ele, a rota responde "não configurado".
+- **Erros**: permissão negada, sem microfone, microfone ocupado, navegador sem suporte (ou fora de HTTPS), gravação curta, silêncio (detectado no navegador, sem gastar cota), `NO_SPEECH` (o modelo devolve `[sem fala]`), falha de rede e de transcrição — todos com "Tentar de novo" e sem apagar o texto digitado. Fechar a conversa ou sair da tela cancela a gravação e desliga o microfone.
+
 **Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
 
-Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.
+Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts`, `lib/ai/services/services.test.ts`, `lib/ai/audio.test.ts` e `lib/ai/services/transcribe.test.ts`.
 
 ## Jurisprudência
 

@@ -39,6 +39,10 @@ const FEATURES: [string, string][] = [
     "Painel, processos e clientes",
     "Panorama do escritório, resumo e próximos passos do processo, análise de movimentação, resumo do cliente e chat — só quando alguém pede.",
   ],
+  [
+    "Conversa por voz",
+    "Quando alguém grava a pergunta, o áudio vai para a transcrição e é descartado em seguida — a Íntegra não guarda gravações. O texto volta para o campo, para revisão antes de enviar.",
+  ],
   ["Central de Atendimento", "Resumos e sugestões de resposta das conversas do WhatsApp, quando alguém pede — processados pela Anthropic (Claude)."],
 ]
 

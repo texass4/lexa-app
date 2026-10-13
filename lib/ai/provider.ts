@@ -40,6 +40,18 @@ export interface AIProviderResult<T> {
   usage?: AIUsage
 }
 
+/** Áudio para transcrever (já validado pelo servidor). */
+export interface AITranscriptionRequest {
+  audio: Uint8Array
+  mimeType: string
+  /** Instruções de sistema da transcrição. */
+  system: string
+  /** Pedido em texto que acompanha o áudio. */
+  prompt: string
+  signal?: AbortSignal
+  tier?: AITier
+}
+
 export interface AIProvider {
   readonly name: string
   readonly model: string
@@ -49,6 +61,8 @@ export interface AIProvider {
   generateText(request: AIRequest): Promise<AIProviderResult<string>>
   /** JSON seguindo `schema`. Devolve o objeto ainda não validado — quem chama valida. */
   generateJSON(request: AIRequest & { schema: JsonSchema }): Promise<AIProviderResult<unknown>>
+  /** Áudio → texto. Ausente = o provedor configurado não transcreve áudio. */
+  transcribe?(request: AITranscriptionRequest): Promise<AIProviderResult<string>>
 }
 
 let cached: { key: string; provider: AIProvider } | undefined

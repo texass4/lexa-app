@@ -225,6 +225,10 @@ export type AIErrorCode =
   | "BLOCKED"
   | "UNAVAILABLE"
   | "UNEXPECTED"
+  /** Conversa por voz: a gravação não tinha fala inteligível. */
+  | "NO_SPEECH"
+  /** Conversa por voz: áudio fora do formato, curto ou longo demais. */
+  | "INVALID_AUDIO"
 
 /* ------------------------------ jurisprudência ----------------------------- */
 

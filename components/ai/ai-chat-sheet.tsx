@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ArrowUp, Check, Copy, ListChecks, RotateCcw } from "lucide-react"
+import { ArrowUp, Check, Copy, ListChecks, Mic, RotateCcw, Square } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
@@ -14,6 +14,7 @@ import { AIMarkdown } from "./ai-markdown"
 import type { AIContext } from "./ai-context"
 import type { AIChat, ChatEntry } from "./use-ai"
 import { useLexaAI } from "./lexa-ai-provider"
+import { useVoiceInput, type VoiceState } from "./use-voice-input"
 
 const TOPIC = { office: "o escritório", process: "este processo", client: "este cliente", jurisprudence: "esta decisão" } as const
 
@@ -69,6 +70,57 @@ function AnswerActions({ entry, context }: { entry: ChatEntry; context: AIContex
   )
 }
 
+const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+
+/** Linha de estado da gravação, logo acima do campo (anunciada aos leitores de tela). */
+function VoiceStatus({ state, onCancel, onStop, onRetry }: { state: VoiceState; onCancel: () => void; onStop: () => void; onRetry: () => void }) {
+  if (state.status === "idle") return null
+  return (
+    <div role="status" aria-live="polite" className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+      {state.status === "requesting" && <span className="text-muted-foreground">Aguardando a permissão do microfone…</span>}
+      {state.status === "recording" && (
+        <>
+          <span className="flex items-center gap-1.5 font-medium text-danger">
+            <span aria-hidden className="size-2 animate-pulse rounded-full bg-danger" />
+            Gravando · <span className="tabular">{clock(state.seconds)}</span>
+            <span className="font-normal text-subtle">de 1:00</span>
+          </span>
+          <span className="ml-auto flex gap-1">
+            <Button type="button" variant="ghost" size="xs" onClick={onCancel}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="secondary" size="xs" onClick={onStop}>
+              Concluir
+            </Button>
+          </span>
+        </>
+      )}
+      {state.status === "processing" && (
+        <>
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span aria-hidden className="size-3 animate-spin rounded-full border-2 border-border-strong border-t-foreground" />
+            Transcrevendo o áudio…
+          </span>
+          <Button type="button" variant="ghost" size="xs" className="ml-auto" onClick={onCancel}>
+            Cancelar
+          </Button>
+        </>
+      )}
+      {state.status === "done" && <span className="text-success">Transcrição inserida no campo — revise e envie quando quiser.</span>}
+      {state.status === "error" && (
+        <>
+          <span className="min-w-0 flex-1 text-danger">{state.message}</span>
+          {state.reason !== "unsupported" && (
+            <Button type="button" variant="ghost" size="xs" onClick={onRetry}>
+              Tentar de novo
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 /**
  * Conversa com a Íntegra IA num painel lateral (de baixo, no mobile). O estado da
  * conversa fica no `LexaAIProvider` (`useAIChat`), então fechar e reabrir
@@ -91,16 +143,42 @@ export function AIChatSheet({
 }) {
   const [draft, setDraft] = React.useState("")
   const endRef = React.useRef<HTMLDivElement>(null)
+  const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const ready = isAIReady(status)
+
+  // Voz: a transcrição entra no campo (junto do que já foi digitado) para revisão — nunca é enviada sozinha.
+  const voice = useVoiceInput({
+    onTranscript: (text) => {
+      setDraft((current) => {
+        const next = current.trim() ? `${current.trimEnd()} ${text}` : text
+        return next.slice(0, CHAT_LIMITS.messageChars)
+      })
+      requestAnimationFrame(() => {
+        const input = inputRef.current
+        if (!input) return
+        input.focus()
+        input.setSelectionRange(input.value.length, input.value.length)
+      })
+    },
+  })
+  const listening = voice.state.status === "requesting" || voice.state.status === "recording"
+  const busyVoice = listening || voice.state.status === "processing"
+  const { cancel: cancelVoice } = voice
+
+  // Fechar a conversa nunca deixa o microfone ligado.
+  React.useEffect(() => {
+    if (!open) cancelVoice()
+  }, [open, cancelVoice])
 
   React.useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })
   }, [chat.messages.length, chat.pending])
 
   const submit = (text = draft) => {
-    if (!text.trim() || chat.pending || !ready) return
+    if (!text.trim() || chat.pending || !ready || busyVoice) return
     chat.send(text)
     setDraft("")
+    voice.reset()
   }
 
   return (
@@ -134,18 +212,23 @@ export function AIChatSheet({
           }}
           className="space-y-2"
         >
+          <VoiceStatus state={voice.state} onCancel={voice.cancel} onStop={voice.stop} onRetry={voice.start} />
           <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface px-3 py-2 focus-within:border-border-strong focus-within:ring-2 focus-within:ring-brand/25">
             <label htmlFor="lexa-ai-input" className="sr-only">
               Pergunte à Íntegra
             </label>
             <textarea
               id="lexa-ai-input"
+              ref={inputRef}
               rows={1}
               value={draft}
               maxLength={CHAT_LIMITS.messageChars}
               disabled={!ready}
               placeholder={ready ? `Pergunte sobre ${TOPIC[context.scope.type]}…` : "Conversa indisponível"}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value)
+                if (voice.state.status === "done") voice.reset()
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault()
@@ -154,7 +237,32 @@ export function AIChatSheet({
               }}
               className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] pointer-coarse:min-h-8 leading-snug outline-none field-sizing-content placeholder:text-subtle disabled:cursor-not-allowed"
             />
-            <Button type="submit" size="icon-sm" aria-label="Enviar pergunta" disabled={!draft.trim() || chat.pending || !ready}>
+            {ready && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={listening ? "Parar a gravação e transcrever" : "Falar a pergunta (gravar áudio)"}
+                aria-pressed={listening}
+                title={listening ? "Parar e transcrever" : "Falar a pergunta"}
+                disabled={voice.state.status === "processing" || voice.state.status === "requesting"}
+                onClick={() => (voice.state.status === "recording" ? voice.stop() : voice.start())}
+                className={cn(
+                  "text-muted-foreground",
+                  listening && "bg-danger-soft text-danger hover:bg-danger-soft hover:text-danger",
+                  voice.state.status === "processing" && "text-brand",
+                )}
+              >
+                {voice.state.status === "recording" ? (
+                  <Square className="fill-current" />
+                ) : voice.state.status === "processing" ? (
+                  <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+                ) : (
+                  <Mic />
+                )}
+              </Button>
+            )}
+            <Button type="submit" size="icon-sm" aria-label="Enviar pergunta" disabled={!draft.trim() || chat.pending || !ready || busyVoice}>
               <ArrowUp />
             </Button>
           </div>
