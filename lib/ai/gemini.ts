@@ -164,14 +164,22 @@ export class GeminiProvider implements AIProvider {
           ? [this.model, ...this.fallbackModels]
           : [this.model, this.lightModel]
 
+    // Cada tentativa (modelo, resultado, tempo) vai para o log do erro final.
+    const attempts: NonNullable<AIError["attempts"]> = []
+    const fail = (known: AIError, model: string, began: number) => {
+      attempts.push({ model, code: known.code, status: known.providerStatus, ms: Date.now() - began })
+      known.attempts = attempts
+      return known
+    }
     for (let i = 0; ; i++) {
       const model = chain[i]
+      const began = Date.now()
       try {
         return { response: await this.attempt(model, request, extra, signal, contents), model }
       } catch (error) {
-        if (request.signal?.aborted) throw new AIError("CANCELLED", { cause: error })
-        if (timeout.aborted) throw new AIError("TIMEOUT", { cause: error })
-        const known = mapGeminiError(error)
+        if (request.signal?.aborted) throw fail(new AIError("CANCELLED", { cause: error }), model, began)
+        if (timeout.aborted) throw fail(new AIError("TIMEOUT", { cause: error }), model, began)
+        const known = fail(mapGeminiError(error), model, began)
         const next = chain[i + 1]
         if (!next || !SWITCHABLE.has(known.code) || (next === model && known.code === "MODEL_UNAVAILABLE")) throw known
         if (next === model) await sleep(this.retryDelayMs, signal)

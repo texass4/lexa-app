@@ -61,6 +61,8 @@ export class AIError extends Error {
   readonly retryAfter?: number
   /** Status HTTP devolvido pelo provedor, quando houver — vai para o log (não é sensível). */
   readonly providerStatus?: number
+  /** Modelos tentados até o erro (preenchido pelo provedor) — só para o log. */
+  attempts?: { model: string; code: string; status?: number; ms: number }[]
 
   constructor(code: AIErrorCode, options: { message?: string; retryAfter?: number; providerStatus?: number; cause?: unknown } = {}) {
     super(options.message ?? AI_ERROR_MESSAGES[code], { cause: options.cause })

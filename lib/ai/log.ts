@@ -20,6 +20,8 @@ export interface AILogEvent {
   cached?: boolean
   inputTokens?: number
   outputTokens?: number
+  /** Num erro: cada modelo tentado, em ordem (ex.: "gemini-3.5-flash-lite 503 12.1s > gemini-3.5-flash TIMEOUT 18.4s"). */
+  attempts?: string
 }
 
 export type AILogger = (event: AILogEvent) => void

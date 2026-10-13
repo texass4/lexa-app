@@ -410,6 +410,8 @@ lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/
 
 **Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
 
+Diagnóstico com a chave real: `npm run ai:check` (texto e áudio de teste em cada modelo, com tempo e erro do provedor; `-- --wav=arquivo.wav` transcreve um WAV seu). Num erro, o log `[lexa-ia]` traz `attempts`: cada modelo tentado, com status e tempo.
+
 Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts`, `lib/ai/services/services.test.ts`, `lib/ai/audio.test.ts` e `lib/ai/services/transcribe.test.ts`.
 
 ## Jurisprudência

@@ -68,7 +68,8 @@ export async function track<T extends { cached?: boolean }>(
     return result as unknown as T
   } catch (error) {
     const known = isAIError(error) ? error : new AIError("UNEXPECTED", { cause: error })
-    log({ ...base, durationMs: Date.now() - started, ok: false, code: known.code, providerStatus: known.providerStatus })
+    const attempts = known.attempts?.map((a) => `${a.model} ${a.status ?? a.code} ${(a.ms / 1000).toFixed(1)}s`).join(" > ")
+    log({ ...base, durationMs: Date.now() - started, ok: false, code: known.code, providerStatus: known.providerStatus, attempts })
     throw known
   }
 }

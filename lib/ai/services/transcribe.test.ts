@@ -181,6 +181,17 @@ describe("Gemini — modelos atuais", () => {
     assert.equal(result.usage?.model, "gemini-3.5-flash-lite")
   })
 
+  it("o erro final lista cada modelo tentado (vai para o log)", async () => {
+    const { client } = replying({ "gemini-3.5-flash-lite": 503, "gemini-3.5-flash": 404 })
+    const provider = new GeminiProvider({ apiKey: "k", model: "gemini-3.5-flash", lightModel: "gemini-3.5-flash-lite", timeoutMs: 5_000, client, retryDelayMs: 0 })
+    const error = await provider.transcribe({ audio: wav(1), mimeType: "audio/wav", system: "S", prompt: "P", seconds: 1, tier: "light" }).catch((e) => e)
+    assert.equal(error.code, "MODEL_UNAVAILABLE")
+    assert.deepEqual(
+      error.attempts.map((a: { model: string; status?: number }) => `${a.model} ${a.status}`),
+      ["gemini-3.5-flash-lite 503", "gemini-3.5-flash 404"],
+    )
+  })
+
   it("família 3 fica na temperatura padrão do Google; 2.5 mantém a pedida", async () => {
     const { sent, client } = replying({})
     await new GeminiProvider({ apiKey: "k", model: "gemini-3.5-flash", timeoutMs: 5_000, client }).generateText(request)
