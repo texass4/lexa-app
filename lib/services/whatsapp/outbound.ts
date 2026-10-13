@@ -1,7 +1,7 @@
 /**
  * Envio pela Central — servidor apenas.
  *
- *   Tela → POST /api/whatsapp/conversations/:id/messages → aqui → provedor (Meta ou Z-API) → WhatsApp
+ *   Tela → POST /api/whatsapp/conversations/:id/messages → aqui → Meta (Cloud API) → WhatsApp
  *
  * A mensagem é gravada como `pending` antes de ir para o provedor (a tela já mostra) e
  * vira `sent` ou `failed` com a resposta. Entregue/lida chegam depois, pelo webhook.
@@ -14,20 +14,19 @@
 
 import { HttpError } from "@/lib/auth/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { ZapiError } from "@/lib/integrations/whatsapp/zapi/client"
 import { MetaError } from "@/lib/integrations/whatsapp/meta/client"
 import type { SendResult } from "@/lib/integrations/whatsapp/types"
 import { baseMime, extensionOf } from "@/lib/whatsapp/files"
 import { MAX_ATTACHMENT_BYTES, metaSendRefusal } from "@/lib/whatsapp/config"
 import { MESSAGE_SELECT, type MessageRow } from "@/lib/whatsapp/mappers"
-import { providerFor } from "./instances"
+import { LEGACY_CONNECTION, providerFor } from "./instances"
 import { touchConversation } from "./inbound"
 import { loadConversation, UUID, type Actor, type LoadedConversation } from "./actor"
 import { publicMessage } from "@/lib/core/public-error"
 
 const BUCKET = "whatsapp"
 const MAX_TEXT = 4096
-/** Tempo do link assinado que a Z-API usa para baixar o anexo. */
+/** Tempo do link assinado que o provedor usa para baixar o anexo. */
 const SIGNED_URL_SECONDS = 60 * 60
 
 export interface SendInput {
@@ -49,6 +48,8 @@ const db = () => getSupabaseAdmin()
 
 /** Regras do WhatsApp oficial, conferidas antes de gravar a mensagem. */
 function checkMetaRules(conversation: Pick<LoadedConversation, "instance" | "last_inbound_at">, type: SendInput["type"]) {
+  // Conversa de conexão antiga (removida): só o histórico e notas internas.
+  if (conversation.instance.provider !== "meta" && type !== "note") throw new HttpError(409, LEGACY_CONNECTION)
   const refusal = metaSendRefusal(conversation.instance.provider, conversation.last_inbound_at, type)
   if (refusal) throw new HttpError(409, refusal)
 }
@@ -81,7 +82,7 @@ async function loadMessage(id: string) {
   return data!
 }
 
-/** Manda para a Z-API uma mensagem já gravada como `pending` e grava o resultado. */
+/** Manda ao provedor uma mensagem já gravada como `pending` e grava o resultado. */
 async function dispatch(
   conversation: LoadedConversation,
   message: { id: string; type: string; body: string | null; reply_to_message_id: string | null; sent_at: string },
@@ -132,11 +133,10 @@ async function dispatch(
       p_at: new Date().toISOString(),
     })
   } catch (error) {
-    const known = error instanceof ZapiError || error instanceof MetaError || error instanceof HttpError
+    const known = error instanceof MetaError || error instanceof HttpError
     const reason = publicMessage(known ? error.message : "", "Não foi possível enviar a mensagem. Tente novamente.")
     const code = error instanceof MetaError && error.code !== undefined ? String(error.code) : null
-    if (error instanceof ZapiError) console.error("[whatsapp] Z-API recusou o envio:", error.status, error.detail)
-    else if (error instanceof MetaError) console.error("[whatsapp] Meta recusou o envio:", error.status, error.code ?? "", error.subcode ?? "", error.detail ?? "")
+    if (error instanceof MetaError) console.error("[whatsapp] Meta recusou o envio:", error.status, error.code ?? "", error.subcode ?? "", error.detail ?? "")
     else if (!(error instanceof HttpError)) console.error("[whatsapp] Falha no envio:", error)
     await db()
       .from("whatsapp_messages")

@@ -28,7 +28,7 @@ describe("WhatsApp oficial — regras de envio (antes de gravar)", () => {
     for (const type of ["image", "document", "audio"] as const) assert.match(metaSendRefusal("meta", hoursAgo(1), type, NOW) ?? "", /só mensagens de texto/)
   })
 
-  it("nota interna nunca vai ao WhatsApp: liberada sempre; conexão antiga não muda", () => {
+  it("nota interna nunca vai ao WhatsApp: liberada sempre; outro provedor não passa por estas regras", () => {
     assert.equal(metaSendRefusal("meta", null, "note", NOW), null)
     assert.equal(metaSendRefusal("zapi", null, "image", NOW), null)
   })

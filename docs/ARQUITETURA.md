@@ -27,7 +27,7 @@ Servidor (Route Handlers em app/api/*)
       ↓
   lib/services/<domínio>/*             regras de servidor (consulta de processos, e-mail, WhatsApp, jurisprudência…)
       ↓
-  lib/integrations/*                   clientes HTTP de terceiros (DataJud, Z-API)
+  lib/integrations/*                   clientes HTTP de terceiros (DataJud, Meta/WhatsApp)
 ```
 
 **Princípios**
@@ -104,7 +104,7 @@ lexa-app/
 │   ├── core/                    utilitários comuns
 │   ├── store/  auth/  ai/  admin/  supabase/
 │   ├── services/                servidor: email, jurisprudence, processos, whatsapp
-│   └── integrations/            legal/ (DataJud) · whatsapp/ (Z-API)
+│   └── integrations/            legal/ (DataJud) · whatsapp/meta (Cloud API)
 ├── types/                       tipos das entidades
 ├── supabase/
 │   ├── migrations/              SQL do banco em ordem (0001 → 0018): tabelas, RLS, funções, Storage
@@ -196,7 +196,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 | `processes/search`, `processes/[id]/sync`, `processes/monitoring` | `requireMember("processes.*")` | consulta de processo pelo CNJ e monitoramento |
 | `ai/*` | `aiRoute` | Íntegra IA (medição, limites e cache no banco) |
 | `whatsapp/*` | `requireActor` | Central de Atendimento |
-| `whatsapp/webhook` | segredo do webhook | eventos da Z-API |
+| `whatsapp/meta/webhook` | assinatura `X-Hub-Signature-256` (App Secret) | eventos da Meta (WhatsApp oficial) |
 | `cron/process-sync` | `Bearer CRON_SECRET` | monitoramento das movimentações dos processos |
 | `process-enrichment` · `process-enrichment/[id]` | `requireMember` (`processes.edit` para iniciar, `processes.view` para ler) | Consulta processual: inicia a execução (responde na hora, roda com `after`) e devolve etapas/fontes/relatório; ver `docs/CONSULTA_PROCESSUAL.md` |
 | `cron/jurisprudence-sync` | `Bearer CRON_SECRET` | alimenta a base de jurisprudência pelas fontes oficiais (STJ) — 1×/dia; ver `docs/JURISPRUDENCIA.md` |

@@ -260,8 +260,12 @@ export function ConversationView({
   }
 
   const outsideWindow = official && !insideServiceWindow(conversation.lastInboundAt, now)
+  // Conversa de outro número (a conexão antiga, desativada): fica o histórico e as notas internas.
+  const legacy = !!connection?.instance && connection.instance.id !== conversation.instanceId
   const replyBlocked =
-    health === "unconfigured"
+    legacy
+      ? "Conversa de uma conexão antiga do WhatsApp, desativada"
+      : health === "unconfigured"
       ? "WhatsApp não configurado"
       : health === "disconnected"
         ? "WhatsApp desconectado"

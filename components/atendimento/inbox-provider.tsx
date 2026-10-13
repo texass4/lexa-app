@@ -79,7 +79,7 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   React.useEffect(() => {
-    // Carga inicial de sistemas externos (Supabase e Z-API).
+    // Carga inicial de sistemas externos (Supabase e Meta).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload()
     reloadInstance()

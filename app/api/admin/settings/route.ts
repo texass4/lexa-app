@@ -7,6 +7,7 @@ import { sanitizeSettings } from "@/lib/admin/settings"
 import { loadPlans } from "@/lib/admin/data"
 import { isEmailConfigured } from "@/lib/services/email"
 import { describeAIModels } from "@/lib/ai/config"
+import { metaPlatformSetup } from "@/lib/services/whatsapp/instances"
 
 export const GET = route(async (request) => {
   await requireAdmin(request)
@@ -17,7 +18,7 @@ export const GET = route(async (request) => {
     // Só se existem, nunca o valor: segredos ficam nas variáveis de ambiente.
     secrets: {
       ai: !!process.env.GEMINI_API_KEY?.trim(),
-      whatsapp: !!(process.env.ZAPI_TOKEN || process.env.WHATSAPP_API_TOKEN),
+      whatsapp: metaPlatformSetup().ready,
       datajud: !!process.env.DATAJUD_API_KEY,
       email: isEmailConfigured(),
     },

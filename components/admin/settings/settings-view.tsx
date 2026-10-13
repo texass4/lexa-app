@@ -281,7 +281,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
                   onChange={(e) => set("whatsapp", { businessNumber: e.target.value })}
                 />
               </Field>
-              <SecretStatus ok={data.secrets.whatsapp} name="ZAPI_TOKEN" />
+              <SecretStatus ok={data.secrets.whatsapp} name="META_APP_SECRET, WHATSAPP_WEBHOOK_VERIFY_TOKEN, WHATSAPP_CREDENTIALS_KEY" />
             </div>
           </Section>
         </div>

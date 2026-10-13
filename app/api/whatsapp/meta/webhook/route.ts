@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   let failed = false
   for (const event of events) {
     try {
-      const outcome = await handleWebhookEvent(event, logged, "meta")
+      const outcome = await handleWebhookEvent(event, logged)
       followUps.push(...outcome.followUps)
     } catch (error) {
       failed = true

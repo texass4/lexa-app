@@ -28,8 +28,8 @@ integrations/legal/datajud/provider.ts    ProcessProvider: client.ts (timeout, r
 sheet.ts → import.ts                       ficha normalizada → processo da Íntegra
 
 Central de Atendimento (WhatsApp)
-    tela → /api/whatsapp/* → lib/services/whatsapp → Z-API → WhatsApp
-    WhatsApp → Z-API → /api/whatsapp/webhook → banco → Realtime → tela
+    tela → /api/whatsapp/* → lib/services/whatsapp → Meta (Cloud API) → WhatsApp
+    WhatsApp → Meta → /api/whatsapp/meta/webhook (assinado) → banco → Realtime → tela
 
 E-mail (convite, recuperação de senha)
     tela → Route Handler → lib/auth/mailer.ts → lib/services/email → Nodemailer → SMTP
@@ -182,9 +182,9 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 ## 4b. Central de Atendimento (WhatsApp)
 
-**Provedor:** o padrão é o **WhatsApp oficial** (WhatsApp Business Cloud API, da Meta). Cada escritório conecta o próprio número em Atendimento › Configurar; o token fica cifrado por escritório (`whatsapp_credentials`) e o webhook oficial é `POST /api/whatsapp/meta/webhook`, com assinatura. A arquitetura, as regras da Meta (janela de 24 h, só texto nesta etapa), a configuração e o que falta estão em **`docs/WHATSAPP_CLOUD_API.md`**. A Z-API, descrita abaixo, é **legado** (não oficial, via WhatsApp Web) e fica só para quem já a usa. As tabelas, a tela, as permissões e o Realtime são os mesmos para os dois provedores.
+**Provedor:** só o **WhatsApp oficial** (WhatsApp Business Cloud API, da Meta). Cada escritório conecta o próprio número em Atendimento › Configurar; o token fica cifrado por escritório (`whatsapp_credentials`) e o webhook é `POST /api/whatsapp/meta/webhook`, com assinatura. A arquitetura, as regras da Meta (janela de 24 h, só texto nesta etapa), a configuração e o que falta estão em **`docs/WHATSAPP_CLOUD_API.md`**. A conexão antiga (Z-API, não oficial) foi **removida**: as conversas dela continuam no banco como histórico (com notas internas), sem envio nem recebimento.
 
-**Vínculo com cliente:** telefone **não** vincula sozinho, nos dois provedores. A tela sugere o cliente de mesmo telefone e alguém confirma.
+**Vínculo com cliente:** telefone **não** vincula sozinho. A tela sugere o cliente de mesmo telefone e alguém confirma.
 
 **Tela** — `/atendimento`, três áreas: conversas (`conversation-list.tsx`) → conversa (`conversation-view.tsx`: cabeçalho com ações rápidas, busca, `message-list.tsx`, `composer.tsx`) → contexto jurídico (`context-panel.tsx`) com a aba Íntegra IA (`ai-panel.tsx`). Abaixo de 1280 px o contexto abre como painel lateral; no celular, lista e conversa se alternam. O `AppShell` dá altura total a essa rota.
 
@@ -192,7 +192,7 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 | Tabela | O quê |
 |---|---|
-| `whatsapp_instances` | conexão com a Z-API (sem token) e status |
+| `whatsapp_instances` | número oficial do escritório (Phone Number ID, WABA ID) e status; o token fica em `whatsapp_credentials` (cifrado, só o servidor) |
 | `whatsapp_contacts` | telefone do contato; `client_id` quando vinculado a um cliente |
 | `whatsapp_conversations` | uma por contato e instância; status, responsável, não lidas, prévia |
 | `whatsapp_messages` | recebidas, enviadas, notas internas (`note`) e registros (`event`) |
@@ -204,17 +204,17 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 Isolamento: RLS de leitura (`current_org_id()` + `whatsapp.view`) e **chaves estrangeiras compostas** `(organization_id, id)` — o banco recusa qualquer referência entre escritórios. O navegador só lê; toda escrita passa por `/api/whatsapp/*` (`requireActor` → serviço → service role). A tela recebe mudanças pelo Realtime do Supabase (`inbox-provider.tsx`), que respeita a mesma RLS.
 
-**Envio** — `POST /api/whatsapp/conversations/:id/messages` (`services/whatsapp/outbound.ts`): grava `pending`, chama a Z-API e vira `sent`/`failed`; entregue/lida chegam pelo webhook e só avançam (`whatsapp_apply_status`). Anexos: o navegador sobe em `whatsapp/<org>/outgoing/…` e a Z-API recebe um link assinado de 1 h. **Notas internas** são gravadas e param ali — o banco impede que uma nota tenha id do WhatsApp.
+**Envio** — `POST /api/whatsapp/conversations/:id/messages` (`services/whatsapp/outbound.ts`): confere as regras da Meta (janela de 24 h, só texto), grava `pending`, chama a Meta e vira `sent`/`failed`; entregue/lida chegam pelo webhook e só avançam (`whatsapp_apply_status`). **Notas internas** são gravadas e param ali — o banco impede que uma nota tenha id do WhatsApp.
 
-**Recebimento** — a Z-API chama `POST /api/whatsapp/webhook?token=<ZAPI_WEBHOOK_SECRET>` (rota pública no `proxy.ts`). O segredo é comparado em tempo constante e o `instanceId` do corpo define o escritório. `parseZapiWebhook` traduz o evento; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, cria a conversa e grava a mensagem (idempotente). O contato novo fica "Contato novo": a tela sugere o cliente de mesmo telefone (com e sem o nono dígito, `lib/whatsapp/phone.ts`), e vincular ou transformar em cliente é sempre uma ação confirmada. Mídias recebidas são copiadas para o Storage depois da resposta (`after`), porque os links da Z-API expiram.
+**Recebimento** — a Meta chama `POST /api/whatsapp/meta/webhook` (rota pública no `proxy.ts`), assinado com o App Secret; o Phone Number ID do evento define o escritório. `parseMetaWebhook` traduz; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, cria a conversa e grava a mensagem (idempotente). O contato novo fica "Contato novo": a tela sugere o cliente de mesmo telefone (com e sem o nono dígito, `lib/whatsapp/phone.ts`), e vincular ou transformar em cliente é sempre uma ação confirmada. Mídias recebidas são baixadas da Meta (com o token do escritório) para o Storage depois da resposta (`after`).
 
-**Instância** — a do `.env` pertence ao escritório de `ZAPI_ORGANIZATION_ID` (criada sozinha no primeiro uso). Credenciais nunca vão ao banco nem ao navegador; `providerFor()` (`services/whatsapp/instances.ts`) é o ponto a estender para vários números. Quem tem `office.manage` vê na Central o diagnóstico, o QR Code e o botão que cadastra os webhooks na Z-API.
+**Conexão** — quem tem `office.manage` conecta, revalida e desconecta o número em Atendimento › status da conexão (`meta-connection.tsx` → `/api/whatsapp/instance/meta` → `services/whatsapp/meta-connection.ts`). "Conectado" só depois de a Meta confirmar número, posse e assinatura do aplicativo.
 
 **Permissões** — `whatsapp.view` (ler), `whatsapp.edit` (responder, notas, tags, status, assumir conversa sem responsável), `whatsapp.assign` (distribuir e trocar responsável). Padrões por papel em `role_defaults` (0002) e `lib/auth/permissions.ts`.
 
 **Íntegra IA** — `POST /api/whatsapp/ai` (`services/whatsapp/ai.ts`, Claude via `@anthropic-ai/sdk`, saída estruturada com zod). Resume, sugere resposta, identifica tarefas e processos, analisa imagens/PDFs recebidos e escreve resumo interno. **Nunca executa nada**: a resposta sugerida vai para o campo (só sai com "Enviar") e criar tarefa / salvar nota pedem confirmação.
 
-Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZATION_ID`, `ZAPI_WEBHOOK_SECRET`, opcionais `ZAPI_WEBHOOK_BASE_URL` e `ANTHROPIC_API_KEY` (veja `.env.example`).
+Variáveis (da plataforma, uma vez): `META_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_CREDENTIALS_KEY`, opcionais `META_GRAPH_API_VERSION` e `ANTHROPIC_API_KEY` (veja `.env.example`).
 
 ---
 
@@ -347,7 +347,7 @@ Notificações (o envio de e-mail já existe — `sendEmail` em `lib/services/em
 
 **Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
 
-Autenticação, e-mail transacional (SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), o salvamento dos processos, os prazos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Autenticação, e-mail transacional (SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), o salvamento dos processos, os prazos, o WhatsApp oficial (Cloud API da Meta; depende da configuração do aplicativo da Meta), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 

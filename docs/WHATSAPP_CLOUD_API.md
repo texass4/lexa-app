@@ -22,7 +22,7 @@ Cliente no WhatsApp ──► Meta ──► POST /api/whatsapp/meta/webhook    
            grava "pendente" → "enviada"/"falhou")
 ```
 
-- **Provedor:** `lib/integrations/whatsapp/meta/` (cliente da Graph API e tradução do webhook), na mesma interface `WhatsAppProvider` da conexão antiga. Banco, serviços e tela são os mesmos.
+- **Provedor:** `lib/integrations/whatsapp/meta/` (cliente da Graph API e tradução do webhook), na interface `WhatsAppProvider`. Banco, serviços e tela são os da Central de Atendimento.
 - **Um aplicativo da Meta para a plataforma, um número por escritório.** O aplicativo da Íntegra recebe os webhooks de todos os escritórios. Cada escritório vincula o **próprio** número com a **própria** autorização: WABA ID, Phone Number ID e token de acesso. Não existe credencial global que represente todos os escritórios.
 - **Escritório de cada evento:** o `metadata.phone_number_id` do evento é casado com o número que o escritório vinculou. Um número só pode pertencer a um escritório (restrição no banco). Nada no corpo escolhe o escritório diretamente.
 
@@ -61,7 +61,7 @@ O teste SQL `supabase/tests/whatsapp_cloud.sql` (incluído no `npm run test:rls`
   - o registro `whatsapp_webhook_events` da Meta guarda uma cópia **sem conteúdo** (`redactMetaPayload`);
   - ninguém lê esse registro pelo navegador.
 - **Mídia recebida:** baixada depois da resposta, com o token, e só de domínios da Meta. Arquivos acima de 64 MB são recusados. Vai para o bucket privado `whatsapp/<escritório>/…`.
-- **Identidade:** o telefone **não** vincula o contato ao cliente automaticamente, porque telefone não prova identidade. A tela **sugere** o cliente com o mesmo telefone e alguém confirma ("Vincular"). Isso mudou também para a conexão antiga.
+- **Identidade:** o telefone **não** vincula o contato ao cliente automaticamente, porque telefone não prova identidade. A tela **sugere** o cliente com o mesmo telefone e alguém confirma ("Vincular").
 - **Permissões:** `whatsapp.view` para ler, `whatsapp.edit` para responder e `office.manage` para conectar ou desconectar o número.
 
 ## Regras da Meta aplicadas
@@ -148,4 +148,4 @@ Para validar contra a Meta de verdade:
 - **Reações.**
 - **Medição de uso e custo** por escritório. A Meta cobra modelos de mensagem pela tabela dela.
 
-A conexão antiga (Z-API, não oficial, via WhatsApp Web) continua no código só para quem já a usa. Ela não deve ser usada em escritórios novos.
+A conexão antiga (Z-API, não oficial, via WhatsApp Web) foi **removida**. As conversas dela continuam no banco como histórico: dá para ler e escrever notas internas, mas não para responder.

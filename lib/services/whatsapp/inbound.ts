@@ -1,8 +1,7 @@
 /**
  * Processamento dos webhooks do WhatsApp — servidor apenas (service role).
  *
- *   WhatsApp → Meta (Cloud API) → POST /api/whatsapp/meta/webhook → parseMetaWebhook ┐
- *   WhatsApp → Z-API (legado)   → POST /api/whatsapp/webhook      → parseZapiWebhook ┴→ aqui → banco → tela (Realtime)
+ *   WhatsApp → Meta (Cloud API) → POST /api/whatsapp/meta/webhook → parseMetaWebhook → aqui → banco → tela (Realtime)
  *
  * Tudo é idempotente: o provedor pode repetir um webhook, e a mesma mensagem nunca
  * entra duas vezes (única por conversa + id do WhatsApp). O escritório vem da
@@ -25,7 +24,7 @@ const BUCKET = "whatsapp"
 
 type MessageEvent = Extract<WebhookEvent, { kind: "message" }>
 
-/** Trabalho que pode rodar depois de responder à Z-API (download de mídia). */
+/** Trabalho que pode rodar depois de responder ao provedor (download de mídia). */
 export type FollowUp = () => Promise<void>
 
 export interface WebhookOutcome {
@@ -111,7 +110,7 @@ export async function touchConversation(
   if (error) console.error("[whatsapp] Falha ao atualizar a conversa:", error.message)
 }
 
-/** Arquivo recebido por link (Z-API) ou por id (Meta, baixado com a credencial do escritório). */
+/** Arquivo recebido por link ou por id (Meta: baixado com a credencial do escritório). */
 type MediaSource = { url: string } | { mediaId: string; instance: Instance }
 
 async function fetchMedia(source: MediaSource): Promise<{ bytes: Uint8Array; mimeType?: string }> {
@@ -175,7 +174,7 @@ async function processMessage(instance: Instance, event: MessageEvent, raw: unkn
   if (known) return { status: "ignored", reason: "mensagem já registrada", followUps: [] }
 
   if (event.fromMe) {
-    // Enviada pela Íntegra: o webhook pode chegar antes de a Z-API responder o envio.
+    // Enviada pela Íntegra: o webhook pode chegar antes de o provedor responder o envio.
     // Adota a mensagem pendente em vez de duplicá-la como "enviada pelo celular".
     const since = new Date(Date.now() - 2 * 60_000).toISOString()
     let pending = db()
@@ -330,8 +329,8 @@ async function processEvent(instance: Instance, event: WebhookEvent, raw: unknow
  * processa. `raw` é o que vai para o registro de diagnóstico (a rota da Meta manda
  * uma cópia sem o conteúdo das conversas).
  */
-export async function handleWebhookEvent(event: WebhookEvent, raw: unknown, provider: "zapi" | "meta" = "zapi"): Promise<WebhookOutcome> {
-  const instance = event.instanceExternalId ? await instanceByExternalId(event.instanceExternalId, provider) : null
+export async function handleWebhookEvent(event: WebhookEvent, raw: unknown): Promise<WebhookOutcome> {
+  const instance = event.instanceExternalId ? await instanceByExternalId(event.instanceExternalId) : null
 
   const { data: logged } = await db()
     .from("whatsapp_webhook_events")
@@ -339,7 +338,7 @@ export async function handleWebhookEvent(event: WebhookEvent, raw: unknown, prov
       organization_id: instance?.organization_id ?? null,
       instance_id: instance?.id ?? null,
       event_type: event.kind,
-      provider,
+      provider: "meta",
       payload: raw as object,
     })
     .select("id")

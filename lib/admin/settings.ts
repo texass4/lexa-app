@@ -54,7 +54,6 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
 
 export const WHATSAPP_PROVIDERS = [
   { value: "", label: "Nenhum" },
-  { value: "zapi", label: "Z-API" },
   { value: "meta", label: "WhatsApp Cloud API (Meta)" },
   { value: "twilio", label: "Twilio" },
   { value: "other", label: "Outro" },

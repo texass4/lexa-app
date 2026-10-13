@@ -115,7 +115,7 @@ export function toInstance(row: InstanceRow): WhatsAppInstance {
   return {
     id: row.id!,
     organizationId: row.organization_id!,
-    provider: row.provider ?? "zapi",
+    provider: row.provider ?? "meta",
     externalId: row.external_id!,
     businessAccountId: opt(row.business_account_id),
     name: row.name ?? "WhatsApp",

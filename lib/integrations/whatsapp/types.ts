@@ -1,6 +1,6 @@
 /**
- * Contrato neutro entre a Íntegra e um provedor de WhatsApp: a Cloud API oficial da
- * Meta (`meta/`) e, como legado, a Z-API (`zapi/`).
+ * Contrato neutro entre a Íntegra e o provedor de WhatsApp — hoje, a Cloud API oficial
+ * da Meta (`meta/`).
  *
  * Os serviços (`lib/services/whatsapp/*`) só conhecem estes tipos: trocar ou somar
  * um provedor é escrever outro adaptador que produza `WebhookEvent` e implemente
@@ -28,11 +28,7 @@ export interface WhatsAppProvider {
   sendDocument(input: SendBase & { url: string; fileName: string; extension: string; caption?: string }): Promise<SendResult>
   sendAudio(input: SendBase & { url: string }): Promise<SendResult>
   markRead(input: { phone: string; messageId: string }): Promise<void>
-  status(): Promise<{ connected: boolean; detail?: string; smartphoneConnected?: boolean }>
-  /** Só provedores que conectam por QR Code (Z-API). */
-  qrCode?(): Promise<{ image?: string; needsPasskey?: boolean }>
-  /** Só provedores em que o webhook é cadastrado por conexão (Z-API). Na Meta, é no aplicativo. */
-  configureWebhooks?(url: string): Promise<void>
+  status(): Promise<{ connected: boolean; detail?: string }>
   /** Mídia recebida que vem por id (Meta): baixa com a credencial do escritório. */
   downloadMedia?(mediaId: string): Promise<{ bytes: Uint8Array; mimeType?: string }>
   /** O provedor envia anexos pela Íntegra? (Meta: só texto nesta etapa.) */
