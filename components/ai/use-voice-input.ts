@@ -15,13 +15,13 @@ import * as React from "react"
 import { AUDIO_FORMAT, AUDIO_LIMITS, encodeWav, hasSound } from "@/lib/ai/audio"
 import { publicMessage } from "@/lib/core/public-error"
 
-export type VoiceErrorReason = "unsupported" | "denied" | "no-mic" | "busy" | "too-short" | "no-speech" | "network" | "failed"
+export type VoiceErrorReason = "unsupported" | "denied" | "no-mic" | "busy" | "too-short" | "no-speech" | "network" | "slow" | "failed"
 
 export type VoiceState =
   | { status: "idle" }
   | { status: "requesting" }
   | { status: "recording"; seconds: number }
-  | { status: "processing" }
+  | { status: "processing"; seconds: number }
   | { status: "done" }
   | { status: "error"; reason: VoiceErrorReason; message: string }
 
@@ -33,6 +33,7 @@ const MESSAGES: Record<VoiceErrorReason, string> = {
   "too-short": "A gravação ficou curta demais. Segure um pouco mais e fale a pergunta.",
   "no-speech": "Não identificamos fala na gravação. Fale mais perto do microfone e tente de novo.",
   network: "Sem conexão para transcrever o áudio. Verifique a internet e tente de novo.",
+  slow: "A transcrição demorou demais e foi interrompida. Tente de novo — o texto digitado continua no campo.",
   failed: "Não foi possível transcrever o áudio agora. Tente de novo.",
 }
 
@@ -86,6 +87,9 @@ function micError(error: unknown): VoiceErrorReason {
 /** Erros do servidor cuja mensagem ajuda aqui (limites, áudio recusado); o resto vira a mensagem da transcrição. */
 const SERVER_MESSAGE = new Set(["INVALID_AUDIO", "RATE_LIMITED", "PLAN_LIMIT", "PROVIDER_RATE_LIMITED", "DISABLED", "NOT_CONFIGURED", "FORBIDDEN"])
 
+/** O servidor desiste em 30 s; aqui há folga para a resposta chegar. Nunca fica "transcrevendo" para sempre. */
+const CLIENT_TIMEOUT_MS = 40_000
+
 const failure = (reason: VoiceErrorReason, message = MESSAGES[reason]): VoiceState => ({ status: "error", reason, message })
 
 export function useVoiceInput({ onTranscript }: { onTranscript: (text: string) => void }) {
@@ -109,8 +113,7 @@ export function useVoiceInput({ onTranscript }: { onTranscript: (text: string) =
     stream.current = null
   }, [])
 
-  const transcribe = React.useCallback(async (blob: Blob, id: number) => {
-    setState({ status: "processing" })
+  const send = React.useCallback(async (blob: Blob, id: number) => {
     let samples: Float32Array
     try {
       samples = await toMono16k(blob)
@@ -125,6 +128,11 @@ export function useVoiceInput({ onTranscript }: { onTranscript: (text: string) =
 
     const controller = new AbortController()
     request.current = controller
+    let slow = false
+    const limit = setTimeout(() => {
+      slow = true
+      controller.abort()
+    }, CLIENT_TIMEOUT_MS)
     let response: Response
     try {
       response = await fetch("/api/ai/transcribe", {
@@ -134,9 +142,13 @@ export function useVoiceInput({ onTranscript }: { onTranscript: (text: string) =
         signal: controller.signal,
       })
     } catch {
-      if (id === session.current && !controller.signal.aborted) setState(failure("network"))
+      if (id === session.current) {
+        if (slow) setState(failure("slow"))
+        else if (!controller.signal.aborted) setState(failure("network"))
+      }
       return
     } finally {
+      clearTimeout(limit)
       if (request.current === controller) request.current = null
     }
     if (id !== session.current) return
@@ -144,11 +156,32 @@ export function useVoiceInput({ onTranscript }: { onTranscript: (text: string) =
     if (!response.ok || !data?.text) {
       const code = data?.error?.code
       if (code === "NO_SPEECH") return setState(failure("no-speech"))
+      if (code === "TIMEOUT") return setState(failure("slow"))
       return setState(failure("failed", code && SERVER_MESSAGE.has(code) ? publicMessage(data?.error?.message, MESSAGES.failed) : MESSAGES.failed))
     }
     transcriptRef.current(data.text)
     setState({ status: "done" })
   }, [])
+
+  /** Conversão + envio, com o tempo decorrido à vista (nunca um "transcrevendo" mudo). */
+  const transcribe = React.useCallback(
+    async (blob: Blob, id: number) => {
+      const began = Date.now()
+      setState({ status: "processing", seconds: 0 })
+      const clock = setInterval(() => {
+        const seconds = Math.floor((Date.now() - began) / 1000)
+        setState((s) => (s.status === "processing" ? { status: "processing", seconds } : s))
+      }, 1000)
+      ticker.current = clock
+      try {
+        await send(blob, id)
+      } finally {
+        clearInterval(clock)
+        if (ticker.current === clock) ticker.current = null
+      }
+    },
+    [send],
+  )
 
   const stop = React.useCallback(() => {
     const active = recorder.current

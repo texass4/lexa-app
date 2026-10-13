@@ -53,6 +53,19 @@ function thinkingFor(model: string) {
   return undefined
 }
 
+/** Transcrever não pede raciocínio: desliga onde dá (2.5 Flash) ou usa o nível mínimo (família 3). */
+function minimalThinking(model: string) {
+  if (/-lite\b/.test(model)) return undefined
+  if (/^gemini-2\.5-flash/.test(model)) return { thinkingBudget: 0 }
+  if (/^gemini-3.*flash/.test(model)) return { thinkingLevel: ThinkingLevel.MINIMAL }
+  return thinkingFor(model)
+}
+
+/** Teto de uma transcrição: fala rápida fica bem abaixo de 8 tokens por segundo. */
+const transcriptTokens = (seconds: number) => Math.min(1024, 128 + Math.ceil(seconds * 8))
+/** Transcrever um pedido de até 1 min leva segundos; acima disso algo travou. */
+const TRANSCRIBE_TIMEOUT_MS = 30_000
+
 /** Falhas que outro modelo (ou uma nova tentativa) pode resolver. */
 const SWITCHABLE = new Set(["UNAVAILABLE", "PROVIDER_RATE_LIMITED", "MODEL_UNAVAILABLE"])
 
@@ -98,7 +111,8 @@ export class GeminiProvider implements AIProvider {
   /**
    * Áudio → texto com o mesmo modelo multimodal (o áudio vai como `inlineData`, em
    * memória; nada é enviado à File API nem guardado). Vai pelo nível pedido (o leve,
-   * em geral) com o mesmo raciocínio mínimo e as mesmas reservas das outras chamadas.
+   * em geral), com as mesmas reservas, sem raciocínio, resposta do tamanho do áudio
+   * (uma repetição sem fim do modelo para cedo) e tempo máximo próprio, mais curto.
    */
   async transcribe(request: AITranscriptionRequest): Promise<AIProviderResult<string>> {
     const contents = [
@@ -108,7 +122,15 @@ export class GeminiProvider implements AIProvider {
       },
     ]
     const { response, model } = await this.call(
-      { system: request.system, messages: [], temperature: 0, maxOutputTokens: 2048, signal: request.signal, tier: request.tier },
+      {
+        system: request.system,
+        messages: [],
+        maxOutputTokens: transcriptTokens(request.seconds),
+        signal: request.signal,
+        tier: request.tier,
+        timeoutMs: Math.min(this.timeoutMs, TRANSCRIBE_TIMEOUT_MS),
+        reasoning: "minimal",
+      },
       {},
       contents,
     )
@@ -121,7 +143,7 @@ export class GeminiProvider implements AIProvider {
    * vez. Todas as tentativas dividem o mesmo tempo máximo.
    */
   private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}, contents?: GenerateContentParameters["contents"]) {
-    const timeout = AbortSignal.timeout(this.timeoutMs)
+    const timeout = AbortSignal.timeout(request.timeoutMs ?? this.timeoutMs)
     const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
     // Leve: se o modelo leve falhar, o principal responde (mais caro, mas o evento não fica sem análise).
     const first = this.modelFor(request.tier)
@@ -162,7 +184,7 @@ export class GeminiProvider implements AIProvider {
         systemInstruction: request.system,
         temperature: request.temperature ?? DEFAULT_TEMPERATURE,
         maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-        thinkingConfig: thinkingFor(model),
+        thinkingConfig: request.reasoning === "minimal" ? minimalThinking(model) : thinkingFor(model),
         abortSignal: signal,
         ...extra,
       },

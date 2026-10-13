@@ -100,6 +100,11 @@ function VoiceStatus({ state, onCancel, onStop, onRetry }: { state: VoiceState; 
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <span aria-hidden className="size-3 animate-spin rounded-full border-2 border-border-strong border-t-foreground" />
             Transcrevendo o áudio…
+            {state.seconds >= 3 && (
+              <span aria-hidden className="tabular text-subtle">
+                {state.seconds} s
+              </span>
+            )}
           </span>
           <Button type="button" variant="ghost" size="xs" className="ml-auto" onClick={onCancel}>
             Cancelar

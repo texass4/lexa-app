@@ -29,7 +29,7 @@ export async function transcribeAudio(deps: AIServiceDeps, audio: Uint8Array): P
 
   return track<{ text: string; seconds: number; cached?: boolean }>(deps, "voice.transcribe", async () => {
     const { value, usage } = await meteredCall(deps.meter, provider, { organizationId: deps.repo.organizationId, userId: deps.userId, operation: "voice.transcribe" }, "light", () =>
-      transcribe({ audio, mimeType: AUDIO_FORMAT.mimeType, system: TRANSCRIBE_SYSTEM, prompt: TRANSCRIBE_PROMPT, signal: deps.signal, tier: "light" }),
+      transcribe({ audio, mimeType: AUDIO_FORMAT.mimeType, system: TRANSCRIBE_SYSTEM, prompt: TRANSCRIBE_PROMPT, seconds: checked.info.seconds, signal: deps.signal, tier: "light" }),
     )
     const text = cleanTranscript(value)
     if (!text) throw new AIError("NO_SPEECH")

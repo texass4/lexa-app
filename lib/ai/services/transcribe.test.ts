@@ -88,15 +88,68 @@ describe("Gemini — pedido de transcrição", () => {
     }
     const provider = new GeminiProvider({ apiKey: "chave-de-teste", model: "gemini-2.5-flash", lightModel: "gemini-2.5-flash-lite", timeoutMs: 10_000, client })
     const audio = wav(1)
-    const result = await provider.transcribe({ audio, mimeType: "audio/wav", system: "S", prompt: "Transcreva o áudio.", tier: "light" })
+    const result = await provider.transcribe({ audio, mimeType: "audio/wav", system: "S", prompt: "Transcreva o áudio.", seconds: 1, tier: "light" })
     assert.equal(result.value, "Resuma o processo.")
-    const params = sent[0] as { model: string; contents: { parts: { inlineData?: { mimeType: string; data: string }; text?: string }[] }[]; config: { systemInstruction: string; temperature: number } }
+    const params = sent[0] as { model: string; contents: { parts: { inlineData?: { mimeType: string; data: string }; text?: string }[] }[]; config: { systemInstruction: string; maxOutputTokens: number } }
     assert.equal(params.model, "gemini-2.5-flash-lite")
     assert.equal(params.config.systemInstruction, "S")
-    assert.equal(params.config.temperature, 0)
+    assert.equal(params.config.maxOutputTokens, 128 + 8)
+    assert.equal((params.config as { thinkingConfig?: unknown }).thinkingConfig, undefined)
     const [audioPart, textPart] = params.contents[0].parts
     assert.equal(audioPart.inlineData?.mimeType, "audio/wav")
     assert.deepEqual(Buffer.from(audioPart.inlineData!.data, "base64"), Buffer.from(audio))
     assert.equal(textPart.text, "Transcreva o áudio.")
+  })
+})
+
+describe("Gemini — transcrição rápida", () => {
+  const capture = () => {
+    const sent: { model: string; config: { maxOutputTokens: number; thinkingConfig?: unknown; abortSignal?: AbortSignal } }[] = []
+    const client: GeminiClientLike = {
+      models: {
+        async generateContent(params) {
+          sent.push(params as never)
+          return { text: "ok", candidates: [{ finishReason: "STOP" }] }
+        },
+      },
+    }
+    return { sent, client }
+  }
+
+  it("sem raciocínio no 2.5 Flash, nível mínimo na família 3; resposta do tamanho do áudio", async () => {
+    for (const [model, thinking] of [
+      ["gemini-2.5-flash", { thinkingBudget: 0 }],
+      ["gemini-3-flash-preview", { thinkingLevel: "MINIMAL" }],
+    ] as const) {
+      const { sent, client } = capture()
+      const provider = new GeminiProvider({ apiKey: "k", model, lightModel: model, timeoutMs: 45_000, client })
+      await provider.transcribe({ audio: wav(1), mimeType: "audio/wav", system: "S", prompt: "P", seconds: 60, tier: "light" })
+      assert.deepEqual(sent[0].config.thinkingConfig, thinking)
+      assert.equal(sent[0].config.maxOutputTokens, 128 + 480)
+    }
+  })
+
+  it("trava do provedor: desiste em 30 s (não nos 45 s das análises) com TIMEOUT", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] })
+    const client: GeminiClientLike = {
+      models: {
+        generateContent: (params) =>
+          new Promise((_, reject) => params.config?.abortSignal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })))),
+      },
+    }
+    let timeoutMs = 0
+    const original = AbortSignal.timeout
+    AbortSignal.timeout = (ms: number) => {
+      timeoutMs = ms
+      return original.call(AbortSignal, 1)
+    }
+    try {
+      const provider = new GeminiProvider({ apiKey: "k", model: "gemini-2.5-flash", lightModel: "gemini-2.5-flash-lite", timeoutMs: 45_000, client })
+      const outcome = await provider.transcribe({ audio: wav(1), mimeType: "audio/wav", system: "S", prompt: "P", seconds: 1, tier: "light" }).catch((e) => e.code)
+      assert.equal(timeoutMs, 30_000)
+      assert.equal(outcome, "TIMEOUT")
+    } finally {
+      AbortSignal.timeout = original
+    }
   })
 })

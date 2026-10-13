@@ -23,6 +23,10 @@ export interface AIRequest {
   signal?: AbortSignal
   /** `light`: operação simples — usa o modelo mais barato (`AI_MODEL_LIGHT`). */
   tier?: AITier
+  /** Tempo máximo desta chamada (padrão: `AI_TIMEOUT_MS`). */
+  timeoutMs?: number
+  /** `minimal`: tarefa mecânica (ex.: transcrever) — o mínimo de raciocínio que o modelo aceita. */
+  reasoning?: "minimal"
 }
 
 export interface AIUsage {
@@ -48,6 +52,8 @@ export interface AITranscriptionRequest {
   system: string
   /** Pedido em texto que acompanha o áudio. */
   prompt: string
+  /** Duração do áudio: limita o tamanho da resposta (uma transcrição não passa disso). */
+  seconds: number
   signal?: AbortSignal
   tier?: AITier
 }
