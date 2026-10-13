@@ -121,7 +121,7 @@ O que foi validado aqui:
 
 Para validar contra a Meta de verdade:
 
-1. Configure a plataforma (seção acima) num ambiente com HTTPS público, como homologação ou um túnel.
+1. Configure a plataforma (seção acima) num ambiente com HTTPS público, como homologação ou um túnel. No modo de desenvolvimento por túnel, os domínios `*.trycloudflare.com` e `*.ngrok-free.app` já são aceitos (`next.config.ts`); para outro domínio, use `DEV_ALLOWED_ORIGINS`. A tela também pode ser usada por `http://localhost:3000`: o túnel só precisa existir para a Meta entregar o webhook.
 2. No painel do app, use o **número de teste** da Meta e cadastre o seu celular como destinatário permitido.
 3. Conecte o número de teste em Atendimento › Configurar. O status deve ficar "Conectado", com o nome do número.
 4. Mande uma mensagem do seu celular para o número de teste. Ela deve aparecer na lista em segundos.
