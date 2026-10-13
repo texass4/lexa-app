@@ -34,6 +34,8 @@ interface GeminiOptions {
   client?: GeminiClientLike
   /** Espera antes de repetir o mesmo modelo (sem reserva configurado). */
   retryDelayMs?: number
+  /** Tempos da transcrição (total e por modelo). Padrão: 30 s e 14 s. */
+  transcribeTimeouts?: { totalMs: number; attemptMs: number }
 }
 
 const DEFAULT_TEMPERATURE = 0.2
@@ -72,8 +74,11 @@ const temperatureFor = (model: string, requested?: number) => (/^gemini-3/.test(
 
 /** Teto de uma transcrição: fala rápida fica bem abaixo de 8 tokens por segundo. */
 const transcriptTokens = (seconds: number) => Math.min(1024, 128 + Math.ceil(seconds * 8))
-/** Transcrever um pedido de até 1 min leva segundos; acima disso algo travou. */
-const TRANSCRIBE_TIMEOUT_MS = 30_000
+/**
+ * Transcrever um pedido de até 1 min leva poucos segundos; acima disso algo travou.
+ * Cada modelo tem a sua parte do tempo: se o primeiro trava, o seguinte ainda responde.
+ */
+const TRANSCRIBE_TIMEOUTS = { totalMs: 30_000, attemptMs: 14_000 }
 
 /** Falhas que outro modelo (ou uma nova tentativa) pode resolver. */
 const SWITCHABLE = new Set(["UNAVAILABLE", "PROVIDER_RATE_LIMITED", "MODEL_UNAVAILABLE"])
@@ -86,6 +91,7 @@ export class GeminiProvider implements AIProvider {
   private readonly client: GeminiClientLike
   private readonly timeoutMs: number
   private readonly retryDelayMs: number
+  private readonly transcribeTimeouts: { totalMs: number; attemptMs: number }
 
   constructor(options: GeminiOptions) {
     if (typeof window !== "undefined") throw new Error("GeminiProvider só pode rodar no servidor.")
@@ -94,6 +100,7 @@ export class GeminiProvider implements AIProvider {
     this.fallbackModels = options.fallbackModels ?? []
     this.timeoutMs = options.timeoutMs
     this.retryDelayMs = options.retryDelayMs ?? 1500
+    this.transcribeTimeouts = options.transcribeTimeouts ?? TRANSCRIBE_TIMEOUTS
     // Sem novas tentativas dentro do SDK: quem decide repetir ou trocar de modelo é `call`.
     this.client = options.client ?? new GoogleGenAI({ apiKey: options.apiKey })
   }
@@ -137,7 +144,8 @@ export class GeminiProvider implements AIProvider {
         maxOutputTokens: transcriptTokens(request.seconds),
         signal: request.signal,
         tier: request.tier,
-        timeoutMs: Math.min(this.timeoutMs, TRANSCRIBE_TIMEOUT_MS),
+        timeoutMs: Math.min(this.timeoutMs, this.transcribeTimeouts.totalMs),
+        attemptTimeoutMs: this.transcribeTimeouts.attemptMs,
         reasoning: "minimal",
       },
       {},
@@ -174,14 +182,17 @@ export class GeminiProvider implements AIProvider {
     for (let i = 0; ; i++) {
       const model = chain[i]
       const began = Date.now()
+      const own = request.attemptTimeoutMs ? AbortSignal.timeout(request.attemptTimeoutMs) : undefined
       try {
-        return { response: await this.attempt(model, request, extra, signal, contents), model }
+        return { response: await this.attempt(model, request, extra, own ? AbortSignal.any([signal, own]) : signal, contents), model }
       } catch (error) {
         if (request.signal?.aborted) throw fail(new AIError("CANCELLED", { cause: error }), model, began)
         if (timeout.aborted) throw fail(new AIError("TIMEOUT", { cause: error }), model, began)
-        const known = fail(mapGeminiError(error), model, began)
+        // Este modelo passou do tempo dele: o próximo (outro modelo) ainda cabe no tempo total.
+        const known = fail(own?.aborted ? new AIError("TIMEOUT", { cause: error }) : mapGeminiError(error), model, began)
         const next = chain[i + 1]
-        if (!next || !SWITCHABLE.has(known.code) || (next === model && known.code === "MODEL_UNAVAILABLE")) throw known
+        const switchable = SWITCHABLE.has(known.code) || (own?.aborted && next !== model)
+        if (!next || !switchable || (next === model && known.code === "MODEL_UNAVAILABLE")) throw known
         if (next === model) await sleep(this.retryDelayMs, signal)
       }
     }

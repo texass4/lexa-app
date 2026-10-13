@@ -25,6 +25,8 @@ export interface AIRequest {
   tier?: AITier
   /** Tempo máximo desta chamada (padrão: `AI_TIMEOUT_MS`). */
   timeoutMs?: number
+  /** Tempo máximo de cada modelo: passou, o próximo da lista tenta (dentro de `timeoutMs`). */
+  attemptTimeoutMs?: number
   /** `minimal`: tarefa mecânica (ex.: transcrever) — o mínimo de raciocínio que o modelo aceita. */
   reasoning?: "minimal"
 }

@@ -131,7 +131,7 @@ describe("Gemini — transcrição rápida", () => {
     }
   })
 
-  it("trava do provedor: desiste em 30 s (não nos 45 s das análises) com TIMEOUT", async (t) => {
+  it("trava do provedor: desiste em 30 s no total (não nos 45 s das análises), 14 s por modelo", async (t) => {
     t.mock.timers.enable({ apis: ["setTimeout"] })
     const client: GeminiClientLike = {
       models: {
@@ -139,16 +139,17 @@ describe("Gemini — transcrição rápida", () => {
           new Promise((_, reject) => params.config?.abortSignal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })))),
       },
     }
-    let timeoutMs = 0
+    const asked: number[] = []
     const original = AbortSignal.timeout
     AbortSignal.timeout = (ms: number) => {
-      timeoutMs = ms
-      return original.call(AbortSignal, 1)
+      asked.push(ms)
+      return original.call(AbortSignal, ms === 30_000 ? 1 : 60_000)
     }
     try {
       const provider = new GeminiProvider({ apiKey: "k", model: "gemini-2.5-flash", lightModel: "gemini-2.5-flash-lite", timeoutMs: 45_000, client })
       const outcome = await provider.transcribe({ audio: wav(1), mimeType: "audio/wav", system: "S", prompt: "P", seconds: 1, tier: "light" }).catch((e) => e.code)
-      assert.equal(timeoutMs, 30_000)
+      assert.equal(asked[0], 30_000)
+      assert.equal(asked[1], 14_000)
       assert.equal(outcome, "TIMEOUT")
     } finally {
       AbortSignal.timeout = original
@@ -190,6 +191,37 @@ describe("Gemini — modelos atuais", () => {
       error.attempts.map((a: { model: string; status?: number }) => `${a.model} ${a.status}`),
       ["gemini-3.5-flash-lite 503", "gemini-3.5-flash 404"],
     )
+  })
+
+  it("transcrição: modelo que trava cede a vez ao próximo dentro do tempo total", async () => {
+    const sent: string[] = []
+    const client: GeminiClientLike = {
+      models: {
+        generateContent: (params) => {
+          sent.push(params.model)
+          if (params.model === "gemini-3.5-flash")
+            return Promise.resolve({ text: "Quais prazos vencem hoje?", candidates: [{ finishReason: "STOP" }] })
+          return new Promise((_, reject) =>
+            params.config?.abortSignal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))),
+          )
+        },
+      },
+    }
+    const provider = new GeminiProvider({
+      apiKey: "k",
+      model: "gemini-3.5-flash",
+      lightModel: "gemini-3.5-flash-lite",
+      timeoutMs: 45_000,
+      client,
+      transcribeTimeouts: { totalMs: 2_000, attemptMs: 200 },
+    })
+    // O timer de AbortSignal.timeout não segura o processo de teste (num servidor, sim).
+    const alive = setInterval(() => {}, 50)
+    const result = await provider
+      .transcribe({ audio: wav(1), mimeType: "audio/wav", system: "S", prompt: "P", seconds: 1, tier: "light" })
+      .finally(() => clearInterval(alive))
+    assert.deepEqual(sent, ["gemini-3.5-flash-lite", "gemini-3.5-flash"])
+    assert.equal(result.value, "Quais prazos vencem hoje?")
   })
 
   it("família 3 fica na temperatura padrão do Google; 2.5 mantém a pedida", async () => {
