@@ -19,12 +19,16 @@ type Nullable<T> = { [K in keyof T]: T[K] | null }
 export type InstanceRow = Nullable<{
   id: string
   organization_id: string
-  provider: "zapi"
+  provider: WhatsAppInstance["provider"]
   external_id: string
+  business_account_id: string
   name: string
   phone: string
   status: WhatsAppInstance["status"]
   status_detail: string
+  verified_name: string
+  quality_rating: string
+  last_checked_at: string
   connected_at: string
   last_event_at: string
 }>
@@ -113,10 +117,14 @@ export function toInstance(row: InstanceRow): WhatsAppInstance {
     organizationId: row.organization_id!,
     provider: row.provider ?? "zapi",
     externalId: row.external_id!,
+    businessAccountId: opt(row.business_account_id),
     name: row.name ?? "WhatsApp",
     phone: opt(row.phone),
     status: row.status ?? "unknown",
     statusDetail: opt(row.status_detail),
+    verifiedName: opt(row.verified_name),
+    qualityRating: opt(row.quality_rating),
+    lastCheckedAt: opt(row.last_checked_at),
     connectedAt: opt(row.connected_at),
     lastEventAt: opt(row.last_event_at),
   }

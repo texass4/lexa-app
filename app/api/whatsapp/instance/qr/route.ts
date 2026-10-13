@@ -14,7 +14,10 @@ export const GET = route(async () => {
   const instance = await instanceForOrg(actor.organizationId)
   if (!instance) throw new HttpError(409, NOT_ACTIVATED)
   try {
-    const qr = await providerFor(instance).qrCode()
+    const provider = await providerFor(instance)
+    // O WhatsApp oficial não usa QR Code: o número é vinculado com os dados da Meta.
+    if (!provider.qrCode) throw new HttpError(409, "Este número é conectado pelos dados da Meta, sem QR Code.")
+    const qr = await provider.qrCode()
     return NextResponse.json(qr, { headers: { "Cache-Control": "no-store" } })
   } catch (error) {
     if (error instanceof ZapiError) throw new HttpError(502, error.message)

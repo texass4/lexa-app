@@ -177,8 +177,8 @@ function Bubble({
         </div>
       </div>
       {message.status === "failed" && (
-        <div className="mt-1 flex items-center gap-2 px-1 text-[11.5px] text-danger">
-          <span className="max-w-[320px] truncate">Não enviada{failureReason(message.error)}</span>
+        <div className="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 px-1 text-[11.5px] leading-snug text-danger">
+          <span className="min-w-0 max-w-[320px]">Não enviada{failureReason(message.error)}</span>
           <button type="button" onClick={() => onRetry(message)} className="inline-flex items-center gap-1 font-medium underline-offset-2 outline-none hover:underline focus-visible:underline">
             <RotateCw className="size-3" /> Tentar de novo
           </button>

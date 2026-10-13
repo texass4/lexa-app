@@ -48,6 +48,13 @@ const SOURCE_DISCLOSURE = [
   "lib/services/consulta/workflow.ts",
 ]
 
+/**
+ * Conexão do WhatsApp oficial, vista só por quem administra o escritório: os dados vêm
+ * do painel da Meta, que chama a credencial de "token de acesso" — quem configura
+ * precisa reconhecer o nome. Só a palavra "token" é liberada, e só neste arquivo.
+ */
+const META_SETUP = ["components/atendimento/meta-connection.tsx"]
+
 const FORBIDDEN: { name: string; pattern: RegExp; allowIn?: string[] }[] = [
   { name: "variável de ambiente", pattern: /\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/ },
   { name: "configuração do servidor", pattern: /(\.env\b|vari[aá]ve(l|is) de ambiente|ambiente do servidor|no servidor|do servidor)/i },
@@ -55,7 +62,8 @@ const FORBIDDEN: { name: string; pattern: RegExp; allowIn?: string[] }[] = [
   { name: "serviço ou infraestrutura", pattern: /\b(supabase|postgres(ql)?|postgrest|z-?api|smtp|nodemailer|vercel|next\.?js|realtime)\b/i },
   { name: "nome de fonte de dados", pattern: /\bdatajud\b/i, allowIn: SOURCE_DISCLOSURE },
   { name: "banco de dados", pattern: /\b(migra[çc][ãa]o|migrations?\/|sql editor|rls|row[- ]level)\b/i },
-  { name: "jargão de integração", pattern: /\b(webhooks?|endpoint|payload|json|stack ?trace|api key|token)\b/i },
+  { name: "jargão de integração", pattern: /\b(webhooks?|endpoint|payload|json|stack ?trace|api key)\b/i },
+  { name: "jargão de integração (credencial)", pattern: /\btoken\b/i, allowIn: META_SETUP },
   { name: "código HTTP", pattern: /\b(http|status|erro)\s*[1-5]\d\d\b/i },
   { name: "rota interna", pattern: /(^|\s)\/(api|rest|auth\/v1|storage\/v1)\//i },
 ]

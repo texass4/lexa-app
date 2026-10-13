@@ -1,19 +1,24 @@
 /**
  * Envio pela Central — servidor apenas.
  *
- *   Tela → POST /api/whatsapp/conversations/:id/messages → aqui → Z-API → WhatsApp
+ *   Tela → POST /api/whatsapp/conversations/:id/messages → aqui → provedor (Meta ou Z-API) → WhatsApp
  *
- * A mensagem é gravada como `pending` antes de ir para a Z-API (a tela já mostra) e
+ * A mensagem é gravada como `pending` antes de ir para o provedor (a tela já mostra) e
  * vira `sent` ou `failed` com a resposta. Entregue/lida chegam depois, pelo webhook.
  * Notas internas são gravadas e param aqui: nunca chamam o provedor.
+ *
+ * WhatsApp oficial (Meta): só texto nesta etapa, e só dentro da janela de atendimento
+ * (24 h desde a última mensagem do cliente) — fora dela a Meta exige modelo aprovado,
+ * então o envio é recusado ANTES de gravar, com a explicação.
  */
 
 import { HttpError } from "@/lib/auth/server"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { ZapiError } from "@/lib/integrations/whatsapp/zapi/client"
+import { MetaError } from "@/lib/integrations/whatsapp/meta/client"
 import type { SendResult } from "@/lib/integrations/whatsapp/types"
 import { baseMime, extensionOf } from "@/lib/whatsapp/files"
-import { MAX_ATTACHMENT_BYTES } from "@/lib/whatsapp/config"
+import { MAX_ATTACHMENT_BYTES, metaSendRefusal } from "@/lib/whatsapp/config"
 import { MESSAGE_SELECT, type MessageRow } from "@/lib/whatsapp/mappers"
 import { providerFor } from "./instances"
 import { touchConversation } from "./inbound"
@@ -41,6 +46,12 @@ export interface SendInput {
 }
 
 const db = () => getSupabaseAdmin()
+
+/** Regras do WhatsApp oficial, conferidas antes de gravar a mensagem. */
+function checkMetaRules(conversation: Pick<LoadedConversation, "instance" | "last_inbound_at">, type: SendInput["type"]) {
+  const refusal = metaSendRefusal(conversation.instance.provider, conversation.last_inbound_at, type)
+  if (refusal) throw new HttpError(409, refusal)
+}
 
 function validate(actor: Actor, input: SendInput) {
   if (!["text", "image", "document", "audio", "note"].includes(input.type)) throw new HttpError(400, "Tipo de mensagem inválido.")
@@ -75,7 +86,6 @@ async function dispatch(
   conversation: LoadedConversation,
   message: { id: string; type: string; body: string | null; reply_to_message_id: string | null; sent_at: string },
 ) {
-  const provider = providerFor(conversation.instance)
   const phone = conversation.contact.phone
 
   let replyTo: string | undefined
@@ -85,6 +95,8 @@ async function dispatch(
   }
 
   try {
+    // Dentro do try: sem credencial, a mensagem vira "falhou" (nunca fica pendente para sempre).
+    const provider = await providerFor(conversation.instance)
     let result: SendResult
     if (message.type === "text") {
       result = await provider.sendText({ phone, text: message.body ?? "", replyTo })
@@ -109,7 +121,7 @@ async function dispatch(
 
     await db()
       .from("whatsapp_messages")
-      .update({ provider_message_id: result.messageId, provider_zaap_id: result.providerId ?? null, error: null })
+      .update({ provider_message_id: result.messageId, provider_zaap_id: result.providerId ?? null, error: null, provider_error_code: null })
       .eq("id", message.id)
     // Só para frente: o webhook pode ter adotado a mensagem (e até avançado o status)
     // antes desta resposta. A função também atualiza a prévia da conversa.
@@ -120,10 +132,16 @@ async function dispatch(
       p_at: new Date().toISOString(),
     })
   } catch (error) {
-    const reason = publicMessage(error instanceof ZapiError || error instanceof HttpError ? error.message : "", "Não foi possível enviar a mensagem. Tente novamente.")
+    const known = error instanceof ZapiError || error instanceof MetaError || error instanceof HttpError
+    const reason = publicMessage(known ? error.message : "", "Não foi possível enviar a mensagem. Tente novamente.")
+    const code = error instanceof MetaError && error.code !== undefined ? String(error.code) : null
     if (error instanceof ZapiError) console.error("[whatsapp] Z-API recusou o envio:", error.status, error.detail)
+    else if (error instanceof MetaError) console.error("[whatsapp] Meta recusou o envio:", error.status, error.code ?? "", error.subcode ?? "", error.detail ?? "")
     else if (!(error instanceof HttpError)) console.error("[whatsapp] Falha no envio:", error)
-    await db().from("whatsapp_messages").update({ status: "failed", error: reason, failed_at: new Date().toISOString() }).eq("id", message.id)
+    await db()
+      .from("whatsapp_messages")
+      .update({ status: "failed", error: reason, provider_error_code: code, failed_at: new Date().toISOString() })
+      .eq("id", message.id)
     // A prévia da lista mostra a falha se esta ainda é a última mensagem.
     await db()
       .from("whatsapp_conversations")
@@ -137,6 +155,7 @@ async function dispatch(
 export async function sendMessage(actor: Actor, conversationId: string, input: SendInput) {
   const text = validate(actor, input)
   const conversation = await loadConversation(actor, conversationId)
+  checkMetaRules(conversation, input.type)
 
   let replyToId: string | null = null
   if (input.replyToId) {
@@ -226,7 +245,8 @@ export async function retryMessage(actor: Actor, messageId: string) {
   if (message.status !== "failed") throw new HttpError(409, "Só mensagens que falharam podem ser reenviadas.")
 
   const conversation = await loadConversation(actor, message.conversation_id)
-  await db().from("whatsapp_messages").update({ status: "pending", error: null, failed_at: null }).eq("id", message.id)
+  checkMetaRules(conversation, message.type as SendInput["type"])
+  await db().from("whatsapp_messages").update({ status: "pending", error: null, provider_error_code: null, failed_at: null }).eq("id", message.id)
   await dispatch(conversation, message)
   return loadMessage(message.id)
 }

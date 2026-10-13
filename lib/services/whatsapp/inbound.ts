@@ -1,19 +1,24 @@
 /**
  * Processamento dos webhooks do WhatsApp — servidor apenas (service role).
  *
- *   WhatsApp → Z-API → POST /api/whatsapp/webhook → parseZapiWebhook → aqui → banco → tela (Realtime)
+ *   WhatsApp → Meta (Cloud API) → POST /api/whatsapp/meta/webhook → parseMetaWebhook ┐
+ *   WhatsApp → Z-API (legado)   → POST /api/whatsapp/webhook      → parseZapiWebhook ┴→ aqui → banco → tela (Realtime)
  *
- * Tudo é idempotente: a Z-API pode repetir um webhook, e a mesma mensagem nunca
- * entra duas vezes (única por conversa + id do WhatsApp).
+ * Tudo é idempotente: o provedor pode repetir um webhook, e a mesma mensagem nunca
+ * entra duas vezes (única por conversa + id do WhatsApp). O escritório vem da
+ * instância (número) do evento — nunca de outro campo do corpo.
+ *
+ * Contato novo NÃO é vinculado sozinho a um cliente pelo telefone: telefone não prova
+ * identidade (número reciclado, parente, celular do escritório). A tela sugere o
+ * cliente de mesmo telefone e a pessoa confirma.
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
-import { phoneMatchKeys } from "@/lib/whatsapp/phone"
 import { baseMime, safeFileName } from "@/lib/whatsapp/files"
 import { TYPE_PREVIEW } from "@/lib/whatsapp/config"
 import type { WebhookEvent } from "@/lib/integrations/whatsapp/types"
 import type { ContactRow } from "@/lib/whatsapp/mappers"
-import { instanceByExternalId, type Instance } from "./instances"
+import { instanceByExternalId, providerFor, type Instance } from "./instances"
 
 const MAX_MEDIA_BYTES = 64 * 1024 * 1024
 const BUCKET = "whatsapp"
@@ -31,21 +36,9 @@ export interface WebhookOutcome {
 
 const db = () => getSupabaseAdmin()
 
-/** Cliente do escritório com este telefone, ou null. */
-async function matchClient(organizationId: string, phone: string): Promise<string | null> {
-  const keys = phoneMatchKeys(phone)
-  if (!keys.length) return null
-  const { data, error } = await db().rpc("whatsapp_match_client", { p_org: organizationId, p_keys: keys })
-  if (error) {
-    console.error("[whatsapp] Falha ao procurar cliente pelo telefone:", error.message)
-    return null
-  }
-  return (data as string | null) ?? null
-}
-
 /**
  * Contato do escritório com este telefone. Se é a primeira mensagem, cria o contato
- * e já o vincula ao cliente de mesmo telefone — se houver. Nunca cria cliente.
+ * SEM cliente: o vínculo é sempre confirmado por alguém na tela. Nunca cria cliente.
  */
 export async function upsertContact(organizationId: string, phone: string, profile: { name?: string; photo?: string } = {}) {
   const { data: existing } = await db()
@@ -64,11 +57,10 @@ export async function upsertContact(organizationId: string, phone: string, profi
     return data ?? existing
   }
 
-  const clientId = await matchClient(organizationId, phone)
   const { data: created } = await db()
     .from("whatsapp_contacts")
     .upsert(
-      { organization_id: organizationId, phone, push_name: profile.name ?? null, avatar_url: profile.photo ?? null, client_id: clientId },
+      { organization_id: organizationId, phone, push_name: profile.name ?? null, avatar_url: profile.photo ?? null },
       { onConflict: "organization_id,phone", ignoreDuplicates: true },
     )
     .select("*")
@@ -119,20 +111,32 @@ export async function touchConversation(
   if (error) console.error("[whatsapp] Falha ao atualizar a conversa:", error.message)
 }
 
-/** Baixa a mídia da Z-API para o Storage do escritório (os links dela expiram em 30 dias). */
-function storeMediaLater(attachment: { id: string; organization_id: string }, conversationId: string, url: string, fileName?: string, mime?: string): FollowUp {
+/** Arquivo recebido por link (Z-API) ou por id (Meta, baixado com a credencial do escritório). */
+type MediaSource = { url: string } | { mediaId: string; instance: Instance }
+
+async function fetchMedia(source: MediaSource): Promise<{ bytes: Uint8Array; mimeType?: string }> {
+  if ("mediaId" in source) {
+    const provider = await providerFor(source.instance)
+    if (!provider.downloadMedia) throw new Error("provedor sem download de mídia")
+    return provider.downloadMedia(source.mediaId)
+  }
+  // Só links HTTPS do provedor — nunca endereços internos ou outros protocolos.
+  if (new URL(source.url).protocol !== "https:") throw new Error("URL de mídia não é HTTPS")
+  const response = await fetch(source.url, { signal: AbortSignal.timeout(90_000), redirect: "follow" })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const declared = Number(response.headers.get("content-length") ?? 0)
+  if (declared > MAX_MEDIA_BYTES) throw new Error("arquivo acima de 64 MB")
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (bytes.byteLength > MAX_MEDIA_BYTES) throw new Error("arquivo acima de 64 MB")
+  return { bytes, mimeType: response.headers.get("content-type") ?? undefined }
+}
+
+/** Guarda a mídia recebida no Storage do escritório (os links e ids dos provedores expiram). */
+function storeMediaLater(attachment: { id: string; organization_id: string }, conversationId: string, source: MediaSource, fileName?: string, mime?: string): FollowUp {
   return async () => {
     try {
-      // Só links HTTPS do provedor — nunca endereços internos ou outros protocolos.
-      if (new URL(url).protocol !== "https:") throw new Error("URL de mídia não é HTTPS")
-      const response = await fetch(url, { signal: AbortSignal.timeout(90_000), redirect: "follow" })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const declared = Number(response.headers.get("content-length") ?? 0)
-      if (declared > MAX_MEDIA_BYTES) throw new Error("arquivo acima de 64 MB")
-      const bytes = new Uint8Array(await response.arrayBuffer())
-      if (bytes.byteLength > MAX_MEDIA_BYTES) throw new Error("arquivo acima de 64 MB")
-
-      const contentType = baseMime(mime) ?? baseMime(response.headers.get("content-type") ?? undefined) ?? "application/octet-stream"
+      const { bytes, mimeType } = await fetchMedia(source)
+      const contentType = baseMime(mime) ?? baseMime(mimeType) ?? "application/octet-stream"
       const path = `${attachment.organization_id}/${conversationId}/${attachment.id}/${safeFileName(fileName, "arquivo", contentType)}`
       const { error } = await db().storage.from(BUCKET).upload(path, bytes, { contentType, upsert: true })
       if (error) throw error
@@ -141,7 +145,7 @@ function storeMediaLater(attachment: { id: string; organization_id: string }, co
         .update({ storage_path: path, size_bytes: bytes.byteLength, download_status: "stored" })
         .eq("id", attachment.id)
     } catch (error) {
-      console.error(`[whatsapp] Não foi possível guardar a mídia ${attachment.id}:`, error)
+      console.error(`[whatsapp] Não foi possível guardar a mídia ${attachment.id}:`, error instanceof Error ? error.message : error)
       await db().from("whatsapp_message_attachments").update({ download_status: "failed" }).eq("id", attachment.id)
     }
   }
@@ -246,12 +250,13 @@ async function processMessage(instance: Instance, event: MessageEvent, raw: unkn
         height: media.height ?? null,
         page_count: media.pageCount ?? null,
         voice_note: media.voiceNote ?? false,
-        download_status: media.url ? "pending" : "failed",
+        download_status: media.url || media.mediaId ? "pending" : "failed",
       })
       .select("id, organization_id")
       .single<{ id: string; organization_id: string }>()
     if (attachmentError) throw attachmentError
-    if (media.url) followUps.push(storeMediaLater(attachment, conversation.id, media.url, media.fileName, media.mimeType))
+    const source: MediaSource | null = media.url ? { url: media.url } : media.mediaId ? { mediaId: media.mediaId, instance } : null
+    if (source) followUps.push(storeMediaLater(attachment, conversation.id, source, media.fileName, media.mimeType))
   }
 
   await touchConversation(conversation.id, { at: event.at, body: event.body, type: event.type, direction, status, countUnread: !event.fromMe })
@@ -294,7 +299,7 @@ async function processEvent(instance: Instance, event: WebhookEvent, raw: unknow
           .join(",")
         await db()
           .from("whatsapp_messages")
-          .update({ status: "failed", error: event.error, failed_at: event.at })
+          .update({ status: "failed", error: event.error, provider_error_code: event.errorCode ?? null, failed_at: event.at })
           .eq("organization_id", org)
           .eq("direction", "outbound")
           .or(filter)
@@ -320,9 +325,13 @@ async function processEvent(instance: Instance, event: WebhookEvent, raw: unknow
   }
 }
 
-/** Registra o webhook bruto, identifica o escritório pela instância e processa. */
-export async function handleWebhookEvent(event: WebhookEvent, raw: unknown): Promise<WebhookOutcome> {
-  const instance = event.instanceExternalId ? await instanceByExternalId(event.instanceExternalId) : null
+/**
+ * Registra o webhook, identifica o escritório pela instância (número) do provedor e
+ * processa. `raw` é o que vai para o registro de diagnóstico (a rota da Meta manda
+ * uma cópia sem o conteúdo das conversas).
+ */
+export async function handleWebhookEvent(event: WebhookEvent, raw: unknown, provider: "zapi" | "meta" = "zapi"): Promise<WebhookOutcome> {
+  const instance = event.instanceExternalId ? await instanceByExternalId(event.instanceExternalId, provider) : null
 
   const { data: logged } = await db()
     .from("whatsapp_webhook_events")
@@ -330,6 +339,7 @@ export async function handleWebhookEvent(event: WebhookEvent, raw: unknown): Pro
       organization_id: instance?.organization_id ?? null,
       instance_id: instance?.id ?? null,
       event_type: event.kind,
+      provider,
       payload: raw as object,
     })
     .select("id")

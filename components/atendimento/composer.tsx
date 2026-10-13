@@ -94,6 +94,7 @@ export function Composer({
   replyDisabledReason,
   droppedFile,
   onDroppedFileHandled,
+  textOnly = false,
 }: {
   conversationId: string
   replyTo?: WhatsAppMessage
@@ -106,6 +107,8 @@ export function Composer({
   replyDisabledReason?: string
   droppedFile?: File
   onDroppedFileHandled: () => void
+  /** O número só envia texto (WhatsApp oficial nesta etapa): sem anexos nem áudio gravado. */
+  textOnly?: boolean
 }) {
   const [draft, setDraft] = useDraft(conversationId)
   const [file, setFile] = React.useState<File>()
@@ -121,12 +124,16 @@ export function Composer({
 
   const attach = React.useCallback((f?: File | null) => {
     if (!f) return
+    if (textOnly) {
+      toast("Por enquanto, este número envia só texto pela Íntegra.", { description: "O envio de anexos chega na próxima etapa." })
+      return
+    }
     if (f.size > MAX_ATTACHMENT_BYTES) {
       toast.error("O arquivo passa de 64 MB.")
       return
     }
     setFile(f)
-  }, [])
+  }, [textOnly])
 
   // Arquivo solto sobre a conversa.
   React.useEffect(() => {
@@ -304,7 +311,7 @@ export function Composer({
             note ? "border-brand/35 focus-within:border-brand/60 focus-within:ring-brand/15" : "border-border focus-within:border-brand/50 focus-within:ring-brand/12",
           )}
         >
-          {!note && (
+          {!note && !textOnly && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label="Anexar arquivo"
@@ -352,7 +359,7 @@ export function Composer({
             aria-label={note ? "Nota interna" : "Mensagem"}
             className="max-h-44 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-[14px] leading-[20px] text-foreground outline-none placeholder:text-subtle disabled:opacity-60 sm:text-[13.5px]"
           />
-          {!note && !draft.text.trim() && !file ? (
+          {!note && !textOnly && !draft.text.trim() && !file ? (
             <Button variant="ghost" size="icon" aria-label="Gravar áudio" disabled={blocked || busy} onClick={recorder.start} className="rounded-[10px]">
               <Mic className="size-[18px]" />
             </Button>

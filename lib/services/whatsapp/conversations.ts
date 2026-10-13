@@ -107,7 +107,7 @@ export async function updateConversation(actor: Actor, conversationId: string, p
         .maybeSingle<{ provider_message_id: string }>()
       if (!last) return
       try {
-        await providerFor(conversation.instance).markRead({ phone: conversation.contact.phone, messageId: last.provider_message_id })
+        await (await providerFor(conversation.instance)).markRead({ phone: conversation.contact.phone, messageId: last.provider_message_id })
       } catch (error) {
         console.warn("[whatsapp] Não foi possível marcar como lida no WhatsApp:", error instanceof Error ? error.message : error)
       }

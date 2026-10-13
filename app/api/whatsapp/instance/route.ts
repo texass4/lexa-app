@@ -1,16 +1,18 @@
 /**
- * GET  /api/whatsapp/instance — conexão do escritório (status ao vivo na Z-API).
- * POST /api/whatsapp/instance — { action: "webhooks" } cadastra a URL de webhook na Z-API.
+ * GET  /api/whatsapp/instance — conexão do escritório (status verificado no provedor).
+ *      `?check=1` força a verificação agora (WhatsApp oficial: senão, a cada 5 min).
+ * POST /api/whatsapp/instance — { action: "webhooks" } cadastra a URL de webhook na Z-API (legado).
  *
- * Nenhuma credencial sai daqui. A URL do webhook (que leva o segredo) só aparece
- * para quem administra o escritório, para colar no painel da Z-API se preciso.
+ * Nenhuma credencial sai daqui. Para o WhatsApp oficial, só os ids públicos da Meta
+ * (para quem administra) e se há token salvo — nunca o token.
  */
 
 import { NextResponse, type NextRequest } from "next/server"
 import { HttpError, readJson, route } from "@/lib/auth/server"
 import { ZapiError } from "@/lib/integrations/whatsapp/zapi/client"
 import { requireActor } from "@/lib/services/whatsapp/actor"
-import { envSetup, instanceForOrg, NOT_ACTIVATED, providerFor, RECEIVING_NOT_ACTIVATED, refreshInstanceStatus } from "@/lib/services/whatsapp/instances"
+import { envSetup, instanceForOrg, metaPlatformSetup, NOT_ACTIVATED, providerFor, RECEIVING_NOT_ACTIVATED, refreshInstanceStatus } from "@/lib/services/whatsapp/instances"
+import { hasAccessToken } from "@/lib/services/whatsapp/credentials"
 import { toInstance } from "@/lib/whatsapp/mappers"
 
 export const runtime = "nodejs"
@@ -29,30 +31,39 @@ export const GET = route(async (request) => {
   const actor = await requireActor("whatsapp.view")
   const canManage = actor.can("office.manage")
   const setup = envSetup()
-  if (canManage && setup.missing.length) console.warn("[whatsapp] Conexão incompleta. Faltam no ambiente:", setup.missing.join(", "))
   let instance = await instanceForOrg(actor.organizationId)
+  const isMeta = instance?.provider === "meta"
+  if (canManage && instance?.provider === "zapi" && setup.missing.length) console.warn("[whatsapp] Conexão incompleta. Faltam no ambiente:", setup.missing.join(", "))
+  const platform = metaPlatformSetup()
+  const hasToken = isMeta && instance ? await hasAccessToken(instance) : false
 
   let live: { connected: boolean; smartphoneConnected?: boolean; error?: string } | null = null
-  if (instance) {
+  if (instance && (!isMeta || hasToken)) {
     try {
-      const refreshed = await refreshInstanceStatus(instance)
+      const refreshed = await refreshInstanceStatus(instance, { force: request.nextUrl.searchParams.get("check") === "1" })
       instance = refreshed.instance
-      live = { connected: instance.status === "connected", smartphoneConnected: refreshed.smartphoneConnected }
+      live = {
+        connected: instance.status === "connected",
+        smartphoneConnected: refreshed.smartphoneConnected,
+        ...(instance.status === "error" ? { error: instance.status_detail ?? CHECK_FAILED } : {}),
+      }
     } catch (error) {
       if (!(error instanceof ZapiError || error instanceof HttpError)) console.error("[whatsapp] Falha ao consultar a conexão:", error)
       live = { connected: false, error: error instanceof ZapiError || error instanceof HttpError ? error.message : CHECK_FAILED }
     }
   }
 
-  const url = canManage ? webhookUrl(request) : null
+  const url = canManage && !isMeta ? webhookUrl(request) : null
   return NextResponse.json({
     instance: instance ? toInstance(instance) : null,
     live,
     canManage,
     // Só se a ativação está completa: os nomes do que falta ficam no log do servidor.
-    activated: setup.missing.length === 0,
+    activated: isMeta ? platform.ready && hasToken : setup.missing.length === 0,
     webhookUrl: url,
     webhookHttps: url ? url.startsWith("https://") : null,
+    // WhatsApp oficial: a plataforma está pronta? (o escritório só informa os dados dele)
+    meta: { platformReady: platform.ready, hasToken },
   })
 })
 
@@ -72,7 +83,10 @@ export const POST = route(async (request) => {
     throw new HttpError(409, RECEIVING_NOT_ACTIVATED)
   }
   try {
-    await providerFor(instance).configureWebhooks(url)
+    const provider = await providerFor(instance)
+    // WhatsApp oficial: o recebimento é ligado ao salvar a conexão (assinatura do aplicativo na conta).
+    if (!provider.configureWebhooks) throw new HttpError(409, "No WhatsApp oficial, o recebimento é ativado ao salvar a conexão.")
+    await provider.configureWebhooks(url)
   } catch (error) {
     if (error instanceof ZapiError) throw new HttpError(502, error.message)
     throw error

@@ -12,6 +12,7 @@ import { CHECK_FAILED, CONNECTION_LABEL as LABEL, connectionHealth, connectionPr
 import { publicMessage } from "@/lib/core/public-error"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import { useInbox } from "./inbox-provider"
+import { MetaConnectionSetup } from "./meta-connection"
 
 export function useConnectionHealth(): ConnectionHealth {
   const { instance, instanceLoading } = useInbox()
@@ -21,9 +22,10 @@ export function useConnectionHealth(): ConnectionHealth {
 export function ConnectionBadge({ className }: { className?: string }) {
   const health = useConnectionHealth()
   const { instance } = useInbox()
+  const [open, setOpen] = React.useState(false)
   const phone = instance?.instance?.phone
-  return (
-    <p className={cn("flex items-center gap-1.5 text-[12px] text-muted-foreground", className)}>
+  const content = (
+    <>
       <span
         aria-hidden
         className={cn(
@@ -35,7 +37,22 @@ export function ConnectionBadge({ className }: { className?: string }) {
         {LABEL[health]}
         {health === "connected" && phone ? ` · ${formatPhone(phone)}` : ""}
       </span>
-    </p>
+    </>
+  )
+  // Quem administra abre a configuração da conexão por aqui (também com o número conectado).
+  if (!instance?.canManage) return <p className={cn("flex items-center gap-1.5 text-[12px] text-muted-foreground", className)}>{content}</p>
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`${LABEL[health]} — configurar a conexão`}
+        className={cn("flex max-w-full items-center gap-1.5 rounded-[6px] text-left text-[12px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40", className)}
+      >
+        {content}
+      </button>
+      <ConnectionDialog open={open} onOpenChange={setOpen} />
+    </>
   )
 }
 
@@ -88,6 +105,10 @@ function ConnectionSetup() {
       </p>
     )
   }
+
+  // WhatsApp oficial (Meta): o padrão para conectar um número. O fluxo por QR Code
+  // abaixo é o da conexão antiga (legado), mantido para quem já a usa.
+  if (info.instance?.provider !== "zapi") return <MetaConnectionSetup info={info} onChanged={reloadInstance} />
 
   const loadQr = async () => {
     setBusy("qr")

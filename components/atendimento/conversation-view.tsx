@@ -46,7 +46,7 @@ import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { getUser } from "@/lib/auth/account"
 import { normalize } from "@/lib/core/format"
-import { SYSTEM_STATUSES, STATUS_TONE, statusOption } from "@/lib/whatsapp/config"
+import { insideServiceWindow, SYSTEM_STATUSES, STATUS_TONE, statusOption } from "@/lib/whatsapp/config"
 import { attachmentKindFor } from "@/lib/whatsapp/files"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import { uploadOutgoing, whatsappApi } from "@/lib/whatsapp/client"
@@ -129,7 +129,16 @@ export function ConversationView({
   onShowAi: () => void
   panel: "context" | "ai" | null
 }) {
-  const { upsertConversation, patchConversation } = useInbox()
+  const { upsertConversation, patchConversation, instance: connection } = useInbox()
+  // Regras do WhatsApp oficial valem para conversas do número oficial (não para as da conexão antiga).
+  const official = connection?.instance?.provider === "meta" && connection.instance.id === conversation.instanceId
+  // Relógio da janela de 24 h (WhatsApp oficial): reavalia a cada minuto com a conversa aberta.
+  const [now, setNow] = React.useState(() => Date.now())
+  React.useEffect(() => {
+    if (!official) return
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [official])
   const { can, user, organization } = useSession()
   const { processes } = useOfficeData()
   const { openDialog } = useUI()
@@ -250,7 +259,19 @@ export function ConversationView({
     }
   }
 
-  const replyBlocked = health === "unconfigured" ? "WhatsApp não configurado" : health === "disconnected" ? "WhatsApp desconectado" : health === "error" ? "Conexão indisponível" : undefined
+  const outsideWindow = official && !insideServiceWindow(conversation.lastInboundAt, now)
+  const replyBlocked =
+    health === "unconfigured"
+      ? "WhatsApp não configurado"
+      : health === "disconnected"
+        ? "WhatsApp desconectado"
+        : health === "error"
+          ? "Conexão indisponível"
+          : outsideWindow
+            ? conversation.lastInboundAt
+              ? "Mais de 24 h desde a última mensagem do cliente: o WhatsApp só permite modelo aprovado"
+              : "O cliente ainda não escreveu: o WhatsApp só permite iniciar com modelo aprovado"
+            : undefined
 
   return (
     <div
@@ -478,6 +499,7 @@ export function ConversationView({
         replyDisabledReason={replyBlocked ? `${replyBlocked} — só notas internas.` : undefined}
         droppedFile={dropped}
         onDroppedFileHandled={() => setDropped(undefined)}
+        textOnly={official}
       />
 
       {dragging && (

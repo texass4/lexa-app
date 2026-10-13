@@ -18,12 +18,20 @@ export interface ConversationStatusOption {
 export interface WhatsAppInstance {
   id: ID
   organizationId: ID
-  provider: "zapi"
+  /** `meta`: WhatsApp Business Cloud API (oficial). `zapi`: legado. */
+  provider: "zapi" | "meta"
+  /** Meta: Phone Number ID. Z-API: id da instância. */
   externalId: string
+  /** Meta: WABA ID. */
+  businessAccountId?: string
   name: string
   phone?: string
-  status: "unknown" | "connected" | "disconnected"
+  /** `error`: configurada, mas a última verificação no provedor falhou. */
+  status: "unknown" | "connected" | "disconnected" | "error"
   statusDetail?: string
+  verifiedName?: string
+  qualityRating?: string
+  lastCheckedAt?: string
   connectedAt?: string
   lastEventAt?: string
 }

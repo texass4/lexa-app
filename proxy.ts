@@ -2,11 +2,12 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 
 /**
- * Rotas acessíveis sem login. O webhook do WhatsApp é chamado pela Z-API (sem
- * sessão) e se autentica sozinho com o segredo da URL; as rotas de `/api/cron/`
- * são chamadas pelo agendador da hospedagem e exigem o `CRON_SECRET`.
+ * Rotas acessíveis sem login. Os webhooks do WhatsApp são chamados pelo provedor (sem
+ * sessão) e se autenticam sozinhos: o da Meta pela assinatura `X-Hub-Signature-256`,
+ * o da Z-API (legado) pelo segredo da URL. As rotas de `/api/cron/` são chamadas pelo
+ * agendador da hospedagem e exigem o `CRON_SECRET`.
  */
-const PUBLIC = ["/login", "/cadastro", "/recuperar-senha", "/auth/confirm", "/api/auth/", "/api/whatsapp/webhook", "/api/cron/"]
+const PUBLIC = ["/login", "/cadastro", "/recuperar-senha", "/auth/confirm", "/api/auth/", "/api/whatsapp/webhook", "/api/whatsapp/meta/webhook", "/api/cron/"]
 /** Telas de entrada: quem já está logado é mandado para o app. */
 const GUEST_ONLY = ["/login", "/cadastro", "/recuperar-senha"]
 /** Área do Super Admin. */

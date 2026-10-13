@@ -180,7 +180,11 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 ---
 
-## 4b. Central de Atendimento (WhatsApp via Z-API)
+## 4b. Central de Atendimento (WhatsApp)
+
+**Provedor:** o padrão é o **WhatsApp oficial** (WhatsApp Business Cloud API, da Meta). Cada escritório conecta o próprio número em Atendimento › Configurar; o token fica cifrado por escritório (`whatsapp_credentials`) e o webhook oficial é `POST /api/whatsapp/meta/webhook`, com assinatura. A arquitetura, as regras da Meta (janela de 24 h, só texto nesta etapa), a configuração e o que falta estão em **`docs/WHATSAPP_CLOUD_API.md`**. A Z-API, descrita abaixo, é **legado** (não oficial, via WhatsApp Web) e fica só para quem já a usa. As tabelas, a tela, as permissões e o Realtime são os mesmos para os dois provedores.
+
+**Vínculo com cliente:** telefone **não** vincula sozinho, nos dois provedores. A tela sugere o cliente de mesmo telefone e alguém confirma.
 
 **Tela** — `/atendimento`, três áreas: conversas (`conversation-list.tsx`) → conversa (`conversation-view.tsx`: cabeçalho com ações rápidas, busca, `message-list.tsx`, `composer.tsx`) → contexto jurídico (`context-panel.tsx`) com a aba Íntegra IA (`ai-panel.tsx`). Abaixo de 1280 px o contexto abre como painel lateral; no celular, lista e conversa se alternam. O `AppShell` dá altura total a essa rota.
 
@@ -202,7 +206,7 @@ Isolamento: RLS de leitura (`current_org_id()` + `whatsapp.view`) e **chaves est
 
 **Envio** — `POST /api/whatsapp/conversations/:id/messages` (`services/whatsapp/outbound.ts`): grava `pending`, chama a Z-API e vira `sent`/`failed`; entregue/lida chegam pelo webhook e só avançam (`whatsapp_apply_status`). Anexos: o navegador sobe em `whatsapp/<org>/outgoing/…` e a Z-API recebe um link assinado de 1 h. **Notas internas** são gravadas e param ali — o banco impede que uma nota tenha id do WhatsApp.
 
-**Recebimento** — a Z-API chama `POST /api/whatsapp/webhook?token=<ZAPI_WEBHOOK_SECRET>` (rota pública no `proxy.ts`). O segredo é comparado em tempo constante e o `instanceId` do corpo define o escritório. `parseZapiWebhook` traduz o evento; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, **vincula sozinho ao cliente de mesmo telefone** (com e sem o nono dígito — `lib/whatsapp/phone.ts`), cria a conversa e grava a mensagem (idempotente). Sem cliente, fica "Contato novo": transformar em cliente é sempre uma ação confirmada na tela. Mídias recebidas são copiadas para o Storage depois da resposta (`after`), porque os links da Z-API expiram.
+**Recebimento** — a Z-API chama `POST /api/whatsapp/webhook?token=<ZAPI_WEBHOOK_SECRET>` (rota pública no `proxy.ts`). O segredo é comparado em tempo constante e o `instanceId` do corpo define o escritório. `parseZapiWebhook` traduz o evento; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, cria a conversa e grava a mensagem (idempotente). O contato novo fica "Contato novo": a tela sugere o cliente de mesmo telefone (com e sem o nono dígito, `lib/whatsapp/phone.ts`), e vincular ou transformar em cliente é sempre uma ação confirmada. Mídias recebidas são copiadas para o Storage depois da resposta (`after`), porque os links da Z-API expiram.
 
 **Instância** — a do `.env` pertence ao escritório de `ZAPI_ORGANIZATION_ID` (criada sozinha no primeiro uso). Credenciais nunca vão ao banco nem ao navegador; `providerFor()` (`services/whatsapp/instances.ts`) é o ponto a estender para vários números. Quem tem `office.manage` vê na Central o diagnóstico, o QR Code e o botão que cadastra os webhooks na Z-API.
 

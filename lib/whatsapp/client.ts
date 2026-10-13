@@ -47,6 +47,8 @@ export interface InstanceInfo {
   activated: boolean
   webhookUrl: string | null
   webhookHttps: boolean | null
+  /** WhatsApp oficial: plataforma habilitada e token do escritório salvo (nunca o token). */
+  meta: { platformReady: boolean; hasToken: boolean }
 }
 
 export interface SendPayload {
@@ -72,7 +74,10 @@ export type AiResponse =
   | { action: "internal_summary"; result: { note: string } }
 
 export const whatsappApi = {
-  instance: () => api<InstanceInfo>("/api/whatsapp/instance"),
+  instance: (check = false) => api<InstanceInfo>(`/api/whatsapp/instance${check ? "?check=1" : ""}`),
+  connectMeta: (input: { businessAccountId: string; phoneNumberId: string; accessToken?: string }) =>
+    api<{ instance: WhatsAppInstance }>("/api/whatsapp/instance/meta", { method: "POST", body: input }),
+  disconnectMeta: () => api<{ instance: WhatsAppInstance }>("/api/whatsapp/instance/meta", { method: "DELETE" }),
   qrCode: () => api<{ image?: string; needsPasskey?: boolean }>("/api/whatsapp/instance/qr"),
   registerWebhooks: () => api<{ ok: true }>("/api/whatsapp/instance", { method: "POST", body: { action: "webhooks" } }),
 
