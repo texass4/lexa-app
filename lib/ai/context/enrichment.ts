@@ -5,6 +5,7 @@
  */
 
 import { SOURCE_STATUS_LABEL, type EnrichmentRun, type SourceId } from "@/lib/services/consulta/types"
+import { describeTribunalForAI } from "@/lib/services/processos/tribunal-identification"
 import { type BuiltContext, SourceRegistry, fmtDate, fmtDateTime } from "./shared"
 
 const LIMITS = { parties: 20, lawyers: 20, movements: 15, communications: 5, excerpt: 300 } as const
@@ -43,7 +44,9 @@ export function buildEnrichmentContext(run: EnrichmentRun): BuiltContext {
     })),
     resumo: {
       titulo: report.summary.title,
-      tribunal: report.summary.tribunal,
+      // Relatórios antigos não têm a identificação: o tribunal vai sem afirmar onde tramita.
+      tribunal: report.tribunal ? undefined : report.summary.tribunal,
+      tribunal_identificacao: describeTribunalForAI(report.tribunal),
       orgao_julgador: report.summary.unit,
       situacao: report.summary.situation,
       ultima_movimentacao: report.summary.lastMovement ? `${fmtDateTime(report.summary.lastMovement.at)} — ${report.summary.lastMovement.title}` : undefined,

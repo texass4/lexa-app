@@ -106,7 +106,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
     area: "Cível" as PracticeArea,
     type: "",
     court: "",
-    // Só a consulta informa a comarca (o tribunal); à mão, nada é presumido.
+    // Comarca não é presumida: nem à mão nem pela consulta (que só informa o tribunal).
     district: "",
     opposingParty: "",
     ownerId: currentUserId(),
@@ -232,7 +232,8 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
       number: found.number,
       type: found.className ?? found.subject ?? form.type,
       court: found.judicialUnit ?? form.court,
-      district: found.tribunal ?? form.district,
+      // A consulta não informa comarca: a sigla do tribunal não entra aqui.
+      district: form.district,
       opposingParty: found.parties.passive[0]?.name ?? form.opposingParty,
       area,
       // Os dados públicos aparecem no formulário (sem edição: vêm da consulta).

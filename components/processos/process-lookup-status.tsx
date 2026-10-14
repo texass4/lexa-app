@@ -11,13 +11,13 @@ import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import type { Process } from "@/types"
 
 /** Campos que a consulta preenche — mesmos rótulos no esqueleto e no resultado. */
-const FIELDS = ["Tribunal", "Grau", "Classe", "Órgão julgador", "Ajuizamento", "Movimentações"] as const
+const FIELDS = ["Tribunal na fonte", "Grau", "Classe", "Órgão julgador", "Ajuizamento", "Movimentações"] as const
 
 /** O que o resultado mostra, venha de uma consulta ou de um processo já salvo. */
 export type LookupSummary = Record<(typeof FIELDS)[number], string | undefined>
 
 export const summaryFromSheet = (sheet: ProcessSheet): LookupSummary => ({
-  Tribunal: sheet.tribunal,
+  "Tribunal na fonte": sheet.tribunal,
   Grau: degreeLabel(sheet.degree),
   Classe: sheet.className ?? sheet.subject,
   "Órgão julgador": sheet.judicialUnit,
@@ -26,7 +26,7 @@ export const summaryFromSheet = (sheet: ProcessSheet): LookupSummary => ({
 })
 
 export const summaryFromProcess = (process: Process): LookupSummary => ({
-  Tribunal: process.tribunal,
+  "Tribunal na fonte": process.tribunal,
   Grau: degreeLabel(process.degree),
   Classe: process.className ?? process.subject ?? process.type,
   "Órgão julgador": process.judicialUnit ?? process.court,

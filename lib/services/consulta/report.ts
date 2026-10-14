@@ -10,11 +10,12 @@
 
 import { formatCNJ } from "@/lib/processos/cnj"
 import { processTitle } from "@/lib/processos/label"
-import { tribunalInfo } from "@/lib/processos/tribunals"
+import { originTribunal, tribunalByAcronym } from "@/lib/processos/tribunals"
+import { CURRENT_STATUS_LABEL, tribunalLabel } from "@/lib/services/processos/tribunal-identification"
 import { degreeLabel } from "@/lib/services/processos/labels"
 import type { Communication } from "@/lib/integrations/legal/djen/mapper"
 import type { ProcessSheet } from "@/lib/services/processos/sheet"
-import type { Process } from "@/types"
+import type { Process, TribunalIdentification } from "@/types"
 import { collectMentions } from "./magistrate"
 import {
   NOT_AVAILABLE,
@@ -70,6 +71,8 @@ export interface AssembleInput {
   jurisprudence?: JurisprudenceData | null
   /** Fontes externas puladas porque o processo está em segredo de justiça. */
   secretSkipped?: boolean
+  /** Origem × atual × inferido (`identifyTribunal`). */
+  tribunal?: TribunalIdentification
 }
 
 /* -------------------------------- helpers -------------------------------- */
@@ -128,14 +131,15 @@ function buildFields(input: AssembleInput, verifyUrl?: string): ReportField[] {
     const c = communications?.items.find((item) => !!pick(item))
     return c ? pick(c) : undefined
   }
-  const tribunal = s?.tribunal ? tribunalInfo(input.cnj, s.tribunal) : undefined
+  // Tribunal como o registro da fonte informa — comparado com o cadastro e o DJEN.
+  const tribunal = tribunalByAcronym(s?.tribunal)
 
   const secrecy =
     s?.secrecyLevel !== undefined ? (s.secrecyLevel === 0 ? "Público (nível 0)" : `Sigilo nível ${s.secrecyLevel}`) : undefined
 
   return [
     field("numero", "Número CNJ", [dj(s?.number), !s && process?.number ? office(process.number) : undefined]),
-    field("tribunal", "Tribunal", [
+    field("tribunal", "Tribunal informado pelas fontes", [
       dj(tribunal ? `${tribunal.acronym} — ${tribunal.name}` : s?.tribunal),
       office(process?.tribunal),
       djen(fromComms((c) => c.tribunal)),
@@ -255,8 +259,11 @@ function buildOffice(input: AssembleInput): OfficeComparison | undefined {
 export function assembleReport(input: AssembleInput): EnrichmentReport {
   const { cnj, primary, process, communications } = input
   const sheet = primary?.sheet
-  const tribunal = tribunalInfo(cnj, sheet?.tribunal)
-  const verifyUrl = tribunal?.site
+  const identification = input.tribunal
+  const origin = originTribunal(cnj)
+  const current = identification?.current.status === "confirmed" ? tribunalByAcronym(identification.current.acronym) : undefined
+  // Onde verificar: o tribunal atual quando confirmado; senão, o de origem (onde o número nasceu).
+  const verifyUrl = (current ?? origin)?.site
   const fields = buildFields(input, verifyUrl)
   const hidden = !!process?.secret || (sheet?.secrecyLevel ?? 0) > 0
   const parties = buildParties(input, hidden)
@@ -283,10 +290,14 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
   }))
 
   const links: ReportLink[] = []
-  if (tribunal) {
+  for (const [t, role] of [
+    [origin, "tribunal de origem"],
+    [current && current.acronym !== origin?.acronym ? current : undefined, "tribunal atual"],
+  ] as const) {
+    if (!t) continue
     links.push({
-      label: `Site oficial do ${tribunal.acronym}`,
-      url: tribunal.site,
+      label: `Site oficial do ${t.acronym} (${role})`,
+      url: t.site,
       source: "tribunal",
       note: "Consulta processual pública no site do tribunal (pode pedir CAPTCHA; a Íntegra não acessa por você).",
     })
@@ -311,7 +322,15 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
   if (input.secretSkipped) {
     notices.push("Processo em segredo de justiça: as fontes públicas não foram consultadas e o cadastro do escritório foi preservado como está.")
   }
-  if (input.primaryStatus === "not_found") notices.push("A fonte processual principal (DataJud) não tem este número. Pode ser atraso de indexação, segredo de justiça ou número incorreto.")
+  if (input.primaryStatus === "not_found") {
+    const dataset = identification?.checks.find((c) => c.role === "origem")?.dataset
+    notices.push(
+      `O DataJud não tem este número no índice do tribunal de origem${origin ? ` (${origin.acronym}${dataset ? `, ${dataset}` : ""})` : ""}. Pode ser atraso de indexação, segredo de justiça ou tramitação em outro tribunal — a ausência não prova onde o processo está.`,
+    )
+  }
+  if (identification?.current.status === "conflicting") {
+    notices.push("Há registros do número em mais de um tribunal. O tribunal atual não foi confirmado: confira no site oficial.")
+  }
   if (["unavailable", "timeout", "rate_limited", "error"].includes(input.primaryStatus)) {
     notices.push("A fonte processual principal não respondeu nesta consulta. O relatório mostra só o que as demais fontes trouxeram — tente de novo mais tarde.")
   }
@@ -327,7 +346,15 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
     generatedAt: input.now.toISOString(),
     summary: {
       title,
-      tribunal: tribunal ? `${tribunal.acronym} — ${tribunal.name}` : undefined,
+      tribunal: tribunalLabel(origin?.acronym, origin?.name),
+      currentTribunal: identification
+        ? {
+            label: identification.current.status === "confirmed" ? tribunalLabel(identification.current.acronym, identification.current.name) : undefined,
+            status: identification.current.status,
+            statusLabel: CURRENT_STATUS_LABEL[identification.current.status],
+            inferred: identification.inferred ? tribunalLabel(identification.inferred.acronym, identification.inferred.name) : undefined,
+          }
+        : undefined,
       unit: magistrate.unit?.value,
       situation: sheet?.sourceStatus,
       lastMovement: sheet?.lastMovement ? { title: sheet.lastMovement.name, at: sheet.lastMovement.occurredAt } : undefined,
@@ -345,6 +372,7 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
     office: buildOffice(input),
     unavailable,
     notices,
+    tribunal: identification,
   }
 }
 

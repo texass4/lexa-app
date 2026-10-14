@@ -129,7 +129,7 @@ describe("consulta processual — resultados", () => {
     assert.equal(state.report!.movements.total, 3)
     const missing = state.report!.unavailable.map((u) => u.label)
     for (const label of ["Valor da causa", "Prioridades e características", "Partes", "Magistrado", "Perfil institucional do magistrado"]) assert.ok(missing.includes(label), label)
-    assert.ok(state.foundFields.includes("Tribunal"))
+    assert.ok(state.foundFields.includes("Tribunal informado pelas fontes"))
     assert.equal(state.dataVersion, sheet.updatedAt)
     // Etapas visíveis, na ordem, todas resolvidas.
     assert.deepEqual(
@@ -485,5 +485,132 @@ describe("consulta processual — cache e duplicidade", () => {
     assert.equal(calls, 3)
     clock += 2000
     assert.equal((await a(CNJ, { force: false })).cached, false)
+  })
+})
+
+describe("consulta processual — tribunal de origem × atual (DADOS SIMULADOS)", () => {
+  const stjHit = {
+    tribunal: "STJ",
+    degree: "SUP",
+    dataset: "api_publica_stj",
+    updatedAt: "2026-10-01T10:00:00",
+    movementCount: 1,
+    lastMovement: { name: "Conclusão", occurredAt: "2026-09-30T10:00:00" },
+  }
+
+  it("consulta o superior do segmento e separa origem, atual e as consultas feitas", async () => {
+    const asked: string[] = []
+    const d = deps({ superior: async (_cnj, tribunal) => (asked.push(tribunal), { dataset: "api_publica_stj", records: [], checkedAt: NOW.toISOString() }) })
+    const state = await runWorkflow({ cnj: CNJ }, d)
+    assert.deepEqual(asked, ["STJ"])
+    const id = state.report!.tribunal!
+    assert.equal(id.origin.acronym, "TRF1")
+    assert.deepEqual(
+      id.checks.map((c) => [c.role, c.tribunal, c.status]),
+      [
+        ["origem", "TRF1", "found"],
+        ["superior", "STJ", "not_found"],
+      ],
+    )
+    assert.ok(id.current.reasons.some((r) => r.includes("A ausência não prova")))
+    assert.equal(state.report!.summary.tribunal, "TRF1 — Tribunal Regional Federal da 1ª Região")
+    assert.ok(state.report!.summary.currentTribunal)
+  })
+
+  it("resultados contraditórios (origem e superior com registro): nada afirmado, aviso no relatório", async () => {
+    const d = deps({ superior: async () => ({ dataset: "api_publica_stj", records: [stjHit], checkedAt: NOW.toISOString() }) })
+    const state = await runWorkflow({ cnj: CNJ }, d)
+    assert.equal(state.report!.tribunal!.current.status, "conflicting")
+    assert.equal(state.report!.summary.currentTribunal?.label, undefined)
+    assert.ok(state.report!.notices.some((n) => n.includes("mais de um tribunal")))
+  })
+
+  it("superior fora do ar (429, timeout, autenticação) não derruba a consulta", async () => {
+    for (const code of ["RATE_LIMIT", "TIMEOUT", "AUTHENTICATION", "UNAVAILABLE"] as const) {
+      const d = deps({
+        superior: async () => {
+          throw new LookupError(code, "simulado")
+        },
+      })
+      const state = await runWorkflow({ cnj: CNJ }, d)
+      assert.equal(state.status, "completed", code)
+      assert.equal(source(state, "datajud").status, "ok")
+      const superiorCheck = state.report!.tribunal!.checks.find((c) => c.role === "superior")
+      assert.equal(superiorCheck?.status, "failed")
+      assert.notEqual(state.report!.tribunal!.current.status, "confirmed")
+      assert.ok(state.internalErrors.some((e) => e.code === `SUPERIOR_${code}`))
+    }
+  })
+
+  it("não encontrado na origem: o aviso diz onde procurou e que a ausência não prova nada", async () => {
+    const d = deps({
+      primary: async () => {
+        throw new LookupError("NOT_FOUND", "simulado")
+      },
+      superior: async () => ({ dataset: "api_publica_stj", records: [], checkedAt: NOW.toISOString() }),
+    })
+    const state = await runWorkflow({ cnj: CNJ }, d)
+    assert.equal(state.report!.tribunal!.current.status, "not_found")
+    assert.equal(state.report!.tribunal!.inferred?.basis, "cnj")
+    assert.ok(state.report!.notices.some((n) => n.includes("TRF1") && n.includes("não prova")))
+    assert.ok(step(state, "fonte_principal").detail?.includes("TRF1"))
+  })
+
+  it("origem falhou e só o superior respondeu com registro: atual não confirmado", async () => {
+    const d = deps({
+      primary: async () => {
+        throw new LookupError("UNAVAILABLE", "simulado")
+      },
+      superior: async () => ({ dataset: "api_publica_stj", records: [stjHit], checkedAt: NOW.toISOString() }),
+    })
+    const state = await runWorkflow({ cnj: CNJ }, d)
+    const id = state.report!.tribunal!
+    assert.equal(id.current.status, "not_confirmed")
+    assert.ok(id.current.reasons.some((r) => r.includes("TRF1 não respondeu")))
+  })
+
+  it("segredo de justiça: nem a origem nem o superior são consultados", async () => {
+    let called = 0
+    const d = deps({ superior: async () => (called++, { dataset: "api_publica_stj", records: [], checkedAt: NOW.toISOString() }) })
+    const state = await runWorkflow({ cnj: CNJ, process: office({ secret: true }) }, d)
+    assert.equal(called, 0)
+    assert.equal(state.report!.tribunal!.current.status, "not_checked")
+    assert.equal(state.report!.tribunal!.origin.acronym, "TRF1")
+  })
+
+  it("consulta desligada pela administração: superior também não é consultado", async () => {
+    let called = 0
+    const d = deps({
+      primary: async () => {
+        throw new LookupError("NOT_CONFIGURED", "simulado")
+      },
+      superior: async () => (called++, { dataset: "api_publica_stj", records: [], checkedAt: NOW.toISOString() }),
+    })
+    await runWorkflow({ cnj: CNJ }, d)
+    assert.equal(called, 0)
+  })
+})
+
+describe("relatórios guardados antes da separação origem × atual", () => {
+  it("a tela e a IA continuam funcionando sem os campos novos", async () => {
+    const { buildEnrichmentContext } = await import("@/lib/ai/context/enrichment")
+    const state = await runWorkflow({ cnj: CNJ }, deps())
+    const asRun = (report: NonNullable<RunState["report"]>) =>
+      ({ id: "r1", cnj: CNJ, status: "completed", forced: false, startedAt: NOW.toISOString(), steps: state.steps, sources: state.sources, report, foundFields: [], missingFields: [] }) as Parameters<
+        typeof buildEnrichmentContext
+      >[0]
+
+    // Relatório novo: identificação estruturada, sem "tribunal" solto.
+    const fresh = buildEnrichmentContext(asRun(state.report!)).context as { resumo: Record<string, unknown> }
+    assert.equal(fresh.resumo.tribunal, undefined)
+    assert.ok(fresh.resumo.tribunal_identificacao)
+
+    // Relatório antigo: sem `tribunal` nem `currentTribunal`.
+    const { tribunal: _t, ...old } = state.report!
+    void _t
+    const legacy = { ...old, summary: { ...old.summary, currentTribunal: undefined } }
+    const context = buildEnrichmentContext(asRun(legacy)).context as { resumo: Record<string, unknown> }
+    assert.equal(context.resumo.tribunal, legacy.summary.tribunal)
+    assert.equal(context.resumo.tribunal_identificacao, undefined)
   })
 })

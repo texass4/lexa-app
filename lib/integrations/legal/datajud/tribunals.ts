@@ -1,52 +1,59 @@
 /**
- * Tribunal de um número CNJ, pelos segmentos `J.TR` (justiça + tribunal).
+ * Cobertura do DataJud: quais tribunais têm índice consultável (`api_publica_<sigla
+ * minúscula>`). A identificação do tribunal pelo número fica em
+ * `lib/processos/tribunals.ts` — um número pode ser válido e ter tribunal conhecido sem
+ * que haja índice para ele aqui.
  *
- * O índice consultado na fonte é `api_publica_<sigla minúscula>`.
+ * Só entram índices conferidos na documentação oficial da API pública do DataJud
+ * (https://datajud-wiki.cnj.jus.br/api-publica/endpoints). Tribunais Regionais
+ * Eleitorais, Justiça Militar Estadual e as Auditorias da Justiça Militar da União
+ * ficam de fora até a grafia dos índices ser confirmada lá: o número deles continua
+ * identificado (origem), mas a consulta responde "fonte não cobre este tribunal".
  */
 
-const STATE_COURTS: Record<string, string> = {
-  "01": "TJAC",
-  "02": "TJAL",
-  "03": "TJAP",
-  "04": "TJAM",
-  "05": "TJBA",
-  "06": "TJCE",
-  "07": "TJDFT",
-  "08": "TJES",
-  "09": "TJGO",
-  "10": "TJMA",
-  "11": "TJMT",
-  "12": "TJMS",
-  "13": "TJMG",
-  "14": "TJPA",
-  "15": "TJPB",
-  "16": "TJPR",
-  "17": "TJPE",
-  "18": "TJPI",
-  "19": "TJRJ",
-  "20": "TJRN",
-  "21": "TJRS",
-  "22": "TJRO",
-  "23": "TJRR",
-  "24": "TJSC",
-  "25": "TJSE",
-  "26": "TJSP",
-  "27": "TJTO",
-}
+import { originAcronym } from "@/lib/processos/tribunals"
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
-const TRIBUNALS: Record<string, string> = (() => {
-  const map: Record<string, string> = { "3.00": "STJ", "5.00": "TST", "6.00": "TSE", "7.00": "STM" }
-  for (let n = 1; n <= 6; n += 1) map[`4.${pad(n)}`] = `TRF${n}`
-  for (let n = 1; n <= 24; n += 1) map[`5.${pad(n)}`] = `TRT${n}`
-  for (const [code, acronym] of Object.entries(STATE_COURTS)) map[`8.${code}`] = acronym
-  return map
-})()
+const COVERED: ReadonlySet<string> = new Set([
+  "STJ",
+  "TST",
+  "TSE",
+  "STM",
+  ...Array.from({ length: 6 }, (_, i) => `TRF${i + 1}`),
+  ...Array.from({ length: 24 }, (_, i) => `TRT${i + 1}`),
+  ...["AC", "AL", "AP", "AM", "BA", "CE", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SE", "SP", "TO"].map((uf) => `TJ${uf}`),
+  "TJDFT",
+])
 
-/** Sigla do tribunal (ex.: "TRF1") para 20 dígitos de CNJ; `undefined` se não houver índice. */
+/** A sigla tem índice no DataJud? */
+export const isCovered = (acronym: string | undefined) => !!acronym && COVERED.has(acronym.toUpperCase())
+
+/** Sigla do tribunal de ORIGEM (ex.: "TRF1") quando há índice para ele; `undefined` caso contrário. */
 export function tribunalFor(digits: string): string | undefined {
-  return TRIBUNALS[`${digits[13]}.${digits.slice(14, 16)}`]
+  const acronym = originAcronym(digits)
+  return isCovered(acronym) ? acronym : undefined
 }
 
 export const datasetFor = (tribunal: string) => `api_publica_${tribunal.toLowerCase()}`
+
+/** Sigla pelo índice (`api_publica_tjsp` → "TJSP"); `undefined` para índice fora da cobertura. */
+export function tribunalOfDataset(dataset: string | undefined): string | undefined {
+  const match = /^api_publica_([a-z0-9-]+)$/.exec(dataset?.trim().toLowerCase() ?? "")
+  const acronym = match?.[1].toUpperCase()
+  return isCovered(acronym) ? acronym : undefined
+}
+
+/** Tribunal superior que recebe os recursos de cada segmento (`J`). */
+const SUPERIOR_BY_SEGMENT: Record<string, string> = { "4": "STJ", "8": "STJ", "9": "STJ", "5": "TST", "6": "TSE", "7": "STM" }
+
+/**
+ * Tribunal superior a consultar de forma complementar para um número (20 dígitos).
+ * `undefined` quando o próprio número já é de tribunal superior (`TR` = 00) ou o
+ * segmento não tem superior com índice.
+ */
+export function superiorFor(digits: string): string | undefined {
+  if (digits.slice(14, 16) === pad(0)) return undefined
+  const superior = SUPERIOR_BY_SEGMENT[digits[13]]
+  return isCovered(superior) ? superior : undefined
+}

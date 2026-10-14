@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { fmtDayLabel, fmtNumericDate, fmtShortDate, fmtTime } from "@/lib/core/dates"
 import { degreeLabel, isAutoTracked, ORIGIN_LABEL } from "@/lib/services/processos/labels"
+import { CURRENT_STATUS_LABEL, tribunalIdentificationOf, tribunalLabel } from "@/lib/services/processos/tribunal-identification"
 import type { Process, ProcessParty } from "@/types"
 import type { RefreshState } from "./use-process-refresh"
 
@@ -39,13 +40,56 @@ function summaryOrigin(process: Process) {
     : "Informações cadastradas pelo escritório."
 }
 
+/** "03/10/2026" de um ISO (local ou UTC). */
+const day = (iso?: string) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10).split("-").reverse().join("/") : undefined)
+
+/** Tribunal de origem (pelo número) × atual (pela fonte), com o porquê. */
+function TribunalFacts({ process }: { process: Process }) {
+  const id = tribunalIdentificationOf(process)
+  if (!id) return null
+  const { current, inferred } = id
+  const confirmed = current.status === "confirmed"
+  const currentText = confirmed
+    ? [tribunalLabel(current.acronym, current.name), current.degree && degreeLabel(current.degree)].filter(Boolean).join(" · ")
+    : CURRENT_STATUS_LABEL[current.status]
+  return (
+    <div className="mt-4 rounded-[10px] border border-border bg-surface-muted/40 px-3.5 py-3">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div className="min-w-0">
+          <dt className="text-[11.5px] text-muted-foreground">Tribunal de origem (pelo número)</dt>
+          <dd className="mt-0.5 text-[13px] font-medium break-words text-foreground">{tribunalLabel(id.origin.acronym, id.origin.name) ?? "Não identificado"}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-[11.5px] text-muted-foreground">Tribunal atual</dt>
+          <dd className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[13px] font-medium break-words text-foreground">
+            {currentText}
+            {confirmed && current.checkedAt && <span className="text-[11.5px] font-normal text-muted-foreground">conferido na fonte pública em {day(current.checkedAt)}</span>}
+          </dd>
+          {!confirmed && inferred && (
+            <p className="mt-1 text-[11.5px] text-muted-foreground">
+              Provável (inferência): {tribunalLabel(inferred.acronym, inferred.name)}. {inferred.note}
+            </p>
+          )}
+        </div>
+      </dl>
+      {current.reasons.length > 0 && (
+        <ul className="mt-2.5 space-y-1 text-[11.5px] leading-relaxed text-muted-foreground">
+          {current.reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 /** Dados que vieram da fonte, já dentro do cadastro do escritório. */
 export function ProcessSummaryPanel({ process }: { process: Process }) {
   const facts: Fact[] = [
     { label: "Classe", value: process.className },
     { label: "Assunto", value: process.subject },
     { label: "Órgão julgador", value: process.judicialUnit ?? process.court },
-    { label: "Tribunal", value: process.tribunal },
+    { label: process.origin === "manual" ? "Tribunal (cadastro do escritório)" : "Tribunal informado pela fonte", value: process.tribunal },
     { label: "Sistema", value: process.system },
     { label: "Grau", value: degreeLabel(process.degree) },
     { label: "Ajuizado em", value: fmtNumericDate(process.distributedAt) },
@@ -57,6 +101,7 @@ export function ProcessSummaryPanel({ process }: { process: Process }) {
       <PanelHeader title="Resumo" description={summaryOrigin(process)} />
       <div className="px-5 pb-5">
         <FactGrid facts={facts} />
+        <TribunalFacts process={process} />
       </div>
     </Panel>
   )

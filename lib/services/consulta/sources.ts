@@ -13,6 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { LookupError } from "@/lib/integrations/legal/errors"
+import { datajudProvider } from "@/lib/integrations/legal/datajud/provider"
 import { createDjenClient, type DjenClient } from "@/lib/integrations/legal/djen/client"
 import { mapCommunication, type Communication } from "@/lib/integrations/legal/djen/mapper"
 import { processLookup } from "@/lib/services/processos/process-lookup"
@@ -97,6 +98,14 @@ export function productionSources({ organizationId, admin, datajudEnabled }: Pro
       const result = await processLookup.lookup({ organizationId, cnj, store, maxAgeMs: force ? MIN_REFRESH_INTERVAL_MS : FRESH_FOR_MS })
       return { sheet: result.sheet, checkedAt: result.checkedAt, cached: result.cached }
     },
+    // Tribunal superior do segmento (complementar, sem cache: uma ida à fonte por consulta,
+    // já limitada pelo teto de consultas do escritório).
+    superior: datajudEnabled
+      ? async (cnj, tribunal) => {
+          const { dataset, records } = await datajudProvider.lookupRecords(cnj, tribunal)
+          return { dataset, records, checkedAt: new Date().toISOString() }
+        }
+      : null,
     communications: djenEnabled() ? djenForOrg(organizationId) : null,
     jurisprudence: jurisprudenceConfig().enabled
       ? async (input) => {

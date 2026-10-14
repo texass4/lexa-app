@@ -18,6 +18,7 @@ import type { Process, ProcessMovement } from "@/types"
 import { toProcessMovements } from "./import"
 import { collectHashes, diffMovements } from "./movements"
 import type { ProcessSheet } from "./sheet"
+import { identifyFromSheet } from "./tribunal-identification"
 
 export interface MergeOptions {
   /** Gera o id de cada movimentação importada. */
@@ -62,6 +63,8 @@ export function mergeProcessSheet(current: Process, sheet: ProcessSheet, checked
     subject: pick(current.subject, sheet.subject),
     judicialUnit: pick(current.judicialUnit, sheet.judicialUnit),
     system: pick(current.system, sheet.system),
+    // Evidência da fonte, separada do tribunal do cadastro (que segue a regra acima).
+    tribunalIdentification: identifyFromSheet(sheet, checkedAt),
     parties: sheet.parties.active.length || sheet.parties.passive.length || sheet.parties.others.length ? sheet.parties : current.parties,
     source: {
       provider: sheet.source.provider,

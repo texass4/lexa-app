@@ -7,7 +7,7 @@
  */
 
 import { formatCNJ } from "@/lib/processos/cnj"
-import type { ExternalParty, ExternalProcess, ProviderName } from "@/lib/integrations/legal/types"
+import type { ExternalParty, ExternalProcess, ExternalRecord, ProviderName } from "@/lib/integrations/legal/types"
 import type { MovementComplement, MovementDocument, MovementJudicialUnit } from "@/types"
 import { externalMovementHash } from "./movements"
 
@@ -60,6 +60,11 @@ export interface ProcessSheet {
   parties: SheetParties
   lastMovement?: { name: string; occurredAt: string }
   movements: SheetMovement[]
+  /**
+   * Todos os registros do número na fonte (evidência do tribunal e do grau atuais).
+   * Ausente em fichas antigas do cache — `originCheckFromSheet` usa os campos acima.
+   */
+  records?: ExternalRecord[]
   source: { provider: ProviderName; externalId?: string; dataset?: string }
 }
 
@@ -123,6 +128,11 @@ export function buildProcessSheet(external: ExternalProcess): ProcessSheet {
     parties: external.parties ?? { active: [], passive: [], others: [] },
     lastMovement: latest ? { name: latest.name, occurredAt: latest.occurredAt } : undefined,
     movements,
+    records: external.records?.map((record) => ({
+      ...record,
+      updatedAt: toLocal(record.updatedAt),
+      lastMovement: record.lastMovement ? { ...record.lastMovement, occurredAt: toLocal(record.lastMovement.occurredAt) ?? record.lastMovement.occurredAt } : undefined,
+    })),
     source: external.source,
   }
 }

@@ -7,6 +7,7 @@
 
 import type { PracticeArea, ProcessMovement, ProcessStatus, Process } from "@/types"
 import type { ProcessSheet, SheetMovement } from "./sheet"
+import { identifyFromSheet } from "./tribunal-identification"
 
 /**
  * Movimentações da ficha no formato interno, ainda sem `id`.
@@ -64,7 +65,9 @@ export function buildProcessDraft(sheet: ProcessSheet, meta: ImportProcessMeta, 
     // `type` é o rótulo curto que a lista de processos já exibe.
     type: meta.type || sheet.className || sheet.subject || "Processo importado",
     court: meta.court || sheet.judicialUnit || "Não informado",
-    district: meta.district ?? sheet.tribunal ?? "Não informado",
+    // Comarca só quando alguém informou: a sigla do tribunal não é comarca (vazio = não
+    // informada, como no cadastro manual).
+    district: meta.district?.trim() ?? "",
     opposingParty: meta.opposingParty ?? firstPassive ?? "Não informado",
     status: meta.status ?? "em_andamento",
     claimValue: meta.claimValue ?? 0,
@@ -72,6 +75,7 @@ export function buildProcessDraft(sheet: ProcessSheet, meta: ImportProcessMeta, 
     lastMovementAt: movements[0]?.at ?? syncedAt,
     tribunal: sheet.tribunal,
     degree: sheet.degree,
+    tribunalIdentification: identifyFromSheet(sheet, syncedAt),
     className: sheet.className,
     subject: sheet.subject,
     judicialUnit: sheet.judicialUnit,

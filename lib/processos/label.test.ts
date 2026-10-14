@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { humanizeProcessMention, processNumberLabel, processSubject, processTitle } from "./label"
+import { SIM_TJSP } from "@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios"
+import { humanizeProcessMention, processDistrict, processNumberLabel, processSubject, processTitle } from "./label"
 
 const base = { type: "Ação de cobrança", area: "Cível" as const, number: "00012345620268240001", code: "#103023" }
 
@@ -39,5 +40,19 @@ describe("citação do processo em textos já gravados", () => {
   it("não mexe em outro processo nem em código parecido", () => {
     assert.equal(humanizeProcessMention("Processo #1030370 cadastrado.", "#103037", label), "Processo #1030370 cadastrado.")
     assert.equal(humanizeProcessMention("Processo #103099", "#103037", label), "Processo #103099")
+  })
+})
+
+describe("comarca do processo (número SIMULADO)", () => {
+  it("registros antigos com a sigla do tribunal como comarca: ignorada na leitura", () => {
+    assert.equal(processDistrict({ district: "TJSP", tribunal: "TJSP", cnj: SIM_TJSP, number: "" }), undefined)
+    // Mesmo se o tribunal do cadastro mudou: a sigla do tribunal de origem também não é comarca.
+    assert.equal(processDistrict({ district: "TJSP", tribunal: undefined, cnj: SIM_TJSP, number: "" }), undefined)
+  })
+
+  it("comarca de verdade aparece; vazio e marcadores não", () => {
+    assert.equal(processDistrict({ district: "Campinas", tribunal: "TJSP", cnj: SIM_TJSP, number: "" }), "Campinas")
+    assert.equal(processDistrict({ district: "", tribunal: "TJSP", number: "" }), undefined)
+    assert.equal(processDistrict({ district: "Não informado", number: "" }), undefined)
   })
 })

@@ -54,6 +54,7 @@ import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
+import { processDistrict } from "@/lib/processos/label"
 import { useStartConsulta } from "./consulta/start-consulta"
 import { PROCESS_STATUS } from "@/lib/core/config"
 import { useCategoryLookup } from "@/components/agenda/use-category"
@@ -546,12 +547,13 @@ export function ProcessProfile({ id }: { id: string }) {
     />
   )
 
+  const district = processDistrict(process)
   const detailsPanel = (
     <Panel>
       <PanelHeader title="Detalhes" />
       <dl className="divide-y divide-border px-5 pb-3">
         <Detail label="Juízo">{process.court}</Detail>
-        {process.district && <Detail label="Comarca">{process.district}</Detail>}
+        {district && <Detail label="Comarca">{district}</Detail>}
         <Detail label="Parte contrária">{process.opposingParty}</Detail>
         <Detail label="Área">{process.area}</Detail>
         {client && (

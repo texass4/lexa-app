@@ -7,6 +7,8 @@
  * aparece como "Não disponível na fonte consultada" — nunca é completado.
  */
 
+import type { CurrentTribunalStatus, TribunalIdentification } from "@/types"
+
 /** Fontes que o workflow conhece. */
 export type SourceId = "datajud" | "djen" | "jurisprudencia" | "cadastro" | "tribunal"
 
@@ -211,7 +213,10 @@ export interface EnrichmentReport {
   generatedAt: string
   summary: {
     title: string
+    /** Tribunal de ORIGEM, pelo número (relatórios antigos: o tribunal da fonte ou do número). */
     tribunal?: string
+    /** Tribunal atual e a situação da confirmação. Ausente em relatórios antigos. */
+    currentTribunal?: { label?: string; status: CurrentTribunalStatus; statusLabel: string; inferred?: string }
     unit?: string
     situation?: string
     lastMovement?: { title: string; at: string }
@@ -231,6 +236,8 @@ export interface EnrichmentReport {
   unavailable: { label: string; reason: string }[]
   /** Avisos importantes (sigilo, segredo de justiça, não encontrado). */
   notices: string[]
+  /** Origem × atual × inferido, com a evidência. Ausente em relatórios antigos. */
+  tribunal?: TribunalIdentification
 }
 
 /** Execução como a tela recebe (sem erros internos). */

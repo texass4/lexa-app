@@ -6,6 +6,7 @@
 
 import type { Process } from "@/types"
 import { formatCNJ, onlyDigits } from "./cnj"
+import { originAcronym } from "./tribunals"
 
 type Labelled = Pick<Process, "type" | "area" | "number" | "code"> & Partial<Pick<Process, "className" | "subject">>
 
@@ -48,4 +49,19 @@ export function humanizeProcessMention(text: string, code: string | undefined, l
       new RegExp(`^[Pp]rocesso ${escape(code)}$`).test(part.trim()) ? label : part.replace(mention, (_, word: string) => `${word} “${label}”`),
     )
     .join(" · ")
+}
+
+const DISTRICT_PLACEHOLDER = /^(a definir|não informado|nao informado)$/i
+
+/**
+ * Comarca do processo para exibir, ou `undefined`. Cadastros importados antes da
+ * correção guardaram a sigla do tribunal como comarca ("TJSP"): ela é ignorada na
+ * leitura, sem regravar o registro.
+ */
+export function processDistrict(process: Pick<Process, "district" | "tribunal" | "cnj" | "number">): string | undefined {
+  const district = process.district?.trim()
+  if (!district || DISTRICT_PLACEHOLDER.test(district)) return undefined
+  const key = district.toUpperCase().replace(/[^A-Z0-9]/g, "")
+  const acronyms = [process.tribunal, originAcronym(onlyDigits(process.cnj ?? process.number ?? ""))]
+  return acronyms.some((a) => a && a.toUpperCase().replace(/[^A-Z0-9]/g, "") === key) ? undefined : district
 }

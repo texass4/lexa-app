@@ -153,3 +153,27 @@ describe("ficha e rascunho de processo interno", () => {
     assert.equal(draft.opposingParty, "Não informado")
   })
 })
+
+describe("registros de todos os graus (DADOS SIMULADOS)", () => {
+  it("guarda cada documento como evidência, do mais recente ao mais antigo", async () => {
+    const { simTjspTwoDegrees, SIM_TJSP } = await import("./__fixtures__/tribunal-scenarios")
+    const process = mapSearchResponse(simTjspTwoDegrees, SIM_TJSP)
+    assert.equal(process?.records?.length, 2)
+    assert.deepEqual(
+      process?.records?.map((r) => [r.degree, r.tribunal, r.dataset]),
+      [
+        ["G2", "TJSP", "api_publica_tjsp"],
+        ["G1", "TJSP", "api_publica_tjsp"],
+      ],
+    )
+    assert.equal(process?.records?.[0].lastMovement?.name, "Conclusão")
+    // A ficha continua vindo do documento mais recente.
+    assert.equal(process?.degree, "G2")
+  })
+
+  it("registro sem tribunal fica sem tribunal (não é completado pelo número)", async () => {
+    const { simMissingTribunal, SIM_TJSP } = await import("./__fixtures__/tribunal-scenarios")
+    const [record] = mapSearchResponse(simMissingTribunal, SIM_TJSP)?.records ?? []
+    assert.equal(record.tribunal, undefined)
+  })
+})

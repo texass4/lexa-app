@@ -16,6 +16,9 @@
 
 import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
 import { LookupError, type LookupErrorCode } from "@/lib/integrations/legal/errors"
+import { datasetFor, superiorFor, tribunalFor } from "@/lib/integrations/legal/datajud/tribunals"
+import type { ExternalRecord } from "@/lib/integrations/legal/types"
+import { identifyTribunal, originCheckFromSheet, type CheckInput } from "@/lib/services/processos/tribunal-identification"
 import type { Communication } from "@/lib/integrations/legal/djen/mapper"
 import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import type { Process } from "@/types"
@@ -46,6 +49,12 @@ export interface CommunicationsResult {
   cached: boolean
 }
 
+export interface SuperiorResult {
+  dataset: string
+  records: ExternalRecord[]
+  checkedAt: string
+}
+
 export interface RelatedInput {
   subject?: string
   className?: string
@@ -59,6 +68,11 @@ export interface WorkflowDeps {
   primary: (cnj: string, options: { force: boolean }) => Promise<PrimaryResult>
   /** Comunicações oficiais; `null` = fonte não habilitada neste ambiente. */
   communications: ((cnj: string, options: { force: boolean }) => Promise<CommunicationsResult>) | null
+  /**
+   * Registros do número no índice de outro tribunal (o superior do segmento). Consulta
+   * complementar: nada encontrado não prova nada. `null` = não consultar.
+   */
+  superior?: ((cnj: string, tribunal: string) => Promise<SuperiorResult>) | null
   /** Jurisprudência relacionada (base da Íntegra); `null` = módulo sem fonte configurada. */
   jurisprudence: ((input: RelatedInput) => Promise<JurisprudenceData>) | null
   /** Recebe o estado a cada etapa (gravado no banco pelo servidor). */
@@ -229,10 +243,13 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
       await step("fonte_principal", "done", primary.cached ? "Dados encontrados (consulta recente reaproveitada)." : "Dados encontrados.")
     } catch (error) {
       primaryStatus = fail("datajud", t0, error)
+      const index = tribunalFor(cnj)
       await step(
         "fonte_principal",
         primaryStatus === "not_found" ? "done" : "failed",
-        primaryStatus === "not_found" ? "A fonte não tem este número." : PUBLIC_SOURCE_MESSAGE[primaryStatus],
+        primaryStatus === "not_found"
+          ? `Não localizado no índice ${index ? `do ${index}` : "consultado"} — o processo pode tramitar em outro tribunal.`
+          : PUBLIC_SOURCE_MESSAGE[primaryStatus],
       )
     }
   }
@@ -244,10 +261,31 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
   /* 4. Complementares (em paralelo, cada uma com o seu prazo) ------------- */
   await step("complementares", "running")
   // Objeto (e não variáveis soltas): as consultas abaixo rodam em paralelo e escrevem aqui.
-  const extra: { communications: CommunicationsResult | null; communicationsStatus: SourceStatus; jurisprudence: JurisprudenceData | null } = {
+  const extra: {
+    communications: CommunicationsResult | null
+    communicationsStatus: SourceStatus
+    jurisprudence: JurisprudenceData | null
+    superior: CheckInput | null
+  } = {
     communications: null,
     communicationsStatus: "not_configured",
     jurisprudence: null,
+    superior: null,
+  }
+
+  // Tribunal superior do segmento: só complementa a identificação do tribunal atual.
+  const runSuperior = async () => {
+    const superior = superiorFor(cnj)
+    if (secret || !superior || !deps.superior || primaryStatus === "not_configured") return
+    const base = { tribunal: superior, role: "superior" as const, provider: "datajud" as const, dataset: datasetFor(superior) }
+    try {
+      const result = await withTimeout(deps.superior(cnj, superior), timeouts.complementary)
+      extra.superior = { ...base, dataset: result.dataset, checkedAt: result.checkedAt, status: result.records.length ? "found" : "not_found", records: result.records }
+    } catch (error) {
+      const { code, detail } = classify(error)
+      state.internalErrors.push({ source: "datajud", code: `SUPERIOR_${code}`, detail })
+      extra.superior = { ...base, checkedAt: iso(), status: "failed", records: [] }
+    }
   }
 
   const runCommunications = async () => {
@@ -306,7 +344,7 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
     }
   }
 
-  await Promise.all([runCommunications(), runJurisprudence()])
+  await Promise.all([runCommunications(), runJurisprudence(), runSuperior()])
   const complementaryFailed = state.sources.filter((s) => s.role === "complementar" && !OK_LIKE.includes(s.status))
   await step(
     "complementares",
@@ -315,7 +353,25 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
   )
 
   /* 5–6. Magistrado, consolidação ---------------------------------------- */
+  const checks: CheckInput[] = []
+  const originIndex = tribunalFor(cnj)
+  if (primary) checks.push(originCheckFromSheet(primary.sheet, primary.checkedAt))
+  else if (originIndex && primaryStatus !== "skipped" && primaryStatus !== "not_configured" && primaryStatus !== "unsupported") {
+    checks.push({
+      tribunal: originIndex,
+      role: "origem",
+      provider: "datajud",
+      dataset: datasetFor(originIndex),
+      checkedAt: source("datajud").finishedAt,
+      status: primaryStatus === "not_found" ? "not_found" : "failed",
+      records: [],
+    })
+  }
+  if (extra.superior) checks.push(extra.superior)
+  const tribunal = identifyTribunal(cnj, checks, iso())
+
   const report = assembleReport({
+    tribunal,
     cnj,
     now: deps.now(),
     process,

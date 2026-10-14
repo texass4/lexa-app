@@ -97,3 +97,35 @@ describe("aplicar ficha reconsultada", () => {
     assert.equal(newMovementsMessage(3, "#103000"), "3 novas movimentações no processo #103000.")
   })
 })
+
+describe("tribunal: origem × atual na sincronização e na importação (DADOS SIMULADOS)", () => {
+  it("sincronização grava a identificação com evidência e não troca o tribunal do cadastro manual", async () => {
+    const sim = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const simSheet = buildProcessSheet(mapSearchResponse(sim.simTjspFirstDegree, sim.SIM_TJSP) as ExternalProcess)
+    const manual: Process = { ...base, cnj: sim.SIM_TJSP, number: simSheet.number, origin: "manual", source: undefined, tribunal: "TJSP (informado pelo escritório)" }
+    const { process } = mergeProcessSheet(manual, simSheet, "2026-10-14T08:00:00", { newId })
+    assert.equal(process.tribunal, "TJSP (informado pelo escritório)")
+    assert.equal(process.tribunalIdentification?.origin.acronym, "TJSP")
+    assert.equal(process.tribunalIdentification?.current.status, "confirmed")
+    assert.equal(process.tribunalIdentification?.current.checkedAt, "2026-10-14T08:00:00")
+    // Comarca do cadastro intocada.
+    assert.equal(process.district, manual.district)
+  })
+
+  it("processo antigo sem identificação ganha uma na próxima sincronização", () => {
+    assert.equal(base.tribunalIdentification, undefined)
+    const { process } = mergeProcessSheet(base, sheet, "2026-10-14T08:00:00", { newId })
+    assert.equal(process.tribunalIdentification?.origin.acronym, "TRF1")
+    assert.ok(process.tribunalIdentification?.current.status)
+  })
+
+  it("importação não usa a sigla do tribunal como comarca", async () => {
+    const { buildProcessDraft } = await import("./import")
+    const draft = buildProcessDraft(sheet, { clientId: "c", ownerId: "u", area: "Cível" }, "2026-10-14T08:00:00")
+    assert.equal(draft.district, "")
+    assert.equal(draft.tribunal, "TRF1")
+    assert.equal(draft.tribunalIdentification?.origin.acronym, "TRF1")
+    // Comarca informada por alguém é mantida.
+    assert.equal(buildProcessDraft(sheet, { clientId: "c", ownerId: "u", area: "Cível", district: "Tefé" }, "2026-10-14T08:00:00").district, "Tefé")
+  })
+})

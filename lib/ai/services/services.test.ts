@@ -895,3 +895,29 @@ describe("conversa da Íntegra com a base de jurisprudência", () => {
     })
   })
 })
+
+describe("tribunal no contexto da IA (DADOS SIMULADOS)", () => {
+  it("processo salvo antes da verificação: origem pelo número, atual não verificado, com aviso", async () => {
+    const { SIM_TJSP } = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const { deps } = makeDeps(() => validSummary)
+    const data = await loadProcessData(deps.repo, processA.id)
+    const legacy = { ...data, process: { ...data.process, cnj: SIM_TJSP, tribunalIdentification: undefined } }
+    const { context } = buildProcessContext(legacy, NOW)
+    const processo = context.processo as Record<string, unknown>
+    assert.equal(processo.tribunal, undefined, "o tribunal do cadastro não vai como 'tribunal'")
+    assert.equal(processo.tribunal_no_cadastro, "TJMA")
+    const id = processo.tribunal_identificacao as { tribunal_de_origem: string; tribunal_atual: { situacao: string; tribunal?: string }; aviso?: string }
+    assert.ok(id.tribunal_de_origem.startsWith("TJSP"))
+    assert.equal(id.tribunal_atual.situacao, "Não verificado")
+    assert.equal(id.tribunal_atual.tribunal, undefined)
+    assert.ok(id.aviso)
+  })
+
+  it("comarca antiga com a sigla do tribunal não vai para a IA", async () => {
+    const { deps } = makeDeps(() => validSummary)
+    const data = await loadProcessData(deps.repo, processA.id)
+    const { context } = buildProcessContext({ ...data, process: { ...data.process, district: "TJMA" } }, NOW)
+    assert.equal((context.processo as Record<string, unknown>).comarca, undefined)
+    assert.equal((buildProcessContext(data, NOW).context.processo as Record<string, unknown>).comarca, "São Luís")
+  })
+})

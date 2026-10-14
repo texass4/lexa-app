@@ -11,7 +11,7 @@
 
 import { onlyDigits } from "@/lib/processos/cnj"
 import type { MovementComplement, MovementJudicialUnit } from "@/types"
-import type { ExternalMovement, ExternalParty, ExternalProcess } from "../types"
+import type { ExternalMovement, ExternalParty, ExternalProcess, ExternalRecord } from "../types"
 
 /* ------------------------- formato bruto da fonte ------------------------- */
 
@@ -208,18 +208,44 @@ export function mapMovements(source: DataJudRawSource): ExternalMovement[] {
  * Um mesmo número pode ter vários documentos (graus diferentes, reprocessos).
  * Escolhe o mais recentemente atualizado; empate, o que tem mais movimentações.
  */
-function pickBestHit(response: DataJudSearchResponse): DataJudHit | null {
-  const hits = (response?.hits?.hits ?? []).filter((hit) => !!hit?._source)
-  if (!hits.length) return null
+const hitsOf = (response: DataJudSearchResponse) => (response?.hits?.hits ?? []).filter((hit) => !!hit?._source)
 
-  return hits.reduce((best, hit) => {
-    const bestAt = isoDate(best._source?.dataHoraUltimaAtualizacao) ?? ""
-    const hitAt = isoDate(hit._source?.dataHoraUltimaAtualizacao) ?? ""
-    if (hitAt !== bestAt) return hitAt > bestAt ? hit : best
-    const bestCount = best._source?.movimentos?.length ?? 0
-    const hitCount = hit._source?.movimentos?.length ?? 0
-    return hitCount > bestCount ? hit : best
-  })
+/** Mais recente primeiro; empate → mais movimentações. */
+function compareHits(a: DataJudHit, b: DataJudHit) {
+  const aAt = isoDate(a._source?.dataHoraUltimaAtualizacao) ?? ""
+  const bAt = isoDate(b._source?.dataHoraUltimaAtualizacao) ?? ""
+  if (aAt !== bAt) return bAt.localeCompare(aAt)
+  return (b._source?.movimentos?.length ?? 0) - (a._source?.movimentos?.length ?? 0)
+}
+
+/** Resumo de um documento da fonte — evidência, não conclusão. */
+function toRecord(hit: DataJudHit): ExternalRecord {
+  const source = hit._source ?? {}
+  const [last] = mapMovements(source)
+  const keys = last?.complements?.map((c) => c.key).filter((key): key is string => !!key)
+  return {
+    tribunal: text(source.tribunal)?.toUpperCase(),
+    degree: text(source.grau),
+    judicialUnit: text(source.orgaoJulgador?.nome),
+    updatedAt: isoDate(source.dataHoraUltimaAtualizacao),
+    dataset: text(hit._index),
+    movementCount: source.movimentos?.length ?? 0,
+    lastMovement: last ? { name: last.name, code: last.code, occurredAt: last.occurredAt, complementKeys: keys?.length ? keys : undefined } : undefined,
+  }
+}
+
+/** Todos os registros do número na resposta, do mais recente ao mais antigo. */
+export function mapRecords(response: DataJudSearchResponse): ExternalRecord[] {
+  return [...hitsOf(response)].sort(compareHits).map(toRecord)
+}
+
+/**
+ * Documento que preenche a ficha: o atualizado mais recentemente. É só o registro de
+ * onde vêm os dados exibidos — não prova em que tribunal ou grau o processo está hoje
+ * (os demais registros seguem em `records`).
+ */
+function pickBestHit(response: DataJudSearchResponse): DataJudHit | null {
+  return [...hitsOf(response)].sort(compareHits)[0] ?? null
 }
 
 /** Resposta bruta → `ExternalProcess`. `null` quando a fonte não achou nada. */
@@ -256,6 +282,7 @@ export function mapSearchResponse(response: DataJudSearchResponse, requestedCnj:
     status: situationName(source.situacao),
     secrecyLevel: typeof source.nivelSigilo === "number" ? source.nivelSigilo : undefined,
     movements,
+    records: mapRecords(response),
     source: {
       provider: "datajud",
       externalId: text(source.id) ?? text(hit._id),

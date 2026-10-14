@@ -148,7 +148,17 @@ function SummaryPanel({ run, report }: { run: EnrichmentRun; report: EnrichmentR
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           {[
-            ["Tribunal", s.tribunal],
+            // Relatórios antigos não separam origem e atual: mantêm o rótulo de sempre.
+            [s.currentTribunal ? "Tribunal de origem (pelo número)" : "Tribunal", s.tribunal],
+            ...(s.currentTribunal
+              ? [
+                  [
+                    "Tribunal atual",
+                    s.currentTribunal.label ??
+                      `${s.currentTribunal.statusLabel}${s.currentTribunal.inferred ? ` · provável: ${s.currentTribunal.inferred} (inferência)` : ""}`,
+                  ],
+                ]
+              : []),
             ["Órgão julgador", s.unit],
             ["Situação na fonte", s.situation],
             ["Última movimentação", s.lastMovement ? `${fmtLocal(s.lastMovement.at)} — ${s.lastMovement.title}` : undefined],
@@ -246,6 +256,92 @@ function OfficePanel({ run, report }: { run: EnrichmentRun; report: EnrichmentRe
           <Button variant="secondary" onClick={apply} disabled={applying}>
             <RefreshCw className={cn(applying && "animate-spin")} /> {applying ? "Atualizando…" : "Atualizar processo com a consulta"}
           </Button>
+        )}
+      </div>
+    </Panel>
+  )
+}
+
+const CURRENT_TONE: Record<NonNullable<EnrichmentReport["tribunal"]>["current"]["status"], Tone> = {
+  confirmed: "success",
+  not_confirmed: "warning",
+  conflicting: "warning",
+  not_found: "neutral",
+  unsupported: "neutral",
+  not_checked: "neutral",
+}
+const CHECK_LABEL = { found: "registro encontrado", not_found: "nada encontrado", failed: "sem resposta", not_checked: "não consultado" } as const
+
+/** Origem (número) × atual (fonte) × inferido, com as consultas que sustentam cada um. */
+function TribunalPanel({ report }: { report: EnrichmentReport }) {
+  const id = report.tribunal
+  const status = report.summary.currentTribunal
+  if (!id || !status) return null
+  const { origin, current, inferred } = id
+  return (
+    <Panel>
+      <PanelHeader title="Tribunal" icon={<Landmark />} description="Onde o processo começou e onde a fonte indica que ele está — com a evidência de cada um." />
+      <div className="space-y-4 px-5 pb-5">
+        <dl className="divide-y divide-border">
+          <div className="grid grid-cols-1 gap-1.5 py-3 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-4">
+            <dt className="text-[12.5px] text-muted-foreground">Tribunal de origem</dt>
+            <dd className="min-w-0">
+              <p className="text-[13px] font-medium text-foreground">{report.summary.tribunal ?? "Não identificado"}</p>
+              <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                Pelo número CNJ{origin.segment ? ` · ${origin.segment}` : ""}. Indica onde o processo começou, não onde tramita hoje.
+              </p>
+            </dd>
+          </div>
+          <div className="grid grid-cols-1 gap-1.5 py-3 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-4">
+            <dt className="text-[12.5px] text-muted-foreground">Tribunal atual</dt>
+            <dd className="min-w-0 space-y-1.5">
+              <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground">
+                {status.label}
+                <StatusBadge tone={CURRENT_TONE[current.status]} size="sm" dot={false}>
+                  {status.statusLabel}
+                </StatusBadge>
+              </p>
+              {current.checkedAt && (
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-muted-foreground">
+                  <SourceTag source="datajud" />
+                  {current.dataset && <span className="font-mono">{current.dataset}</span>}
+                  {current.degree && <span>grau {current.degree}</span>}
+                  {current.updatedAt && <span>atualizado na fonte em {fmtLocal(current.updatedAt)}</span>}
+                  <span>consultado em {fmtUtc(current.checkedAt)}</span>
+                </p>
+              )}
+              <ul className="space-y-1 text-[12px] leading-relaxed text-muted-foreground">
+                {current.reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+          {inferred && current.status !== "confirmed" && (
+            <div className="grid grid-cols-1 gap-1.5 py-3 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-4">
+              <dt className="text-[12.5px] text-muted-foreground">Tribunal inferido</dt>
+              <dd className="min-w-0">
+                <p className="text-[13px] font-medium text-foreground">{status.inferred}</p>
+                <p className="mt-0.5 text-[11.5px] text-muted-foreground">{inferred.note}</p>
+              </dd>
+            </div>
+          )}
+        </dl>
+        {id.checks.length > 0 && (
+          <div>
+            <p className="text-[11px] font-medium tracking-[0.08em] text-subtle uppercase">Consultas feitas</p>
+            <ul className="mt-2 space-y-1.5">
+              {id.checks.map((c) => (
+                <li key={`${c.role}-${c.tribunal}`} className="text-[12px] text-muted-foreground">
+                  <span className="font-medium text-foreground">{c.tribunal}</span> ({c.role === "origem" ? "tribunal de origem" : "tribunal superior, complementar"}) —{" "}
+                  {CHECK_LABEL[c.status]}
+                  {c.records.length > 1 ? ` · ${c.records.length} registros` : ""}
+                  {c.dataset ? ` · ${c.dataset}` : ""}
+                  {c.checkedAt ? ` · ${fmtUtc(c.checkedAt)}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </Panel>
@@ -571,6 +667,7 @@ export function EnrichmentReportView({ run, report, ai }: { run: EnrichmentRun; 
       <div className="min-w-0 space-y-5 @5xl/main:col-span-7">
         <SummaryPanel run={run} report={report} />
         {ai}
+        <TribunalPanel report={report} />
         <FieldsPanel report={report} />
         <PartiesPanel report={report} />
         <MagistratePanel report={report} />

@@ -8,8 +8,8 @@
 import { LookupError } from "../errors"
 import type { ProcessProvider } from "../types"
 import { createDataJudClient, type DataJudClient } from "./client"
-import { mapSearchResponse } from "./mapper"
-import { datasetFor, tribunalFor } from "./tribunals"
+import { mapRecords, mapSearchResponse } from "./mapper"
+import { datasetFor, isCovered, tribunalFor } from "./tribunals"
 
 const apiKey = () => (process.env.DATAJUD_API_KEY ?? "").trim().replace(/^["']|["']$/g, "")
 
@@ -32,7 +32,7 @@ function getClient(): DataJudClient {
   return client.instance
 }
 
-export const datajudProvider: ProcessProvider = {
+export const datajudProvider = {
   name: "datajud",
   async lookup(digits) {
     const tribunal = tribunalFor(digits)
@@ -40,4 +40,10 @@ export const datajudProvider: ProcessProvider = {
     const response = await getClient().searchByNumber(digits, datasetFor(tribunal))
     return mapSearchResponse(response, digits)
   },
-}
+  async lookupRecords(digits, tribunal) {
+    if (!isCovered(tribunal)) throw new LookupError("UNSUPPORTED_COURT", `sem índice para ${tribunal}`)
+    const dataset = datasetFor(tribunal)
+    const response = await getClient().searchByNumber(digits, dataset)
+    return { dataset, records: mapRecords(response) }
+  },
+} satisfies Required<ProcessProvider>

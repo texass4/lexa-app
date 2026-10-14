@@ -80,9 +80,49 @@ Mostrado e comparado com as fontes públicas, **nunca alterado pela consulta**.
 
 ### 5. Site oficial do tribunal · **link (sem consulta automática)**
 
-Nome, segmento de Justiça e site oficial (`https://www.<sigla>.jus.br`) derivados da estrutura
-do número CNJ (Resolução CNJ 65/2008), sem rede. A consulta pública do tribunal é feita pela
+Nome, segmento de Justiça e site oficial (`https://www.<sigla>.jus.br`) do tribunal de origem,
+derivados da estrutura do número CNJ (Resolução CNJ 65/2008), sem rede; quando o tribunal atual
+é confirmado e é outro, o link dele também aparece. A consulta pública do tribunal é feita pela
 pessoa — pode pedir CAPTCHA, e a Íntegra não acessa por ela.
+
+## Tribunal de origem × tribunal atual × tribunal inferido
+
+`lib/services/processos/tribunal-identification.ts` (lógica pura; testes em
+`tribunal-identification.test.ts`, com dados simulados).
+
+| | De onde vem | O que garante |
+|---|---|---|
+| **Origem** | número CNJ (`J.TR`, `lib/processos/tribunals.ts`), sem rede | onde o processo começou — nunca apresentado como "atual" |
+| **Atual** | registros do DataJud (`records` da ficha: todos os documentos do número, um por grau) | só com evidência suficiente (critérios abaixo) |
+| **Inferido** | registro atualizado mais recentemente ou, sem registro, a origem | sempre exibido como inferência |
+
+Critérios para o atual ser `confirmed` (todos): algum índice consultado tem registro; todos os
+registros apontam o mesmo tribunal, igual ao do índice (senão `conflicting`); o registro mais
+recente informa o tribunal e tem data de atualização; a última movimentação não indica remessa,
+redistribuição, declínio, devolução nem baixa; nenhuma outra consulta falhou. O grau só é
+informado quando um único grau aparece. Os demais estados: `not_confirmed`, `not_found`
+(ausência não prova onde tramita), `unsupported` (sem índice para o tribunal de origem) e
+`not_checked` (nenhuma consulta concluída, segredo de justiça ou cadastro antigo).
+
+- **Validade × cobertura:** `parseCNJ` (`lib/processos/cnj.ts`) só diz se o número é bem formado;
+  a identificação da origem cobre todos os segmentos (inclusive TRE, TJM, STF e CNJ), e a
+  cobertura do DataJud (`datajud/tribunals.ts`) diz se há índice para consultar. TRE, Justiça
+  Militar Estadual e Auditorias Militares ficam fora da cobertura até a grafia dos índices ser
+  conferida na documentação oficial do DataJud (o número continua identificado).
+- **Tribunal superior (complementar):** a consulta processual também procura o número no
+  índice do superior do segmento (STJ para Estadual/Federal, TST, TSE, STM), em paralelo, com
+  o prazo das fontes complementares. Nada encontrado lá não prova nada; registro lá e na origem
+  vira `conflicting`; falha lá impede a confirmação, mas não derruba a consulta. A importação, a
+  sincronização e o monitoramento não consultam o superior (sem custo extra no cron).
+- **Persistência:** `Process.tribunalIdentification` (dentro de `data`, sem migração), gravado
+  na importação e a cada sincronização; o relatório guarda o mesmo objeto em `report.tribunal`.
+  Processos e relatórios antigos, sem o campo, são lidos por `tribunalIdentificationOf` (origem
+  pelo número, atual `not_checked`) e pela tela/IA com o rótulo antigo.
+- **Comarca:** a sigla do tribunal deixou de ser gravada em `district`. Registros antigos com a
+  sigla não são regravados — `processDistrict` a ignora na leitura (perfil e IA).
+- **IA:** recebe `tribunal_identificacao` (origem, atual com fonte e motivos, inferido) e, sem
+  confirmação, o aviso para não afirmar onde o processo tramita. O tribunal do cadastro vai
+  como `tribunal_no_cadastro`.
 
 ### Não integradas (e por quê)
 

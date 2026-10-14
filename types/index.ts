@@ -253,6 +253,85 @@ export interface Process extends TenantEntity {
   lastSyncedAt?: string
   /** Última sincronização feita pelo monitoramento automático (servidor). Ausente = nunca. */
   autoSyncedAt?: string
+  /**
+   * Tribunal de origem (pelo número) separado do tribunal atual (pela fonte), com a
+   * evidência de cada um. Ausente em processos cadastrados antes desta verificação —
+   * leia por `tribunalIdentificationOf`, que trata esses registros.
+   */
+  tribunalIdentification?: TribunalIdentification
+}
+
+/* --------------------------- Tribunal do processo -------------------------- */
+
+/**
+ * Situação do tribunal ATUAL:
+ * - `confirmed`: os critérios de evidência foram atendidos (`tribunal-identification.ts`);
+ * - `not_confirmed`: há registro na fonte, mas sem evidência suficiente;
+ * - `conflicting`: registros ou consultas apontam tribunais diferentes;
+ * - `not_found`: nenhuma fonte consultada tem o número — não prova onde tramita;
+ * - `unsupported`: não há fonte consultável para o tribunal de origem;
+ * - `not_checked`: nenhuma consulta concluída (fonte fora do ar, cadastro antigo…).
+ */
+export type CurrentTribunalStatus = "confirmed" | "not_confirmed" | "conflicting" | "not_found" | "unsupported" | "not_checked"
+
+/** Um registro encontrado na fonte, guardado como evidência. */
+export interface TribunalRecordEvidence {
+  /** Tribunal como o registro informa (ausente quando a fonte não informou). */
+  tribunal?: string
+  degree?: string
+  judicialUnit?: string
+  /** Última atualização do registro na fonte. */
+  updatedAt?: string
+  dataset?: string
+  lastMovement?: { name: string; occurredAt: string }
+}
+
+/** Uma consulta a um índice de tribunal. */
+export interface TribunalCheck {
+  /** Sigla do tribunal do índice consultado. */
+  tribunal: string
+  /** `origem`: tribunal do número; `superior`: consulta complementar (a ausência não prova nada). */
+  role: "origem" | "superior"
+  status: "found" | "not_found" | "failed" | "not_checked"
+  provider: "datajud"
+  dataset?: string
+  /** ISO de quando a fonte foi consultada (pode vir do cache do escritório). */
+  checkedAt?: string
+  records: TribunalRecordEvidence[]
+}
+
+export interface TribunalIdentification {
+  /** Pelo número CNJ — certo enquanto o número for válido; não diz onde tramita hoje. */
+  origin: {
+    acronym?: string
+    name?: string
+    segment?: string
+    source: "cnj"
+    /** Há índice consultável para ele na fonte. */
+    covered: boolean
+  }
+  /** Pela fonte consultada — só preenchido com evidência. */
+  current: {
+    status: CurrentTribunalStatus
+    acronym?: string
+    name?: string
+    /** Só quando um único grau aparece nos registros. */
+    degree?: string
+    judicialUnit?: string
+    source?: "datajud"
+    dataset?: string
+    /** Atualização do registro na fonte. */
+    updatedAt?: string
+    /** ISO da consulta que sustenta a conclusão. */
+    checkedAt?: string
+    /** Critérios atendidos e o que faltou, em linguagem simples. */
+    reasons: string[]
+  }
+  /** Palpite quando o atual não está confirmado — sempre exibido como inferência. */
+  inferred?: { acronym: string; name: string; basis: "cnj" | "registro_mais_recente"; note: string }
+  checks: TribunalCheck[]
+  /** ISO (UTC) de quando a identificação foi montada. */
+  identifiedAt: string
 }
 
 /* -------------------------------- Tarefas --------------------------------- */

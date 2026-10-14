@@ -46,3 +46,41 @@ export function maskCNJ(value: string) {
   const separators = ["", "-", ".", ".", ".", "."]
   return parts.reduce((out, part, i) => (part ? out + separators[i] + part : out), "")
 }
+
+/** Partes do número CNJ. Só estrutura: não diz se o tribunal existe nem se há fonte para ele. */
+export interface CNJParts {
+  /** 20 dígitos, sem pontuação. */
+  digits: string
+  sequence: string
+  checkDigits: string
+  /** Ano de ajuizamento (`AAAA`). */
+  year: number
+  /** Segmento da Justiça (`J`): "8" = Justiça Estadual. */
+  segment: string
+  /** Tribunal dentro do segmento (`TR`): "26" = São Paulo na Justiça Estadual. */
+  tribunalCode: string
+  /** Unidade de origem (`OOOO`). */
+  unitCode: string
+  /** O dígito verificador confere (ISO 7064 MOD 97-10). */
+  checkDigitsValid: boolean
+}
+
+/**
+ * Lê as partes de um número CNJ (com ou sem pontuação). `null` quando não tem 20
+ * dígitos. Um número com dígito verificador errado ainda é lido — `checkDigitsValid`
+ * diz se ele vale; quem consulta fontes externas deve exigir `true`.
+ */
+export function parseCNJ(value: string): CNJParts | null {
+  const d = onlyDigits(value ?? "")
+  if (d.length !== DIGITS_LENGTH) return null
+  return {
+    digits: d,
+    sequence: d.slice(0, 7),
+    checkDigits: d.slice(7, 9),
+    year: Number(d.slice(9, 13)),
+    segment: d.slice(13, 14),
+    tribunalCode: d.slice(14, 16),
+    unitCode: d.slice(16, 20),
+    checkDigitsValid: hasValidCheckDigits(d),
+  }
+}
