@@ -234,7 +234,7 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
 
   const context = {
     data_de_hoje: fmtToday(now),
-    metricas_calculadas_pelo_lexa: metrics,
+    metricas_calculadas: metrics,
     processos_ativos_por_responsavel: data.can.processes ? processesByOwner : undefined,
     ...lists,
     processos_movimentados_desde_o_inicio_da_semana:

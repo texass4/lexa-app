@@ -14,21 +14,13 @@ import { formatFileSize, uid } from "@/lib/core/format"
 import { currentOrgId } from "@/lib/auth/account"
 import { documentRequiredIssue } from "@/lib/clientes/clients"
 import { getSupabase } from "@/lib/supabase/client"
+import { DOCUMENT_MIME } from "@/lib/documentos/documents"
 import type { DocumentKind } from "@/types"
 
 export const DOCUMENT_KINDS: DocumentKind[] = ["Contrato", "Procuração", "Documento pessoal", "Petição", "Comprovante", "Laudo", "Decisão"]
 const EXTENSIONS = ["pdf", "docx", "doc", "txt", "jpg", "png"] as const
 const MAX_BYTES = 25 * 1024 * 1024
 /** O tipo vem da extensão aceita, nunca do navegador: um .pdf é servido sempre como PDF. */
-const MIME: Record<(typeof EXTENSIONS)[number], string> = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  doc: "application/msword",
-  txt: "text/plain; charset=utf-8",
-  jpg: "image/jpeg",
-  png: "image/png",
-}
-
 type Defaults = { clientId?: string; processId?: string }
 
 export function NewDocumentDialog({ open, onOpenChange, defaults }: { open: boolean; onOpenChange: (o: boolean) => void; defaults?: Defaults }) {
@@ -81,7 +73,7 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
 
     // Pasta do escritório: a política do Storage só aceita a de quem está logado.
     const storagePath = `${currentOrgId()}/${uid("file")}.${extension}`
-    const { error: uploadError } = await getSupabase().storage.from("documents").upload(storagePath, file.source, { contentType: MIME[extension] })
+    const { error: uploadError } = await getSupabase().storage.from("documents").upload(storagePath, file.source, { contentType: DOCUMENT_MIME[extension] })
     if (uploadError) {
       setUploading(false)
       setError("Não foi possível enviar o arquivo. Verifique se você pode adicionar documentos e tente de novo.")

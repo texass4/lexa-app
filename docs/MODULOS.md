@@ -76,7 +76,7 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 2. `POST /api/processes/search` → `lookup-service.ts`, com stale-while-revalidate: cache fresco responde na hora; cache vencido responde na hora e atualiza em segundo plano (`after`).
 3. A ficha é salva na hora (`importProcess`). Se o CNJ já existe, é atualizado (`applyProcessSync`), nunca duplicado.
 
-**Cadastrar à mão** — o mesmo "Novo processo", sem depender da consulta (processos em segredo de justiça não estão nela): cliente, número (opcional; informado, só o formato e o dígito verificador do CNJ são conferidos — não precisa existir na consulta), tipo de ação/classe, área, tribunal, grau, órgão julgador, parte contrária, responsável, status, valor da causa, descrição/observações e **segredo de justiça (Sim/Não)**. Salva mesmo se a consulta não encontrou o processo ou estava fora do ar. O processo nasce com `origin: "manual"` ("Cadastrado pelo escritório" no perfil; o resumo diz "Informações cadastradas pelo escritório"). Em segredo de justiça (`secret`), "Preencher" e "Atualizar" ficam desligados e o processo nunca entra no monitoramento automático (que só pega processos importados da consulta). Se um cadastro manual com CNJ for atualizado depois, a regra de `mergeProcessSheet` é explícita: o que o escritório preencheu (tribunal, grau, órgão, classe…) prevalece e a fonte só completa o que estava vazio; as movimentações públicas entram normalmente.
+**Cadastrar à mão** — o mesmo "Novo processo", sem depender da consulta (processos em segredo de justiça não estão nela): cliente, número (opcional; informado, só o formato e o dígito verificador do CNJ são conferidos — não precisa existir na consulta), tipo de ação/classe, área, tribunal, grau, órgão julgador, parte contrária, responsável, status, valor da causa, descrição/observações e **segredo de justiça (Sim/Não)**. Salva mesmo se a consulta não encontrou o processo ou estava fora do ar. O processo nasce com `origin: "manual"` ("Cadastrado pelo escritório" no perfil; o resumo diz "Informações cadastradas pelo escritório"). Em segredo de justiça (`secret`), "Preencher" e "Atualizar" ficam desligados e o processo nunca entra no monitoramento automático (que só pega processos importados da consulta e, desde a migração 0024, também exclui os importados que o escritório marcou como segredo de justiça); as rotas de consulta recusam no servidor processo em segredo de justiça, mesmo chamadas fora da tela; e o relatório da consulta processual não guarda partes, comunicações nem complementos de processo com sigilo informado pela fonte ou com nível de sigilo não informado (ver `docs/CONSULTA_PROCESSUAL.md`). Se um cadastro manual com CNJ for atualizado depois, a regra de `mergeProcessSheet` é explícita: o que o escritório preencheu (tribunal, grau, órgão, classe…) prevalece e a fonte só completa o que estava vazio; as movimentações públicas entram normalmente.
 
 **Consultar processo** — workflow que reúne DataJud, comunicações oficiais (DJEN, desligada por padrão), jurisprudência e o cadastro do escritório num relatório com a fonte e a data de cada dado, magistrado só por menção explícita em publicação oficial, e "Não disponível na fonte consultada" para o resto. Execução no servidor com etapas visíveis, registrada em `process_enrichment_runs` (migração 0020). Detalhes, fontes, custos e limitações: `docs/CONSULTA_PROCESSUAL.md`.
 
@@ -103,6 +103,8 @@ Detalhes da fonte que valem lembrar:
 - Sob carga, a fonte responde **200 com shards falhos e sem resultados**. O cliente trata isso como falha temporária e tenta de novo — não como "não encontrado".
 
 Variáveis de ambiente (só servidor): `DATAJUD_API_KEY`; opcionais `PROCESS_LOOKUP_TIMEOUT_MS` e `DATAJUD_BASE_URL`.
+
+Limite: as rotas `processes/search` e `processes/[id]/sync` aceitam até 60 consultas por pessoa a cada 10 minutos e 1000 por escritório por hora (`LIMITS.processLookup*`, `lib/auth/protection/rate-limit.ts`); acima disso respondem 429 com a mensagem padrão de "muitas tentativas". O monitoramento automático não passa por esse limite.
 
 ### Monitoramento automático
 
@@ -428,4 +430,4 @@ data, 20 por página; decisão completa num painel lateral com Salvar, Vincular 
 vínculos são do escritório (RLS). No processo, "Jurisprudência relacionada" (vinculadas +
 pesquisa a partir do processo + análise de semelhança). Vincular registra
 "vinculou uma jurisprudência ao processo." na linha do tempo. Fonte, sincronização, dados,
-variáveis, testes e limitações: `docs/JURISPRUDENCIA.md`. Migração: `0019_jurisprudencia.sql`.
+variáveis, testes e limitações: `docs/JURISPRUDENCIA.md`. Migrações: `0019_jurisprudencia.sql` e `0022_jurisprudencia_relevancia.sql` (recuperação da IA).

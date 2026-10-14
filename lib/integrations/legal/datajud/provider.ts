@@ -40,10 +40,10 @@ export const datajudProvider = {
     const response = await getClient().searchByNumber(digits, datasetFor(tribunal))
     return mapSearchResponse(response, digits)
   },
-  async lookupRecords(digits, tribunal) {
+  async lookupRecords(digits, tribunal, options) {
     if (!isCovered(tribunal)) throw new LookupError("UNSUPPORTED_COURT", `sem índice para ${tribunal}`)
     const dataset = datasetFor(tribunal)
-    const response = await getClient().searchByNumber(digits, dataset)
+    const response = await getClient().searchByNumber(digits, dataset, { signal: options?.signal })
     return { dataset, records: mapRecords(response, digits), coverage: mapCoverage(response, digits) }
   },
 } satisfies Required<ProcessProvider>

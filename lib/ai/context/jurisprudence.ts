@@ -10,23 +10,15 @@ import type { JurisprudenceDecision } from "@/lib/services/jurisprudence/types"
 import type { Process } from "@/types"
 import { describeTribunalForAI, tribunalIdentificationOf } from "@/lib/services/processos/tribunal-identification"
 import type { AISources } from "@/lib/ai/types"
+import type { RetrievalResult } from "@/lib/ai/jurisprudence-pipeline"
 import { type BuiltContext, SourceRegistry, fmtDate, fmtDateTime, fmtToday } from "./shared"
+import { BASE_NOTE, decisionLabel, describeCase, describePrecedent, describeQueries, registerDecision, retrievalOutcome } from "./jurisprudence-comparative"
+
+export { decisionLabel }
 
 const LIMITS = { decisionText: 12_000, cited: 3_000, relatedEmenta: 2_500, movements: 5 } as const
 
 const cut = (text: string | undefined, max: number) => (text && text.length > max ? `${text.slice(0, max)}… [texto cortado]` : text)
-
-export const decisionLabel = (d: Pick<JurisprudenceDecision, "tribunal" | "classCode" | "processNumber">) =>
-  [d.tribunal, [d.classCode, d.processNumber].filter(Boolean).join(" ")].filter(Boolean).join(" · ")
-
-function registerDecision(registry: SourceRegistry, decision: JurisprudenceDecision) {
-  return registry.add("jurisprudence", {
-    id: decision.id,
-    label: decisionLabel(decision),
-    date: decision.judgmentDate,
-    href: `/jurisprudencia?id=${decision.id}`,
-  })
-}
 
 function describeProcess(registry: SourceRegistry, process: Process) {
   const ref = registry.add("process", { id: process.id, label: `Processo ${process.number}`, date: process.lastMovementAt, href: `/processos/${process.id}` })
@@ -114,11 +106,18 @@ export function buildRelatedContext(process: Process, decisions: JurisprudenceDe
 
 export interface ChatJurisprudence {
   /** Pesquisa feita na base para esta pergunta (ou por que não foi possível). */
-  search?: { query: string; total: number; decisions: JurisprudenceDecision[] } | { unavailable: string }
+  search?: ChatSearch | { unavailable: string }
   /** Vinculadas ao processo da conversa. */
   linked?: JurisprudenceDecision[]
   /** Salvas pelo escritório. */
   saved?: JurisprudenceDecision[]
+}
+
+export interface ChatSearch {
+  /** Caso estruturado, consultas por questão e precedentes comparados (`jurisprudence-pipeline.ts`). */
+  result: RetrievalResult
+  /** Falso no modo Jurisprudência: dados do processo servem à pesquisa, mas não vão ao modelo. */
+  withProcessData: boolean
 }
 
 const CHAT_EMENTA = 1_500
@@ -127,6 +126,9 @@ const CHAT_EMENTA = 1_500
  * Bloco de jurisprudência para a conversa: só decisões reais da base, cada uma com uma
  * referência [J1]… que vira link para a decisão. A mesma decisão em duas listas tem a
  * mesma referência. Vem com as próprias fontes (prefixo J, sem colisão com o resto).
+ * Da pesquisa, só vão os precedentes selecionados pela classificação jurídica, com a
+ * questão, a pertinência, a posição lida na ementa (e o trecho), o resultado como
+ * escrito, a comparação com o caso e o trecho LITERAL que os liga à pergunta.
  */
 export function jurisprudenceChatSection(input: ChatJurisprudence): { context: Record<string, unknown>; sources: AISources } {
   const registry = new SourceRegistry()
@@ -154,15 +156,18 @@ export function jurisprudenceChatSection(input: ChatJurisprudence): { context: R
   if (input.linked?.length) context.jurisprudencia_vinculada_ao_processo = input.linked.map(describe)
   if (input.saved?.length) context.jurisprudencia_salva_pelo_escritorio = input.saved.map(describe)
   if (input.search) {
-    context.pesquisa_de_jurisprudencia =
-      "unavailable" in input.search
-        ? { situacao: input.search.unavailable }
-        : {
-            termos_pesquisados: input.search.query,
-            total_na_base: input.search.total,
-            base: "Somente decisões indexadas pela Íntegra a partir de fontes oficiais (hoje: STJ — Portal de Dados Abertos).",
-            decisoes: input.search.decisions.map(describe),
-          }
+    if ("unavailable" in input.search) context.pesquisa_de_jurisprudencia = { situacao: input.search.unavailable }
+    else {
+      const { result, withProcessData } = input.search
+      context.pesquisa_de_jurisprudencia = {
+        base: BASE_NOTE,
+        caso: describeCase(result.analysis, { withProcessData }),
+        consultas_executadas: describeQueries(result),
+        candidatas_avaliadas: result.metrics.unique,
+        resultado: retrievalOutcome(result),
+        decisoes: result.precedents.map((p) => describePrecedent(registry, refs, p, result.analysis, { full: false })),
+      }
+    }
   }
   return { context, sources: registry.sources }
 }

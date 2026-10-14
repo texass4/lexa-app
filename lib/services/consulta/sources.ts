@@ -45,7 +45,7 @@ const djenClient = () =>
 
 /** Comunicações de um processo, com cache por escritório e deduplicação. */
 export function cachedCommunications(
-  fetchItems: (cnj: string) => Promise<{ items: Communication[]; total: number }>,
+  fetchItems: (cnj: string, signal?: AbortSignal) => Promise<{ items: Communication[]; total: number }>,
   options: { now?: () => number; ttlMs?: number } = {},
 ) {
   const now = options.now ?? Date.now
@@ -53,14 +53,14 @@ export function cachedCommunications(
   const communicationsCache = new Map<string, { at: number; value: CommunicationsResult }>()
   const communicationsInflight = new Map<string, Promise<CommunicationsResult>>()
   return (organizationId: string) =>
-    async (cnj: string, { force }: { force: boolean }): Promise<CommunicationsResult> => {
+    async (cnj: string, { force, signal }: { force: boolean; signal?: AbortSignal }): Promise<CommunicationsResult> => {
       const key = `${organizationId}:${cnj}`
       const hit = communicationsCache.get(key)
       if (hit && !force && now() - hit.at < ttl) return { ...hit.value, cached: true }
       const running = communicationsInflight.get(key)
       if (running) return running
       const task = (async () => {
-        const { items, total } = await fetchItems(cnj)
+        const { items, total } = await fetchItems(cnj, signal)
         const value: CommunicationsResult = { items, total, checkedAt: new Date(now()).toISOString(), cached: false }
         communicationsCache.set(key, { at: now(), value })
         if (communicationsCache.size > 500) communicationsCache.delete(communicationsCache.keys().next().value!)
@@ -71,8 +71,8 @@ export function cachedCommunications(
     }
 }
 
-const djenForOrg = cachedCommunications(async (cnj) => {
-  const { items, total } = await djenClient().searchByProcess(cnj)
+const djenForOrg = cachedCommunications(async (cnj, signal) => {
+  const { items, total } = await djenClient().searchByProcess(cnj, { signal })
   const mapped = items
     .map(mapCommunication)
     .filter((c): c is Communication => !!c && !c.cancelled)
@@ -101,8 +101,8 @@ export function productionSources({ organizationId, admin, datajudEnabled }: Pro
     // Tribunal superior do segmento (complementar, sem cache: uma ida à fonte por consulta,
     // já limitada pelo teto de consultas do escritório).
     superior: datajudEnabled
-      ? async (cnj, tribunal) => {
-          const { dataset, records, coverage } = await datajudProvider.lookupRecords(cnj, tribunal)
+      ? async (cnj, tribunal, signal) => {
+          const { dataset, records, coverage } = await datajudProvider.lookupRecords(cnj, tribunal, { signal })
           return { dataset, records, coverage, checkedAt: new Date().toISOString() }
         }
       : null,
@@ -110,7 +110,8 @@ export function productionSources({ organizationId, admin, datajudEnabled }: Pro
     jurisprudence: jurisprudenceConfig().enabled
       ? async (input) => {
           const query = relatedQueryForProcess({ subject: input.subject, type: input.type ?? "", className: input.className, area: input.area as Process["area"] })
-          if (query.missing) return { items: [], total: 0, basis: query.basis, message: query.missing }
+          // Sem termo útil a pesquisa NÃO é feita — e o relatório diz isso, não "sem resultado".
+          if (query.missing) return { items: [], total: 0, basis: query.basis, message: query.missing, executed: false }
           // Base pública (sem dado de escritório): leitura direta, sem depender da sessão da requisição.
           const page = await createIndexedProvider(jurisprudenceRepository(admin)).search({ text: query.text, filters: query.filters, page: 1, pageSize: 5 })
           const items: ReportJurisprudence[] = page.results.map((r) => ({

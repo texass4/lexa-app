@@ -193,7 +193,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 |---|---|---|
 | `auth/signup`, `auth/recover`, `auth/events` | pública / sessão | cadastro, recuperação de senha, auditoria de login |
 | `me/email`, `team/users/*` | `requireMember` | conta da pessoa e equipe do escritório |
-| `processes/search`, `processes/[id]/sync`, `processes/monitoring` | `requireMember("processes.*")` | consulta de processo pelo CNJ e monitoramento |
+| `processes/search`, `processes/[id]/sync`, `processes/monitoring` | `requireMember("processes.*")`; consulta com limite por pessoa (60/10 min) e por escritório (1000/h) | consulta de processo pelo CNJ e monitoramento |
 | `ai/*` | `aiRoute` | Íntegra IA (medição, limites e cache no banco) |
 | `whatsapp/*` | `requireActor` | Central de Atendimento |
 | `whatsapp/meta/webhook` | assinatura `X-Hub-Signature-256` (App Secret) | eventos da Meta (WhatsApp oficial) |
@@ -209,7 +209,8 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 - Cada coleção do escritório é uma tabela `(organization_id, id, data jsonb, created_at, updated_at)`. A RLS libera só o escritório da pessoa e só os módulos que ela pode ver.
 - O store carrega na abertura só o que a primeira tela usa (recortes recentes; processos sem o histórico de movimentações) e o resto sob demanda, quando a tela ou o registro é aberto (`lib/store/on-demand.ts`); o histórico das listagens vem do banco em páginas de 50, com contagens e busca feitas no banco (`lib/store/history-lists.ts`, migração 0017; detalhes em MODULOS.md). Grava só o que mudou (agrupado em 300 ms) e recebe as mudanças da equipe pelo Realtime. Edições conferem a versão (`updated_at`): se outra pessoa gravou antes, a gravação é recusada com aviso.
 - WhatsApp, monitoramento, consumo de IA e Admin têm tabelas próprias (ver as migrações). As tabelas da antiga Triagem (`triage_items`, `intimacoes`…) continuam no banco, sem uso, para não apagar dados.
-- Arquivos: Storage, em `documents/<organization_id>/…` e `whatsapp/<organization_id>/…`, sempre com URL assinada.
+- Arquivos: Storage, em `documents/<organization_id>/…` e `whatsapp/<organization_id>/…`, sempre com URL assinada. `documents` e `avatars` só aceitam os formatos oferecidos na tela (migração 0023; a lista de Documentos está em `DOCUMENT_MIME`, `lib/documentos/documents.ts`).
+- Privilégios: os papéis da API (`anon`, `authenticated`) não têm TRUNCATE, TRIGGER nem REFERENCES no schema `public` (a RLS não vale para TRUNCATE) — migração 0023, conferida por `supabase/tests/privilegios.sql`. Tabela nova criada pelo SQL Editor já nasce assim; se for criada por outro papel, rode a 0023 de novo.
 
 ---
 

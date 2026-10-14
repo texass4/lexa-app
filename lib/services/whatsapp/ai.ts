@@ -7,6 +7,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk"
+import { sanitizeAIOutput } from "@/lib/ai/output-sanitizer"
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod"
 import * as z from "zod/v4"
 import { HttpError } from "@/lib/auth/server"
@@ -183,5 +184,7 @@ export async function runAssistant(actor: Actor, conversationId: string, action:
   if (response.stop_reason === "refusal") throw new HttpError(422, "A Íntegra IA não pôde analisar este conteúdo.")
   if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new HttpError(502, "A Íntegra IA não concluiu a resposta. Tente de novo.")
 
-  return { action, result: response.parsed_output, ...(action === "processes" ? { processes } : {}) } as AiResult & { processes?: { number: string }[] }
+  // A resposta sugerida pode ir para o cliente: nenhum nome interno nem o nome antigo do produto.
+  const result = sanitizeAIOutput(response.parsed_output)
+  return { action, result, ...(action === "processes" ? { processes } : {}) } as AiResult & { processes?: { number: string }[] }
 }

@@ -17,6 +17,7 @@ import { useAIAction } from "@/components/ai/use-ai"
 import type { Process } from "@/types"
 import { jurisApi, type LinkedEntry, type RelatedResponse } from "./api"
 import { DecisionSheet, type DecisionChange } from "./decision-sheet"
+import { ComparativeAnalysis } from "./strategy-panel"
 import { decisionMeta, decisionTitle, ResultRow } from "./result-row"
 
 const SIMILARITY: Record<Similarity, { label: string; tone: "success" | "info" | "neutral" }> = {
@@ -192,6 +193,10 @@ export function ProcessJurisprudencePanel({ process }: { process: Process }) {
           )}
         </div>
       )}
+
+      <div className="border-t border-border">
+        <ComparativeAnalysis process={process} onOpen={setSelected} />
+      </div>
 
       <DecisionSheet id={selected} onOpenChange={(o) => !o && setSelected(undefined)} processId={process.id} query={related.data?.query.text} onChange={onChange} />
     </Panel>

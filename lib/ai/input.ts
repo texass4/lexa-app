@@ -61,3 +61,13 @@ export function readRelatedInput(body: unknown): { processId: string; ids: strin
   }
   return { processId, ids: input.ids as string[] }
 }
+
+/** Análise comparativa: `{ question, processId? }`. */
+export function readStrategyInput(body: unknown): { question: string; processId?: string } {
+  const input = record(body)
+  const processId = input.processId === undefined || input.processId === null ? undefined : readId(input, "processId")
+  if (typeof input.question !== "string") throw bad("Pergunta inválida.")
+  const question = input.question.trim()
+  if (question.length < 3 || question.length > CHAT_LIMITS.messageChars) throw bad(`A pergunta precisa ter entre 3 e ${CHAT_LIMITS.messageChars} caracteres.`)
+  return { question, processId }
+}

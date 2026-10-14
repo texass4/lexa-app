@@ -19,7 +19,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Permission } from "@/lib/auth/permissions"
 import { FINANCIAL_ACTIVITY_TYPES, visibleActivities } from "@/lib/financeiro/access"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, ProcessMovement, Task } from "@/types"
-import { DECISION_COLUMNS, isUuid, jurisprudenceRepository, toDecision, type DecisionRow } from "@/lib/services/jurisprudence/store"
+import { DECISION_COLUMNS, isUuid, jurisprudenceRepository, toDecision, type AICandidate, type DecisionRow } from "@/lib/services/jurisprudence/store"
+import { JurisprudenceError } from "@/lib/services/jurisprudence/errors"
 import type { JurisprudenceDecision, JurisprudenceFilters } from "@/lib/services/jurisprudence/types"
 
 /** Processo sem a lista de movimentações (só a mais recente) — para visões de vários processos. */
@@ -83,11 +84,30 @@ export interface AIRepository {
   getJurisprudence(ids: string[]): Promise<JurisprudenceDecision[]>
   /** Pesquisa na base indexada (a mesma da tela); devolve as decisões completas e o total. */
   searchJurisprudence(text: string, filters: JurisprudenceFilters, limit: number): Promise<{ decisions: JurisprudenceDecision[]; total: number }>
+  /**
+   * Candidatas para a IA: um grupo de variantes por conceito (`jurisprudence-query.ts`).
+   * Com `required` (índices dos grupos obrigatórios — E), a consulta é por questão
+   * jurídica (migração 0025); sem, qualquer grupo (0022). `fallback`: migração ausente —
+   * a 0022 com o E conferido aqui, ou a pesquisa da tela (menos, sem marcação por campo).
+   * `signal`: cancelamento de quem pediu.
+   */
+  jurisprudenceCandidates(
+    groups: string[][],
+    filters: JurisprudenceFilters,
+    limit: number,
+    options?: { required?: number[]; signal?: AbortSignal },
+  ): Promise<{ candidates: AICandidateLike[]; matched: number; fallback?: boolean }>
   /** Decisões vinculadas a um processo do escritório (RLS). */
   linkedJurisprudence(processId: string): Promise<JurisprudenceDecision[]>
   /** As decisões salvas pelo escritório mais recentemente (RLS). */
   savedJurisprudence(limit: number): Promise<JurisprudenceDecision[]>
 }
+
+/** Candidata da base para a IA; `db` falta quando veio da pesquisa da tela. */
+export type AICandidateLike = Omit<AICandidate, "db"> & { db?: AICandidate["db"] }
+
+/** Na pesquisa da tela (sem a 0022), quantas decisões completas entram na reclassificação. */
+const FALLBACK_CANDIDATES = 20
 
 const PAGE = 1000
 /** Listas de ids enviadas numa consulta (acima disso, em partes). */
@@ -323,6 +343,37 @@ export function createSupabaseRepository(supabase: SupabaseClient, organizationI
       const { rows, total } = await jurisprudenceRepository(supabase).search({ text, filters, sort: "relevance", limit, offset: 0 })
       const decisions = await loadDecisions(rows.map((row) => row.id))
       return { decisions, total }
+    },
+
+    async jurisprudenceCandidates(groups, filters, limit, options = {}) {
+      if (!can("processes.view") || !groups.length) return { candidates: [], matched: 0 }
+      const repo = jurisprudenceRepository(supabase)
+      const anyGroup = async (): Promise<{ candidates: AICandidateLike[]; matched: number; fallback?: boolean }> => {
+        try {
+          return await repo.aiCandidates(groups, filters, limit)
+        } catch (error) {
+          if (!(error instanceof JurisprudenceError) || error.code !== "NOT_CONFIGURED") throw error
+          // Sem a 0022: as variantes viram uma pesquisa da tela (OU) e a reclassificação
+          // confere os campos das decisões completas — inclusive o texto integral.
+          const text = [...new Set(groups.flat())].join(" ").slice(0, 300)
+          const { rows, total } = await repo.search({ text, filters, sort: "relevance", limit: FALLBACK_CANDIDATES, offset: 0 })
+          const decisions = await loadDecisions(rows.map((row) => row.id))
+          return { candidates: decisions.map((decision) => ({ decision })), matched: total, fallback: true }
+        }
+      }
+      const required = options.required ?? []
+      if (!required.length) return anyGroup()
+      try {
+        return await repo.issueCandidates(groups, required, filters, limit, options.signal)
+      } catch (error) {
+        if (!(error instanceof JurisprudenceError) || error.code !== "NOT_CONFIGURED") throw error
+        // Sem a 0025: a consulta por qualquer grupo, e o E dos obrigatórios conferido aqui
+        // pelo que o banco achou em cada parte do índice (sem essa marcação, fica para a classificação).
+        const out = await anyGroup()
+        const has = (c: AICandidateLike, i: number) => !c.db || c.db.a.includes(i) || c.db.b.includes(i) || c.db.c.includes(i)
+        const candidates = out.candidates.filter((c) => required.every((i) => has(c, i)))
+        return { candidates, matched: candidates.length, fallback: true }
+      }
     },
 
     async linkedJurisprudence(processId) {

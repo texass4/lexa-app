@@ -4,6 +4,7 @@
  * decisão de jurisprudência, J1, J2…; o que faltou vai explicitamente como ausente.
  */
 
+import { jurisprudenceMessage, jurisprudenceState } from "@/lib/services/consulta/jurisprudence-state"
 import { SOURCE_STATUS_LABEL, type EnrichmentRun, type SourceId } from "@/lib/services/consulta/types"
 import { describeTribunalForAI } from "@/lib/services/processos/tribunal-identification"
 import { type BuiltContext, SourceRegistry, fmtDate, fmtDateTime } from "./shared"
@@ -69,6 +70,11 @@ export function buildEnrichmentContext(run: EnrichmentRun): BuiltContext {
     comunicacoes_recentes: report.communications.items
       .slice(0, LIMITS.communications)
       .map((c) => ({ data: fmtDate(c.date), tipo: c.type, documento: c.documentType, orgao: c.unit, trecho: cut(c.excerpt, LIMITS.excerpt), fonte: ref("djen") })),
+    // Não rodar não é não achar: a IA recebe o que aconteceu com a pesquisa.
+    situacao_da_pesquisa_de_jurisprudencia: jurisprudenceMessage(
+      report.jurisprudence,
+      jurisprudenceState(report.jurisprudence, run.sources.find((s) => s.id === "jurisprudencia")?.status),
+    ),
     jurisprudencia: report.jurisprudence.items.map((j) => ({
       ref: registry.add("jurisprudence", { id: j.id, label: j.label, date: j.date, href: j.href }),
       decisao: j.label,

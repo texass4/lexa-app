@@ -169,6 +169,13 @@ export interface ReportCommunication {
   excerpt?: string
 }
 
+/**
+ * O que aconteceu com a pesquisa de jurisprudência nesta consulta — estados distintos,
+ * nunca a mesma mensagem: não rodar (faltaram termos) não é o mesmo que não achar.
+ * Ausente em relatórios gravados antes deste campo (ver `jurisprudenceState`).
+ */
+export type JurisprudenceState = "results" | "no_results" | "not_run" | "not_configured" | "unavailable" | "timeout"
+
 export interface ReportJurisprudence {
   id: string
   label: string
@@ -237,7 +244,7 @@ export interface EnrichmentReport {
   magistrate: MagistrateReport
   movements: { items: ReportMovement[]; total: number; truncated: boolean }
   communications: { items: ReportCommunication[]; total: number; truncated: boolean }
-  jurisprudence: { items: ReportJurisprudence[]; total: number; basis: string[]; message?: string }
+  jurisprudence: { items: ReportJurisprudence[]; total: number; basis: string[]; message?: string; state?: JurisprudenceState }
   links: ReportLink[]
   conflicts: ReportConflict[]
   office?: OfficeComparison

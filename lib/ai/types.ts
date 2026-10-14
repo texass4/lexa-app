@@ -268,6 +268,90 @@ export interface EnrichmentSummary {
   cuidados: string[]
 }
 
+/** Trecho de uma decisão usado na análise: literal só se CONFERIDO com o texto da base. */
+export interface StrategyExcerpt {
+  texto: string
+  tipo: "literal" | "parafrase"
+  /** Preenchida pela Íntegra quando o trecho dito literal não confere com a decisão. */
+  nota?: string
+}
+
+export interface StrategyPrecedent {
+  ref: string
+  por_que_importa: string
+  semelhancas: string[]
+  distincoes: string[]
+  compatibilidade: string
+  limitacoes: string[]
+  trechos: StrategyExcerpt[]
+}
+
+export interface StrategyThesis {
+  tese: string
+  justificativa: string
+  requisitos: string[]
+  elementos_do_caso: string[]
+  refs: string[]
+  distincoes: string[]
+  riscos: string[]
+  informacoes_necessarias: string[]
+}
+
+/** Análise comparativa: só sobre precedentes REAIS recuperados da base; a IA interpreta. */
+export interface JurisprudenceStrategy {
+  sintese: string
+  precedentes: StrategyPrecedent[]
+  teses_favoraveis: StrategyThesis[]
+  contrarios_e_distincoes: { ref: string; fundamento_contrario: string; distincao_possivel: string; como_demonstrar: string }[]
+  riscos: { texto: string; refs: string[] }[]
+  lacunas_probatorias: { fato: string; situacao: "informado" | "prova mencionada" | "sem prova informada" | "contraditorio"; observacao: string }[]
+  cenarios: { se: string; entao: string; refs: string[] }[]
+  proximos_pontos: string[]
+  informacoes_ausentes: string[]
+}
+
+/** O que a pesquisa encontrou, calculado pela Íntegra (não pelo modelo) — a tela mostra junto. */
+export interface StrategyRetrievalView {
+  status: "ok" | "sem_resultados" | "nao_executada" | "indisponivel" | "cancelada"
+  support: "suficiente" | "parcial" | "insuficiente"
+  message: string
+  caso: {
+    profundidade: "simples" | "completa"
+    questoes: { questao: string; tese?: string; ampla: boolean; roteiro: { texto: string; situacao: string; detalhe?: string }[] }[]
+    fatos: { fato: string; origem: "pergunta" | "processo"; trecho?: string }[]
+    provas: { prova: string; situacao: "mencionada" | "ausente"; origem: "pergunta" | "processo" }[]
+    posicao: "autor" | "reu" | "nao_informada"
+    fase?: string
+    lacunas: string[]
+  }
+  precedentes: {
+    ref: string
+    id: string
+    label: string
+    href: string
+    questao: string
+    tribunal: string
+    orgao?: string
+    relator?: string
+    dataJulgamento?: string
+    publicacao?: string
+    assunto?: string
+    nivel: "aplicavel" | "relacionada"
+    posicao: "acolhe" | "rejeita" | "indeterminada"
+    posicaoCliente: "favoravel" | "contraria" | "indeterminada"
+    trechoPosicao?: string
+    ressalva?: string
+    resultado?: string
+    trecho?: { campo: "ementa" | "tese"; texto: string; cortado: boolean }
+    fatosEmComum: string[]
+    distincoes: string[]
+    metadadosAusentes: string[]
+    pontuacao: number
+  }[]
+  consultas: { questao: string; tipo: string; conceitos: string[]; resultados: number; situacao: string }[]
+  metricas: { candidatas: number; unicas: number; duplicatas: number; pertinentes: number; selecionadas: number; aplicaveis: number; contrarias: number; cobertura: number; ms: number }
+}
+
 export interface RelatedJurisprudenceAnalysis {
   visao_geral: string
   decisoes: { ref: string; semelhanca: Similarity; motivo: string }[]

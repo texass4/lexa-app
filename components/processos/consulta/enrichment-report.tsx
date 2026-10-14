@@ -14,6 +14,7 @@ import { useSession } from "@/lib/auth/session"
 import { useOfficeActions } from "@/lib/store/office-store"
 import { useUI } from "@/lib/store/ui-store"
 import { refreshProcess } from "@/lib/services/processos/client"
+import { jurisprudenceMessage, jurisprudenceState } from "@/lib/services/consulta/jurisprudence-state"
 import {
   NOT_AVAILABLE,
   SOURCE_STATUS_LABEL,
@@ -578,8 +579,11 @@ function MovementsPanel({ report }: { report: EnrichmentReport }) {
   )
 }
 
-function JurisprudencePanel({ report }: { report: EnrichmentReport }) {
+function JurisprudencePanel({ run, report }: { run: EnrichmentRun; report: EnrichmentReport }) {
   const j = report.jurisprudence
+  // Não rodar, não estar configurada, falhar e não achar são coisas diferentes (`jurisprudenceState`).
+  const state = jurisprudenceState(j, run.sources.find((s) => s.id === "jurisprudencia")?.status)
+  const message = jurisprudenceMessage(j, state)
   return (
     <Panel>
       <PanelHeader
@@ -590,7 +594,7 @@ function JurisprudencePanel({ report }: { report: EnrichmentReport }) {
         }
       />
       <div className="px-5 pb-5">
-        {j.items.length ? (
+        {state === "results" && j.items.length ? (
           <ul className="space-y-2">
             {j.items.map((d) => (
               <li key={d.id} className="rounded-[10px] border border-border px-3 py-2.5">
@@ -607,7 +611,7 @@ function JurisprudencePanel({ report }: { report: EnrichmentReport }) {
             ))}
           </ul>
         ) : (
-          <p className="text-[13px] text-subtle">{j.message ?? "Nenhuma decisão relacionada encontrada na base."}</p>
+          <p className="text-[13px] text-subtle">{message}</p>
         )}
         {j.total > j.items.length && (
           <p className="mt-2 text-[12px] text-muted-foreground">{j.total} decisões encontradas; mostrando as mais relevantes.</p>
@@ -718,7 +722,7 @@ export function EnrichmentReportView({ run, report, ai }: { run: EnrichmentRun; 
       </div>
       <div className="min-w-0 space-y-5 @5xl/main:col-span-5">
         <OfficePanel run={run} report={report} />
-        <JurisprudencePanel report={report} />
+        <JurisprudencePanel run={run} report={report} />
         <SourcesPanel run={run} />
         <UnavailablePanel report={report} />
         <LinksPanel report={report} />

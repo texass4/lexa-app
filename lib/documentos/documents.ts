@@ -4,6 +4,20 @@ import { toast } from "sonner"
 import { getSupabase } from "@/lib/supabase/client"
 import type { LegalDocument } from "@/types"
 
+/**
+ * Tipo de cada formato aceito em Documentos — o mesmo para o envio pela tela e para
+ * "salvar em Documentos" no Atendimento. O bucket `documents` só aceita estes tipos
+ * (migração 0023): mudou aqui, mude lá também.
+ */
+export const DOCUMENT_MIME: Record<LegalDocument["extension"], string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  doc: "application/msword",
+  txt: "text/plain; charset=utf-8",
+  jpg: "image/jpeg",
+  png: "image/png",
+}
+
 /** URL temporária (5 min por padrão) do arquivo no Storage; null se não há arquivo ou sem permissão. */
 export async function documentUrl(doc: LegalDocument, { download = false, expiresIn = 300 } = {}) {
   if (!doc.storagePath) return null

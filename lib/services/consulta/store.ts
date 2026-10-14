@@ -8,6 +8,7 @@
  *   e só as colunas públicas — `internal_errors` nunca sai daqui.
  */
 
+import { redactStoredReport } from "./protection"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { EnrichmentRun, RunStatus } from "./types"
 import type { RunState } from "./workflow"
@@ -51,7 +52,8 @@ export const toRun = (row: RunRow): EnrichmentRun => ({
   durationMs: row.duration_ms ?? undefined,
   steps: row.steps ?? [],
   sources: row.sources ?? [],
-  report: row.report ?? undefined,
+  // Relatório antigo de processo não público: o restrito sai na leitura (o banco não muda).
+  report: row.report ? redactStoredReport(row.report) : undefined,
   foundFields: row.found_fields ?? [],
   missingFields: row.missing_fields ?? [],
   dataVersion: row.data_version ?? undefined,

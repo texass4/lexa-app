@@ -32,16 +32,16 @@ export async function requireMember(permission?: Permission) {
   const caller = await getCaller()
   const { profile } = caller
   if (profile.role === "super_admin" || !profile.organization_id) throw new HttpError(403, "Disponível apenas para membros de um escritório.")
-  const { data: org } = await getSupabaseAdmin()
-    .from("organizations")
-    .select("status")
-    .eq("id", profile.organization_id)
-    .maybeSingle<{ status: string }>()
+  // Situação do escritório e configurações da plataforma não dependem uma da outra: as
+  // duas leituras vão juntas (toda rota de membro passa aqui). A ordem das recusas não muda.
+  const [{ data: org }, { maintenance }] = await Promise.all([
+    getSupabaseAdmin().from("organizations").select("status").eq("id", profile.organization_id).maybeSingle<{ status: string }>(),
+    loadSettings(),
+  ])
   if (!profile.active || org?.status !== "active") throw new HttpError(403, "Acesso desativado.")
   if (permission && !hasPermission(profile, permission)) throw new HttpError(403, "Você não tem permissão para esta ação.")
   // Manutenção: as rotas do servidor usam a service role (ignoram a RLS), então o
   // bloqueio precisa estar aqui também — não só em `current_org_id()`.
-  const { maintenance } = await loadSettings()
   if (maintenance.enabled) throw new HttpError(503, maintenance.message)
   return { ...caller, organizationId: profile.organization_id }
 }
@@ -56,10 +56,10 @@ export async function requireSuperAdmin() {
  * Para as rotas de consulta processual: o escritório de quem chama, ou a resposta
  * de erro no formato que `lib/services/processos/client.ts` entende.
  */
-export async function authorizeMember(permission?: Permission): Promise<{ organizationId: string } | { response: Response }> {
+export async function authorizeMember(permission?: Permission): Promise<{ organizationId: string; userId: string } | { response: Response }> {
   try {
-    const { organizationId } = await requireMember(permission)
-    return { organizationId }
+    const { organizationId, profile } = await requireMember(permission)
+    return { organizationId, userId: profile.id }
   } catch (error) {
     if (!(error instanceof HttpError)) throw error
     const { status, message } = toPublicError(error)

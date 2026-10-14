@@ -338,14 +338,8 @@ export function TimelineTab({ hub, clientId }: { hub: ClientHub; clientId: strin
   const options = [
     { value: "todos" as const, label: "Tudo", count: allTotal },
     ...(Object.keys(TIMELINE_GROUPS) as (keyof typeof TIMELINE_GROUPS)[])
-      .map((key) => ({
-        value: key,
-        label: TIMELINE_GROUPS[key].label,
-        count: key === filter ? history.total : undefined,
-        loaded: hub.activities.some((a) => inGroup(a, key)),
-      }))
-      .filter((o) => o.loaded || o.value === filter)
-      .map(({ loaded: _loaded, ...o }) => o),
+      .filter((key) => key === filter || hub.activities.some((a) => inGroup(a, key)))
+      .map((key) => ({ value: key, label: TIMELINE_GROUPS[key].label, count: key === filter ? history.total : undefined })),
   ]
 
   const toEntry = (a: Activity) => {

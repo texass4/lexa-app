@@ -1,0 +1,41 @@
+{
+  "_leia": "Conjunto de avaliação REVISÁVEL da recuperação de jurisprudência da IA. As perguntas são de teste; os ids em 'relevantes'/'irrelevantes' devem ser preenchidos por quem revisar os resultados na base real (rode o script uma vez, leia as decisões e anote). Enquanto estiverem vazios, o script só mostra as listas antes/depois, sem calcular acerto. Não preencha com ids que não foram lidos.",
+  "consultas": [
+    {
+      "pergunta": "Há jurisprudência sobre negativação indevida e dano moral?",
+      "tema_esperado": "Inscrição indevida em cadastro de inadimplentes gerando dano moral (Direito do Consumidor/Civil).",
+      "relevantes": [],
+      "irrelevantes": []
+    },
+    {
+      "pergunta": "Cabe indenização por dano moral em caso de atraso contratual?",
+      "tema_esperado": "Dano moral por atraso/inadimplemento contratual (ex.: atraso na entrega de imóvel). Decisões sobre parcelas previdenciárias em atraso ou multa tributária não servem.",
+      "relevantes": [],
+      "irrelevantes": []
+    },
+    {
+      "pergunta": "Quais precedentes sobre erro médico e responsabilidade do hospital?",
+      "tema_esperado": "Responsabilidade civil de hospital por erro médico. Decisões penais (homicídio culposo) não sustentam a tese cível.",
+      "relevantes": [],
+      "irrelevantes": []
+    },
+    {
+      "pergunta": "Há jurisprudência sobre fornecimento de medicamento pelo Estado?",
+      "tema_esperado": "Dever do poder público de fornecer medicamento. Tributação de medicamentos e crimes com medicamentos não servem.",
+      "relevantes": [],
+      "irrelevantes": []
+    },
+    {
+      "pergunta": "Qual o entendimento sobre ICMS sobre TUSD e TUST?",
+      "tema_esperado": "Inclusão da TUSD/TUST na base de cálculo do ICMS sobre energia elétrica.",
+      "relevantes": [],
+      "irrelevantes": []
+    },
+    {
+      "pergunta": "Há precedentes sobre o termo inicial de benefícios previdenciários?",
+      "tema_esperado": "Data de início do benefício previdenciário (requerimento administrativo, citação, laudo).",
+      "relevantes": [],
+      "irrelevantes": []
+    }
+  ]
+}

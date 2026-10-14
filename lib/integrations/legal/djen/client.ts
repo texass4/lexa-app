@@ -17,6 +17,7 @@
  * só para falhas passageiras, backoff exponencial, `Retry-After` nunca antecipado.
  */
 
+import { attemptSignal, pause, throwIfCancelled } from "../cancel"
 import { LookupError } from "../errors"
 import { parseRetryAfter } from "../datajud/client"
 
@@ -89,25 +90,28 @@ export function createDjenClient(options: DjenClientOptions = {}) {
   const now = options.now ?? Date.now
   const log = options.log ?? (() => {})
 
-  async function getPage(digits: string, page: number): Promise<DjenPage> {
+  async function getPage(digits: string, page: number, signal?: AbortSignal): Promise<DjenPage> {
     const params = new URLSearchParams({ numeroProcesso: digits, pagina: String(page), itensPorPagina: String(PAGE_SIZE) })
     const url = `${config.baseUrl}/comunicacao?${params}`
     let last = new LookupError("UNAVAILABLE", "nenhuma tentativa concluída")
 
     for (let attempt = 1; attempt <= config.maxAttempts; attempt += 1) {
+      throwIfCancelled(signal)
       const started = now()
       let response: Response
       try {
         response = await doFetch(url, {
           headers: { Accept: "application/json", "User-Agent": "Integra/1.0" },
           cache: "no-store",
-          signal: AbortSignal.timeout(config.attemptTimeoutMs),
+          signal: attemptSignal(config.attemptTimeoutMs, signal),
         })
       } catch (error) {
+        // Cancelado pelo chamador: para aqui, sem nova tentativa.
+        throwIfCancelled(signal)
         const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")
         log("network_error", { attempt, reason: timedOut ? "timeout" : "connection", ms: now() - started })
         last = new LookupError(timedOut ? "TIMEOUT" : "UNAVAILABLE", timedOut ? "sem resposta" : `falha de conexão: ${(error as Error)?.message}`)
-        if (attempt < config.maxAttempts) await sleep(Math.min(1000 * 2 ** (attempt - 1), config.maxWaitMs))
+        if (attempt < config.maxAttempts) await pause(Math.min(1000 * 2 ** (attempt - 1), config.maxWaitMs), sleep, signal)
         continue
       }
 
@@ -131,18 +135,21 @@ export function createDjenClient(options: DjenClientOptions = {}) {
       if (status === 400 || status === 422) throw new LookupError("NOT_CONFIGURED", `HTTP ${status} — consulta recusada (parâmetros)`, { status })
       last = new LookupError(status === 408 || status === 504 ? "TIMEOUT" : "UNAVAILABLE", `HTTP ${status}`, { status, retryAfterMs: hint })
       if (attempt === config.maxAttempts || (hint !== undefined && hint > config.maxWaitMs)) break
-      await sleep(hint ?? Math.min(1000 * 2 ** (attempt - 1), config.maxWaitMs))
+      await pause(hint ?? Math.min(1000 * 2 ** (attempt - 1), config.maxWaitMs), sleep, signal)
     }
     throw last
   }
 
-  /** Comunicações publicadas para um processo (20 dígitos), até `maxPages` páginas. */
-  async function searchByProcess(digits: string): Promise<DjenProcessResult> {
+  /**
+   * Comunicações publicadas para um processo (20 dígitos), até `maxPages` páginas.
+   * `signal`: cancelamento do chamador — nenhuma tentativa, espera ou página depois dele.
+   */
+  async function searchByProcess(digits: string, { signal }: { signal?: AbortSignal } = {}): Promise<DjenProcessResult> {
     const items: DjenItem[] = []
     let total = 0
     for (let page = 1; page <= config.maxPages; page += 1) {
-      if (page > 1) await sleep(config.pageDelayMs)
-      const data = await getPage(digits, page)
+      if (page > 1) await pause(config.pageDelayMs, sleep, signal)
+      const data = await getPage(digits, page, signal)
       const batch = data.items ?? []
       items.push(...batch)
       total = Math.max(data.count ?? 0, items.length)

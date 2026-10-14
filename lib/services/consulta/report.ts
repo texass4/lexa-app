@@ -17,6 +17,7 @@ import type { Communication } from "@/lib/integrations/legal/djen/mapper"
 import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import type { Process, TribunalIdentification } from "@/types"
 import { collectMentions } from "./magistrate"
+import { mayStoreRestricted, processProtection, PUBLIC_SECRECY_LABEL, type Protection } from "./protection"
 import {
   NOT_AVAILABLE,
   type EnrichmentReport,
@@ -24,6 +25,7 @@ import {
   type OfficeComparison,
   type ReportConflict,
   type ReportField,
+  type JurisprudenceState,
   type ReportJurisprudence,
   type ReportLawyer,
   type ReportLink,
@@ -57,6 +59,9 @@ export interface JurisprudenceData {
   total: number
   basis: string[]
   message?: string
+  /** `false`: a pesquisa NÃO foi feita (ex.: termos insuficientes) — não é "sem resultado". */
+  executed?: boolean
+  state?: JurisprudenceState
 }
 
 export interface AssembleInput {
@@ -71,6 +76,10 @@ export interface AssembleInput {
   jurisprudence?: JurisprudenceData | null
   /** Fontes externas puladas porque o processo está em segredo de justiça. */
   secretSkipped?: boolean
+  /** Sigilo decidido no workflow (`processProtection`); sem ele, é calculado aqui. */
+  protection?: Protection
+  /** O que aconteceu com a pesquisa de jurisprudência (não rodar ≠ não achar). */
+  jurisprudenceState?: JurisprudenceState
   /** Origem × atual × inferido (`identifyTribunal`). */
   tribunal?: TribunalIdentification
 }
@@ -144,7 +153,7 @@ function buildFields(input: AssembleInput, verifyUrl?: string): ReportField[] {
   const recordNote = unitOrigin(s)
 
   const secrecy =
-    s?.secrecyLevel !== undefined ? (s.secrecyLevel === 0 ? "Público (nível 0)" : `Sigilo nível ${s.secrecyLevel}`) : undefined
+    s?.secrecyLevel !== undefined ? (s.secrecyLevel === 0 ? PUBLIC_SECRECY_LABEL : `Sigilo nível ${s.secrecyLevel}`) : undefined
 
   return [
     field("numero", "Número CNJ", [dj(s?.number), !s && process?.number ? office(process.number) : undefined]),
@@ -272,16 +281,21 @@ function buildOffice(input: AssembleInput): OfficeComparison | undefined {
 
 /* ------------------------------- relatório ------------------------------- */
 
-export function assembleReport(input: AssembleInput): EnrichmentReport {
-  const { cnj, primary, process, communications } = input
-  const sheet = primary?.sheet
+export function assembleReport(rawInput: AssembleInput): EnrichmentReport {
+  const sheet = rawInput.primary?.sheet
+  // Sigilo: fora de "público" (protegido ou não informado), nada de comunicação — teor,
+  // nomes, advogados, menções — entra no relatório, mesmo que tenha chegado até aqui.
+  const protection = rawInput.protection ?? processProtection({ process: rawInput.process, sheet })
+  const restricted = !mayStoreRestricted(protection)
+  const input: AssembleInput = restricted ? { ...rawInput, communications: null } : rawInput
+  const { cnj, process, communications } = input
   const identification = input.tribunal
   const origin = originTribunal(cnj)
   const current = identification?.current.status === "confirmed" ? tribunalByAcronym(identification.current.acronym) : undefined
   // Onde verificar: o tribunal atual quando confirmado; senão, o de origem (onde o número nasceu).
   const verifyUrl = (current ?? origin)?.site
   const fields = buildFields(input, verifyUrl)
-  const hidden = !!process?.secret || (sheet?.secrecyLevel ?? 0) > 0
+  const hidden = restricted
   const parties = buildParties(input, hidden)
   const magistrate = buildMagistrate(input, fields, verifyUrl)
 
@@ -289,7 +303,8 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
   const movements = movementsAll.slice(0, LIMITS.movements).map((m) => ({
     at: m.occurredAt,
     title: m.name,
-    description: m.description,
+    // O complemento escrito pode citar pessoas e atos: só de processo público.
+    description: restricted ? undefined : m.description,
     code: m.code,
     unit: m.judicialUnit?.name,
   }))
@@ -328,8 +343,9 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
       label: f.label,
       reason: f.key === "prioridades" ? `${NOT_AVAILABLE} (a API pública do DataJud não informa prioridades)` : NOT_AVAILABLE,
     }))
-  if (!parties.items.length) unavailable.push({ label: "Partes", reason: hidden ? "Não exibidas: processo com sigilo" : NOT_AVAILABLE })
-  if (!parties.lawyers.length) unavailable.push({ label: "Representantes (advogados)", reason: hidden ? "Não exibidos: processo com sigilo" : NOT_AVAILABLE })
+  const hiddenReason = protection.level === "protected" ? "processo com sigilo" : "sigilo não confirmado pela fonte"
+  if (!parties.items.length) unavailable.push({ label: "Partes", reason: hidden ? `Não exibidas: ${hiddenReason}` : NOT_AVAILABLE })
+  if (!parties.lawyers.length) unavailable.push({ label: "Representantes (advogados)", reason: hidden ? `Não exibidos: ${hiddenReason}` : NOT_AVAILABLE })
   if (!magistrate.mentions.length) unavailable.push({ label: "Magistrado", reason: `${NOT_AVAILABLE} — o nome do órgão julgador não identifica o juiz` })
   unavailable.push({ label: "Perfil institucional do magistrado", reason: "Não disponível nas fontes integradas — consulte o site oficial do tribunal" })
   if (!movementsAll.length) unavailable.push({ label: "Movimentações", reason: NOT_AVAILABLE })
@@ -350,7 +366,10 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
   if (["unavailable", "timeout", "rate_limited", "error"].includes(input.primaryStatus)) {
     notices.push("A fonte processual principal não respondeu nesta consulta. O relatório mostra só o que as demais fontes trouxeram — tente de novo mais tarde.")
   }
-  if ((sheet?.secrecyLevel ?? 0) > 0) notices.push(`A fonte informa sigilo (nível ${sheet!.secrecyLevel}): parte das informações não é pública e não foi exibida.`)
+  if (protection.reason === "fonte") notices.push(`A fonte informa sigilo (nível ${sheet!.secrecyLevel}): comunicações, partes e complementos das movimentações não foram consultados nem guardados.`)
+  if (protection.level === "unknown" && !input.secretSkipped) {
+    notices.push("A fonte principal não informou o nível de sigilo: por cautela, comunicações, partes e complementos das movimentações não foram consultados nem guardados.")
+  }
 
   const title = process
     ? processTitle(process, input.clientName)
@@ -387,7 +406,7 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
     magistrate,
     movements: { items: movements, total: movementsAll.length, truncated: movementsAll.length > movements.length },
     communications: { items: comms, total: communications?.total ?? 0, truncated: (communications?.total ?? 0) > comms.length },
-    jurisprudence: input.jurisprudence ?? { items: [], total: 0, basis: [] },
+    jurisprudence: reportJurisprudence(input),
     links,
     conflicts: buildConflicts(fields),
     office: buildOffice(input),
@@ -395,6 +414,13 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
     notices,
     tribunal: identification,
   }
+}
+
+/** Jurisprudência do relatório, sempre com o estado do que aconteceu (sem o controle interno `executed`). */
+function reportJurisprudence(input: AssembleInput): EnrichmentReport["jurisprudence"] {
+  const data = input.jurisprudence ?? { items: [], total: 0, basis: [] }
+  const state = input.jurisprudenceState ?? data.state ?? (data.items.length ? "results" : undefined)
+  return { items: data.items, total: data.total, basis: data.basis, ...(data.message ? { message: data.message } : {}), ...(state ? { state } : {}) }
 }
 
 /** Rótulos do que foi encontrado / do que faltou (para o registro da execução). */

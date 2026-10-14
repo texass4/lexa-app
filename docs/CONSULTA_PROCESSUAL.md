@@ -34,6 +34,7 @@ Uma fonte fora do ar não derruba as outras.
 | Proteção | Como |
 |---|---|
 | Timeout | DataJud: 35 s por tentativa, 60 s no total (cliente) + 70 s no workflow; complementares: 20 s por tentativa, 30 s no workflow |
+| Cancelamento | Estourado o prazo do workflow, a consulta complementar (DJEN, índice superior) é **cancelada** (`AbortSignal`): a requisição em curso é interrompida e nenhuma nova tentativa, espera ou página começa (`lib/integrations/legal/cancel.ts`). A fonte principal usa o cache compartilhado de consultas em andamento e fica limitada pelo prazo total do próprio cliente (60 s) |
 | Retry/backoff | 3 tentativas só para falhas passageiras, espera exponencial; `Retry-After` respeitado; 429 para na hora |
 | Cache | DataJud: cache do escritório (6 h; "Consultar novamente" aceita até 1 min). DJEN: 1 h por escritório + número. Consulta concluída há < 10 min é reaproveitada (a menos que se peça "Consultar novamente") |
 | Deduplicação | Uma execução em andamento por escritório + número (índice único no banco); pedidos repetidos voltam a mesma. Chamadas simultâneas à mesma fonte viram uma |
@@ -52,7 +53,7 @@ Uma fonte fora do ar não derruba as outras.
 | Não traz | partes e advogados, **magistrado**, valor da causa, prioridades, documentos/autos |
 | Limitações | atualização em lotes pelos tribunais (atraso de dias); processos sigilosos podem não aparecer; sob carga responde 200 sem resultados (tratado como falha passageira) |
 | Custo | gratuita |
-| Uso comercial | sujeito aos termos publicados pelo CNJ na documentação do DataJud — confirme antes de produção |
+| Uso comercial | sujeito aos termos publicados pelo CNJ na documentação do DataJud — **pendente de validação jurídica/contratual** antes de uso comercial (este documento não conclui sobre a licitude) |
 | Configuração | `DATAJUD_API_KEY` (chave pública divulgada pelo CNJ); Admin › Configurações › "Consulta automática ao DataJud" |
 | Verificar | link para o site oficial do tribunal (a API não tem página por processo) |
 
@@ -73,6 +74,21 @@ Uma fonte fora do ar não derruba as outras.
 
 Pesquisa local (sem rede externa) por assunto, classe e tipo de ação; ver
 `docs/JURISPRUDENCIA.md`. Só roda com `JURISPRUDENCIA_FONTES` configurada.
+
+Estados distintos no relatório (`jurisprudence.state`) e na tela — "não pesquisou" nunca
+aparece como "não achou":
+
+| Estado | Quando |
+|---|---|
+| `results` | pesquisa feita, com decisões relacionadas |
+| `no_results` | pesquisa feita, nenhuma decisão para os termos |
+| `not_run` | não pesquisado: o processo não tem assunto, classe nem tipo de ação suficientes |
+| `not_configured` | base de jurisprudência não configurada |
+| `unavailable` | a base falhou ou ficou indisponível |
+| `timeout` | a pesquisa passou do prazo e foi interrompida |
+
+Relatórios gravados antes do campo são lidos pelo estado da fonte
+(`lib/services/consulta/jurisprudence-state.ts`).
 
 ### 4. Cadastro do escritório · **interna**
 
@@ -166,9 +182,26 @@ desta verificação).
 
 ## Segredo de justiça e sigilo
 
-- Processo do cadastro marcado em segredo de justiça: as fontes públicas **não são
-  consultadas**, o cadastro fica como está e "Atualizar processo" não aparece.
-- Sigilo informado pela fonte (nível > 0): partes não são exibidas.
+Regra única no servidor (`lib/services/consulta/protection.ts`), aplicada **antes** das
+consultas complementares e **antes** de gravar o relatório. O nível de sigilo nunca é alterado.
+
+| Situação | Fontes externas | O relatório guarda |
+|---|---|---|
+| Segredo de justiça no **cadastro** | nenhuma (nem DataJud, nem DJEN, nem índice superior) | só o cadastro |
+| Fonte informa **nível > 0** | DataJud (que informou o sigilo); DJEN e índice superior **não** | metadados: número, classe, assuntos, órgão, datas, movimento e data (sem o complemento escrito) |
+| Fonte **não informa** o nível (ou não respondeu) | **desconhecido ≠ público**: DJEN não; índice superior (só metadados) sim | o mesmo do caso acima, com aviso |
+| Fonte informa **nível 0** | todas as configuradas | tudo, inclusive comunicações e partes como publicadas |
+
+- Partes, advogados, menções a magistrado, trechos de comunicação e complementos das
+  movimentações só entram no relatório de processo confirmado como público.
+- Relatório gravado antes desta regra: o conteúdo restrito sai **na leitura**
+  (`redactStoredReport`); o registro no banco não é alterado.
+- Rotas de consulta pelo navegador (`/api/processes/search`, `/api/processes/[id]/sync`):
+  processo em segredo de justiça no cadastro do escritório é recusado no servidor
+  (`lib/services/processos/secret-guard.ts`); se o cadastro não puder ser lido, recusa.
+- Monitoramento automático (migração **0024**, aditiva): a seleção horária não pega processo
+  em segredo de justiça no cadastro. Teste: `supabase/tests/monitoramento_sigilo.sql`.
+- Mensagens públicas dizem só *por que* a fonte não foi consultada — nenhum dado do processo.
 
 ## Cadastro do escritório
 

@@ -32,7 +32,4 @@ export const startConsulta = (input: { processId?: string; cnj?: string; force?:
 
 export const fetchRun = (id: string, signal?: AbortSignal) => call<{ run: EnrichmentRun }>(`/api/process-enrichment/${encodeURIComponent(id)}`, { signal })
 
-export const fetchLatestRun = (processId: string, signal?: AbortSignal) =>
-  call<{ run: EnrichmentRun | null }>(`/api/process-enrichment?processId=${encodeURIComponent(processId)}`, { signal })
-
 export const consultaHref = (runId: string) => `/processos/consulta?execucao=${encodeURIComponent(runId)}`

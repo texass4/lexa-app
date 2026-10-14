@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useOfficeActions } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { getSupabase } from "@/lib/supabase/client"
+import { DOCUMENT_MIME } from "@/lib/documentos/documents"
 import { formatFileSize, uid } from "@/lib/core/format"
 import { attachmentUrl } from "@/lib/whatsapp/client"
 import { extensionOf } from "@/lib/whatsapp/files"
@@ -55,14 +56,6 @@ async function openAttachment(attachment: WhatsAppAttachment, download = false) 
 
 const KINDS: DocumentKind[] = ["Documento pessoal", "Comprovante", "Contrato", "Procuração", "Petição", "Laudo", "Decisão"]
 const SAVABLE: Record<string, LegalDocument["extension"]> = { pdf: "pdf", docx: "docx", doc: "doc", txt: "txt", jpg: "jpg", jpeg: "jpg", png: "png" }
-const MIME: Record<LegalDocument["extension"], string> = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  doc: "application/msword",
-  txt: "text/plain",
-  jpg: "image/jpeg",
-  png: "image/png",
-}
 
 function useSaveToDocuments(attachment: WhatsAppAttachment, clientId?: string) {
   const { addDocument } = useOfficeActions()
@@ -82,7 +75,7 @@ function useSaveToDocuments(attachment: WhatsAppAttachment, clientId?: string) {
       })
       if (blob.size > 25 * 1024 * 1024) throw new Error("O arquivo passa de 25 MB, o limite de Documentos.")
       const storagePath = `${organization.id}/${uid("file")}.${extension}`
-      const { error } = await getSupabase().storage.from("documents").upload(storagePath, blob, { contentType: MIME[extension] })
+      const { error } = await getSupabase().storage.from("documents").upload(storagePath, blob, { contentType: DOCUMENT_MIME[extension] })
       if (error) throw error
       const name = attachment.fileName ?? `WhatsApp ${new Date().toLocaleDateString("pt-BR")}.${extension}`
       addDocument({ name, kind, clientId, extension, sizeBytes: blob.size, storagePath })

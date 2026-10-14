@@ -158,23 +158,29 @@ describe("consulta processual — resultados", () => {
     assert.ok(state.internalErrors.some((e) => e.source === "djen" && e.detail?.includes("HTTP 503")))
   })
 
-  it("fonte principal indisponível: mostra o que as outras trouxeram e avisa", async () => {
+  it("fonte principal indisponível: sigilo desconhecido — comunicações NÃO são consultadas nem guardadas", async () => {
+    let djenCalls = 0
     const state = await runWorkflow(
       { cnj: CNJ },
       deps({
         primary: async () => {
           throw new LookupError("UNAVAILABLE", "sem resposta")
         },
-        communications: async (): Promise<CommunicationsResult> => ({ items: [comm()], total: 1, checkedAt: NOW.toISOString(), cached: false }),
+        communications: async (): Promise<CommunicationsResult> => {
+          djenCalls += 1
+          return { items: [comm()], total: 1, checkedAt: NOW.toISOString(), cached: false }
+        },
       }),
     )
-    assert.equal(state.status, "partial")
+    // Antes: sem a fonte principal, o processo era tratado como público e o DJEN era consultado.
+    assert.equal(djenCalls, 0)
+    assert.equal(state.status, "failed")
     assert.equal(step(state, "fonte_principal").status, "failed")
     assert.ok(state.report!.notices.some((n) => n.includes("não respondeu")))
-    assert.equal(state.report!.parties.items[0].name, "JOÃO DA SILVA")
-    assert.equal(state.report!.parties.items[0].pole, "Polo ativo")
-    assert.equal(state.report!.parties.lawyers[0].oab, "AM 1.234")
-    assert.equal(fieldValues(state, "orgao_julgador")[0].source, "djen")
+    assert.ok(state.report!.notices.some((n) => n.includes("não informou o nível de sigilo")))
+    assert.equal(state.sources.find((s) => s.id === "djen")!.message, "Não consultada: o nível de sigilo não foi confirmado pela fonte principal.")
+    assert.equal(state.report!.parties.items.length, 0)
+    assert.equal(state.report!.communications.items.length, 0)
   })
 
   it("limite da fonte (429) e demora: estados distintos, sem travar a consulta", async () => {

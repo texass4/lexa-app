@@ -8,8 +8,11 @@
  *
  * - Cada fonte tem prazo próprio; uma fonte fora do ar não derruba as outras: o
  *   relatório sai parcial, dizendo o que faltou.
- * - Processo do escritório em segredo de justiça: as fontes públicas não são
- *   consultadas (não se presume acesso aos autos) e o cadastro fica como está.
+ * - Sigilo (`protection.ts`): segredo de justiça no cadastro → nenhuma fonte pública;
+ *   sigilo informado pela fonte ou nível não informado → sem comunicações (DJEN) e sem
+ *   dado restrito no relatório. Decidido aqui, antes de cada consulta e da gravação.
+ * - Prazo de fonte complementar estourado → a consulta é CANCELADA (sinal de abort), não
+ *   só ignorada: sem novas tentativas nem páginas depois do prazo.
  * - O detalhe técnico de cada falha vai para `internalErrors` (só servidor); a tela
  *   recebe estado + mensagem pública.
  */
@@ -23,6 +26,7 @@ import type { Communication } from "@/lib/integrations/legal/djen/mapper"
 import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import type { Process } from "@/types"
 import { assembleReport, DATAJUD_DOCS_URL, DJEN_PUBLIC_URL, fieldSummary, type JurisprudenceData } from "./report"
+import { mayQueryCommunications, mayQuerySuperior, processProtection, protectionSkipMessage } from "./protection"
 import {
   SOURCE_NAMES,
   STEP_LABELS,
@@ -34,6 +38,7 @@ import {
   type StepId,
   type StepState,
   type StepStatus,
+  type JurisprudenceState,
 } from "./types"
 
 export interface PrimaryResult {
@@ -68,15 +73,18 @@ export interface WorkflowDeps {
   now: () => Date
   /** Fonte principal. Falha → `LookupError`. */
   primary: (cnj: string, options: { force: boolean }) => Promise<PrimaryResult>
-  /** Comunicações oficiais; `null` = fonte não habilitada neste ambiente. */
-  communications: ((cnj: string, options: { force: boolean }) => Promise<CommunicationsResult>) | null
+  /**
+   * Comunicações oficiais; `null` = fonte não habilitada neste ambiente. `signal` é
+   * abortado quando o prazo da fonte estoura: a consulta deve parar (sem nova tentativa).
+   */
+  communications: ((cnj: string, options: { force: boolean; signal?: AbortSignal }) => Promise<CommunicationsResult>) | null
   /**
    * Registros do número no índice de outro tribunal (o superior do segmento). Consulta
    * complementar: nada encontrado não prova nada. `null` = não consultar.
    */
-  superior?: ((cnj: string, tribunal: string) => Promise<SuperiorResult>) | null
+  superior?: ((cnj: string, tribunal: string, signal?: AbortSignal) => Promise<SuperiorResult>) | null
   /** Jurisprudência relacionada (base da Íntegra); `null` = módulo sem fonte configurada. */
-  jurisprudence: ((input: RelatedInput) => Promise<JurisprudenceData>) | null
+  jurisprudence: ((input: RelatedInput, signal?: AbortSignal) => Promise<JurisprudenceData>) | null
   /** Recebe o estado a cada etapa (gravado no banco pelo servidor). */
   progress: (state: RunState) => Promise<void>
   /** Prazo de cada fonte, em ms. */
@@ -110,13 +118,29 @@ export interface RunState {
 
 const DEFAULT_TIMEOUTS = { primary: 70_000, complementary: 30_000 }
 
-/** Rejeita com `LookupError("TIMEOUT")` se a promessa não terminar no prazo. */
-export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+/**
+ * Rejeita com `LookupError("TIMEOUT")` se a promessa não terminar no prazo. Com
+ * `controller`, o prazo também CANCELA a operação (abort): ela para de tentar em vez de
+ * continuar em segundo plano depois que o resultado já foi dado como "sem resposta".
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number, controller?: AbortController): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new LookupError("TIMEOUT", `sem resposta em ${ms} ms`)), ms)
+    timer = setTimeout(() => {
+      controller?.abort(new LookupError("TIMEOUT", `sem resposta em ${ms} ms`))
+      reject(new LookupError("TIMEOUT", `sem resposta em ${ms} ms`))
+    }, ms)
   })
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
+/** Estado da jurisprudência a partir do estado da fonte (falhas não viram "sem resultado"). */
+const JURISPRUDENCE_STATE_BY_STATUS: Partial<Record<SourceStatus, JurisprudenceState>> = {
+  timeout: "timeout",
+  unavailable: "unavailable",
+  rate_limited: "unavailable",
+  error: "unavailable",
+  not_configured: "not_configured",
 }
 
 const STATUS_BY_CODE: Partial<Record<LookupErrorCode, SourceStatus>> = {
@@ -256,6 +280,9 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
     }
   }
 
+  // Sigilo, com o que se sabe agora (cadastro + ficha da fonte): vale para tudo daqui em diante.
+  const protection = processProtection({ process, sheet: primary?.sheet })
+
   /* 3. Normalizar --------------------------------------------------------- */
   if (primary) await step("normalizar", "done", `${primary.sheet.movements.length} movimentações e dados do processo organizados.`)
   else await step("normalizar", "skipped", "Sem dados da fonte principal para organizar.")
@@ -267,21 +294,24 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
     communications: CommunicationsResult | null
     communicationsStatus: SourceStatus
     jurisprudence: JurisprudenceData | null
+    jurisprudenceState: JurisprudenceState
     superior: CheckInput | null
   } = {
     communications: null,
     communicationsStatus: "not_configured",
     jurisprudence: null,
+    jurisprudenceState: "not_configured",
     superior: null,
   }
 
   // Tribunal superior do segmento: só complementa a identificação do tribunal atual.
   const runSuperior = async () => {
     const superior = superiorFor(cnj)
-    if (secret || !superior || !deps.superior || primaryStatus === "not_configured") return
+    if (!mayQuerySuperior(protection) || !superior || !deps.superior || primaryStatus === "not_configured") return
     const base = { tribunal: superior, role: "superior" as const, provider: "datajud" as const, dataset: datasetFor(superior) }
+    const controller = new AbortController()
     try {
-      const result = await withTimeout(deps.superior(cnj, superior), timeouts.complementary)
+      const result = await withTimeout(deps.superior(cnj, superior, controller.signal), timeouts.complementary, controller)
       extra.superior = checkFromRecords({ tribunal: superior, role: "superior", dataset: result.dataset, checkedAt: result.checkedAt, records: result.records, coverage: result.coverage })
     } catch (error) {
       const { code, detail } = classify(error)
@@ -291,19 +321,21 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
   }
 
   const runCommunications = async () => {
-    if (secret) {
-      extra.communicationsStatus = "skipped"
-      source("djen").message = "Não consultada: processo em segredo de justiça."
-      return
-    }
     if (!deps.communications) {
       extra.communicationsStatus = "not_configured"
       Object.assign(source("djen"), { status: "not_configured", message: PUBLIC_SOURCE_MESSAGE.not_configured })
       return
     }
+    // Teor, nomes e advogados: só de processo que a fonte confirmou como público.
+    if (!mayQueryCommunications(protection)) {
+      extra.communicationsStatus = "skipped"
+      source("djen").message = protectionSkipMessage(protection)
+      return
+    }
     const t0 = begin("djen")
+    const controller = new AbortController()
     try {
-      const communications = await withTimeout(deps.communications(cnj, { force }), timeouts.complementary)
+      const communications = await withTimeout(deps.communications(cnj, { force, signal: controller.signal }), timeouts.complementary, controller)
       extra.communications = communications
       const found = communications.items.length
       extra.communicationsStatus = found ? "ok" : "not_found"
@@ -319,6 +351,7 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
 
   const runJurisprudence = async () => {
     if (!deps.jurisprudence) {
+      extra.jurisprudenceState = "not_configured"
       Object.assign(source("jurisprudencia"), { status: "not_configured", message: "Base de jurisprudência não configurada." })
       return
     }
@@ -329,20 +362,35 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
       type: process?.type,
       area: process?.area,
     }
+    const notRun = (message: string, basis: string[] = []) => {
+      extra.jurisprudenceState = "not_run"
+      extra.jurisprudence = { items: [], total: 0, basis, message, executed: false, state: "not_run" }
+      Object.assign(source("jurisprudencia"), { status: "skipped", message })
+    }
     if (!query.subject && !query.className && !query.type) {
-      Object.assign(source("jurisprudencia"), { status: "skipped", message: "Sem assunto, classe ou tipo de ação para orientar a pesquisa." })
+      notRun("Pesquisa não realizada: o processo não tem assunto, classe ou tipo de ação para orientá-la.")
       return
     }
     const t0 = begin("jurisprudencia")
+    const controller = new AbortController()
     try {
-      const jurisprudence = await withTimeout(deps.jurisprudence(query), timeouts.complementary)
-      extra.jurisprudence = jurisprudence
+      const jurisprudence = await withTimeout(deps.jurisprudence(query, controller.signal), timeouts.complementary, controller)
+      // A fonte pode recusar pesquisar (termos genéricos demais): isso não é "sem resultado".
+      if (jurisprudence.executed === false) {
+        source("jurisprudencia").startedAt = undefined
+        notRun(`Pesquisa não realizada: ${jurisprudence.message ?? "termos insuficientes para pesquisar."}`.replace(/: (\p{Lu})/u, (_m, c: string) => `: ${c.toLowerCase()}`), jurisprudence.basis)
+        return
+      }
+      const state: JurisprudenceState = jurisprudence.items.length ? "results" : "no_results"
+      extra.jurisprudenceState = state
+      extra.jurisprudence = { ...jurisprudence, executed: true, state }
       finish("jurisprudencia", t0, jurisprudence.items.length ? "ok" : "not_found", {
         checkedAt: iso(),
-        message: jurisprudence.items.length ? `${jurisprudence.total} decisão(ões) potencialmente relacionada(s).` : "Nenhuma decisão relacionada na base.",
+        message: jurisprudence.items.length ? `${jurisprudence.total} decisão(ões) potencialmente relacionada(s).` : "Pesquisa feita: nenhuma decisão relacionada na base para estes termos.",
       })
     } catch (error) {
-      fail("jurisprudencia", t0, error)
+      const status = fail("jurisprudencia", t0, error)
+      extra.jurisprudenceState = JURISPRUDENCE_STATE_BY_STATUS[status] ?? "unavailable"
     }
   }
 
@@ -383,7 +431,9 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
     communications: extra.communications,
     communicationsStatus: extra.communicationsStatus,
     jurisprudence: extra.jurisprudence,
+    jurisprudenceState: extra.jurisprudenceState,
     secretSkipped: secret,
+    protection,
   })
   await step(
     "magistrado",

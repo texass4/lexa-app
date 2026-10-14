@@ -152,5 +152,6 @@ export interface ProcessProvider {
    * segmento). Lista vazia = nada encontrado ali — o que não prova ausência de
    * tramitação. Falhas lançam `LookupError`.
    */
-  lookupRecords?(digits: string, tribunal: string): Promise<{ dataset: string; records: ExternalRecord[]; coverage: ExternalCoverage }>
+  /** `signal`: cancelamento do chamador (sem novas tentativas depois dele). */
+  lookupRecords?(digits: string, tribunal: string, options?: { signal?: AbortSignal }): Promise<{ dataset: string; records: ExternalRecord[]; coverage: ExternalCoverage }>
 }

@@ -82,7 +82,7 @@ export function buildFinanceContext(data: FinanceData, now: Date): BuiltContext 
   const today = startOfDay(now)
   const context = {
     data_de_hoje: fmtToday(now),
-    metricas_calculadas_pelo_lexa: {
+    metricas_calculadas: {
       mes_atual: metrics.month,
       recebido_no_mes: formatCurrency(metrics.receivedThisMonth),
       previsto_para_o_mes: formatCurrency(metrics.expectedThisMonth),

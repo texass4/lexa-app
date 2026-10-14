@@ -49,6 +49,3 @@ export function publicJurisprudenceError(error: unknown) {
   const code = error instanceof JurisprudenceError ? error.code : "UNEXPECTED"
   return { code, ...PUBLIC[code] }
 }
-
-/** Falhas passageiras da fonte: vale tentar de novo depois. */
-export const isTransient = (code: JurisprudenceErrorCode) => code === "RATE_LIMIT" || code === "TIMEOUT" || code === "UNAVAILABLE"

@@ -24,8 +24,8 @@ const QUERY_TIMEOUT_MS = 10_000
 function dbError(error: { code?: string; message?: string; name?: string } | null | undefined, what: string): JurisprudenceError {
   const code = error?.code ?? ""
   if (error?.name === "AbortError" || code === "57014" || code === "20") return new JurisprudenceError("TIMEOUT", `${what}: tempo esgotado`)
-  // Função ou tabela ausente: a migração 0019 não foi aplicada.
-  if (code === "PGRST202" || code === "42883" || code === "42P01" || code === "PGRST205") return new JurisprudenceError("NOT_CONFIGURED", `${what}: migração 0019 ausente (${code})`)
+  // Função ou tabela ausente: a migração 0019 (ou a 0022, para a IA) não foi aplicada.
+  if (code === "PGRST202" || code === "42883" || code === "42P01" || code === "PGRST205") return new JurisprudenceError("NOT_CONFIGURED", `${what}: migração ausente (${code})`)
   if (code === "42501") return new JurisprudenceError("NOT_FOUND", `${what}: sem permissão`)
   return new JurisprudenceError("UNAVAILABLE", `${what}: ${code} ${error?.message ?? ""}`.trim())
 }
@@ -140,6 +140,21 @@ export interface DecisionRow {
   updated_at: string
 }
 
+/** Linha de `jurisprudence_ai_candidates`: a decisão (sem o texto integral) + onde cada conceito apareceu. */
+interface CandidateRow extends Omit<DecisionRow, "decision_text"> {
+  groups_a: number[] | null
+  groups_b: number[] | null
+  groups_c: number[] | null
+  fts_rank: number | null
+  matched_total: number | string
+}
+
+/** Candidata para a IA: a decisão e os conceitos (índices a partir de 0) achados em cada parte do índice. */
+export interface AICandidate {
+  decision: JurisprudenceDecision
+  db: { a: number[]; b: number[]; c: number[] }
+}
+
 export const DECISION_COLUMNS = [
   "id", "provider", "tribunal", "external_id", "process_number", "registry_number", "class_code", "class_name", "court", "rapporteur",
   "judgment_date", "publication_date", "publication", "decision_type", "subject", "ementa", "decision_text", "thesis", "keywords",
@@ -249,6 +264,54 @@ export function jurisprudenceRepository(supabase: SupabaseClient) {
       if (error) throw dbError(error, "pesquisa")
       const rows = (data ?? []) as SearchRow[]
       return { rows: rows.map(toResult), total: rows.length ? Number(rows[0].total) : 0 }
+    },
+
+    /**
+     * Candidatas para a IA (`jurisprudence_ai_candidates`, migração 0022): um grupo por
+     * conceito da pergunta; para cada decisão, os grupos achados em cada parte do índice
+     * (índices a partir de 0). Não substitui `search` — a tela continua usando aquela.
+     */
+    async aiCandidates(groups: string[][], filters: JurisprudenceFilters, limit: number): Promise<{ candidates: AICandidate[]; matched: number }> {
+      const { data, error } = await supabase
+        .rpc("jurisprudence_ai_candidates", { p_groups: groups, p_filters: filters, p_limit: limit })
+        .abortSignal(timeout())
+      if (error) throw dbError(error, "candidatas")
+      const rows = (data ?? []) as CandidateRow[]
+      const zeroBased = (list: number[] | null) => (list ?? []).map((i) => i - 1)
+      return {
+        candidates: rows.map((row) => ({
+          decision: toDecision({ ...row, decision_text: null }),
+          db: { a: zeroBased(row.groups_a), b: zeroBased(row.groups_b), c: zeroBased(row.groups_c) },
+        })),
+        matched: rows.length ? Number(rows[0].matched_total) : 0,
+      }
+    },
+
+    /**
+     * Candidatas para UMA questão jurídica (`jurisprudence_issue_candidates`, migração
+     * 0025): os grupos em `required` (índices a partir de 0) são obrigatórios — E entre
+     * eles —, os demais só ordenam. `signal`: cancelamento de quem pediu (somado ao prazo).
+     */
+    async issueCandidates(
+      groups: string[][],
+      required: number[],
+      filters: JurisprudenceFilters,
+      limit: number,
+      signal?: AbortSignal,
+    ): Promise<{ candidates: AICandidate[]; matched: number }> {
+      const { data, error } = await supabase
+        .rpc("jurisprudence_issue_candidates", { p_groups: groups, p_required: required, p_filters: filters, p_limit: limit })
+        .abortSignal(signal ? AbortSignal.any([signal, timeout()]) : timeout())
+      if (error) throw dbError(error, "candidatas por questão")
+      const rows = (data ?? []) as CandidateRow[]
+      const zeroBased = (list: number[] | null) => (list ?? []).map((i) => i - 1)
+      return {
+        candidates: rows.map((row) => ({
+          decision: toDecision({ ...row, decision_text: null }),
+          db: { a: zeroBased(row.groups_a), b: zeroBased(row.groups_b), c: zeroBased(row.groups_c) },
+        })),
+        matched: rows.length ? Number(rows[0].matched_total) : 0,
+      }
     },
 
     async getDecision(id: string): Promise<JurisprudenceDecision | null> {

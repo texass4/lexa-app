@@ -125,9 +125,6 @@ export function tribunalName(acronym: string): string {
 /** Site institucional quando não segue `<sigla>.jus.br` (as CJMs ficam no portal da Justiça Militar da União). */
 const siteOf = (acronym: string) => (/^CJM\d{1,2}$/.test(acronym) ? "https://www.stm.jus.br" : `https://www.${acronym.toLowerCase()}.jus.br`)
 
-/** Segmento da Justiça (`J`) por extenso. */
-export const segmentName = (segment: string): string | undefined => SEGMENTS[segment]
-
 /** Dados públicos de um tribunal pela sigla (de origem ou informada por fonte). */
 export function tribunalByAcronym(acronym: string | undefined, segment?: string): TribunalInfo | undefined {
   const a = acronym?.trim().toUpperCase()

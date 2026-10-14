@@ -10,14 +10,16 @@
 
 import { AIError } from "@/lib/ai/errors"
 import { stripUnknownRefs, groundingWarnings } from "@/lib/ai/grounding"
+import { contextKeys, sanitizeAIText } from "@/lib/ai/output-sanitizer"
 import { buildClientContext, loadClientData } from "@/lib/ai/context/client"
 import { buildOfficeContext, loadOfficeData } from "@/lib/ai/context/office"
 import { buildProcessContext, loadProcessData } from "@/lib/ai/context/process"
 import { buildDecisionContext, jurisprudenceChatSection, type ChatJurisprudence } from "@/lib/ai/context/jurisprudence"
-import { asksForJurisprudence, asksForSaved, searchTermsFrom } from "@/lib/ai/jurisprudence-intent"
+import { asksForJurisprudence, asksForSaved } from "@/lib/ai/jurisprudence-intent"
+import { analyzeCase, withoutProcessData } from "@/lib/ai/jurisprudence-case"
+import { logComparative, retrievePrecedents } from "@/lib/ai/jurisprudence-pipeline"
 import { jurisprudenceConfig } from "@/lib/services/jurisprudence/config"
-import { relatedQueryForProcess } from "@/lib/services/jurisprudence/service"
-import type { JurisprudenceDecision, JurisprudenceFilters } from "@/lib/services/jurisprudence/types"
+import type { JurisprudenceDecision } from "@/lib/services/jurisprudence/types"
 import type { Process } from "@/types"
 import { sanitizeAIContext } from "@/lib/ai/context/sanitize"
 import type { BuiltContext } from "@/lib/ai/context/shared"
@@ -68,18 +70,23 @@ async function buildScopeContext(deps: AIServiceDeps, scope: ChatScope): Promise
   }
 }
 
-/** Quantas decisões da base entram numa resposta da conversa. */
-export const CHAT_JURISPRUDENCE_RESULTS = 5
-
 /**
  * Jurisprudência na conversa — só decisões reais da base:
  * - processo: as vinculadas a ele, sempre;
- * - pergunta sobre jurisprudência: pesquisa na base com os termos da pergunta (ou, sem
- *   tema na pergunta, com o assunto/tipo/classe do processo ou o assunto da decisão);
+ * - pergunta sobre jurisprudência: a pergunta e os dados do processo viram o CASO
+ *   (questões jurídicas, fatos, lacunas — `analyzeCase`); cada questão vira consultas
+ *   próprias à base e os precedentes passam pela classificação jurídica e pela
+ *   comparação com o caso (`retrievePrecedents`). Sem tema na pergunta nem no processo,
+ *   o assunto da decisão da conversa;
  * - pergunta sobre "salvas": as salvas pelo escritório.
  * A pesquisa é no banco (barata); o modelo nunca é a fonte.
  */
-async function jurisprudenceFor(deps: AIServiceDeps, question: string, ctx: Partial<ScopeContext>, { always = false } = {}): Promise<ChatJurisprudence> {
+async function jurisprudenceFor(
+  deps: AIServiceDeps,
+  question: string,
+  ctx: Partial<ScopeContext>,
+  { always = false, withProcessData = true } = {},
+): Promise<ChatJurisprudence> {
   const out: ChatJurisprudence = {}
   if (!deps.repo.can("processes.view")) return out
   if (ctx.process) out.linked = await deps.repo.linkedJurisprudence(ctx.process.id).catch(() => [])
@@ -93,28 +100,29 @@ async function jurisprudenceFor(deps: AIServiceDeps, question: string, ctx: Part
     out.search = { unavailable: "A pesquisa de jurisprudência ainda não está configurada no escritório: não há base para consultar." }
     return out
   }
-  let query = searchTermsFrom(question)
-  let filters: JurisprudenceFilters = {}
-  if (query.length < 4 && ctx.process) {
-    const related = relatedQueryForProcess(ctx.process)
-    query = related.text
-    filters = related.filters
-  } else if (query.length < 4 && ctx.decision) {
-    query = (ctx.decision.subject ?? "").slice(0, 300)
-  }
-  if (query.length < 3) {
+  let analysis = analyzeCase({ question, process: ctx.process })
+  if (!analysis.issues.length && ctx.decision?.subject) analysis = analyzeCase({ question: ctx.decision.subject.slice(0, 300) })
+  // Modo Jurisprudência: o processo só identifica a questão; nada dele entra na comparação.
+  if (!withProcessData) analysis = withoutProcessData(analysis)
+  if (!analysis.issues.length) {
     out.search = { unavailable: "A pergunta não traz o tema a pesquisar. Peça, por exemplo: \"há jurisprudência sobre negativação indevida?\"" }
     return out
   }
-  try {
-    const { decisions, total } = await deps.repo.searchJurisprudence(query, filters, CHAT_JURISPRUDENCE_RESULTS + (ctx.decision ? 1 : 0))
+  const result = await retrievePrecedents(analysis, {
+    candidates: (groups, filters, limit, options) => deps.repo.jurisprudenceCandidates(groups, filters, limit, options),
+    loadFull: (ids) => deps.repo.getJurisprudence(ids),
+    signal: deps.signal,
+    cacheScope: deps.repo.organizationId,
+    cache: deps.jurisprudenceCache,
     // Na conversa sobre uma decisão, "semelhantes" não inclui ela mesma.
-    const others = decisions.filter((d) => d.id !== ctx.decision?.id).slice(0, CHAT_JURISPRUDENCE_RESULTS)
-    out.search = { query, total: ctx.decision && others.length < decisions.length ? Math.max(0, total - 1) : total, decisions: others }
-  } catch (error) {
-    console.warn("[ia] pesquisa de jurisprudência na conversa falhou:", error instanceof Error ? error.message : error)
+    excludeIds: ctx.decision ? [ctx.decision.id] : undefined,
+  })
+  ;(deps.jurisprudenceLog ?? logComparative)(result)
+  if (result.status === "indisponivel" || result.status === "cancelada") {
     out.search = { unavailable: "A pesquisa de jurisprudência não respondeu agora. Tente de novo em instantes." }
+    return out
   }
+  out.search = { result, withProcessData }
   return out
 }
 
@@ -122,7 +130,7 @@ async function jurisprudenceFor(deps: AIServiceDeps, question: string, ctx: Part
 async function jurisprudenceOnlyContext(deps: AIServiceDeps, scope: ChatScope, question: string): Promise<BuiltContext> {
   if (!deps.repo.can("processes.view")) throw new AIError("FORBIDDEN")
   const process = scope.type === "process" ? (await loadProcessData(deps.repo, scope.id, nowOf(deps))).process : undefined
-  const juris = jurisprudenceChatSection(await jurisprudenceFor(deps, question, { process }, { always: true }))
+  const juris = jurisprudenceChatSection(await jurisprudenceFor(deps, question, { process }, { always: true, withProcessData: false }))
   return { context: juris.context, sources: juris.sources, basis: "Decisões da base de jurisprudência da Íntegra (fontes oficiais)." }
 }
 
@@ -159,7 +167,9 @@ export async function chat(deps: AIServiceDeps, scope: ChatScope, messages: AIMe
       "standard",
       () => deps.provider.generateText({ system, messages: history, temperature: 0.3, signal: deps.signal }),
     )
-    const text = stripUnknownRefs(value, built.sources).trim()
+    // Limpeza final: nenhum nome interno dos dados (nem o nome antigo do produto) chega à pessoa.
+    // (Referência inventada sai antes, para a limpeza arrumar o espaço que ela deixa.)
+    const text = sanitizeAIText(stripUnknownRefs(value, built.sources), { contextKeys: contextKeys(context), sources: built.sources, linkBareRefs: true }).trim()
     if (!text) throw new AIError("EMPTY_RESPONSE")
 
     return {
