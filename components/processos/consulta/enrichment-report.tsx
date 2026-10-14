@@ -194,7 +194,7 @@ function OfficePanel({ run, report }: { run: EnrichmentRun; report: EnrichmentRe
         <PanelHeader title="Cadastro do escritório" description="Este número não está nos processos do escritório." />
         <div className="px-5 pb-5">
           {can("processes.edit") && (
-            <Button variant="secondary" onClick={() => openDialog("process", { number: report.number })}>
+            <Button variant="secondary" onClick={() => openDialog("process", { number: report.number, tribunalEvidence: report.tribunal ? { cnj: report.cnj, checks: report.tribunal.checks } : undefined })}>
               Cadastrar processo
             </Button>
           )}

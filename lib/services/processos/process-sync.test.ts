@@ -173,3 +173,31 @@ describe("relatório divergente aplicado e sincronizações seguintes (DADOS SIM
     assert.equal(second.tribunalIdentification?.current.acronym, "TJSP")
   })
 })
+
+describe("cadastro a partir de um relatório divergente (DADOS SIMULADOS)", () => {
+  it("a importação guarda a divergência do relatório; número diferente descarta a evidência", async () => {
+    const sim = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const { mapRecords } = await import("@/lib/integrations/legal/datajud/mapper")
+    const { buildProcessDraft } = await import("./import")
+    const { checkFromRecords, checksForNumber, identifyTribunal, originCheckFromSheet, tribunalIdentificationOf } = await import("./tribunal-identification")
+    const simSheet = buildProcessSheet(mapSearchResponse(sim.simTjspFirstDegree, sim.SIM_TJSP) as ExternalProcess)
+    // O relatório da Consulta processual: origem + STJ com registro → divergência.
+    const stj = checkFromRecords({ tribunal: "STJ", role: "superior", dataset: "api_publica_stj", checkedAt: "2026-10-14T12:00:00.000Z", records: mapRecords(sim.simStjRecord, sim.SIM_TJSP) })
+    const report = identifyTribunal(sim.SIM_TJSP, [originCheckFromSheet(simSheet, "2026-10-14T12:00:00.000Z"), stj], "2026-10-14T12:00:00.000Z")
+    assert.equal(report.current.status, "conflicting")
+    const evidence = { cnj: simSheet.number, checks: report.checks } // o relatório manda o número formatado
+
+    // "Cadastrar processo" → o formulário consulta a origem de novo e importa.
+    const draft = buildProcessDraft(simSheet, { clientId: "c", ownerId: "u", area: "Cível", tribunalChecks: checksForNumber(evidence, simSheet.cnj) }, "2026-10-14T09:05:00")
+    const id = tribunalIdentificationOf({ ...draft, cnj: simSheet.cnj })!
+    assert.equal(id.current.status, "conflicting", "o cadastro não vira 'confirmado' pela consulta só da origem")
+    assert.equal(id.current.acronym, undefined)
+    assert.deepEqual(id.candidates?.map((c) => c.acronym).sort(), ["STJ", "TJSP"])
+
+    // A pessoa trocou o número no formulário: a evidência do relatório não vale.
+    assert.equal(checksForNumber(evidence, sim.SIM_TRF1), undefined)
+    assert.equal(checksForNumber(undefined, simSheet.cnj), undefined)
+    // Sem evidência, a importação só da origem segue as regras normais (sem divergência inventada).
+    assert.equal(buildProcessDraft(simSheet, { clientId: "c", ownerId: "u", area: "Cível" }, "2026-10-14T09:05:00").tribunalIdentification?.current.status, "confirmed")
+  })
+})

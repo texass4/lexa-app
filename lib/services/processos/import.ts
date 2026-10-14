@@ -5,7 +5,7 @@
  * reaproveitar quando a persistência sair do browser.
  */
 
-import type { PracticeArea, ProcessMovement, ProcessStatus, Process } from "@/types"
+import type { PracticeArea, ProcessMovement, ProcessStatus, Process, TribunalCheck } from "@/types"
 import type { ProcessSheet, SheetMovement } from "./sheet"
 import { identifyFromSheet } from "./tribunal-identification"
 
@@ -42,6 +42,8 @@ export interface ImportProcessMeta {
   /** Ajustes feitos pelo usuário sobre o que a fonte trouxe. */
   type?: string
   court?: string
+  /** Consultas que acompanham a ficha (ex.: as do relatório da Consulta processual, com o superior). */
+  tribunalChecks?: TribunalCheck[]
 }
 
 /**
@@ -75,7 +77,7 @@ export function buildProcessDraft(sheet: ProcessSheet, meta: ImportProcessMeta, 
     lastMovementAt: movements[0]?.at ?? syncedAt,
     tribunal: sheet.tribunal,
     degree: sheet.degree,
-    tribunalIdentification: identifyFromSheet(sheet, syncedAt),
+    tribunalIdentification: identifyFromSheet(sheet, syncedAt, { checks: meta.tribunalChecks }),
     className: sheet.className,
     subject: sheet.subject,
     judicialUnit: sheet.judicialUnit,

@@ -436,6 +436,16 @@ export function identifyFromSheet(sheet: ProcessSheet, checkedAt: string, option
   return identifyTribunal(sheet.cnj, checks, checkedAt)
 }
 
+/**
+ * Consultas trazidas de um relatório só valem para o MESMO número: com outro número
+ * (a pessoa trocou o CNJ no formulário), a evidência é descartada.
+ */
+export function checksForNumber(evidence: { cnj: string; checks: TribunalCheck[] } | undefined, cnj: string): TribunalCheck[] | undefined {
+  const a = parseCNJ(evidence?.cnj ?? "")?.digits
+  const b = parseCNJ(cnj)?.digits
+  return evidence && a && a === b ? evidence.checks : undefined
+}
+
 type IdentifiableProcess = Pick<Process, "cnj" | "number" | "tribunal" | "tribunalIdentification"> & Partial<Pick<Process, "origin" | "source">>
 
 /**

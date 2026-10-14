@@ -18,21 +18,25 @@ import { degreeLabel, isAutoTracked } from "@/lib/services/processos/labels"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { useRemovedWhileEditing } from "@/lib/store/on-demand"
 import { byId } from "@/lib/store/indexes"
-import type { PracticeArea, Process, ProcessStatus } from "@/types"
+import type { PracticeArea, Process, ProcessStatus, TribunalCheck } from "@/types"
 import { LookupFailed, LookupFound, LookupProgress, summaryFromProcess, summaryFromSheet, type LookupSummary } from "./process-lookup-status"
 import { AUTO_REFRESH_AFTER_MS } from "./use-process-refresh"
+import { checksForNumber } from "@/lib/services/processos/tribunal-identification"
 
 export function NewProcessDialog({
   open,
   onOpenChange,
   clientId,
   number,
+  tribunalEvidence,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   clientId?: string
   /** Número já conhecido (ex.: de uma intimação): o formulário abre com ele. */
   number?: string
+  /** Consultas do relatório da Consulta processual para este número (evidência do tribunal). */
+  tribunalEvidence?: { cnj: string; checks: TribunalCheck[] }
 }) {
   return (
     <Modal
@@ -44,7 +48,7 @@ export function NewProcessDialog({
       size="lg"
       bare
     >
-      <ProcessForm clientId={clientId} number={number} onClose={() => onOpenChange(false)} />
+      <ProcessForm clientId={clientId} number={number} tribunalEvidence={tribunalEvidence} onClose={() => onOpenChange(false)} />
     </Modal>
   )
 }
@@ -95,7 +99,19 @@ const pickForm = (existing: Process) => ({
 /** Já salvo e atualizado há pouco: não precisa consultar de novo. */
 const isRecent = (process: Process) => !!process.lastSyncedAt && getNow().getTime() - parse(process.lastSyncedAt).getTime() < AUTO_REFRESH_AFTER_MS
 
-function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?: string; onClose: () => void }) {
+function ProcessForm({
+  clientId,
+  number,
+  tribunalEvidence,
+  onClose,
+}: {
+  clientId?: string
+  number?: string
+  tribunalEvidence?: { cnj: string; checks: TribunalCheck[] }
+  onClose: () => void
+}) {
+  // Só as consultas do MESMO número: trocar o número no formulário descarta a evidência.
+  const checksFor = (cnj: string) => checksForNumber(tribunalEvidence, cnj)
   const data = useOfficeData()
   const { addProcess, importProcess, updateProcess, applyProcessSync, ensureFullProcesses, versionOf } = useOfficeActions()
   const router = useRouter()
@@ -212,7 +228,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
       }
       if (controller.signal.aborted) return
       const baseVersion = versionOf("processes", existing.id)
-      const { added } = applyProcessSync(existing.id, found, result.checkedAt)
+      const { added } = applyProcessSync(existing.id, found, result.checkedAt, { checks: checksFor(found.cnj) })
       fillForm(formFrom(existing))
       setErrors({})
       setLookup({ state: "filled", cnj: found.cnj, summary: summaryFromSheet(found), processId: existing.id, existed: true, baseVersion })
@@ -251,6 +267,7 @@ function ProcessForm({ clientId, number, onClose }: { clientId?: string; number?
       type: filled.type,
       court: filled.court,
       opposingParty: filled.opposingParty || undefined,
+      tribunalChecks: checksFor(found.cnj),
     })
     // Não foi possível salvar (o aviso já apareceu): o formulário continua para tentar de novo.
     if (!created) {
