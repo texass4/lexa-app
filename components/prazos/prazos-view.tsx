@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
+import { cn } from "cn"
 import { useSearchParams } from "next/navigation"
 import { CalendarRange, Hourglass, ListX, Plus, TriangleAlert } from "lucide-react"
-import { Panel, PanelHeader } from "@/components/ui/panel"
+import { Panel } from "@/components/ui/panel"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -25,7 +26,7 @@ import { searchFilter } from "@/lib/store/storage"
 import { LimitedList } from "@/components/ui/show-more"
 import { useUI } from "@/lib/store/ui-store"
 import type { Prazo } from "@/types"
-import { PrazoRow } from "./prazos-panel"
+import { PrazoListRow } from "./prazos-panel"
 
 type Filter = "abertos" | "vencidos" | "semana" | "30dias" | "sem-tarefa" | "cumpridos" | "perdidos"
 
@@ -157,20 +158,20 @@ export function PrazosView() {
         <StatButton label="Ver prazos vencidos" onClick={() => setFilter("vencidos")}>
           <MiniStat
             label="Vencidos"
-            value={String(overdue).padStart(2, "0")}
+            value={String(overdue)}
             hint="Abertos e já passaram"
             icon={<TriangleAlert />}
             tone={overdue ? "danger" : undefined}
           />
         </StatButton>
         <StatButton label="Ver prazos até domingo" onClick={() => setFilter("semana")}>
-          <MiniStat label="Até domingo" value={String(thisWeek).padStart(2, "0")} hint="Vencem nesta semana" icon={<Hourglass />} />
+          <MiniStat label="Até domingo" value={String(thisWeek)} hint="Vencem nesta semana" icon={<Hourglass />} />
         </StatButton>
         <StatButton label="Ver prazos dos próximos 30 dias" onClick={() => setFilter("30dias")}>
-          <MiniStat label="Próximos 30 dias" value={String(next30).padStart(2, "0")} hint="A partir de hoje" icon={<CalendarRange />} />
+          <MiniStat label="Próximos 30 dias" value={String(next30)} hint="A partir de hoje" icon={<CalendarRange />} />
         </StatButton>
         <StatButton label="Ver prazos sem tarefa" onClick={() => setFilter("sem-tarefa")}>
-          <MiniStat label="Sem tarefa" value={String(noTask).padStart(2, "0")} hint="Abertos sem tarefa vinculada" icon={<ListX />} />
+          <MiniStat label="Sem tarefa" value={String(noTask)} hint="Abertos sem tarefa vinculada" icon={<ListX />} />
         </StatButton>
       </div>
 
@@ -204,10 +205,16 @@ export function PrazosView() {
       </div>
 
       {groups.length ? (
-        <div className="space-y-5">
+        // Um painel só, com o período como cabeçalho de seção: a lista inteira numa leitura.
+        <Panel className="overflow-hidden">
           {groups.map((group) => (
-            <Panel key={group.id}>
-              <PanelHeader title={group.label} description={`${groupTotal(group)} ${groupTotal(group) === 1 ? "prazo" : "prazos"}`} />
+            <section key={group.id} aria-label={group.label} className="border-b border-border last:border-0">
+              <header className="flex items-center gap-2 border-b border-border/70 bg-surface-muted/50 px-4 py-2.5 sm:px-5">
+                <h2 className={cn("text-[12.5px] font-semibold", group.id === "vencido" ? "text-danger" : "text-foreground")}>{group.label}</h2>
+                <span className="tabular rounded-full bg-surface px-1.5 text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
+                  {groupTotal(group)}
+                </span>
+              </header>
               <LimitedList
                 items={group.items}
                 listKey={`${group.id}|${responsible}|${search}`}
@@ -216,16 +223,16 @@ export function PrazosView() {
                 className="mb-4"
               >
                 {(items) => (
-                  <ul className="divide-y divide-border px-3 pb-2">
+                  <ul className="divide-y divide-border/70">
                     {items.map((p) => (
-                      <PrazoRow key={p.id} prazo={p} showProcess />
+                      <PrazoListRow key={p.id} prazo={p} />
                     ))}
                   </ul>
                 )}
               </LimitedList>
-            </Panel>
+            </section>
           ))}
-        </div>
+        </Panel>
       ) : (
         <Panel>
           <EmptyState

@@ -4,7 +4,7 @@ import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
-import { ChevronDown, Kanban, ListChecks, ListTodo, Plus } from "lucide-react"
+import { AlarmClock, CalendarCheck, ChevronDown, CircleCheck, Flag, Kanban, ListChecks, ListTodo, Plus } from "lucide-react"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Panel } from "@/components/ui/panel"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { MiniStat } from "@/components/shared/mini-stat"
 import { TaskItem } from "./task-item"
 import { TaskDetailSheet } from "./task-detail-sheet"
 import { TaskFormDialog } from "./task-form-dialog"
@@ -190,74 +191,116 @@ export function TasksView() {
             : "Acompanhe o que cada pessoa da equipe precisa entregar."
         }
         actions={
-          <>
-            <div role="radiogroup" aria-label="Visualização" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
-              {(
-                [
-                  { value: "board", label: "Quadro", icon: <Kanban className="size-3.5" /> },
-                  { value: "list", label: "Lista", icon: <ListTodo className="size-3.5" /> },
-                ] as { value: ViewMode; label: string; icon: React.ReactNode }[]
-              ).map((v) => (
-                <button
-                  key={v.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={view === v.value}
-                  onClick={() => setView(v.value)}
-                  className={cn(
-                    "flex h-8 items-center gap-1.5 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                    view === v.value ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {v.icon} {v.label}
-                </button>
-              ))}
-            </div>
-            <div role="radiogroup" aria-label="Escopo" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
-              {(["minhas", "escritorio"] as Scope[]).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  role="radio"
-                  aria-checked={scope === s}
-                  onClick={() => setScope(s)}
-                  className={cn(
-                    "h-8 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                    scope === s ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {s === "minhas" ? "Minhas" : "Escritório"}
-                </button>
-              ))}
-            </div>
-            <Can permission="tasks.edit">
-              <Button onClick={() => openDialog("task")}>
-                <Plus /> Nova tarefa
-              </Button>
-            </Can>
-          </>
+          <Can permission="tasks.edit">
+            <Button onClick={() => openDialog("task")}>
+              <Plus /> Nova tarefa
+            </Button>
+          </Can>
         }
       />
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        {view === "list" ? (
-          <FilterTabs
-            ariaLabel="Filtrar tarefas"
-            layoutId="tasks-filter"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: "todas", label: "Todas", count: counts.todas },
-              { value: "hoje", label: "Hoje", count: counts.hoje },
-              { value: "atrasadas", label: "Atrasadas", count: counts.atrasadas },
-              { value: "alta", label: "Alta prioridade", count: counts.alta },
-              { value: "concluidas", label: "Concluídas", count: counts.concluidas },
-            ]}
+      {/* Resumo: cada número abre a lista já filtrada (contagens da janela + histórico). */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {(
+          [
+            { f: "atrasadas", label: "Atrasadas", hint: "Prazo já passou", icon: <AlarmClock />, danger: true },
+            { f: "hoje", label: "Para hoje", hint: "Vencem hoje", icon: <CalendarCheck /> },
+            { f: "alta", label: "Prioridade alta", hint: "Pendentes", icon: <Flag /> },
+            { f: "concluidas", label: "Concluídas", hint: "Inclui o histórico", icon: <CircleCheck /> },
+          ] as { f: Filter; label: string; hint: string; icon: React.ReactNode; danger?: boolean }[]
+        ).map((c) => {
+          const n = counts[c.f]
+          return (
+            <button
+              key={c.f}
+              type="button"
+              aria-label={`Ver tarefas: ${c.label.toLowerCase()}`}
+              aria-pressed={view === "list" && filter === c.f}
+              onClick={() => {
+                setFilter(c.f)
+                setView("list")
+              }}
+              className="rounded-card text-left outline-none transition-transform hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <MiniStat
+                label={c.label}
+                value={n === undefined ? "—" : String(n)}
+                hint={c.hint}
+                icon={c.icon}
+                tone={c.danger && n ? "danger" : undefined}
+                className={cn(view === "list" && filter === c.f && "border-brand/40 ring-2 ring-brand/15")}
+              />
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Barra da lista: exibição, de quem, filtros (na lista) e busca. */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="radiogroup" aria-label="Visualização" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
+            {(
+              [
+                { value: "board", label: "Quadro", icon: <Kanban className="size-3.5" /> },
+                { value: "list", label: "Lista", icon: <ListTodo className="size-3.5" /> },
+              ] as { value: ViewMode; label: string; icon: React.ReactNode }[]
+            ).map((v) => (
+              <button
+                key={v.value}
+                type="button"
+                role="radio"
+                aria-checked={view === v.value}
+                onClick={() => setView(v.value)}
+                className={cn(
+                  "flex h-8 items-center gap-1.5 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                  view === v.value ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {v.icon} {v.label}
+              </button>
+            ))}
+          </div>
+          <div role="radiogroup" aria-label="Escopo" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
+            {(["minhas", "escritorio"] as Scope[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={scope === s}
+                onClick={() => setScope(s)}
+                className={cn(
+                  "h-8 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                  scope === s ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {s === "minhas" ? "Minhas" : "Escritório"}
+              </button>
+            ))}
+          </div>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Buscar tarefa, cliente ou processo…"
+            className="w-full sm:ml-auto sm:w-[280px]"
           />
-        ) : (
-          <div />
+        </div>
+        {view === "list" && (
+          <div className="min-w-0">
+            <FilterTabs
+              ariaLabel="Filtrar tarefas"
+              layoutId="tasks-filter"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: "todas", label: "Todas", count: counts.todas },
+                { value: "hoje", label: "Hoje", count: counts.hoje },
+                { value: "atrasadas", label: "Atrasadas", count: counts.atrasadas },
+                { value: "alta", label: "Alta prioridade", count: counts.alta },
+                { value: "concluidas", label: "Concluídas", count: counts.concluidas },
+              ]}
+            />
+          </div>
         )}
-        <SearchField value={query} onChange={setQuery} placeholder="Buscar tarefa, cliente ou processo…" className="w-full lg:w-[300px]" />
       </div>
 
       {view === "board" ? (

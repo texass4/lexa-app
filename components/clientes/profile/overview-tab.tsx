@@ -28,6 +28,8 @@ import { ActivityIcon } from "@/components/shared/activity-icon"
 import { TaskRow } from "@/components/tarefas/task-row"
 import { useUI } from "@/lib/store/ui-store"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
+import { humanizeProcessMention, processSubject } from "@/lib/processos/label"
 import { PRAZO_ALERT_DAYS } from "@/lib/dashboard/attention"
 import { clientFinance, nextClientDeadline, type ClientHub } from "@/lib/store/selectors"
 import { useCategoryLookup } from "@/components/agenda/use-category"
@@ -126,6 +128,11 @@ export function OverviewTab({
   const lookup = useCategoryLookup()
   const { deadlines } = useOfficeData()
   const { processes, activeProcesses, activities } = hub
+  // Registros antigos citam "Processo #103023": aqui, dentro do cliente, o processo aparece pelo assunto.
+  const human = (a: { processId?: string }, text: string) => {
+    const process = byId(processes, a.processId)
+    return process ? humanizeProcessMention(text, process.code, processSubject(process)) : text
+  }
   const nextDeadline = nextClientDeadline(processes, deadlines)
   const deadlineDays = nextDeadline ? diffInDays(parse(nextDeadline.prazo.fatalDate), getNow()) : undefined
   const tasks = hub.tasks.slice(0, 5)
@@ -183,7 +190,7 @@ export function OverviewTab({
           <MiniStat
             label="Última interação"
             value={lastLabel === "Hoje" || lastLabel === "Ontem" ? lastLabel : lastActivity ? fmtRelative(lastActivity.at) : "—"}
-            hint={lastActivity ? (lastActivity.actor ? `Por ${lastActivity.actor}` : lastActivity.message) : "Nenhuma atividade registrada"}
+            hint={lastActivity ? (lastActivity.actor ? `Por ${lastActivity.actor}` : human(lastActivity, lastActivity.message)) : "Nenhuma atividade registrada"}
             icon={<MessageSquare />}
           />
         </StatLink>
@@ -220,7 +227,7 @@ export function OverviewTab({
             </div>
           </Panel>
 
-          <Panel className="flex-1">
+          <Panel>
             <PanelHeader title="Contato principal" />
             <div className="px-5 pb-5">
               <div className="flex items-center gap-3 rounded-[12px] border border-border bg-surface-muted/40 p-3.5">
@@ -375,9 +382,9 @@ export function OverviewTab({
                     <div className="min-w-0 flex-1 pt-0.5">
                       <p className="text-[13px] leading-snug">
                         {a.actor && <span className="font-semibold">{a.actor} </span>}
-                        {a.message}
+                        {human(a, a.message)}
                       </p>
-                      {a.detail && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{a.detail}</p>}
+                      {a.detail && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{human(a, a.detail)}</p>}
                     </div>
                     <span className="tabular shrink-0 pt-0.5 text-[11.5px] text-subtle">{fmtActivityTime(a.at)}</span>
                   </li>

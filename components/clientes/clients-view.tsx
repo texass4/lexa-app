@@ -4,9 +4,10 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowDown, ArrowUp, ChevronRight, Download, Ellipsis, Eye, Plus, Power, Trash2, Upload, UsersRound, X } from "lucide-react"
+import { AlarmClock, ArrowDown, ArrowUp, ChevronRight, Download, Ellipsis, Eye, Plus, Power, Trash2, Upload, UserPlus, UsersRound, Wallet, X } from "lucide-react"
 import { cn } from "cn"
 import { PageHeader } from "@/components/ui/page-header"
+import { MiniStat } from "@/components/shared/mini-stat"
 import { Button } from "@/components/ui/button"
 import { FilterTabs } from "@/components/ui/filter-tabs"
 import { SearchField } from "@/components/ui/search-field"
@@ -176,6 +177,60 @@ export function ClientsView() {
 
   const counts = Object.fromEntries(FILTERS.map((f) => [f.value, base.filter((row) => testStatus(row, f.value)).length])) as Record<Filter, number>
   const extraFilters = !!(ownerId || area || kind || links)
+  // Contagens do resumo: todos os clientes (sem os filtros da lista), com os mesmos critérios das abas.
+  const allRows = [...rowsById.values()]
+  const summary = [
+    {
+      label: "Clientes ativos",
+      value: allRows.filter((r) => r.client.status === "ativo").length,
+      hint: `de ${allRows.length} cadastrados`,
+      icon: <UsersRound />,
+      active: filter === "ativo" && !extraFilters,
+      apply: () => {
+        clearFilters()
+        setFilter("ativo")
+      },
+    },
+    {
+      label: "Novos",
+      value: allRows.filter((r) => r.client.status === "novo").length,
+      hint: "Ainda em início de atendimento",
+      icon: <UserPlus />,
+      active: filter === "novo" && !extraFilters,
+      apply: () => {
+        clearFilters()
+        setFilter("novo")
+      },
+    },
+    {
+      label: "Com tarefa atrasada",
+      value: allRows.filter((r) => r.overdueTasks > 0).length,
+      hint: "Pedem retorno da equipe",
+      icon: <AlarmClock />,
+      danger: true,
+      active: links === "tarefas-atrasadas" && filter === "todos",
+      apply: () => {
+        clearFilters()
+        setLinks("tarefas-atrasadas")
+      },
+    },
+    ...(can("finance.view")
+      ? [
+          {
+            label: "Inadimplentes",
+            value: allRows.filter((r) => r.delinquent).length,
+            hint: "Com parcela vencida",
+            icon: <Wallet />,
+            danger: true,
+            active: filter === "inadimplente" && !extraFilters,
+            apply: () => {
+              clearFilters()
+              setFilter("inadimplente")
+            },
+          },
+        ]
+      : []),
+  ]
   const clearFilters = () => {
     setOwnerId("")
     setArea("")
@@ -257,6 +312,31 @@ export function ClientsView() {
           </>
         }
       />
+
+      {/* Resumo: cada número aplica o filtro correspondente à lista. */}
+      {ready && data.clients.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {summary.map((c) => (
+            <button
+              key={c.label}
+              type="button"
+              aria-label={`Filtrar: ${c.label.toLowerCase()}`}
+              aria-pressed={c.active}
+              onClick={c.apply}
+              className="rounded-card text-left outline-none transition-transform hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <MiniStat
+                label={c.label}
+                value={String(c.value)}
+                hint={c.hint}
+                icon={c.icon}
+                tone={c.danger && c.value ? "danger" : undefined}
+                className={cn(c.active && "border-brand/40 ring-2 ring-brand/15")}
+              />
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

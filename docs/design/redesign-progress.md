@@ -23,7 +23,7 @@ Inventário completo: `docs/design/redesign-inventory.md`.
 | 3 | Dashboard | concluída e validada |
 | 4 | Documentos | concluída e validada |
 | 5 | Agenda | concluída e validada |
-| 6 | Processos, clientes, tarefas, prazos | parcial: detalhe do processo em abas; lista de processos ajustada; clientes, tarefas e prazos só herdam o sistema |
+| 6 | Processos, clientes, tarefas, prazos | concluída: detalhe do processo em abas; Clientes, Tarefas e Prazos redesenhados; ficha do cliente ajustada |
 | 7 | Jurisprudência e IA (só visual) | parcial: herda tokens; base vazia neste ambiente impede validar resultados |
 | 8 | Demais rotas (configurações, financeiro, atendimento, autenticação, admin, erros) | parcial: Configurações › Acesso e painel da autenticação corrigidos; Admin não capturável |
 | 9 | Responsividade e polimento | parcial: 1440 e 390 em todas as rotas do app; 1024/1680 nas redesenhadas; 768 não varrido |
@@ -33,12 +33,11 @@ Inventário completo: `docs/design/redesign-inventory.md`.
 
 Auditadas: 35/35. Situação por rota: coluna "Status" do inventário.
 
-- Redesenhadas e validadas (7): Início, Documentos, Agenda, Processo (detalhe), Entrar, Cadastro e
-  Recuperar senha (painel da marca).
-- Ajustadas e validadas sem reestruturação (1): Processos.
-- Herdam o novo sistema, validadas sem regressão, redesenho específico pendente (9): Consulta processual,
-  Clientes, Cliente, Atendimento, Tarefas, Prazos, Financeiro, Jurisprudência e Configurações (só a seção
-  Acesso foi corrigida).
+- Redesenhadas e validadas (10): Início, Documentos, Agenda, Processo (detalhe), Clientes, Tarefas, Prazos,
+  Entrar, Cadastro e Recuperar senha (painel da marca).
+- Ajustadas e validadas sem reestruturação (2): Processos e Cliente (ficha).
+- Herdam o novo sistema, validadas sem regressão, redesenho específico pendente (5): Consulta processual,
+  Atendimento, Financeiro, Jurisprudência e Configurações (só a seção Acesso foi corrigida).
 - Validadas sem interface própria (2): raiz e Triagem (redirecionamentos). Não encontrada (2): validadas.
 - Pendentes de captura (14): Erro, Sem acesso, Redefinir senha e as 11 telas do Admin.
 
@@ -109,6 +108,24 @@ Auditadas: 35/35. Situação por rota: coluna "Status" do inventário.
 - Lista de processos: responsável com avatar, prazo sem quebra de linha.
 - Estados "selecionado" unificados no azul de ação (chips, caixa animada, alternadores de Tarefas,
   filtros do Atendimento, categoria da Agenda, etapa da importação de clientes).
+
+### Etapa 6b — Clientes, Tarefas e Prazos
+
+- **Prazos:** a lista virou uma linha por prazo (`PrazoListRow` em `prazos-panel.tsx`) com a data fatal em
+  bloco à esquerda (vermelho se vencido, âmbar se próximo), prazo e processo, responsável com avatar, origem,
+  data interna e situação da tarefa; "Cumprir" à vista e "Marcar como perdido" / "Abrir processo" no menu
+  (mesma confirmação). Os períodos ficam num painel só, como cabeçalhos de seção. Os indicadores deixaram
+  de mostrar zero à esquerda ("02" → "2"). O painel de prazos do processo continua com a linha anterior.
+- **Tarefas:** resumo com Atrasadas, Para hoje, Prioridade alta e Concluídas (inclui o histórico) — cada um
+  abre a lista já filtrada; exibição (Quadro/Lista), escopo (Minhas/Escritório) e busca numa barra, filtros
+  da lista numa linha própria (não cortam mais). Quadro, arrastar, conclusão e `?filtro=` preservados.
+- **Clientes:** resumo com Clientes ativos, Novos, Com tarefa atrasada e Inadimplentes (este só para quem
+  vê o financeiro); cada um aplica o filtro correspondente. Abas, filtros, ordenação, exportar e importar
+  preservados.
+- **Ficha do cliente:** "Contato principal" não estica mais até o fim da coluna; atividade recente,
+  "Última interação" e timeline mostram o processo pelo assunto em vez de "Processo #103065".
+- Validação: 1440 (claro e escuro) e 390 px sem rolagem horizontal nem erro de console; lint, typecheck,
+  768 testes e build ok.
 
 ### Etapa 8 — demais rotas
 

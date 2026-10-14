@@ -33,6 +33,7 @@ import { useUI } from "@/lib/store/ui-store"
 import { describeRelated, type ClientHub } from "@/lib/store/selectors"
 import { fmtDayLabel, fmtDayMonthParts, fmtTime, getNow, parse } from "@/lib/core/dates"
 import { getUser } from "@/lib/auth/account"
+import { humanizeProcessMention, processSubject } from "@/lib/processos/label"
 import type { Activity, ActivityType, Appointment, Client, Task } from "@/types"
 import { Can } from "@/lib/auth/session"
 
@@ -328,6 +329,7 @@ const TIMELINE_GROUPS: Record<Exclude<TimelineFilter, "todos">, { label: string;
 /** Timeline do cliente: só eventos registrados de verdade, com quem fez e quando. */
 export function TimelineTab({ hub, clientId }: { hub: ClientHub; clientId: string }) {
   const [filter, setFilter] = React.useState<TimelineFilter>("todos")
+  const data = useOfficeData()
   const { pageState } = useOfficeActions()
   // A timeline cresce sem limite: vem do banco em páginas (só o grupo escolhido).
   const list = React.useMemo(() => activitiesOf({ clientId }, filter === "todos" ? undefined : TIMELINE_GROUPS[filter].types), [clientId, filter])
@@ -343,7 +345,10 @@ export function TimelineTab({ hub, clientId }: { hub: ClientHub; clientId: strin
   ]
 
   const toEntry = (a: Activity) => {
-    const entry = activityToEntry(a)
+    // Registros antigos citam "Processo #103023": na timeline do cliente, o processo aparece pelo assunto.
+    const process = byId(data.processes, a.processId)
+    const human = (text?: string) => (process && text ? humanizeProcessMention(text, process.code, processSubject(process)) : text)
+    const entry = activityToEntry({ ...a, message: human(a.message) ?? a.message, detail: human(a.detail) })
     // Quem fez: o nome já está na frase quando `actor` existe; senão, vai no detalhe.
     const by = !a.actor && a.actorUserId ? `por ${getUser(a.actorUserId).name}` : undefined
     return { ...entry, detail: [a.detail, by].filter(Boolean).join(" · ") || undefined }
