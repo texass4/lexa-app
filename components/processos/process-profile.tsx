@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { FilterTabs } from "@/components/ui/filter-tabs"
+import { UnderlineTabs } from "@/components/ui/underline-tabs"
 import { DocumentList } from "@/components/shared/document-list"
 import { TaskRow } from "@/components/tarefas/task-row"
 import { ProcessPartiesPanel, ProcessSummaryPanel, ProcessSyncPanel } from "./process-source-panel"
@@ -94,6 +95,8 @@ const WIDE_MIN = 896
 const STICKY_OFFSET = 64
 
 type Section = "movimentacoes" | "prazos" | "documentos" | "jurisprudencia" | "dados" | "historico"
+/** No desktop, a primeira aba reúne o essencial (movimentações ao lado de prazos e tarefas). */
+type WideSection = Section | "visao"
 
 /**
  * Largura do elemento, medida quando ele entra na tela (ref de callback, antes da
@@ -125,6 +128,7 @@ export function ProcessProfile({ id }: { id: string }) {
   const [measure, width] = useElementWidth()
   const narrow = width !== undefined && width < WIDE_MIN
   const [section, setSection] = React.useState<Section>("movimentacoes")
+  const [wideSection, setWideSection] = React.useState<WideSection>("visao")
   const tabsAnchor = React.useRef<HTMLDivElement>(null)
   // O resumo (listas, Painel) já mostra o topo; o histórico e o que é do processo vêm agora.
   const detail = useProcessDetail(process?.id)
@@ -682,6 +686,9 @@ export function ProcessProfile({ id }: { id: string }) {
 
   /* --------------------------------- desktop --------------------------------- */
 
+  const wideSections: { value: WideSection; label: string; count?: number }[] = [{ value: "visao", label: "Visão geral" }, ...sections]
+  const wideCurrent = wideSections.some((s) => s.value === wideSection) ? wideSection : "visao"
+
   const wideLayout = (
     <>
       <FadeIn>
@@ -699,22 +706,52 @@ export function ProcessProfile({ id }: { id: string }) {
 
       {aiPanel}
 
-      <div className="grid grid-cols-1 gap-5 @4xl/main:grid-cols-12">
-        <div className="min-w-0 space-y-5 @4xl/main:col-span-7">
-          {movementsPanel}
-          {jurisprudencePanel}
-          {historyPanel}
-        </div>
-
-        <div className="min-w-0 space-y-5 @4xl/main:col-span-5">
-          <PrazosPanel process={process} />
-          {tasksPanel}
-          {agendaPanel}
-          {syncPanel}
-          <ProcessSummaryPanel process={process} />
-          <ProcessPartiesPanel process={process} />
-          {detailsPanel}
-          {documentsPanel}
+      {/* Abas: a visão geral reúne o essencial; o resto do processo fica a um clique, sem rolar 3.000 px. */}
+      <div>
+        <UnderlineTabs
+          ariaLabel="Seções do processo"
+          layoutId="process-wide-section"
+          value={wideCurrent}
+          onChange={setWideSection}
+          tabs={wideSections}
+          className="mb-5"
+        />
+        <div role="tabpanel" aria-label={wideSections.find((s) => s.value === wideCurrent)?.label}>
+          {wideCurrent === "visao" && (
+            <div className="grid grid-cols-1 gap-5 @4xl/main:grid-cols-12">
+              <div className="min-w-0 space-y-5 @4xl/main:col-span-7">{movementsPanel}</div>
+              <div className="min-w-0 space-y-5 @4xl/main:col-span-5">
+                <PrazosPanel process={process} />
+                {tasksPanel}
+                {agendaPanel}
+              </div>
+            </div>
+          )}
+          {wideCurrent === "movimentacoes" && movementsPanel}
+          {wideCurrent === "prazos" && (
+            <div className="grid grid-cols-1 gap-5 @4xl/main:grid-cols-2">
+              <PrazosPanel process={process} />
+              <div className="min-w-0 space-y-5">
+                {tasksPanel}
+                {agendaPanel}
+              </div>
+            </div>
+          )}
+          {wideCurrent === "documentos" && documentsPanel}
+          {wideCurrent === "jurisprudencia" && jurisprudencePanel}
+          {wideCurrent === "dados" && (
+            <div className="grid grid-cols-1 gap-5 @4xl/main:grid-cols-2">
+              <div className="min-w-0 space-y-5">
+                {detailsPanel}
+                <ProcessPartiesPanel process={process} />
+              </div>
+              <div className="min-w-0 space-y-5">
+                <ProcessSummaryPanel process={process} />
+                {syncPanel}
+              </div>
+            </div>
+          )}
+          {wideCurrent === "historico" && historyPanel}
         </div>
       </div>
     </>

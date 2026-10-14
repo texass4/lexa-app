@@ -1,10 +1,13 @@
 "use client"
 
 import * as React from "react"
-import { ArrowUp, Check, Copy, ListChecks, Mic, RotateCcw, Square } from "lucide-react"
+import { ArrowRight, ArrowUp, Check, Copy, ListChecks, Mic, RotateCcw, ShieldCheck, Square } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
+import { UnderlineTabs } from "@/components/ui/underline-tabs"
+import { DOCKED_PANEL_QUERY, useMediaQuery } from "@/lib/core/hooks"
+import { AIPrivacyNote } from "./ai-privacy"
 import { Button } from "@/components/ui/button"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { CHAT_LIMITS, type AIStatus, type ChatMode } from "@/lib/ai/types"
@@ -33,14 +36,18 @@ const MODE_HINT: Record<ChatMode, string> = {
 function jurisprudencePrompts(scope: AIContext["scope"]["type"]) {
   return scope === "process"
     ? ["Há jurisprudência para este processo?", "Mostre a jurisprudência vinculada a este processo", "Quais decisões o escritório salvou?"]
-    : ["Há jurisprudência sobre negativação indevida?", "Há jurisprudência sobre dano moral por atraso de voo?", "Quais decisões o escritório salvou?"]
+    : [
+        "Há jurisprudência sobre negativação indevida?",
+        "Há jurisprudência sobre dano moral por atraso de voo?",
+        "Quais decisões o escritório salvou?",
+      ]
 }
 
 /** Seletor do modo da conversa (All, Escritório, Jurisprudência). */
 function ModePicker({ modes, value, onChange }: { modes: ChatMode[]; value: ChatMode; onChange: (mode: ChatMode) => void }) {
   const labels = modes.map((mode) => MODE_LABEL[mode])
   return (
-    <div className="space-y-1.5 border-t border-border/70 px-5 py-2.5">
+    <div className="space-y-1.5 px-5 py-2.5">
       <ChoiceChips
         ariaLabel="Responder com base em"
         options={labels}
@@ -186,6 +193,9 @@ export function AIChatSheet({
   onModeChange?: (mode: ChatMode) => void
 }) {
   const [draft, setDraft] = React.useState("")
+  const [tab, setTab] = React.useState<"conversa" | "contexto">("conversa")
+  // Telas largas: o assistente fica acoplado ao lado do conteúdo (não cobre a página).
+  const docked = useMediaQuery(DOCKED_PANEL_QUERY)
   const endRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const ready = isAIReady(status)
@@ -229,26 +239,40 @@ export function AIChatSheet({
     <SideSheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Conversa"
-      className="sm:w-[520px]"
+      title="Assistente Íntegra"
+      className="sm:w-[480px]"
+      docked={docked}
       header={
         <div className="border-b border-border">
-        <div className="flex items-center gap-3 px-5 py-4 pr-14">
-          <AIMark />
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Conversa</h2>
-            <p className="flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
-              <span className="size-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
-              <span className="truncate">Contexto: {context.subtitle}</span>
-            </p>
+          <div className="flex items-center gap-3 px-5 pt-4 pb-2 pr-14">
+            <AIMark />
+            <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.01em]">Assistente Íntegra</h2>
+            {chat.messages.length > 0 && tab === "conversa" && (
+              <Button variant="ghost" size="xs" onClick={chat.reset} aria-label="Começar nova conversa">
+                <RotateCcw /> Nova
+              </Button>
+            )}
           </div>
-          {chat.messages.length > 0 && (
-            <Button variant="ghost" size="xs" onClick={chat.reset} aria-label="Começar nova conversa">
-              <RotateCcw /> Nova conversa
-            </Button>
+          <UnderlineTabs
+            ariaLabel="Assistente"
+            layoutId="assistant-tab"
+            className="mx-0 px-5 sm:px-5"
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { value: "conversa", label: "Conversa" },
+              { value: "contexto", label: "Contexto" },
+            ]}
+          />
+          {tab === "conversa" && (
+            <p className="flex items-center gap-1.5 truncate px-5 py-2 text-[12px] text-muted-foreground">
+              <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
+              <span className="truncate">Usando dados de {context.subtitle}</span>
+            </p>
           )}
-        </div>
-        {ready && onModeChange && modes && modes.length > 1 && <ModePicker modes={modes} value={mode} onChange={onModeChange} />}
+          {tab === "conversa" && ready && onModeChange && modes && modes.length > 1 && (
+            <ModePicker modes={modes} value={mode} onChange={onModeChange} />
+          )}
         </div>
       }
       footer={
@@ -260,7 +284,7 @@ export function AIChatSheet({
           className="space-y-2"
         >
           <VoiceStatus state={voice.state} onCancel={voice.cancel} onStop={voice.stop} onRetry={voice.start} />
-          <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface px-3 py-2 focus-within:border-border-strong focus-within:ring-2 focus-within:ring-brand/25">
+          <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface px-3 py-2.5 shadow-xs focus-within:border-brand/50 focus-within:ring-2 focus-within:ring-brand/20">
             <label htmlFor="lexa-ai-input" className="sr-only">
               Pergunte à Íntegra
             </label>
@@ -319,74 +343,104 @@ export function AIChatSheet({
               <ArrowUp />
             </Button>
           </div>
-          <p className="text-[11px] text-subtle">A resposta usa só os dados da Íntegra e pode errar. Confira antes de usar.</p>
+          <p className="text-[11.5px] text-subtle">A IA usa apenas os dados aos quais você tem acesso e pode errar. Confira antes de usar.</p>
         </form>
       }
     >
-      <div className="space-y-5 px-5 py-5">
-        {status && !ready && <AIUnavailable status={status} />}
-
-        {chat.messages.length === 0 && ready && (
-          <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
-            <p className="font-display text-[18px] leading-snug font-semibold tracking-[-0.015em] text-foreground">
-              {mode === "jurisprudence" ? "Pesquise na jurisprudência" : context.headline}
+      {tab === "contexto" ? (
+        <div className="space-y-5 px-5 py-5 text-[13px]">
+          <section className="space-y-1.5">
+            <h3 className="text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">Assunto desta conversa</h3>
+            <p className="font-medium text-foreground">{context.subtitle}</p>
+            <p className="text-muted-foreground">
+              Cada tela tem a sua conversa: ao abrir outro processo ou cliente, a Íntegra começa outra, e esta continua guardada.
             </p>
-            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-              {mode === "jurisprudence" ? (
-                <>Pergunte por um tema e a Íntegra pesquisa nas decisões da base de jurisprudência, citando cada decisão encontrada. Dados do escritório não entram neste modo.</>
-              ) : (
-                <>
-                  A partir do que está registrado sobre {TOPIC[context.scope.type]}, dá para {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
-                  {CAPABILITIES.at(-1)} — citando de onde veio cada informação. A resposta vira tarefa com um clique.
-                </>
-              )}
+          </section>
+          <section className="space-y-1.5">
+            <h3 className="text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">O que a resposta usa</h3>
+            <p className="text-foreground">{MODE_HINT[mode]}</p>
+            <p className="text-muted-foreground">Toda informação vem com a referência de onde saiu; o que não está nos dados aparece como ausente.</p>
+          </section>
+          <section className="space-y-2 rounded-[10px] border border-border bg-surface-muted/60 p-3">
+            <p className="flex items-center gap-2 font-medium text-foreground">
+              <ShieldCheck className="size-4 text-success" /> Privacidade
             </p>
-            <div className="mt-5 flex flex-col gap-1.5">
-              {(mode === "jurisprudence" ? jurisprudencePrompts(context.scope.type) : context.prompts).map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => submit(prompt)}
-                  disabled={chat.pending}
-                  className="group flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface px-3 py-2.5 text-left text-[13px] text-foreground outline-none transition-[border-color,background-color,transform] hover:border-border-strong hover:bg-surface-muted/60 focus-visible:ring-2 focus-visible:ring-brand/40 active:scale-[0.99] disabled:opacity-50"
-                >
-                  {prompt}
-                  <ArrowUp className="size-3.5 shrink-0 rotate-45 text-subtle transition-colors group-hover:text-brand-strong" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+            <AIPrivacyNote />
+          </section>
+          <Button variant="secondary" size="sm" onClick={() => setTab("conversa")}>
+            Voltar à conversa <ArrowRight />
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-5 px-5 py-5">
+          {status && !ready && <AIUnavailable status={status} />}
 
-        {chat.messages.map((message) =>
-          message.role === "user" ? (
-            <div key={message.id} className="flex justify-end animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-              <p className="max-w-[85%] rounded-[14px] rounded-br-[4px] bg-surface-muted px-3.5 py-2.5 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
-                {message.content}
+          {chat.messages.length === 0 && ready && (
+            <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+              <p className="text-[17px] leading-snug font-semibold tracking-[-0.01em] text-foreground">
+                {mode === "jurisprudence" ? "Pesquise na jurisprudência" : context.headline}
               </p>
-            </div>
-          ) : (
-            <div key={message.id} className="flex gap-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
-              <AIMark className="size-7 rounded-[8px] [&_svg]:size-3.5" />
-              <div className="min-w-0 flex-1 space-y-2.5">
-                <AIMarkdown text={message.content} sources={message.sources ?? {}} onOpen={onOpenSource} />
-                <AIWarnings warnings={message.warnings ?? []} />
-                <AnswerActions entry={message} context={context} />
+              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+                {mode === "jurisprudence" ? (
+                  <>
+                    Pergunte por um tema e a Íntegra pesquisa nas decisões da base de jurisprudência, citando cada decisão encontrada. Dados do
+                    escritório não entram neste modo.
+                  </>
+                ) : (
+                  <>
+                    A partir do que está registrado sobre {TOPIC[context.scope.type]}, dá para {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
+                    {CAPABILITIES.at(-1)} — citando de onde veio cada informação. A resposta vira tarefa com um clique.
+                  </>
+                )}
+              </p>
+              <h3 className="mt-6 mb-2 text-[12px] font-semibold text-foreground">Sugestões para você</h3>
+              <div className="flex flex-col gap-2">
+                {(mode === "jurisprudence" ? jurisprudencePrompts(context.scope.type) : context.prompts).map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => submit(prompt)}
+                    disabled={chat.pending}
+                    className="group flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface px-3.5 py-3 text-left text-[13px] leading-snug text-foreground outline-none transition-[border-color,background-color,transform] hover:border-brand/40 hover:bg-brand-soft/50 focus-visible:ring-2 focus-visible:ring-brand/40 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    {prompt}
+                    <ArrowRight className="size-3.5 shrink-0 text-subtle transition-colors group-hover:text-brand-strong" />
+                  </button>
+                ))}
               </div>
             </div>
-          ),
-        )}
+          )}
 
-        {chat.pending && (
-          <AIThinking
-            label={`Lendo ${context.scope.type === "office" ? "os dados do escritório" : context.subtitle}…`}
-            onCancel={chat.cancel}
-            className="pl-10"
-          />
-        )}
-        {chat.error && <AIErrorNotice error={chat.error} onRetry={chat.retry} />}
-        <div ref={endRef} className={cn(chat.messages.length ? "h-1" : "h-0")} />
-      </div>
+          {chat.messages.map((message) =>
+            message.role === "user" ? (
+              <div key={message.id} className="flex justify-end animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+                <p className="max-w-[85%] rounded-[14px] rounded-br-[4px] bg-surface-muted px-3.5 py-2.5 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
+                  {message.content}
+                </p>
+              </div>
+            ) : (
+              <div key={message.id} className="flex gap-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+                <AIMark className="size-7 rounded-[8px] [&_svg]:size-3.5" />
+                <div className="min-w-0 flex-1 space-y-2.5">
+                  <AIMarkdown text={message.content} sources={message.sources ?? {}} onOpen={onOpenSource} />
+                  <AIWarnings warnings={message.warnings ?? []} />
+                  <AnswerActions entry={message} context={context} />
+                </div>
+              </div>
+            ),
+          )}
+
+          {chat.pending && (
+            <AIThinking
+              label={`Lendo ${context.scope.type === "office" ? "os dados do escritório" : context.subtitle}…`}
+              onCancel={chat.cancel}
+              className="pl-10"
+            />
+          )}
+          {chat.error && <AIErrorNotice error={chat.error} onRetry={chat.retry} />}
+          <div ref={endRef} className={cn(chat.messages.length ? "h-1" : "h-0")} />
+        </div>
+      )}
     </SideSheet>
   )
 }

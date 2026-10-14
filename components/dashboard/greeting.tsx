@@ -15,7 +15,8 @@ const piece = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : 
 function statusLine(signals: AttentionSignal[], empty: boolean) {
   if (empty) return "Seu escritório está pronto. Comece cadastrando um cliente ou consultando um processo."
   const { critical, warning } = countByLevel(signals)
-  if (critical && warning) return `${piece(critical, "ponto precisa de atenção hoje", "pontos precisam de atenção hoje")} · ${piece(warning, "para verificar", "para verificar")}`
+  if (critical && warning)
+    return `${piece(critical, "ponto precisa de atenção hoje", "pontos precisam de atenção hoje")} · ${piece(warning, "para verificar", "para verificar")}`
   if (critical) return piece(critical, "ponto precisa de atenção hoje", "pontos precisam de atenção hoje")
   if (warning) return `Nada urgente · ${piece(warning, "ponto para verificar", "pontos para verificar")}`
   return "Tudo em dia no escritório"
@@ -29,8 +30,8 @@ export function Greeting({ signals, empty = false }: { signals: AttentionSignal[
       <div className="min-w-0">
         {/* O painel só renderiza depois da hidratação, então a data do navegador é segura aqui. */}
         <p className="text-[11.5px] font-medium tracking-[0.12em] text-muted-foreground uppercase">{fmtFullDate(getNow())}</p>
-        <h1 className="mt-2.5 font-display text-[30px] leading-[1.1] font-semibold tracking-[-0.03em] text-foreground sm:text-[36px]">
-          {greeting()}, <span className="text-gold">{user.firstName}</span>.
+        <h1 className="mt-2.5 text-[28px] leading-[1.15] font-semibold tracking-[-0.025em] text-foreground sm:text-[32px]">
+          {greeting()}, {user.firstName}.
         </h1>
         <p className="mt-2 text-[15px] text-muted-foreground">{statusLine(signals, empty)}</p>
       </div>

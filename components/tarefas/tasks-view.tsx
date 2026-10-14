@@ -206,7 +206,7 @@ export function TasksView() {
                   onClick={() => setView(v.value)}
                   className={cn(
                     "flex h-8 items-center gap-1.5 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                    view === v.value ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                    view === v.value ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {v.icon} {v.label}
@@ -223,7 +223,7 @@ export function TasksView() {
                   onClick={() => setScope(s)}
                   className={cn(
                     "h-8 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                    scope === s ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                    scope === s ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {s === "minhas" ? "Minhas" : "Escritório"}

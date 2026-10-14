@@ -131,6 +131,11 @@ describe("openTasksByTab e overdueInvoices", () => {
       ["atrasada", "hoje", "amanha"],
     )
     assert.deepEqual([tabs.atrasadas.length, tabs.hoje.length, tabs.amanha.length], [1, 1, 1])
+    // "Esta semana": de hoje até domingo, sem as atrasadas.
+    assert.deepEqual(
+      tabs.semana.map((t) => t.id),
+      ["hoje", "amanha"],
+    )
   })
 
   it("lista parcelas vencidas da mais antiga para a mais nova", () => {

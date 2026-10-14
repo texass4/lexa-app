@@ -5,7 +5,9 @@ import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "cn"
 import { Greeting } from "./greeting"
 import { InsightBanner } from "./insight-banner"
-import { KpiStrip } from "./kpi-cards"
+import { KpiCards } from "./kpi-cards"
+import { RecentProcesses } from "./recent-processes"
+import { QuickViews } from "./quick-views"
 import { RecentMovements } from "./recent-movements"
 import { TodayAgenda } from "./today-agenda"
 import { OpenTasks } from "./open-tasks"
@@ -62,13 +64,13 @@ function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React
 export function DashboardView() {
   const data = useOfficeData()
   const { can, user } = useSession()
-  // A lista do que merece atenção começa aberta: é a resposta principal do Painel.
-  // Quem fechar, encontra fechada da próxima vez.
+  // A lista do que merece atenção começa fechada (os cartões abaixo já mostram agenda,
+  // tarefas e prazos); quem abrir, encontra aberta da próxima vez.
   const [insights, setInsights] = React.useState(() => {
     try {
-      return localStorage.getItem(INSIGHTS_KEY) !== "0"
+      return localStorage.getItem(INSIGHTS_KEY) === "1"
     } catch {
-      return true
+      return false
     }
   })
   if (!data.hydrated) return <DashboardSkeleton />
@@ -93,7 +95,7 @@ export function DashboardView() {
 
       {!empty && (
         <FadeIn delay={0.02}>
-          <KpiStrip />
+          <KpiCards />
         </FadeIn>
       )}
 
@@ -115,9 +117,10 @@ export function DashboardView() {
         </AnimatePresence>
       </FadeIn>
 
-      {/* Do mais urgente ao contexto: prazos e agenda, trabalho do dia, depois o que mudou. */}
-      <Row left={can("processes.view") && <WeekPrazos />} right={can("agenda.view") && <TodayAgenda />} delay={0.08} />
-      <Row left={can("tasks.view") && <OpenTasks />} right={can("finance.view") && <FinancePanel />} delay={0.12} />
+      {/* Do mais urgente ao contexto: agenda e tarefas do dia, processos, prazos e dinheiro, depois o que mudou. */}
+      <Row left={can("agenda.view") && <TodayAgenda />} right={can("tasks.view") && <OpenTasks />} delay={0.08} />
+      <Row left={can("processes.view") && <RecentProcesses />} right={<QuickViews />} delay={0.1} />
+      <Row left={can("processes.view") && <WeekPrazos />} right={can("finance.view") && <FinancePanel />} delay={0.12} />
       <Row left={can("processes.view") && <RecentMovements />} right={<RecentActivity />} delay={0.16} />
     </div>
   )

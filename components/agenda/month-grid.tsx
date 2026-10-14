@@ -81,7 +81,7 @@ export function MonthGrid({
                 aria-label={`Ver dia ${d.getDate()}`}
                 className={cn(
                   "touch-target relative tabular mb-1 flex size-7 items-center justify-center rounded-full text-[12.5px] font-medium outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/40 max-sm:mx-auto",
-                  today ? "bg-foreground text-background hover:bg-foreground" : inMonth ? "text-foreground" : "text-subtle",
+                  today ? "bg-brand text-brand-foreground hover:bg-brand-strong" : inMonth ? "text-foreground" : "text-subtle",
                 )}
               >
                 {d.getDate()}

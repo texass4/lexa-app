@@ -28,14 +28,9 @@ export interface NavItem {
 
 const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
-    label: "Visão geral",
-    items: [{ href: "/dashboard", label: "Início", icon: LayoutGrid }],
-  },
-  {
-    label: "Escritório",
+    label: "Trabalho",
     items: [
-      { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
-      { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
+      { href: "/dashboard", label: "Início", icon: LayoutGrid },
       {
         href: "/processos",
         label: "Processos",
@@ -43,6 +38,8 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         badgeKey: "processes",
         permission: "processes.view",
       },
+      { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
+      { href: "/agenda", label: "Agenda", icon: CalendarDays, badgeKey: "agenda", permission: "agenda.view" },
       {
         href: "/tarefas",
         label: "Tarefas",
@@ -51,14 +48,9 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         permission: "tasks.view",
         children: [{ href: "/tarefas/prazos", label: "Prazos", icon: Hourglass, badgeKey: "prazos", permission: "processes.view" }],
       },
-      { href: "/agenda", label: "Agenda", icon: CalendarDays, badgeKey: "agenda", permission: "agenda.view" },
-      { href: "/jurisprudencia", label: "Jurisprudência", icon: BookOpenText, permission: "processes.view" },
-    ],
-  },
-  {
-    label: "Gestão",
-    items: [
       { href: "/documentos", label: "Documentos", icon: FolderOpen, permission: "documents.view" },
+      { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
+      { href: "/jurisprudencia", label: "Jurisprudência", icon: BookOpenText, permission: "processes.view" },
       { href: "/financeiro", label: "Financeiro", icon: Wallet, permission: "finance.view" },
     ],
   },
@@ -66,6 +58,25 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     label: "Sistema",
     items: [{ href: "/configuracoes", label: "Configurações", icon: Settings }],
   },
+]
+
+/**
+ * Atalhos da barra lateral: listas reais já filtradas (os filtros por URL existem nas telas).
+ * O número ao lado é calculado com os dados do escritório (`SidebarShortcuts`).
+ */
+export interface Shortcut {
+  href: string
+  label: string
+  icon: LucideIcon
+  permission: Permission
+  countKey: "prazosSemana" | "tarefasHoje" | "processosPrazo" | "documentos"
+}
+
+export const SHORTCUTS: Shortcut[] = [
+  { href: "/tarefas?filtro=hoje", label: "Tarefas de hoje", icon: ListChecks, permission: "tasks.view", countKey: "tarefasHoje" },
+  { href: "/tarefas/prazos?filtro=semana", label: "Prazos da semana", icon: Hourglass, permission: "processes.view", countKey: "prazosSemana" },
+  { href: "/processos?filtro=prazos", label: "Processos com prazo", icon: Scale, permission: "processes.view", countKey: "processosPrazo" },
+  { href: "/documentos?pasta=recentes", label: "Documentos recentes", icon: FolderOpen, permission: "documents.view", countKey: "documentos" },
 ]
 
 export const ROUTE_META: Record<string, { title: string; section: string }> = {

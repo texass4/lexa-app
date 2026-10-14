@@ -70,7 +70,7 @@ function Stepper({ current }: { current: number }) {
           <span
             className={cn(
               "flex size-5 items-center justify-center rounded-full text-[11px] font-semibold",
-              i < current ? "bg-success text-white" : i === current ? "bg-foreground text-background" : "bg-surface-muted text-subtle",
+              i < current ? "bg-success text-white" : i === current ? "bg-brand text-brand-foreground" : "bg-surface-muted text-subtle",
             )}
           >
             {i + 1}

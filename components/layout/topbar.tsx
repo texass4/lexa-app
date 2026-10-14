@@ -7,6 +7,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { Logo } from "@/components/brand/logo"
 import { NewMenu } from "./new-menu"
 import { NotificationsMenu } from "./notifications-menu"
+import { HelpMenu } from "./help-menu"
 import { LexaTrigger } from "@/components/ai/lexa-trigger"
 import { UserMenu } from "./user-menu"
 import { ROUTE_META } from "./nav-config"
@@ -42,8 +43,8 @@ export function Topbar() {
   const isMac = useIsMac()
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
-      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:gap-5 lg:px-8 xl:px-10">
+    <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur-md supports-[backdrop-filter]:bg-surface/80">
+      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:gap-5 lg:px-8">
         {/* Mobile: menu + logo */}
         <button
           type="button"
@@ -75,10 +76,10 @@ export function Topbar() {
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="group hidden h-11 min-w-[200px] max-w-[560px] flex-1 items-center gap-2.5 rounded-[12px] border border-border/90 bg-surface px-4 text-[13.5px] text-subtle shadow-xs outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex"
+            className="group hidden h-11 min-w-[200px] max-w-[600px] flex-1 items-center gap-2.5 rounded-control border border-border bg-background px-4 text-[14px] text-subtle outline-none transition-[border-color,background-color] hover:border-border-strong hover:bg-surface hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex"
           >
             <Search className="size-[17px] text-muted-foreground" strokeWidth={1.8} />
-            <span className="flex-1 truncate text-left">Buscar cliente, processo, documento…</span>
+            <span className="flex-1 truncate text-left">Pesquisar processos, clientes, documentos e tarefas…</span>
             <span className="flex items-center gap-0.5">
               <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
               <Kbd>K</Kbd>
@@ -98,6 +99,9 @@ export function Topbar() {
           </button>
           <LexaTrigger />
           <NotificationsMenu />
+          <div className="hidden sm:block">
+            <HelpMenu />
+          </div>
           <div className="mx-1.5 hidden h-7 w-px bg-border md:block" aria-hidden />
           <div className="hidden md:block">
             <UserMenu variant="header" />

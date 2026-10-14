@@ -16,7 +16,8 @@ import { Can, useSession } from "@/lib/auth/session"
 import { getUser } from "@/lib/auth/account"
 import { describeRelated, taskBucket, type TaskBucket } from "@/lib/store/selectors"
 import { fmtDayMonth, getNow } from "@/lib/core/dates"
-import type { TaskTab } from "@/lib/dashboard/dashboard"
+import { inTaskTab, type TaskTab } from "@/lib/dashboard/dashboard"
+import { ChipTabs } from "./chip-tabs"
 import type { Task } from "@/types"
 import { PanelLink } from "./panel-link"
 
@@ -25,6 +26,7 @@ const TABS: { value: TaskTab; label: string }[] = [
   { value: "atrasadas", label: "Atrasadas" },
   { value: "hoje", label: "Hoje" },
   { value: "amanha", label: "Amanhã" },
+  { value: "semana", label: "Esta semana" },
 ]
 const VISIBLE = 5
 
@@ -41,12 +43,13 @@ function OpenTaskRow({ task }: { task: Task }) {
   const editable = useSession().can("tasks.edit")
   const related = describeRelated(data, task.related)
   const done = task.status === "concluida"
+  const assignee = getUser(task.assigneeId)
   const badge = dueBadge(taskBucket({ ...task, status: "pendente" }), task.dueAt)
   return (
     <motion.li
       layout="position"
       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className="group flex items-center gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-accent/70"
+      className="group flex items-center gap-3 rounded-[10px] px-3 py-2 transition-colors hover:bg-accent/70"
     >
       <AnimatedCheckbox
         checked={done}
@@ -54,20 +57,25 @@ function OpenTaskRow({ task }: { task: Task }) {
         disabled={!editable}
         label={done ? `Reabrir: ${task.title}` : `Concluir: ${task.title}`}
       />
-      <span className={cn("min-w-0 flex-1 text-[13.5px] font-medium max-sm:line-clamp-2 sm:truncate", done ? "text-subtle line-through" : "text-foreground")}>
-        {task.title}
-      </span>
-      <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11.5px] font-medium", badge.cls, done && "opacity-40")}>{badge.label}</span>
-      <span className="hidden w-[150px] shrink-0 overflow-x-clip text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground md:block">
-        {related ? (
-          <Link href={related.href} className="touch-target relative outline-none hover:text-foreground hover:underline focus-visible:underline">
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn("block text-[13.5px] font-medium max-sm:line-clamp-2 sm:truncate", done ? "text-subtle line-through" : "text-foreground")}
+        >
+          {task.title}
+        </span>
+        {related && (
+          <Link
+            href={related.href}
+            className="touch-target relative block truncate text-[12px] text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:underline"
+          >
             {related.label}
           </Link>
-        ) : (
-          "—"
         )}
       </span>
-      <UserAvatar name={getUser(task.assigneeId).name} size="xs" className="max-sm:hidden" />
+      <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", badge.cls, done && "opacity-40")}>{badge.label}</span>
+      <span title={assignee.name} className="max-sm:hidden">
+        <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="sm" />
+      </span>
       <Link
         href={related?.href ?? "/tarefas"}
         aria-label={`Abrir ${task.title}`}
@@ -94,23 +102,28 @@ export function OpenTasks() {
     .map((id) => tasks.find((t) => t.id === id))
     .filter((t): t is Task => !!t && (!mine || t.assigneeId === user.id))
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
-  const bucketOf = (t: Task) => taskBucket({ ...t, status: "pendente" }, now)
-  const byTab: Record<TaskTab, Task[]> = {
-    todas: list,
-    atrasadas: list.filter((t) => bucketOf(t) === "atrasadas"),
-    hoje: list.filter((t) => bucketOf(t) === "hoje"),
-    amanha: list.filter((t) => bucketOf(t) === "amanha"),
-  }
+  const byTab = Object.fromEntries(TABS.map(({ value }) => [value, list.filter((t) => inTaskTab(t, value, now))])) as Record<TaskTab, Task[]>
   const shown = byTab[tab].slice(0, VISIBLE)
   const pendingCount = (items: Task[]) => items.filter((t) => t.status === "pendente").length
 
   return (
     <Panel className="flex flex-col">
       <PanelHeader
-        title="Tarefas em aberto"
+        title="Tarefas"
         icon={<ListChecks />}
         action={
           <>
+            <button
+              type="button"
+              aria-pressed={mine}
+              onClick={() => setMine((v) => !v)}
+              className={cn(
+                "touch-target relative h-8 shrink-0 rounded-full border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                mine ? "border-brand/30 bg-brand-soft text-brand-strong" : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Só minhas
+            </button>
             <Can permission="tasks.edit">
               <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task")}>
                 <Plus />
@@ -120,46 +133,14 @@ export function OpenTasks() {
           </>
         }
       />
-      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-2 sm:px-6">
-        <div role="tablist" aria-label="Filtrar tarefas" className="flex flex-wrap gap-1">
-          {TABS.map((t) => {
-            const active = t.value === tab
-            return (
-              <button
-                key={t.value}
-                role="tab"
-                type="button"
-                aria-selected={active}
-                onClick={() => setTab(t.value)}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                  active ? "border-border bg-surface-muted text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {t.label}
-                <span
-                  className={cn(
-                    "tabular rounded-full px-1.5 text-[10.5px] font-semibold",
-                    active ? "bg-primary text-primary-foreground" : "bg-surface-muted text-muted-foreground",
-                  )}
-                >
-                  {pendingCount(byTab[t.value])}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-        <button
-          type="button"
-          aria-pressed={mine}
-          onClick={() => setMine((v) => !v)}
-          className={cn(
-            "touch-target relative h-7 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-            mine ? "border-brand/30 bg-brand-soft text-brand-strong" : "border-border text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Só minhas
-        </button>
+      <div className="px-5 pb-2 sm:px-6">
+        <ChipTabs
+          ariaLabel="Filtrar tarefas"
+          className="min-w-0"
+          value={tab}
+          onChange={setTab}
+          tabs={TABS.map((t) => ({ ...t, count: pendingCount(byTab[t.value]) }))}
+        />
       </div>
       {shown.length ? (
         <ul className="px-2 pb-3 sm:px-3">

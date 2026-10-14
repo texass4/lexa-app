@@ -88,7 +88,7 @@ export function TimeGrid({
               <span
                 className={cn(
                   "tabular flex size-7 items-center justify-center rounded-full text-[14px] font-semibold",
-                  today ? "bg-foreground text-background" : "text-foreground",
+                  today ? "bg-brand text-brand-foreground" : "text-foreground",
                 )}
               >
                 {d.getDate()}

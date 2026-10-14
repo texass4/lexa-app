@@ -96,7 +96,15 @@ export function officeDigest(data: Pick<DashboardData, "processes" | "deadlines"
 
 /* -------------------------------- Tarefas --------------------------------- */
 
-export type TaskTab = "todas" | "atrasadas" | "hoje" | "amanha"
+export type TaskTab = "todas" | "atrasadas" | "hoje" | "amanha" | "semana"
+
+/** Aba de uma tarefa em aberto. "Esta semana" vai de hoje até domingo (as atrasadas ficam na própria aba). */
+export function inTaskTab(task: Task, tab: TaskTab, now: Date = getNow()) {
+  const bucket = taskBucket({ ...task, status: "pendente" }, now)
+  if (tab === "todas") return true
+  if (tab === "semana") return bucket === "hoje" || bucket === "amanha" || bucket === "semana"
+  return bucket === tab
+}
 
 /** Tarefas em aberto por aba, das mais urgentes para as mais distantes. */
 export function openTasksByTab(tasks: Task[], now: Date = getNow()): Record<TaskTab, Task[]> {
@@ -106,6 +114,7 @@ export function openTasksByTab(tasks: Task[], now: Date = getNow()): Record<Task
     atrasadas: pending.filter((t) => taskBucket(t, now) === "atrasadas"),
     hoje: pending.filter((t) => taskBucket(t, now) === "hoje"),
     amanha: pending.filter((t) => taskBucket(t, now) === "amanha"),
+    semana: pending.filter((t) => inTaskTab(t, "semana", now)),
   }
 }
 

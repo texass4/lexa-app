@@ -7,11 +7,24 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* Títulos de página: mesma família da marca (Geist), em peso semibold. */
-  --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Títulos de página: Inter semibold (a marca continua no logotipo, desenhado em curvas). */
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /*
+   * Escala tipográfica da interface (redesign): título de página 26/28, seção 16, cartão 14,
+   * corpo 14, metadado 12, rótulo de status 11.5. Use as utilidades `text-page-title` etc.
+   */
+  --text-page-title: 1.625rem;
+  --text-page-title--line-height: 2rem;
+  --text-section: 1rem;
+  --text-section--line-height: 1.5rem;
+  --text-card-title: 0.875rem;
+  --text-card-title--line-height: 1.25rem;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1rem;
 
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
@@ -53,6 +66,7 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-highlight: var(--sidebar-highlight);
+  --color-sidebar-active: var(--sidebar-active);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -76,8 +90,8 @@
   --radius-2xl: calc(var(--radius) * 1.8);
 
   /* Superfícies: cartões, controles e pílulas. */
-  --radius-card: 16px;
-  --radius-control: 10px;
+  --radius-card: 12px;
+  --radius-control: 8px;
 
   --shadow-xs: var(--elevation-xs);
   --shadow-card: var(--elevation-card);
@@ -86,152 +100,155 @@
 }
 
 /*
- * Identidade Íntegra.
- * Marinho profundo como cor estrutural (barra lateral, títulos, botão principal),
- * conteúdo em off-white com cartões brancos, azul para ação e foco, dourado só em
- * pequenos acentos (marca, saudação, item ativo). Verde = positivo, vermelho =
- * alerta. As cores semânticas ficam discretas para não competir com a marca.
+ * Identidade Íntegra (redesign 2026 — docs/design/redesign-inventory.md).
+ * Fundo claro (#F8FAFC), superfícies brancas e bordas discretas (#E2E8F0). Azul
+ * profundo (#10263D) estrutura textos e títulos; azul de ação (#2563EB) só no que é
+ * interativo (botões, links, foco, item ativo). Verde petróleo = sucesso, âmbar =
+ * atenção, vermelho = urgente — sempre com texto ou ícone junto, nunca só a cor.
+ * O dourado fica restrito à marca (símbolo e acento do "Í").
  */
 :root {
-  --elevation-xs: 0 1px 2px 0 rgb(16 24 40 / 0.04);
-  --elevation-card: 0 1px 2px 0 rgb(16 24 40 / 0.035), 0 6px 18px -10px rgb(16 24 40 / 0.07);
-  --elevation-float: 0 18px 44px -18px rgb(16 24 40 / 0.26), 0 3px 8px -3px rgb(16 24 40 / 0.07);
-  --radius: 0.625rem;
+  --elevation-xs: 0 1px 2px 0 rgb(16 38 61 / 0.04);
+  --elevation-card: 0 1px 2px 0 rgb(16 38 61 / 0.04), 0 1px 3px -1px rgb(16 38 61 / 0.04);
+  --elevation-float: 0 16px 40px -16px rgb(16 38 61 / 0.22), 0 3px 8px -3px rgb(16 38 61 / 0.08);
+  --radius: 0.5rem;
 
-  --navy: #0f2446;
+  --navy: #10263d;
   --gold: #b08a4c;
   --gold-strong: #8a6a32;
   --gold-soft: #f7f1e6;
 
-  --background: #f5f6f8;
-  --foreground: #0f1b2d;
+  --background: #f8fafc;
+  --foreground: #10263d;
   --surface: #ffffff;
-  --surface-muted: #f1f3f6;
-  --subtle: #8e98a8;
-  --border-strong: #d3d8e0;
+  --surface-muted: #f1f5f9;
+  --subtle: #7b8a9e;
+  --border-strong: #cbd5e1;
 
   --card: #ffffff;
-  --card-foreground: #0f1b2d;
+  --card-foreground: #10263d;
   --popover: #ffffff;
-  --popover-foreground: #0f1b2d;
-  --primary: #0f2446;
+  --popover-foreground: #10263d;
+  --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --secondary: #f1f3f6;
-  --secondary-foreground: #0f1b2d;
-  --muted: #f1f3f6;
-  --muted-foreground: #5d6879;
-  --accent: #eef1f5;
-  --accent-foreground: #0f1b2d;
-  --destructive: #c0392f;
-  --border: #e5e8ee;
-  --input: #dde2e9;
-  --ring: #2b57c4;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #10263d;
+  --muted: #f1f5f9;
+  --muted-foreground: #526379;
+  --accent: #f1f5f9;
+  --accent-foreground: #10263d;
+  --destructive: #b42318;
+  --border: #e2e8f0;
+  --input: #d5dde8;
+  --ring: #2563eb;
 
-  --brand: #2b57c4;
-  --brand-strong: #1f449e;
-  --brand-soft: #eef3fd;
+  --brand: #2563eb;
+  --brand-strong: #1d4ed8;
+  --brand-soft: #eff4ff;
   --brand-foreground: #ffffff;
 
-  --success: #19805a;
-  --success-soft: #e9f6ef;
-  --warning: #a8661c;
-  --warning-soft: #fbf2e4;
-  --danger: #c0392f;
-  --danger-soft: #fcecea;
-  --info: #127184;
-  --info-soft: #e7f4f6;
-  --violet: #6553a6;
-  --violet-soft: #f2f0f9;
+  --success: #0f766e;
+  --success-soft: #e7f5f3;
+  --warning: #b45309;
+  --warning-soft: #fdf3e3;
+  --danger: #b42318;
+  --danger-soft: #fdeceb;
+  --info: #0e7490;
+  --info-soft: #e7f5f9;
+  --violet: #6d4fc2;
+  --violet-soft: #f2effc;
 
-  /* Barra lateral: marinho nos dois temas, como na identidade da Íntegra. */
-  --sidebar: #0b1526;
-  --sidebar-foreground: #eef1f6;
-  --sidebar-muted: #a3aec0;
-  --sidebar-accent: rgb(255 255 255 / 0.07);
-  --sidebar-border: rgb(255 255 255 / 0.08);
-  --sidebar-ring: #d6b97f;
-  --sidebar-highlight: #d6b97f;
+  /* Barra lateral clara: mesma superfície do conteúdo, item ativo em azul de ação. */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #10263d;
+  --sidebar-muted: #4b5b70;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #2563eb;
+  --sidebar-highlight: #2563eb;
+  --sidebar-active: #eff4ff;
 
-  /* Marca (components/brand/logo.tsx): versão escura para fundos claros. */
-  --logo-tile: #0f2446;
+  /* Marca (components/brand/logo.tsx): versão para fundos claros. */
+  --logo-tile: #10263d;
   --logo-glyph: #d6b97f;
   --logo-accent: #efdcb4;
-  --logo-text: #0f2446;
+  --logo-text: #10263d;
   --logo-text-accent: #b08a4c;
 
-  /* Íntegra Admin: mesma barra marinho do CRM, para os dois parecerem um produto só. */
-  --admin-rail: #0b1526;
-  --admin-rail-foreground: #eef1f6;
-  --admin-rail-muted: #a3aec0;
-  --admin-rail-subtle: #7f8ba0;
-  --admin-rail-accent: rgb(255 255 255 / 0.07);
-  --admin-rail-border: rgb(255 255 255 / 0.08);
-  --admin-rail-highlight: #d6b97f;
+  /* Íntegra Admin: trilho escuro próprio, para distinguir a área da plataforma. */
+  --admin-rail: #10263d;
+  --admin-rail-foreground: #eef2f7;
+  --admin-rail-muted: #a7b4c6;
+  --admin-rail-subtle: #8090a6;
+  --admin-rail-accent: rgb(255 255 255 / 0.08);
+  --admin-rail-border: rgb(255 255 255 / 0.09);
+  --admin-rail-highlight: #93b4fb;
 }
 
 .dark {
-  --admin-rail: #08111f;
+  --admin-rail: #0a1624;
   --admin-rail-foreground: #e6ebf3;
   --admin-rail-muted: #96a2b6;
   --admin-rail-subtle: #6f7d95;
   --admin-rail-accent: rgb(255 255 255 / 0.06);
   --admin-rail-border: rgb(255 255 255 / 0.07);
-  --admin-rail-highlight: #d6b97f;
+  --admin-rail-highlight: #93b4fb;
 
-  --navy: #0f2446;
+  --navy: #10263d;
   --gold: #d6b97f;
   --gold-strong: #e4cc9c;
   --gold-soft: #2a2316;
 
-  --background: #121820;
-  --foreground: #e7ebf1;
-  --surface: #1a2230;
-  --surface-muted: #202838;
-  --subtle: #7d8b9e;
-  --border-strong: #3d4a5f;
+  --background: #0b1522;
+  --foreground: #e6ecf4;
+  --surface: #111e2e;
+  --surface-muted: #172638;
+  --subtle: #7f8ea3;
+  --border-strong: #34465d;
 
-  --card: #1a2230;
-  --card-foreground: #e7ebf1;
-  --popover: #1c2534;
-  --popover-foreground: #e7ebf1;
-  --primary: #e7ebf1;
-  --primary-foreground: #121820;
-  --secondary: #242d3e;
-  --secondary-foreground: #e7ebf1;
-  --muted: #242d3e;
-  --muted-foreground: #a3adbd;
-  --accent: #283246;
-  --accent-foreground: #e7ebf1;
-  --destructive: #e0776c;
-  --border: #2c3648;
-  --input: #354156;
-  --ring: #7fa3f5;
+  --card: #111e2e;
+  --card-foreground: #e6ecf4;
+  --popover: #142335;
+  --popover-foreground: #e6ecf4;
+  --primary: #4f86f7;
+  --primary-foreground: #ffffff;
+  --secondary: #1b2b3f;
+  --secondary-foreground: #e6ecf4;
+  --muted: #1b2b3f;
+  --muted-foreground: #a3b0c2;
+  --accent: #1d2e43;
+  --accent-foreground: #e6ecf4;
+  --destructive: #f0857a;
+  --border: #233449;
+  --input: #2d4058;
+  --ring: #6d9bf9;
 
-  --brand: #7fa3f5;
-  --brand-strong: #a9c2fa;
-  --brand-soft: #152241;
-  --brand-foreground: #0b1322;
+  --brand: #6d9bf9;
+  --brand-strong: #9dbcfb;
+  --brand-soft: #14243f;
+  --brand-foreground: #0b1522;
 
-  --success: #6fc093;
-  --success-soft: #11241a;
-  --warning: #d9ae5f;
-  --warning-soft: #2a2213;
-  --danger: #ec8a80;
-  --danger-soft: #2e1717;
-  --info: #6fb7cf;
-  --info-soft: #0f2530;
-  --violet: #aa9de0;
-  --violet-soft: #1e1a30;
+  --success: #5fc2b4;
+  --success-soft: #0f2623;
+  --warning: #e3a560;
+  --warning-soft: #2b2012;
+  --danger: #f0857a;
+  --danger-soft: #2f1717;
+  --info: #67bfd6;
+  --info-soft: #0e2530;
+  --violet: #ac9ae6;
+  --violet-soft: #1e1a33;
 
-  --sidebar: #08111f;
-  --sidebar-foreground: #e6ebf3;
-  --sidebar-muted: #96a2b6;
-  --sidebar-accent: rgb(255 255 255 / 0.06);
-  --sidebar-border: rgb(255 255 255 / 0.07);
-  --sidebar-ring: #d6b97f;
-  --sidebar-highlight: #d6b97f;
+  --sidebar: #0e1a29;
+  --sidebar-foreground: #e6ecf4;
+  --sidebar-muted: #9aa8bb;
+  --sidebar-accent: rgb(255 255 255 / 0.05);
+  --sidebar-border: #1f2f43;
+  --sidebar-ring: #6d9bf9;
+  --sidebar-highlight: #9dbcfb;
+  --sidebar-active: #14243f;
   --elevation-xs: 0 1px 2px 0 rgb(0 0 0 / 0.28);
-  --elevation-card: 0 1px 2px 0 rgb(0 0 0 / 0.32), 0 0 0 1px rgb(255 255 255 / 0.03);
+  --elevation-card: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.02);
   --elevation-float: 0 16px 40px -16px rgb(0 0 0 / 0.55), 0 2px 8px -2px rgb(0 0 0 / 0.35);
 }
 
@@ -256,7 +273,8 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "ss01", "cv11";
+    /* Inter: "1" e "l" distintos (cv05, ss02 não), zero sem barra; números proporcionais por padrão. */
+    font-feature-settings: "cv11";
   }
   ::selection {
     background: color-mix(in oklab, var(--brand) 22%, transparent);
@@ -378,25 +396,23 @@
 }
 
 @layer utilities {
-  /* Barra lateral marinho, com um leve brilho dourado no rodapé. */
+  /* Barra lateral: superfície própria com a divisória à direita (clara no tema claro). */
   .sidebar-surface {
-    background:
-      radial-gradient(140% 45% at 0% 100%, rgb(214 185 127 / 0.07), transparent 70%),
-      linear-gradient(180deg, color-mix(in oklab, var(--sidebar) 92%, #1d3456) 0%, var(--sidebar) 45%);
+    background: var(--sidebar);
     box-shadow: inset -1px 0 0 var(--sidebar-border);
   }
-  /* Áreas da Íntegra IA: cartão com um véu azul suave, como um painel de vidro. */
-  .ai-surface {
-    background:
-      radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, var(--brand) 9%, transparent), transparent 55%),
-      linear-gradient(120deg, var(--card) 40%, color-mix(in oklab, var(--brand-soft) 70%, var(--card)) 100%);
+  /* Trilho do Admin: escuro nos dois temas, para a área da plataforma não se confundir com o escritório. */
+  .admin-rail-surface {
+    background: var(--admin-rail);
+    box-shadow: inset -1px 0 0 var(--admin-rail-border);
   }
-  /* Faixa de resumo do Painel: azul-acinzentado claro com um brilho dourado discreto. */
+  /* Áreas da Íntegra IA: superfície com um leve tom azul, para separar do conteúdo. */
+  .ai-surface {
+    background: linear-gradient(180deg, color-mix(in oklab, var(--brand-soft) 55%, var(--card)) 0%, var(--card) 100%);
+  }
+  /* Faixa de resumo: azul muito claro, sem efeito decorativo. */
   .insight-banner {
-    background:
-      radial-gradient(60% 120% at 85% 120%, rgb(214 185 127 / 0.22), transparent 60%),
-      radial-gradient(70% 140% at 0% 0%, color-mix(in oklab, var(--brand) 8%, transparent), transparent 60%),
-      linear-gradient(110deg, color-mix(in oklab, var(--brand-soft) 75%, var(--card)) 0%, color-mix(in oklab, var(--surface-muted) 80%, var(--card)) 55%, color-mix(in oklab, var(--gold-soft) 70%, var(--card)) 100%);
+    background: linear-gradient(110deg, color-mix(in oklab, var(--brand-soft) 80%, var(--card)) 0%, var(--card) 100%);
   }
   /* Rodapé da barra lateral: colunas clássicas esmaecendo no marinho (public/brand/sidebar-columns.webp). */
   .sidebar-columns {

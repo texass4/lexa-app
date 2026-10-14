@@ -20,13 +20,13 @@ export function AgendaList({ days, events, onSelect }: { days: Date[]; events: A
               <span
                 className={cn(
                   "tabular flex size-8 items-center justify-center rounded-full text-[14px] font-semibold",
-                  today ? "bg-foreground text-background" : "bg-surface-muted text-foreground",
+                  today ? "bg-brand text-brand-foreground" : "bg-surface-muted text-foreground",
                 )}
               >
                 {d.getDate()}
               </span>
               <span className="text-[13px] font-semibold capitalize">{today ? "Hoje" : weekdayName(d.getDay())}</span>
-              <span className="text-[12px] text-subtle">{items.length ? `${items.length} compromissos` : "Livre"}</span>
+              <span className="text-[12px] text-subtle">{items.length ? `${items.length} compromisso${items.length === 1 ? "" : "s"}` : "Livre"}</span>
             </header>
             {items.length > 0 && (
               <ul className="overflow-hidden rounded-card border border-border/90 bg-card shadow-card">

@@ -249,7 +249,12 @@ export function ProcessesView() {
                         <Td>
                           <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                         </Td>
-                        <Td className="text-muted-foreground">{owner.firstName}</Td>
+                        <Td>
+                          <span className="flex items-center gap-2 text-muted-foreground">
+                            <UserAvatar name={owner.name} src={owner.avatarUrl} size="xs" />
+                            {owner.firstName}
+                          </span>
+                        </Td>
                         <Td>
                           <DeadlineLabel date={nextOf.get(p.id)?.fatalDate} />
                         </Td>
