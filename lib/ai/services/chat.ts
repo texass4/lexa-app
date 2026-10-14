@@ -22,8 +22,8 @@ import type { Process } from "@/types"
 import { sanitizeAIContext } from "@/lib/ai/context/sanitize"
 import type { BuiltContext } from "@/lib/ai/context/shared"
 import { buildSystemPrompt } from "@/lib/ai/prompts/system"
-import { CHAT_SCOPE_LABEL, CHAT_TASK } from "@/lib/ai/prompts/tasks"
-import { CHAT_LIMITS, type AIMessage, type AIResult, type ChatReply, type ChatScope } from "@/lib/ai/types"
+import { CHAT_MODE_LABEL, CHAT_SCOPE_LABEL, CHAT_TASK } from "@/lib/ai/prompts/tasks"
+import { CHAT_LIMITS, type AIMessage, type AIResult, type ChatMode, type ChatReply, type ChatScope } from "@/lib/ai/types"
 import { meteredCall } from "@/lib/ai/metering"
 import { citedSources, nowOf, track, type AIServiceDeps } from "./run"
 
@@ -79,11 +79,12 @@ export const CHAT_JURISPRUDENCE_RESULTS = 5
  * - pergunta sobre "salvas": as salvas pelo escritório.
  * A pesquisa é no banco (barata); o modelo nunca é a fonte.
  */
-async function jurisprudenceFor(deps: AIServiceDeps, scope: ChatScope, question: string, ctx: ScopeContext): Promise<ChatJurisprudence> {
+async function jurisprudenceFor(deps: AIServiceDeps, question: string, ctx: Partial<ScopeContext>, { always = false } = {}): Promise<ChatJurisprudence> {
   const out: ChatJurisprudence = {}
   if (!deps.repo.can("processes.view")) return out
   if (ctx.process) out.linked = await deps.repo.linkedJurisprudence(ctx.process.id).catch(() => [])
-  if (!asksForJurisprudence(question)) return out
+  // Modo Jurisprudência: pesquisa a cada pergunta. Senão, só quando a pergunta pede decisões.
+  if (!always && !asksForJurisprudence(question)) return out
   if (asksForSaved(question)) {
     out.saved = await deps.repo.savedJurisprudence(10).catch(() => [])
     return out
@@ -117,21 +118,40 @@ async function jurisprudenceFor(deps: AIServiceDeps, scope: ChatScope, question:
   return out
 }
 
-export async function chat(deps: AIServiceDeps, scope: ChatScope, messages: AIMessage[]): Promise<AIResult<ChatReply>> {
-  const history = trimHistory(messages)
+/** Só a jurisprudência: num processo, ele serve só para achar o tema e as decisões vinculadas — seus dados não vão ao modelo. */
+async function jurisprudenceOnlyContext(deps: AIServiceDeps, scope: ChatScope, question: string): Promise<BuiltContext> {
+  if (!deps.repo.can("processes.view")) throw new AIError("FORBIDDEN")
+  const process = scope.type === "process" ? (await loadProcessData(deps.repo, scope.id, nowOf(deps))).process : undefined
+  const juris = jurisprudenceChatSection(await jurisprudenceFor(deps, question, { process }, { always: true }))
+  return { context: juris.context, sources: juris.sources, basis: "Decisões da base de jurisprudência da Íntegra (fontes oficiais)." }
+}
+
+/** Dados do escritório da conversa e, no modo All, a jurisprudência quando a pergunta pede. */
+async function scopedContext(deps: AIServiceDeps, scope: ChatScope, question: string, withJurisprudence: boolean): Promise<BuiltContext> {
   const scoped = await buildScopeContext(deps, scope)
-  const juris = jurisprudenceChatSection(await jurisprudenceFor(deps, scope, history[history.length - 1].content, scoped))
-  const built: BuiltContext = {
+  if (!withJurisprudence) return scoped.built
+  const juris = jurisprudenceChatSection(await jurisprudenceFor(deps, question, scoped))
+  return {
     ...scoped.built,
     context: { ...scoped.built.context, ...juris.context },
     sources: { ...scoped.built.sources, ...juris.sources },
   }
+}
+
+export async function chat(deps: AIServiceDeps, scope: ChatScope, messages: AIMessage[], mode: ChatMode = "all"): Promise<AIResult<ChatReply>> {
+  const history = trimHistory(messages)
+  const question = history[history.length - 1].content
+  // Numa conversa sobre uma decisão, a própria decisão é o contexto: o modo não se aplica.
+  const effective: ChatMode = scope.type === "jurisprudence" ? "all" : mode
+  const built =
+    effective === "jurisprudence" ? await jurisprudenceOnlyContext(deps, scope, question) : await scopedContext(deps, scope, question, effective === "all")
   const context = sanitizeAIContext(built.context)
   const contextText = JSON.stringify(context)
 
-  const operation = `chat.${scope.type}`
+  const operation = effective === "jurisprudence" ? "chat.jurisprudence-search" : `chat.${scope.type}`
+  const labels = effective === "jurisprudence" ? [CHAT_MODE_LABEL.jurisprudence] : [CHAT_SCOPE_LABEL[scope.type], ...(scope.type === "jurisprudence" ? [] : [CHAT_MODE_LABEL[effective]])]
   return track(deps, operation, async () => {
-    const system = buildSystemPrompt(`${CHAT_TASK}\n\n${CHAT_SCOPE_LABEL[scope.type]}\n\nDADOS DA ÍNTEGRA (JSON):\n<dados>\n${contextText}\n</dados>`)
+    const system = buildSystemPrompt(`${CHAT_TASK}\n\n${labels.join("\n")}\n\nDADOS DA ÍNTEGRA (JSON):\n<dados>\n${contextText}\n</dados>`)
     const { value, usage } = await meteredCall(
       deps.meter,
       deps.provider,

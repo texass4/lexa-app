@@ -191,6 +191,16 @@ export interface AIMessage {
 
 export type ChatScope = { type: "process"; id: string } | { type: "client"; id: string } | { type: "office" } | { type: "jurisprudence"; id: string }
 
+/**
+ * De onde a conversa tira as respostas, escolhido pela pessoa no chat:
+ * - `all`: dados do escritório da conversa e, quando a pergunta é sobre decisões, a base de jurisprudência;
+ * - `office`: só os dados do escritório (nunca pesquisa jurisprudência);
+ * - `jurisprudence`: só a base de jurisprudência, pesquisada a cada pergunta (sem dados do escritório).
+ * Numa conversa sobre uma decisão, o modo não se aplica.
+ */
+export const CHAT_MODES = ["all", "office", "jurisprudence"] as const
+export type ChatMode = (typeof CHAT_MODES)[number]
+
 export const CHAT_LIMITS = {
   /** Mensagens anteriores enviadas ao modelo (o resto fica só na tela). */
   history: 10,

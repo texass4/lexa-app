@@ -29,6 +29,7 @@ import { financeAnalysis } from "./finance"
 import { analyzeJurisprudence, analyzeRelatedJurisprudence } from "./jurisprudence"
 import { chat, trimHistory } from "./chat"
 import { asksForJurisprudence, searchTermsFrom } from "../jurisprudence-intent"
+import { readChatInput } from "../input"
 
 const failure = async (promise: Promise<unknown>) => {
   try {
@@ -827,5 +828,70 @@ describe("conversa da Íntegra com a base de jurisprudência", () => {
     const { deps, calls } = setup("x")
     assert.equal(await failure(chat(deps, { type: "jurisprudence", id: "33333333-3333-4333-8333-333333333333" }, [{ role: "user", content: "Explique." }])), "NOT_FOUND")
     assert.equal(calls.length, 0)
+  })
+
+  describe("modo da conversa (All, Escritório, Jurisprudência)", () => {
+    const ask = (content: string) => [{ role: "user" as const, content }]
+    /** Só o bloco de dados (as instruções citam os nomes dos campos). */
+    const dataOf = (system: string) => system.slice(system.indexOf("<dados>"))
+
+    it("All (padrão): dados do escritório e, se a pergunta pede, a jurisprudência", async () => {
+      const { deps, calls, searches } = setup("ok")
+      await withSource(() => chat(deps, { type: "office" }, ask("Há jurisprudência sobre negativação indevida?"), "all"))
+      assert.equal(searches.length, 1)
+      assert.match(dataOf(calls[0].system), /metricas_calculadas_pelo_lexa/)
+      assert.match(dataOf(calls[0].system), /pesquisa_de_jurisprudencia/)
+      assert.match(calls[0].system, /MODO ALL/)
+    })
+
+    it("Escritório: nunca pesquisa jurisprudência, mesmo se a pergunta pedir", async () => {
+      const { deps, calls, searches } = setup("ok")
+      await withSource(() => chat(deps, { type: "process", id: processA.id }, ask("Há jurisprudência sobre negativação indevida?"), "office"))
+      assert.equal(searches.length, 0)
+      assert.equal(dataOf(calls[0].system).includes("pesquisa_de_jurisprudencia"), false)
+      assert.equal(dataOf(calls[0].system).includes("jurisprudencia_vinculada_ao_processo"), false)
+      assert.match(calls[0].system, /MODO ESCRITÓRIO/)
+    })
+
+    it("Jurisprudência: pesquisa a cada pergunta e não envia dados do escritório", async () => {
+      const { deps, calls, searches } = setup("[J1]")
+      const result = await withSource(() => chat(deps, { type: "office" }, ask("negativação indevida"), "jurisprudence"))
+      assert.equal(searches[0].text, "negativação indevida")
+      const sent = calls[0].system
+      assert.match(sent, /MODO JURISPRUDÊNCIA/)
+      assert.match(sent, /Ementa de teste sobre negativação indevida/)
+      assert.equal(dataOf(sent).includes("metricas_calculadas_pelo_lexa"), false)
+      assert.equal(dataOf(sent).includes("processos_ativos"), false)
+      assert.equal(result.sources.J1.href, `/jurisprudencia?id=${J1}`)
+    })
+
+    it("Jurisprudência num processo: o tema vem do processo, mas os dados dele não vão ao modelo", async () => {
+      const { deps, calls, searches } = setup("ok")
+      await withSource(() => chat(deps, { type: "process", id: processA.id }, ask("Há jurisprudência para este processo?"), "jurisprudence"))
+      assert.equal(searches.length, 1)
+      assert.ok(searches[0].text.length > 3)
+      assert.equal(calls[0].system.includes(processA.number ?? "—sem número—"), false)
+      assert.equal(calls[0].system.includes("UM processo específico"), false)
+    })
+
+    it("Jurisprudência sem permissão de processos → FORBIDDEN, sem chamar o modelo", async () => {
+      const built = makeDeps(() => "x", { permissions: ["clients.view", "tasks.view"] })
+      assert.equal(await failure(withSource(() => chat(built.deps, { type: "office" }, ask("negativação indevida"), "jurisprudence"))), "FORBIDDEN")
+      assert.equal(built.calls.length, 0)
+    })
+
+    it("conversa sobre uma decisão: o modo não se aplica (a decisão é o contexto)", async () => {
+      const { deps, calls } = setup("ok")
+      await withSource(() => chat(deps, { type: "jurisprudence", id: J1 }, ask("Explique a decisão."), "office"))
+      assert.match(calls[0].system, /UMA decisão da base de jurisprudência/)
+      assert.equal(calls[0].system.includes("MODO ESCRITÓRIO"), false)
+    })
+
+    it("entrada: modo inválido é recusado; ausente vale All", () => {
+      const body = { scope: { type: "office" }, messages: ask("oi") }
+      assert.equal(readChatInput(body).mode, "all")
+      assert.equal(readChatInput({ ...body, mode: "jurisprudence" }).mode, "jurisprudence")
+      assert.throws(() => readChatInput({ ...body, mode: "tudo" }), /Modo da conversa inválido/)
+    })
   })
 })

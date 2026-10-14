@@ -1,7 +1,7 @@
 /** Validação do corpo das rotas da Íntegra IA. Qualquer desvio vira BAD_REQUEST. */
 
 import { AIError } from "./errors"
-import { CHAT_LIMITS, type AIMessage, type ChatScope } from "./types"
+import { CHAT_LIMITS, CHAT_MODES, type AIMessage, type ChatMode, type ChatScope } from "./types"
 
 /** Ids internos da Íntegra (`p_<uuid>`, `c_123`). */
 const ID = /^[A-Za-z0-9_-]{1,80}$/
@@ -20,7 +20,7 @@ export function readId(body: unknown, field: string): string {
   return value
 }
 
-export function readChatInput(body: unknown): { scope: ChatScope; messages: AIMessage[] } {
+export function readChatInput(body: unknown): { scope: ChatScope; messages: AIMessage[]; mode: ChatMode } {
   const input = record(body)
   const scope = record(input.scope)
   let parsedScope: ChatScope
@@ -38,7 +38,8 @@ export function readChatInput(body: unknown): { scope: ChatScope; messages: AIMe
   const last = messages[messages.length - 1]
   if (last.role !== "user" || !last.content.trim()) throw bad("A conversa precisa terminar numa pergunta.")
   if (last.content.length > CHAT_LIMITS.messageChars) throw bad(`A pergunta pode ter até ${CHAT_LIMITS.messageChars} caracteres.`)
-  return { scope: parsedScope, messages }
+  if (input.mode !== undefined && !CHAT_MODES.includes(input.mode as ChatMode)) throw bad("Modo da conversa inválido.")
+  return { scope: parsedScope, messages, mode: (input.mode as ChatMode | undefined) ?? "all" }
 }
 
 /** Análise de uma decisão: `{ jurisprudenceId, processId?, query? }`. */

@@ -94,6 +94,15 @@ export const CHAT_TASK = `Responda às perguntas do usuário sobre os dados da �
 - Ao falar de uma decisão, diga o tribunal, o órgão julgador e a data como estão nos dados, e o que a ementa mostra. Relacionar a decisão com o caso é uma possibilidade, não uma conclusão.
 - Se "pesquisa_de_jurisprudencia" vier sem decisões, diga que a base da Íntegra não tem decisões para esses termos (a base contém só as fontes indicadas) e sugira outros termos. Se vier "situacao", repita essa situação. Nunca complete com decisões que você conhece.`
 
+/** O modo escolhido pela pessoa no chat: quais dados esta conversa recebeu. */
+export const CHAT_MODE_LABEL = {
+  all: "MODO ALL: os dados abaixo são do escritório desta conversa; quando a pergunta é sobre decisões, vêm também resultados da base de jurisprudência.",
+  office:
+    "MODO ESCRITÓRIO: os dados abaixo são só do escritório desta conversa; a base de jurisprudência NÃO foi consultada. Se pedirem decisões ou jurisprudência, diga que, para isso, é preciso escolher o modo Jurisprudência ou All no topo da conversa.",
+  jurisprudence:
+    "MODO JURISPRUDÊNCIA: os dados abaixo são só decisões da base de jurisprudência da Íntegra (pesquisa com os termos da pergunta e, num processo, as decisões vinculadas a ele). Dados do escritório (tarefas, prazos, agenda, clientes, financeiro, movimentações) NÃO foram enviados: se perguntarem sobre eles, diga que, para isso, é preciso escolher o modo Escritório ou All no topo da conversa.",
+} as const
+
 export const CHAT_SCOPE_LABEL = {
   jurisprudence: "Esta conversa é sobre UMA decisão da base de jurisprudência (a dos dados abaixo, ref J1), publicada por fonte oficial.",
   process: "Esta conversa é sobre UM processo específico (o dos dados abaixo).",

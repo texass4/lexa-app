@@ -8,6 +8,7 @@ import type {
   AIResult,
   AIStatus,
   ChatReply,
+  ChatMode,
   ChatScope,
   ClientSummary,
   EnrichmentSummary,
@@ -69,7 +70,8 @@ export const aiApi = {
     post<AIResult<JurisprudenceAnalysis>>("/api/ai/jurisprudence/analysis", input, signal),
   relatedJurisprudence: (input: { processId: string; ids: string[] }, signal?: AbortSignal) =>
     post<RelatedJurisprudenceResult>("/api/ai/jurisprudence/related", input, signal),
-  chat: (scope: ChatScope, messages: AIMessage[], signal?: AbortSignal) => post<AIResult<ChatReply>>("/api/ai/chat", { scope, messages }, signal),
+  chat: (scope: ChatScope, messages: AIMessage[], signal?: AbortSignal, mode: ChatMode = "all") =>
+    post<AIResult<ChatReply>>("/api/ai/chat", { scope, messages, mode }, signal),
 }
 
 /** Comparação com o processo + contagem por semelhança (calculada no servidor). */

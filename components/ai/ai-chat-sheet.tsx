@@ -6,7 +6,8 @@ import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { Button } from "@/components/ui/button"
-import { CHAT_LIMITS, type AIStatus } from "@/lib/ai/types"
+import { ChoiceChips } from "@/components/ui/choice-chips"
+import { CHAT_LIMITS, type AIStatus, type ChatMode } from "@/lib/ai/types"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
 import { AIErrorNotice, AIMark, AIThinking, AIUnavailable, AIWarnings, isAIReady, type SourceHandler } from "./ai-blocks"
@@ -19,6 +20,37 @@ import { useVoiceInput, type VoiceState } from "./use-voice-input"
 const TOPIC = { office: "o escritório", process: "este processo", client: "este cliente", jurisprudence: "esta decisão" } as const
 
 const CAPABILITIES = ["resumir", "explicar movimentações", "apontar o que merece atenção", "sugerir próximos passos"]
+
+/** Modos da conversa, na ordem do seletor. */
+const MODE_LABEL: Record<ChatMode, string> = { all: "All", office: "Escritório", jurisprudence: "Jurisprudência" }
+const MODE_HINT: Record<ChatMode, string> = {
+  all: "Dados do escritório e, quando a pergunta pede, a base de jurisprudência.",
+  office: "Só os dados do escritório: tarefas, prazos, agenda, processos e clientes.",
+  jurisprudence: "Só a base de jurisprudência: cada pergunta é pesquisada nas decisões.",
+}
+
+/** Sugestões do modo Jurisprudência (as do escopo falam de tarefas e prazos). */
+function jurisprudencePrompts(scope: AIContext["scope"]["type"]) {
+  return scope === "process"
+    ? ["Há jurisprudência para este processo?", "Mostre a jurisprudência vinculada a este processo", "Quais decisões o escritório salvou?"]
+    : ["Há jurisprudência sobre negativação indevida?", "Há jurisprudência sobre dano moral por atraso de voo?", "Quais decisões o escritório salvou?"]
+}
+
+/** Seletor do modo da conversa (All, Escritório, Jurisprudência). */
+function ModePicker({ modes, value, onChange }: { modes: ChatMode[]; value: ChatMode; onChange: (mode: ChatMode) => void }) {
+  const labels = modes.map((mode) => MODE_LABEL[mode])
+  return (
+    <div className="space-y-1.5 border-t border-border/70 px-5 py-2.5">
+      <ChoiceChips
+        ariaLabel="Responder com base em"
+        options={labels}
+        value={MODE_LABEL[value]}
+        onChange={(label) => onChange(modes.find((mode) => MODE_LABEL[mode] === label) ?? "all")}
+      />
+      <p className="text-[11.5px] leading-snug text-subtle">{MODE_HINT[value]}</p>
+    </div>
+  )
+}
 
 /** Ações sob cada resposta: a resposta vira trabalho (tarefa) ou texto reaproveitável. */
 function AnswerActions({ entry, context }: { entry: ChatEntry; context: AIContext }) {
@@ -138,6 +170,9 @@ export function AIChatSheet({
   context,
   status,
   onOpenSource,
+  mode = "all",
+  modes,
+  onModeChange,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -145,6 +180,10 @@ export function AIChatSheet({
   context: AIContext
   status: AIStatus | null
   onOpenSource?: SourceHandler
+  /** Modo da conversa e os disponíveis para quem usa (sem eles, não há seletor). */
+  mode?: ChatMode
+  modes?: ChatMode[]
+  onModeChange?: (mode: ChatMode) => void
 }) {
   const [draft, setDraft] = React.useState("")
   const endRef = React.useRef<HTMLDivElement>(null)
@@ -193,7 +232,8 @@ export function AIChatSheet({
       title="Conversa"
       className="sm:w-[520px]"
       header={
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4 pr-14">
+        <div className="border-b border-border">
+        <div className="flex items-center gap-3 px-5 py-4 pr-14">
           <AIMark />
           <div className="min-w-0 flex-1">
             <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Conversa</h2>
@@ -207,6 +247,8 @@ export function AIChatSheet({
               <RotateCcw /> Nova conversa
             </Button>
           )}
+        </div>
+        {ready && onModeChange && modes && modes.length > 1 && <ModePicker modes={modes} value={mode} onChange={onModeChange} />}
         </div>
       }
       footer={
@@ -229,7 +271,13 @@ export function AIChatSheet({
               value={draft}
               maxLength={CHAT_LIMITS.messageChars}
               disabled={!ready}
-              placeholder={ready ? `Pergunte sobre ${TOPIC[context.scope.type]}…` : "Conversa indisponível"}
+              placeholder={
+                !ready
+                  ? "Conversa indisponível"
+                  : mode === "jurisprudence"
+                    ? "Pesquise um tema na jurisprudência…"
+                    : `Pergunte sobre ${TOPIC[context.scope.type]}…`
+              }
               onChange={(e) => {
                 setDraft(e.target.value)
                 if (voice.state.status === "done") voice.reset()
@@ -280,13 +328,21 @@ export function AIChatSheet({
 
         {chat.messages.length === 0 && ready && (
           <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
-            <p className="font-display text-[18px] leading-snug font-semibold tracking-[-0.015em] text-foreground">{context.headline}</p>
+            <p className="font-display text-[18px] leading-snug font-semibold tracking-[-0.015em] text-foreground">
+              {mode === "jurisprudence" ? "Pesquise na jurisprudência" : context.headline}
+            </p>
             <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-              A partir do que está registrado sobre {TOPIC[context.scope.type]}, dá para {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
-              {CAPABILITIES.at(-1)} — citando de onde veio cada informação. A resposta vira tarefa com um clique.
+              {mode === "jurisprudence" ? (
+                <>Pergunte por um tema e a Íntegra pesquisa nas decisões da base de jurisprudência, citando cada decisão encontrada. Dados do escritório não entram neste modo.</>
+              ) : (
+                <>
+                  A partir do que está registrado sobre {TOPIC[context.scope.type]}, dá para {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
+                  {CAPABILITIES.at(-1)} — citando de onde veio cada informação. A resposta vira tarefa com um clique.
+                </>
+              )}
             </p>
             <div className="mt-5 flex flex-col gap-1.5">
-              {context.prompts.map((prompt) => (
+              {(mode === "jurisprudence" ? jurisprudencePrompts(context.scope.type) : context.prompts).map((prompt) => (
                 <button
                   key={prompt}
                   type="button"

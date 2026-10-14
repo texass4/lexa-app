@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { AIRequestError, aiApi, fetchAIStatus } from "@/lib/ai/client"
-import { CHAT_LIMITS, type ActionSuggestion, type AIMessage, type AISources, type AIStatus, type ChatScope } from "@/lib/ai/types"
+import { CHAT_LIMITS, CHAT_MODES, type ActionSuggestion, type AIMessage, type AISources, type AIStatus, type ChatMode, type ChatScope } from "@/lib/ai/types"
 import { uid } from "@/lib/core/format"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
@@ -63,17 +63,53 @@ export interface ChatEntry {
   warnings?: string[]
 }
 
+const MODE_KEY = "integra.ai.chat-mode"
+
+/** Modo escolhido da última vez (comodidade deste navegador; sem ele, "All"). */
+function storedMode(): ChatMode {
+  try {
+    const saved = window.localStorage.getItem(MODE_KEY)
+    return CHAT_MODES.includes(saved as ChatMode) ? (saved as ChatMode) : "all"
+  } catch {
+    return "all"
+  }
+}
+
+/** Modo da conversa (All, Escritório ou Jurisprudência), lembrado neste navegador. */
+export function useChatMode() {
+  const [mode, setModeState] = React.useState<ChatMode>("all")
+  // Lê depois de montar: o servidor não conhece o navegador (evita diferença na hidratação).
+  React.useEffect(() => {
+    const saved = storedMode()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved !== "all") setModeState(saved)
+  }, [])
+  const setMode = React.useCallback((next: ChatMode) => {
+    setModeState(next)
+    try {
+      window.localStorage.setItem(MODE_KEY, next)
+    } catch {
+      // Sem armazenamento (janela anônima): vale só nesta tela.
+    }
+  }, [])
+  return [mode, setMode] as const
+}
+
 /**
  * Conversa com a Íntegra IA num escopo (processo, cliente ou escritório).
  * Quem usa deve montar o hook com `key` do escopo: trocar de processo começa
  * outra conversa, sem reaproveitar mensagens nem dados do anterior.
  */
-export function useAIChat(scope: ChatScope) {
+export function useAIChat(scope: ChatScope, mode: ChatMode = "all") {
   const [messages, setMessages] = React.useState<ChatEntry[]>([])
   const [pending, setPending] = React.useState(false)
   const [failure, setFailure] = React.useState<{ error: AIRequestError; question: string } | null>(null)
   const controller = React.useRef<AbortController | null>(null)
   const scopeRef = React.useRef(scope)
+  const modeRef = React.useRef(mode)
+  React.useEffect(() => {
+    modeRef.current = mode
+  }, [mode])
 
   React.useEffect(() => () => controller.current?.abort(), [])
 
@@ -93,6 +129,7 @@ export function useAIChat(scope: ChatScope) {
           scopeRef.current,
           history.slice(-CHAT_LIMITS.history).map(({ role, content }) => ({ role, content })),
           current.signal,
+          modeRef.current,
         )
         setMessages((list) => [
           ...list,
