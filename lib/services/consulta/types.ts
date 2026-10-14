@@ -216,7 +216,15 @@ export interface EnrichmentReport {
     /** Tribunal de ORIGEM, pelo número (relatórios antigos: o tribunal da fonte ou do número). */
     tribunal?: string
     /** Tribunal atual e a situação da confirmação. Ausente em relatórios antigos. */
-    currentTribunal?: { label?: string; status: CurrentTribunalStatus; statusLabel: string; inferred?: string }
+    currentTribunal?: {
+      label?: string
+      status: CurrentTribunalStatus
+      statusLabel: string
+      /** Inferência rotulada (nunca em divergência). */
+      inferred?: string
+      /** Divergência: siglas dos tribunais com registro, sem escolha. */
+      candidates?: string[]
+    }
     unit?: string
     situation?: string
     lastMovement?: { title: string; at: string }

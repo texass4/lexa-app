@@ -897,7 +897,7 @@ describe("conversa da Íntegra com a base de jurisprudência", () => {
 })
 
 describe("tribunal no contexto da IA (DADOS SIMULADOS)", () => {
-  it("processo salvo antes da verificação: origem pelo número, atual não verificado, com aviso", async () => {
+  it("processo salvo antes da verificação: origem pelo número, estado legado, sem tribunal atual", async () => {
     const { SIM_TJSP } = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
     const { deps } = makeDeps(() => validSummary)
     const data = await loadProcessData(deps.repo, processA.id)
@@ -906,11 +906,12 @@ describe("tribunal no contexto da IA (DADOS SIMULADOS)", () => {
     const processo = context.processo as Record<string, unknown>
     assert.equal(processo.tribunal, undefined, "o tribunal do cadastro não vai como 'tribunal'")
     assert.equal(processo.tribunal_no_cadastro, "TJMA")
-    const id = processo.tribunal_identificacao as { tribunal_de_origem: string; tribunal_atual: { situacao: string; tribunal?: string }; aviso?: string }
+    const id = processo.tribunal_identificacao as { tribunal_de_origem: string; tribunal_atual: { estado: string; situacao: string; tribunal?: string }; limitacao?: string }
     assert.ok(id.tribunal_de_origem.startsWith("TJSP"))
-    assert.equal(id.tribunal_atual.situacao, "Não verificado")
+    assert.equal(id.tribunal_atual.estado, "legacy")
+    assert.equal(id.tribunal_atual.situacao, "Sem verificação registrada")
     assert.equal(id.tribunal_atual.tribunal, undefined)
-    assert.ok(id.aviso)
+    assert.ok(id.limitacao)
   })
 
   it("comarca antiga com a sigla do tribunal não vai para a IA", async () => {
@@ -919,5 +920,49 @@ describe("tribunal no contexto da IA (DADOS SIMULADOS)", () => {
     const { context } = buildProcessContext({ ...data, process: { ...data.process, district: "TJMA" } }, NOW)
     assert.equal((context.processo as Record<string, unknown>).comarca, undefined)
     assert.equal((buildProcessContext(data, NOW).context.processo as Record<string, unknown>).comarca, "São Luís")
+  })
+})
+
+describe("tribunal: relatório divergente aplicado, lido pela IA (DADOS SIMULADOS)", () => {
+  it("divergência guardada no processo chega à IA sem tribunal atual nem 'provável'", async () => {
+    const sim = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const { mapRecords, mapSearchResponse } = await import("@/lib/integrations/legal/datajud/mapper")
+    const { buildProcessSheet } = await import("@/lib/services/processos/sheet")
+    const { mergeProcessSheet } = await import("@/lib/services/processos/process-sync")
+    const { checkFromRecords } = await import("@/lib/services/processos/tribunal-identification")
+    const sheet = buildProcessSheet(mapSearchResponse(sim.simTjspFirstDegree, sim.SIM_TJSP)!)
+    const stj = checkFromRecords({ tribunal: "STJ", role: "superior", dataset: "api_publica_stj", checkedAt: "2026-09-26T12:00:00.000Z", records: mapRecords(sim.simStjRecord, sim.SIM_TJSP) })
+    const { deps } = makeDeps(() => validSummary)
+    const data = await loadProcessData(deps.repo, processA.id)
+    const base = { ...data.process, cnj: sim.SIM_TJSP, tribunalIdentification: undefined }
+    // "Atualizar processo com a consulta" → depois, uma sincronização comum (só a origem).
+    const applied = mergeProcessSheet(base, sheet, "2026-09-26T09:00:00", { newId: () => "m", checks: [stj] }).process
+    const synced = mergeProcessSheet(applied, sheet, "2026-09-27T09:00:00", { newId: () => "m" }).process
+    for (const process of [applied, synced]) {
+      const { context } = buildProcessContext({ ...data, process }, NOW)
+      const id = (context.processo as Record<string, unknown>).tribunal_identificacao as Record<string, unknown> & { tribunal_atual: { estado: string; tribunal?: string } }
+      assert.equal(id.tribunal_atual.estado, "conflicting")
+      assert.equal(id.tribunal_atual.tribunal, undefined)
+      assert.equal(id.tribunal_inferido, undefined)
+      assert.equal((id.tribunais_com_registro as unknown[]).length, 2)
+    }
+  })
+
+  it("contexto de jurisprudência leva o tribunal com rótulo de origem, nunca solto", async () => {
+    const { buildRelatedContext } = await import("../context/jurisprudence")
+    const { deps } = makeDeps(() => validSummary)
+    const data = await loadProcessData(deps.repo, processA.id)
+    const { context } = buildRelatedContext(data.process, [], NOW)
+    const processo = context.processo_do_escritorio as Record<string, unknown>
+    assert.equal(processo.tribunal, undefined)
+    assert.equal(processo.tribunal_no_cadastro, "TJMA")
+    assert.ok(processo.tribunal_identificacao)
+  })
+
+  it("o prompt de sistema traz a regra do tribunal (origem nunca é o atual sem confirmação)", async () => {
+    const { buildSystemPrompt } = await import("../prompts/system")
+    const prompt = buildSystemPrompt("tarefa")
+    assert.match(prompt, /tribunal de origem \(pelo número CNJ\) indica onde o processo começou, NUNCA onde ele tramita hoje/)
+    for (const state of ["conflicting", "not_confirmed", "not_found", "unsupported", "not_checked"]) assert.ok(prompt.includes(state), state)
   })
 })

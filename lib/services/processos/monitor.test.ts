@@ -345,3 +345,41 @@ describe("monitoramento automático", () => {
     assert.equal(db.released.length, 1)
   })
 })
+
+describe("monitoramento — última tentativa sem apagar a evidência do tribunal", () => {
+  const failures: [string, () => Promise<ExternalProcess | null>, string][] = [
+    ["ausência de resultado", async () => null, "not_found"],
+    ["429", async () => Promise.reject(new LookupError("RATE_LIMIT", "simulado", { status: 429, retryAfterMs: 60_000 })), "rate_limited"],
+    ["fonte fora do ar", async () => Promise.reject(new LookupError("UNAVAILABLE", "simulado", { status: 503 })), "failed"],
+  ]
+
+  for (const [label, failure, outcome] of failures) {
+    it(`evidência válida seguida de ${label}: a evidência e a data dela ficam; a tentativa é registrada`, async () => {
+      restore = silence()
+      const db = memoryRepo([process("p1")])
+      await run(db.repo)
+      const first = db.rows.get(`${ORG}:p1`)!.data.tribunalIdentification!
+      assert.ok(first.current.checkedAt)
+      assert.equal(first.lastAttempt?.outcome, "found")
+
+      clock += 40 * 24 * 60 * 60_000 // passa de qualquer espera
+      reply = failure
+      await run(db.repo)
+      const after = db.rows.get(`${ORG}:p1`)!.data.tribunalIdentification!
+      assert.deepEqual(after.current, first.current, "a evidência anterior não muda")
+      assert.deepEqual(after.checks, first.checks)
+      assert.equal(after.lastAttempt?.outcome, outcome)
+      assert.ok(after.lastAttempt!.at > first.current.checkedAt!, "a tentativa é posterior à evidência")
+      assert.ok(!/Z$/.test(after.lastAttempt!.at), "horário local do escritório")
+    })
+  }
+
+  it("falha que não chegou à fonte (tribunal sem índice) não grava o processo", async () => {
+    restore = silence()
+    const db = memoryRepo([process("p1")])
+    const before = db.rows.get(`${ORG}:p1`)!.version
+    reply = async () => Promise.reject(new LookupError("UNSUPPORTED_COURT", "simulado"))
+    await run(db.repo)
+    assert.equal(db.rows.get(`${ORG}:p1`)!.version, before)
+  })
+})

@@ -14,7 +14,7 @@
  * Lógica pura: sem React, sem banco.
  */
 
-import type { Process, ProcessMovement } from "@/types"
+import type { Process, ProcessMovement, TribunalCheck } from "@/types"
 import { toProcessMovements } from "./import"
 import { collectHashes, diffMovements } from "./movements"
 import type { ProcessSheet } from "./sheet"
@@ -25,6 +25,11 @@ export interface MergeOptions {
   newId: () => string
   /** A sincronização foi feita pelo monitoramento automático (grava `autoSyncedAt`). */
   automatic?: boolean
+  /**
+   * Consultas a outros índices que acompanham esta ficha — as do relatório da Consulta
+   * processual quando a pessoa aplica o relatório (inclusive a do tribunal superior).
+   */
+  checks?: TribunalCheck[]
 }
 
 export interface MergeResult {
@@ -63,8 +68,10 @@ export function mergeProcessSheet(current: Process, sheet: ProcessSheet, checked
     subject: pick(current.subject, sheet.subject),
     judicialUnit: pick(current.judicialUnit, sheet.judicialUnit),
     system: pick(current.system, sheet.system),
-    // Evidência da fonte, separada do tribunal do cadastro (que segue a regra acima).
-    tribunalIdentification: identifyFromSheet(sheet, checkedAt),
+    // Evidência da fonte, separada do tribunal do cadastro (que segue a regra acima). As
+    // consultas já guardadas a outros índices (ex.: superior com registro → divergência)
+    // continuam valendo: a ficha nova só substitui a consulta de origem.
+    tribunalIdentification: identifyFromSheet(sheet, checkedAt, { previous: current.tribunalIdentification, checks: options.checks }),
     parties: sheet.parties.active.length || sheet.parties.passive.length || sheet.parties.others.length ? sheet.parties : current.parties,
     source: {
       provider: sheet.source.provider,

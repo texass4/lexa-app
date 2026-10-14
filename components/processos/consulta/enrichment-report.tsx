@@ -155,7 +155,9 @@ function SummaryPanel({ run, report }: { run: EnrichmentRun; report: EnrichmentR
                   [
                     "Tribunal atual",
                     s.currentTribunal.label ??
-                      `${s.currentTribunal.statusLabel}${s.currentTribunal.inferred ? ` · provável: ${s.currentTribunal.inferred} (inferência)` : ""}`,
+                      (s.currentTribunal.candidates?.length
+                        ? `${s.currentTribunal.statusLabel}: registros em ${s.currentTribunal.candidates.join(" e ")} — nenhum escolhido`
+                        : `${s.currentTribunal.statusLabel}${s.currentTribunal.inferred ? ` · inferido, não confirmado: ${s.currentTribunal.inferred}` : ""}`),
                   ],
                 ]
               : []),
@@ -212,7 +214,9 @@ function OfficePanel({ run, report }: { run: EnrichmentRun; report: EnrichmentRe
         toast.error("Não foi possível atualizar o processo.", { description: result.message })
         return
       }
-      const { added } = applyProcessSync(office.processId, result.sheet, result.checkedAt)
+      // As consultas do relatório (inclusive a do tribunal superior) entram como evidência:
+      // uma divergência continua divergência no processo, sem escolher tribunal.
+      const { added } = applyProcessSync(office.processId, result.sheet, result.checkedAt, { checks: report.tribunal?.checks })
       toast.success("Processo atualizado.", { description: added ? `${added} movimentação(ões) nova(s).` : "Nenhuma movimentação nova." })
     } catch {
       toast.error("Não foi possível atualizar o processo.")
@@ -268,19 +272,29 @@ const CURRENT_TONE: Record<NonNullable<EnrichmentReport["tribunal"]>["current"][
   conflicting: "warning",
   not_found: "neutral",
   unsupported: "neutral",
+  unknown_tribunal: "warning",
+  invalid_number: "danger",
   not_checked: "neutral",
+  legacy: "neutral",
 }
 const CHECK_LABEL = { found: "registro encontrado", not_found: "nada encontrado", failed: "sem resposta", not_checked: "não consultado" } as const
 
-/** Origem (número) × atual (fonte) × inferido, com as consultas que sustentam cada um. */
+/**
+ * Datas da identificação: horário local do escritório, sem fuso (lidas como estão).
+ * Relatórios anteriores guardavam o horário da consulta em UTC (com `Z`).
+ */
+const fmtIdent = (iso?: string) => (iso ? (/Z$/i.test(iso) ? fmtUtc(iso) : fmtLocal(iso)) : undefined)
+
+/** Origem (número) × atual (fonte) × inferido, com as consultas e os registros que sustentam cada um. */
 function TribunalPanel({ report }: { report: EnrichmentReport }) {
   const id = report.tribunal
   const status = report.summary.currentTribunal
   if (!id || !status) return null
   const { origin, current, inferred } = id
+  const conflicting = current.status === "conflicting"
   return (
     <Panel>
-      <PanelHeader title="Tribunal" icon={<Landmark />} description="Onde o processo começou e onde a fonte indica que ele está — com a evidência de cada um." />
+      <PanelHeader title="Tribunal" icon={<Landmark />} description="Onde o processo começou e o que a fonte mostra hoje — com a evidência de cada um." />
       <div className="space-y-4 px-5 pb-5">
         <dl className="divide-y divide-border">
           <div className="grid grid-cols-1 gap-1.5 py-3 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-4">
@@ -307,7 +321,7 @@ function TribunalPanel({ report }: { report: EnrichmentReport }) {
                   {current.dataset && <span className="font-mono">{current.dataset}</span>}
                   {current.degree && <span>grau {current.degree}</span>}
                   {current.updatedAt && <span>atualizado na fonte em {fmtLocal(current.updatedAt)}</span>}
-                  <span>consultado em {fmtUtc(current.checkedAt)}</span>
+                  <span>consultado em {fmtIdent(current.checkedAt)}</span>
                 </p>
               )}
               <ul className="space-y-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -317,12 +331,30 @@ function TribunalPanel({ report }: { report: EnrichmentReport }) {
               </ul>
             </dd>
           </div>
-          {inferred && current.status !== "confirmed" && (
+          {conflicting && id.candidates?.length ? (
+            <div className="grid grid-cols-1 gap-1.5 py-3 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-4">
+              <dt className="text-[12.5px] text-muted-foreground">Tribunais com registro</dt>
+              <dd className="min-w-0 space-y-1">
+                {id.candidates.map((c) => (
+                  <p key={c.acronym} className="text-[13px] text-foreground">
+                    <span className="font-medium">{c.acronym}</span> — {c.name}
+                    <span className="block text-[11.5px] text-muted-foreground">
+                      {[c.role === "origem" ? "tribunal de origem" : "tribunal superior (complementar)", c.degrees.length ? `grau ${c.degrees.join(", ")}` : undefined, c.updatedAt ? `atualizado na fonte em ${fmtLocal(c.updatedAt)}` : undefined]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </p>
+                ))}
+                <p className="text-[11.5px] text-muted-foreground">Nenhum deles foi escolhido como tribunal atual. Confira no site oficial.</p>
+              </dd>
+            </div>
+          ) : null}
+          {inferred && !conflicting && current.status !== "confirmed" && (
             <div className="grid grid-cols-1 gap-1.5 py-3 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-4">
               <dt className="text-[12.5px] text-muted-foreground">Tribunal inferido</dt>
               <dd className="min-w-0">
                 <p className="text-[13px] font-medium text-foreground">{status.inferred}</p>
-                <p className="mt-0.5 text-[11.5px] text-muted-foreground">{inferred.note}</p>
+                <p className="mt-0.5 text-[11.5px] text-muted-foreground">Inferência, não confirmada. {inferred.note}</p>
               </dd>
             </div>
           )}
@@ -330,14 +362,25 @@ function TribunalPanel({ report }: { report: EnrichmentReport }) {
         {id.checks.length > 0 && (
           <div>
             <p className="text-[11px] font-medium tracking-[0.08em] text-subtle uppercase">Consultas feitas</p>
-            <ul className="mt-2 space-y-1.5">
+            <ul className="mt-2 space-y-2">
               {id.checks.map((c) => (
                 <li key={`${c.role}-${c.tribunal}`} className="text-[12px] text-muted-foreground">
                   <span className="font-medium text-foreground">{c.tribunal}</span> ({c.role === "origem" ? "tribunal de origem" : "tribunal superior, complementar"}) —{" "}
                   {CHECK_LABEL[c.status]}
-                  {c.records.length > 1 ? ` · ${c.records.length} registros` : ""}
                   {c.dataset ? ` · ${c.dataset}` : ""}
-                  {c.checkedAt ? ` · ${fmtUtc(c.checkedAt)}` : ""}
+                  {c.checkedAt ? ` · ${fmtIdent(c.checkedAt)}` : ""}
+                  {c.coverage?.partial ? " · resposta parcial" : c.coverage?.truncated ? ` · ${c.coverage.returned} de ${c.coverage.total ?? "mais"} registros` : ""}
+                  {c.records.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 pl-3">
+                      {c.records.map((r, i) => (
+                        <li key={i}>
+                          {[r.tribunal ?? "tribunal não informado", r.degree && `grau ${r.degree}`, r.judicialUnit, r.updatedAt && `atualizado em ${fmtLocal(r.updatedAt)}`]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>

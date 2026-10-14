@@ -3,7 +3,7 @@ import { describe, it } from "node:test"
 
 import { buildProcessSheet } from "@/lib/services/processos/sheet"
 import { buildProcessDraft } from "@/lib/services/processos/import"
-import { mapSearchResponse } from "./mapper"
+import { mapRecords, mapSearchResponse } from "./mapper"
 import { emptyResponse, realMovementsResponse, sparseResponse, trf1Response, twoDegreesResponse, withPartiesResponse } from "./__fixtures__/responses"
 
 const CNJ = "00008323520184013202"
@@ -175,5 +175,47 @@ describe("registros de todos os graus (DADOS SIMULADOS)", () => {
     const { simMissingTribunal, SIM_TJSP } = await import("./__fixtures__/tribunal-scenarios")
     const [record] = mapSearchResponse(simMissingTribunal, SIM_TJSP)?.records ?? []
     assert.equal(record.tribunal, undefined)
+  })
+})
+
+describe("cobertura e número da resposta (DADOS SIMULADOS)", () => {
+  it("marca resposta parcial, truncada e completa", async () => {
+    const { mapCoverage } = await import("./mapper")
+    const sim = await import("./__fixtures__/tribunal-scenarios")
+    assert.deepEqual(mapCoverage(sim.simTjspFirstDegree, sim.SIM_TJSP), { partial: false, truncated: false, returned: 1, total: 1 })
+    assert.equal(mapCoverage(sim.simPartialWithHits, sim.SIM_TJSP).partial, true)
+    assert.deepEqual(mapCoverage(sim.simTruncated, sim.SIM_TJSP), { partial: false, truncated: true, returned: 1, total: 25 })
+    assert.equal(mapCoverage({ ...sim.simTjspFirstDegree, hits: { ...sim.simTjspFirstDegree.hits, total: { value: 1, relation: "gte" } } }).truncated, true)
+  })
+
+  it("documento de outro número não entra na ficha nem nos registros", async () => {
+    const sim = await import("./__fixtures__/tribunal-scenarios")
+    const process = mapSearchResponse(sim.simWithOtherNumber, sim.SIM_TJSP)
+    assert.equal(process?.records?.length, 1)
+    assert.equal(process?.tribunal, "TJSP")
+    assert.equal(process?.coverage?.returned, 1)
+  })
+
+  it("registros guardam a descrição da última movimentação (complementos legíveis)", async () => {
+    const sim = await import("./__fixtures__/tribunal-scenarios")
+    const response = sim.simulatedResponse(sim.SIM_TJSP, [
+      {
+        index: "api_publica_tjsp",
+        tribunal: "TJSP",
+        grau: "G2",
+        updatedAt: "2026-08-01T10:00:00.000Z",
+        movimentos: [
+          {
+            codigo: 123,
+            nome: "Remessa",
+            dataHora: "2026-07-31T10:00:00.000Z",
+            complementosTabelados: [{ codigo: 18, valor: 40, nome: "em grau de recurso", descricao: "motivo_da_remessa" }],
+          },
+        ],
+      },
+    ])
+    const [record] = mapRecords(response, sim.SIM_TJSP)
+    assert.equal(record.lastMovement?.description, "em grau de recurso")
+    assert.deepEqual(record.lastMovement?.complementKeys, ["motivo_da_remessa"])
   })
 })

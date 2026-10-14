@@ -17,8 +17,8 @@
 import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
 import { LookupError, type LookupErrorCode } from "@/lib/integrations/legal/errors"
 import { datasetFor, superiorFor, tribunalFor } from "@/lib/integrations/legal/datajud/tribunals"
-import type { ExternalRecord } from "@/lib/integrations/legal/types"
-import { identifyTribunal, originCheckFromSheet, type CheckInput } from "@/lib/services/processos/tribunal-identification"
+import type { ExternalCoverage, ExternalRecord } from "@/lib/integrations/legal/types"
+import { checkFromRecords, identifyTribunal, officeTime, originCheckFromSheet, type CheckInput } from "@/lib/services/processos/tribunal-identification"
 import type { Communication } from "@/lib/integrations/legal/djen/mapper"
 import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import type { Process } from "@/types"
@@ -52,6 +52,8 @@ export interface CommunicationsResult {
 export interface SuperiorResult {
   dataset: string
   records: ExternalRecord[]
+  /** Parcial/truncada: os registros devolvidos podem não ser todos. */
+  coverage?: ExternalCoverage
   checkedAt: string
 }
 
@@ -280,11 +282,11 @@ export async function runWorkflow(input: WorkflowInput, deps: WorkflowDeps): Pro
     const base = { tribunal: superior, role: "superior" as const, provider: "datajud" as const, dataset: datasetFor(superior) }
     try {
       const result = await withTimeout(deps.superior(cnj, superior), timeouts.complementary)
-      extra.superior = { ...base, dataset: result.dataset, checkedAt: result.checkedAt, status: result.records.length ? "found" : "not_found", records: result.records }
+      extra.superior = checkFromRecords({ tribunal: superior, role: "superior", dataset: result.dataset, checkedAt: result.checkedAt, records: result.records, coverage: result.coverage })
     } catch (error) {
       const { code, detail } = classify(error)
       state.internalErrors.push({ source: "datajud", code: `SUPERIOR_${code}`, detail })
-      extra.superior = { ...base, checkedAt: iso(), status: "failed", records: [] }
+      extra.superior = { ...base, checkedAt: officeTime(iso()), status: "failed", records: [] }
     }
   }
 

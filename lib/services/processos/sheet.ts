@@ -7,7 +7,7 @@
  */
 
 import { formatCNJ } from "@/lib/processos/cnj"
-import type { ExternalParty, ExternalProcess, ExternalRecord, ProviderName } from "@/lib/integrations/legal/types"
+import type { ExternalCoverage, ExternalParty, ExternalProcess, ExternalRecord, ProviderName } from "@/lib/integrations/legal/types"
 import type { MovementComplement, MovementDocument, MovementJudicialUnit } from "@/types"
 import { externalMovementHash } from "./movements"
 
@@ -65,6 +65,8 @@ export interface ProcessSheet {
    * Ausente em fichas antigas do cache — `originCheckFromSheet` usa os campos acima.
    */
   records?: ExternalRecord[]
+  /** Cobertura da resposta (parcial/truncada). Ausente em fichas antigas do cache. */
+  coverage?: ExternalCoverage
   source: { provider: ProviderName; externalId?: string; dataset?: string }
 }
 
@@ -78,7 +80,7 @@ const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)
  * dia anterior no Brasil) e mudaria o horário registrado nos autos. Também
  * deixa o resultado independente do fuso do servidor.
  */
-function toLocal(value: string | undefined): string | undefined {
+export function toLocal(value: string | undefined): string | undefined {
   if (!value) return undefined
   const match = WALL_CLOCK.exec(value.trim())
   if (!match) return undefined
@@ -133,6 +135,7 @@ export function buildProcessSheet(external: ExternalProcess): ProcessSheet {
       updatedAt: toLocal(record.updatedAt),
       lastMovement: record.lastMovement ? { ...record.lastMovement, occurredAt: toLocal(record.lastMovement.occurredAt) ?? record.lastMovement.occurredAt } : undefined,
     })),
+    coverage: external.coverage,
     source: external.source,
   }
 }

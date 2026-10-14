@@ -7,62 +7,121 @@
  *   `confirmed` — todos precisam valer:
  *     1. algum índice consultado devolveu registro do número;
  *     2. todos os registros encontrados apontam o MESMO tribunal, e ele é o tribunal do
- *        índice em que foram achados (senão: `conflicting`);
+ *        índice em que foram achados (senão: `conflicting`, sem escolher nenhum);
  *     3. o registro mais recente informa o tribunal (campo da fonte presente);
  *     4. o registro mais recente tem data de atualização na fonte;
- *     5. a última movimentação desse tribunal não indica remessa, redistribuição,
- *        declínio de competência, devolução nem baixa/arquivamento;
- *     6. nenhuma outra consulta falhou (uma fonte sem resposta pode ter outro registro).
+ *     5. há movimentação, e a última não indica de forma explícita a saída do tribunal
+ *        (remessa a tribunal superior ou a outra Justiça, declínio de competência, baixa
+ *        num tribunal superior, envio à instância superior a partir do 2º grau);
+ *     6. nenhuma outra consulta falhou (uma fonte sem resposta pode ter outro registro);
+ *     7. as respostas com registro vieram completas (sem fragmento falho nem truncamento).
  *   O grau só é informado quando um único grau aparece nos registros.
- * - INFERIDO: quando o atual não está confirmado — o registro atualizado mais recentemente
- *   ou, sem registro, o tribunal de origem. Sempre exibido como inferência.
+ * - INFERIDO: quando o atual não está confirmado e NÃO há divergência — o tribunal dos
+ *   registros encontrados ou, sem registro, o de origem. Sempre exibido como inferência.
+ *   Com divergência, os tribunais com registro são listados (`candidates`), sem escolha.
  *
  * Consulta a tribunal superior é complementar: não achar o número lá não prova que o
  * processo não tramite lá (o índice pode usar outra numeração ou estar atrasado).
+ *
+ * Persistência: a identificação guardada no processo acumula a consulta mais recente de
+ * cada índice (`mergeChecks`). A sincronização (só origem) não apaga a consulta ao
+ * superior feita pela Consulta processual — uma divergência continua divergência até
+ * uma nova consulta ao mesmo índice.
+ *
+ * Datas: as da fonte ficam em horário de parede, lidas literalmente (como no resto da
+ * ficha); as nossas (consulta, tentativa) em horário local do escritório. Tudo sem fuso,
+ * para comparar e exibir do mesmo jeito.
  */
 
+import { toLocalISOIn } from "@/lib/core/dates"
+import { fold } from "@/lib/core/format"
 import { parseCNJ } from "@/lib/processos/cnj"
 import { originAcronym, originTribunal, tribunalByAcronym, tribunalName } from "@/lib/processos/tribunals"
 import { datasetFor, isCovered, tribunalFor, tribunalOfDataset } from "@/lib/integrations/legal/datajud/tribunals"
-import type { ExternalRecord } from "@/lib/integrations/legal/types"
-import { fold } from "@/lib/core/format"
-import type { Process, TribunalCheck, TribunalIdentification, TribunalRecordEvidence } from "@/types"
+import type { ExternalCoverage, ExternalRecord } from "@/lib/integrations/legal/types"
+import type { CurrentTribunalStatus, Process, TribunalAttempt, TribunalCheck, TribunalIdentification, TribunalRecordEvidence } from "@/types"
 import { categorizeMovement } from "./movement-interpreter"
-import type { ProcessSheet } from "./sheet"
+import { OFFICE_TIME_ZONE } from "./monitoring-policy"
+import { toLocal, type ProcessSheet } from "./sheet"
 
-/** Registro da fonte com o que a identificação precisa (inclui pistas da última movimentação). */
-type RecordInput = TribunalRecordEvidence & { lastMovement?: TribunalRecordEvidence["lastMovement"] & { code?: number; complementKeys?: string[] } }
+export type CheckInput = TribunalCheck
 
-export interface CheckInput extends Omit<TribunalCheck, "records"> {
-  records: RecordInput[]
+/* ---------------------------------- datas ---------------------------------- */
+
+/** Data da fonte → horário de parede sem fuso (leitura literal, como `buildProcessSheet`). */
+export const sourceTime = (value?: string) => (value ? (toLocal(value) ?? value) : undefined)
+
+/**
+ * Momento nosso (consulta, tentativa) → horário local do escritório, sem fuso. Com `Z` ou
+ * deslocamento, converte; sem fuso, já é horário local e só padroniza o formato.
+ */
+export function officeTime(value?: string): string | undefined {
+  if (!value) return undefined
+  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(value.trim())) {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? value : toLocalISOIn(date, OFFICE_TIME_ZONE)
+  }
+  return toLocal(value) ?? value
 }
 
 const day = (value?: string) => (value && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10).split("-").reverse().join("/") : undefined)
 
-/** Trechos (sem acento) de movimentação que indicam saída do tribunal ou do órgão. */
-const TRANSFER_HINTS = ["remessa", "remetid", "redistribu", "declin", "incompetencia", "devolucao", "devolvid", "baixa", "arquivamento", "arquivado"]
+const normalizeRecord = (r: TribunalRecordEvidence): TribunalRecordEvidence => ({
+  ...r,
+  tribunal: r.tribunal?.trim().toUpperCase() || undefined,
+  updatedAt: sourceTime(r.updatedAt),
+  lastMovement: r.lastMovement ? { ...r.lastMovement, occurredAt: sourceTime(r.lastMovement.occurredAt) ?? r.lastMovement.occurredAt } : undefined,
+})
 
-/** Motivo pelo qual a última movimentação impede confirmar o tribunal atual (ou `undefined`). */
-export function transferSignal(movement: RecordInput["lastMovement"]): string | undefined {
+const normalizeCheck = (c: TribunalCheck): TribunalCheck => ({ ...c, checkedAt: officeTime(c.checkedAt), records: c.records.map(normalizeRecord) })
+
+/* --------------------------- saída do tribunal ----------------------------- */
+
+const SUPERIOR_COURTS = new Set(["STF", "STJ", "TST", "TSE", "STM"])
+/** Graus que já são a instância mais alta do tribunal: "instância superior" a partir deles sai do tribunal. */
+const TOP_DEGREES = new Set(["G2", "TR", "TRU", "TNU", "SUP"])
+
+/** Verbos de deslocamento dos autos. Sozinhos, NÃO bastam ("Remessa ao Contador"). */
+const MOVE = /\b(remessa|remetid\w*|remet\w*|envi\w*|encaminh\w*|subida|redistribu\w*)\b/
+/** Destino fora do tribunal, explícito no texto. */
+const OUT_OF_TRIBUNAL =
+  /\b(stj|stf|tst|tse|stm|superior tribunal|supremo tribunal|tribunal superior|outro tribunal|justica (federal|estadual|do trabalho|eleitoral|militar))\b/
+const UPPER_INSTANCE = /\b(instancia superior|grau de recurso|grau recursal)\b/
+const DECLINE = /\b(declin\w*|incompetencia)\b/
+
+export interface TransferSignal {
+  /** Impede confirmar o tribunal atual. Sinais informativos (baixa na origem) não impedem. */
+  blocks: boolean
+  text: string
+}
+
+/**
+ * O que a última movimentação diz sobre a saída do tribunal. Só bloqueia com indício
+ * explícito: palavras genéricas ("devolvido", "remessa ao contador", "arquivado") não bastam.
+ */
+export function transferSignal(
+  movement: TribunalRecordEvidence["lastMovement"],
+  record: { degree?: string; tribunal?: string } = {},
+): TransferSignal | undefined {
   if (!movement) return undefined
   const label = `“${movement.name}”${day(movement.occurredAt) ? `, em ${day(movement.occurredAt)}` : ""}`
-  if (categorizeMovement({ code: movement.code, name: movement.name }) === "baixa") return `A última movimentação (${label}) indica baixa ou arquivamento — os autos podem ter voltado à origem.`
-  const folded = fold(movement.name)
-  if (TRANSFER_HINTS.some((hint) => folded.includes(hint)) || movement.complementKeys?.includes("motivo_da_remessa")) {
-    return `A última movimentação (${label}) pode indicar envio a outro órgão ou tribunal.`
+  const text = fold(`${movement.name} ${movement.description ?? ""}`)
+  const tribunal = record.tribunal?.toUpperCase()
+
+  if (DECLINE.test(text)) return { blocks: true, text: `A última movimentação (${label}) indica declínio de competência: o processo pode ter ido para outro juízo ou tribunal.` }
+  if (MOVE.test(text) && OUT_OF_TRIBUNAL.test(text)) return { blocks: true, text: `A última movimentação (${label}) indica envio dos autos para fora deste tribunal.` }
+  if (MOVE.test(text) && UPPER_INSTANCE.test(text) && TOP_DEGREES.has(record.degree?.toUpperCase() ?? "")) {
+    return { blocks: true, text: `A última movimentação (${label}) indica envio à instância superior a partir do grau ${record.degree}: fora deste tribunal.` }
+  }
+  if (categorizeMovement({ code: movement.code, name: movement.name }) === "baixa") {
+    return tribunal && SUPERIOR_COURTS.has(tribunal)
+      ? { blocks: true, text: `A última movimentação no ${tribunal} (${label}) indica baixa: os autos podem ter voltado ao tribunal de origem.` }
+      : { blocks: false, text: `A última movimentação (${label}) indica baixa ou arquivamento no próprio tribunal.` }
   }
   return undefined
 }
 
-/** Evidência que fica guardada (sem as pistas internas da movimentação). */
-const evidence = (r: RecordInput): TribunalRecordEvidence => ({
-  tribunal: r.tribunal,
-  degree: r.degree,
-  judicialUnit: r.judicialUnit,
-  updatedAt: r.updatedAt,
-  dataset: r.dataset,
-  lastMovement: r.lastMovement ? { name: r.lastMovement.name, occurredAt: r.lastMovement.occurredAt } : undefined,
-})
+/* ------------------------------- consultas --------------------------------- */
 
 /** Mesma sigla, sem hífen e com o apelido conhecido do TJDFT. */
 const ALIASES: Record<string, string> = { TJDF: "TJDFT" }
@@ -74,25 +133,69 @@ export const sameTribunal = (a?: string, b?: string) => !!a && !!b && canonical(
 
 const newestFirst = (a: { updatedAt?: string }, b: { updatedAt?: string }) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "")
 
-export function identifyTribunal(cnj: string, checks: CheckInput[], identifiedAt: string): TribunalIdentification {
+const checkKey = (c: Pick<TribunalCheck, "role" | "tribunal">) => `${c.role}:${canonical(c.tribunal)}`
+
+/**
+ * Junta consultas guardadas com consultas novas: por índice (papel + tribunal), fica a
+ * mais recente; em empate, a nova. Consultas a outros índices continuam valendo.
+ */
+export function mergeChecks(previous: TribunalCheck[] | undefined, incoming: TribunalCheck[]): TribunalCheck[] {
+  const merged = new Map<string, TribunalCheck>()
+  for (const check of [...(previous ?? []), ...incoming].map(normalizeCheck)) {
+    const key = checkKey(check)
+    const kept = merged.get(key)
+    if (!kept || (check.checkedAt ?? "") >= (kept.checkedAt ?? "")) merged.set(key, check)
+  }
+  // Origem primeiro, depois superiores: a ordem de exibição não depende de quem chegou antes.
+  return [...merged.values()].sort((a, b) => (a.role === b.role ? 0 : a.role === "origem" ? -1 : 1))
+}
+
+const incompleteText = (c: TribunalCheck) =>
+  c.coverage?.partial
+    ? `A resposta da consulta ao ${c.tribunal} veio parcial (parte do índice não respondeu): pode haver outros registros.`
+    : c.coverage?.truncated
+      ? `A consulta ao ${c.tribunal} devolveu ${c.coverage.returned} de ${c.coverage.total ?? "mais"} registros: pode haver outros registros.`
+      : undefined
+
+/** Tentativa implícita numa identificação: a da consulta de origem (ou da mais recente). */
+function attemptOf(checks: TribunalCheck[]): TribunalAttempt | undefined {
+  const check = checks.find((c) => c.role === "origem") ?? [...checks].sort((a, b) => (b.checkedAt ?? "").localeCompare(a.checkedAt ?? ""))[0]
+  if (!check?.checkedAt || check.status === "not_checked") return undefined
+  return { at: check.checkedAt, tribunal: check.tribunal, outcome: check.status === "found" ? "found" : check.status === "not_found" ? "not_found" : "failed" }
+}
+
+/* ------------------------------ identificação ------------------------------- */
+
+export interface IdentifyOptions {
+  /** Última tentativa explícita (ex.: falha do monitoramento); sem ela, vem das consultas. */
+  lastAttempt?: TribunalAttempt
+}
+
+export function identifyTribunal(cnj: string, input: TribunalCheck[], identifiedAt: string, options: IdentifyOptions = {}): TribunalIdentification {
   const parts = parseCNJ(cnj)
   const origin = parts?.checkDigitsValid ? originTribunal(parts.digits) : undefined
-  const originInfo: TribunalIdentification["origin"] = {
-    acronym: origin?.acronym,
-    name: origin?.name,
-    segment: origin?.segment,
-    source: "cnj",
-    covered: isCovered(origin?.acronym),
+  const checks = input.map(normalizeCheck)
+  const base = {
+    cnj: parts?.digits,
+    origin: { acronym: origin?.acronym, name: origin?.name, segment: origin?.segment, source: "cnj" as const, covered: isCovered(origin?.acronym) },
+    checks,
+    identifiedAt: officeTime(identifiedAt) ?? identifiedAt,
+    lastAttempt: options.lastAttempt ? { ...options.lastAttempt, at: officeTime(options.lastAttempt.at) ?? options.lastAttempt.at } : attemptOf(checks),
   }
-  const stored: TribunalCheck[] = checks.map((c) => ({ ...c, records: c.records.map(evidence) }))
-  const base = { origin: originInfo, checks: stored, identifiedAt }
+  const status = (s: CurrentTribunalStatus, reasons: string[], extra: Partial<TribunalIdentification["current"]> = {}) => ({ status: s, reasons, ...extra })
 
-  const fromOrigin = (note: string): TribunalIdentification["inferred"] =>
-    origin ? { acronym: origin.acronym, name: origin.name, basis: "cnj", note } : undefined
-  const ORIGIN_NOTE = "Deduzido do número CNJ: é o tribunal de origem e não indica onde o processo tramita hoje."
+  const fromOrigin = (): TribunalIdentification["inferred"] =>
+    origin
+      ? { acronym: origin.acronym, name: origin.name, basis: "cnj", note: "Deduzido do número CNJ: é o tribunal de origem e não indica onde o processo tramita hoje." }
+      : undefined
 
   if (!parts || !parts.checkDigitsValid) {
-    return { ...base, current: { status: "not_checked", reasons: ["Número CNJ inválido: o tribunal não foi identificado."] } }
+    return {
+      ...base,
+      current: status("invalid_number", [
+        parts ? "Número CNJ com dígito verificador inválido: o tribunal não foi identificado." : "Número CNJ incompleto: o tribunal não foi identificado.",
+      ]),
+    }
   }
 
   const found = checks.filter((c) => c.status === "found" && c.records.length)
@@ -110,119 +213,141 @@ export function identifyTribunal(cnj: string, checks: CheckInput[], identifiedAt
   /* Sem registro em nenhum índice ------------------------------------------ */
   if (!found.length) {
     const originCheck = checks.find((c) => c.role === "origem")
-    if (!originInfo.covered && !originCheck) {
-      const reason = origin
-        ? `Não há fonte consultável para o ${origin.acronym}: o tribunal atual não foi verificado.`
-        : `O código do tribunal (${parts.segment}.${parts.tribunalCode}) não existe na numeração única: o tribunal não foi identificado.`
-      return { ...base, current: { status: "unsupported", reasons: [reason, ...superiorNotes] }, inferred: fromOrigin(ORIGIN_NOTE) }
+    if (!origin) {
+      return {
+        ...base,
+        current: status("unknown_tribunal", [
+          `O código do tribunal (${parts.segment}.${parts.tribunalCode}) não existe na numeração única: o tribunal não foi identificado.`,
+          ...superiorNotes,
+        ]),
+      }
+    }
+    if (!base.origin.covered && !originCheck) {
+      return {
+        ...base,
+        current: status("unsupported", [`Não há fonte consultável para o ${origin.acronym}: o tribunal atual não foi verificado.`, ...superiorNotes]),
+        inferred: fromOrigin(),
+      }
     }
     if (!originCheck || originCheck.status === "failed" || originCheck.status === "not_checked") {
       return {
         ...base,
-        current: { status: "not_checked", reasons: ["Nenhuma consulta à fonte foi concluída: o tribunal atual não foi verificado.", ...superiorNotes] },
-        inferred: fromOrigin(ORIGIN_NOTE),
+        current: status("not_checked", ["Nenhuma consulta à fonte foi concluída: o tribunal atual não foi verificado.", ...superiorNotes]),
+        inferred: fromOrigin(),
       }
     }
     return {
       ...base,
-      current: {
-        status: "not_found",
-        source: "datajud",
-        dataset: originCheck.dataset,
-        checkedAt: originCheck.checkedAt,
-        reasons: [
+      current: status(
+        "not_found",
+        [
           `Nenhum registro do número na consulta ao ${originCheck.tribunal}. Pode ser atraso de indexação, segredo de justiça ou tramitação em outro tribunal — a ausência não prova onde o processo está.`,
           ...superiorNotes,
         ],
-      },
-      inferred: fromOrigin(ORIGIN_NOTE),
+        { source: "datajud", dataset: originCheck.dataset, checkedAt: originCheck.checkedAt },
+      ),
+      inferred: fromOrigin(),
     }
   }
 
   /* Há registros: confere os critérios ------------------------------------- */
   const records = found
-    .flatMap((c) => c.records.map((r) => ({ ...r, indexTribunal: c.tribunal, check: c })))
+    .flatMap((c) =>
+      c.records.map((r) => ({ ...r, indexTribunal: c.tribunal, check: c, effective: r.tribunal && !sameTribunal(r.tribunal, c.tribunal) ? r.tribunal : c.tribunal })),
+    )
     .sort(newestFirst)
   const latest = records[0]
-  const inferredFromLatest = (): TribunalIdentification["inferred"] => {
-    const acronym = latest.tribunal ?? latest.indexTribunal
-    return {
-      acronym,
-      name: tribunalName(acronym),
-      basis: "registro_mais_recente",
-      note: `Inferido do registro atualizado mais recentemente na fonte${day(latest.updatedAt) ? ` (${day(latest.updatedAt)})` : ""}; não confirmado.`,
-    }
-  }
-  const listed = (list: typeof records) =>
-    list.map((r) => `${r.tribunal ?? r.indexTribunal}${r.degree ? ` (${r.degree})` : ""}${day(r.updatedAt) ? ` — atualizado em ${day(r.updatedAt)}` : ""}`).join("; ")
+  const listed = records
+    .map((r) => `${r.effective}${r.degree ? ` (${r.degree})` : ""}${day(r.updatedAt) ? ` — atualizado em ${day(r.updatedAt)}` : ""}`)
+    .join("; ")
 
-  // Critério 2: um tribunal só, igual ao do índice.
+  // Critério 2: um tribunal só, igual ao do índice. Senão, divergência — sem escolher.
   const mismatched = records.filter((r) => r.tribunal && !sameTribunal(r.tribunal, r.indexTribunal))
-  // O tribunal de cada registro é o do índice quando os dois coincidem (grafia da Íntegra).
-  const tribunals = [...new Set(records.map((r) => (r.tribunal && !sameTribunal(r.tribunal, r.indexTribunal) ? r.tribunal : r.indexTribunal)))]
+  const tribunals = [...new Set(records.map((r) => canonical(r.effective)))]
   if (mismatched.length || tribunals.length > 1) {
+    const candidates = tribunals.map((key) => {
+      const group = records.filter((r) => canonical(r.effective) === key)
+      const acronym = group[0].effective
+      return {
+        acronym,
+        name: tribunalName(acronym),
+        degrees: [...new Set(group.map((r) => r.degree).filter((d): d is string => !!d))],
+        updatedAt: group[0].updatedAt,
+        role: group[0].check.role,
+      }
+    })
     const reasons = [
       tribunals.length > 1
-        ? `Há registros em mais de um tribunal: ${listed(records)}. Sem como saber, pela fonte, onde o processo tramita agora.`
+        ? `Há registros em mais de um tribunal: ${listed}. A fonte não permite dizer em qual deles o processo tramita agora.`
         : `Um registro encontrado na consulta ao ${mismatched[0].indexTribunal} informa outro tribunal (${mismatched[0].tribunal}).`,
+      ...found.map(incompleteText).filter((t): t is string => !!t),
       ...superiorNotes,
     ]
-    return { ...base, current: { status: "conflicting", source: "datajud", checkedAt: latest.check.checkedAt, reasons }, inferred: inferredFromLatest() }
+    return {
+      ...base,
+      current: status("conflicting", reasons, { source: "datajud", checkedAt: latest.check.checkedAt }),
+      candidates,
+    }
   }
 
-  const acronym = canonical(tribunals[0]) === canonical(latest.indexTribunal) ? latest.indexTribunal : tribunals[0]
+  const acronym = latest.indexTribunal
   const missing: string[] = []
-  // Critério 3, 4, 5, 6.
+  const notes: string[] = []
+  // Critérios 3 a 7.
   if (!latest.tribunal) missing.push(`O registro encontrado na consulta ao ${latest.indexTribunal} não informa o tribunal.`)
   if (!latest.updatedAt) missing.push("O registro não tem data de atualização na fonte.")
-  const lastMovement = records
-    .map((r) => r.lastMovement)
-    .filter((m): m is NonNullable<RecordInput["lastMovement"]> => !!m)
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))[0]
-  if (!lastMovement) missing.push("Os registros não trazem movimentações para conferir se houve remessa ou baixa.")
-  const signal = transferSignal(lastMovement)
-  if (signal) missing.push(signal)
+  const withMovement = records.filter((r) => r.lastMovement).sort((a, b) => b.lastMovement!.occurredAt.localeCompare(a.lastMovement!.occurredAt))[0]
+  if (!withMovement) missing.push("Os registros não trazem movimentações para conferir se os autos saíram do tribunal.")
+  const signal = withMovement ? transferSignal(withMovement.lastMovement, { degree: withMovement.degree, tribunal: withMovement.effective }) : undefined
+  if (signal?.blocks) missing.push(signal.text)
+  else if (signal) notes.push(signal.text)
   for (const c of failed) missing.push(`A consulta ao ${c.tribunal} não respondeu: pode haver registro lá.`)
+  for (const text of found.map(incompleteText)) if (text) missing.push(text)
 
   const degrees = [...new Set(records.map((r) => r.degree).filter(Boolean))]
   const units = [...new Set(records.map((r) => r.judicialUnit).filter(Boolean))]
-  const degreeNote = degrees.length > 1 ? [`Registros em mais de um grau (${degrees.join(", ")}): o grau atual não foi confirmado.`] : []
+  if (degrees.length > 1) notes.push(`Registros em mais de um grau (${degrees.join(", ")}): o grau atual não foi confirmado.`)
   const info = tribunalByAcronym(acronym)
 
   if (missing.length) {
     return {
       ...base,
-      current: {
-        status: "not_confirmed",
+      current: status("not_confirmed", [...missing, ...notes, ...superiorNotes], {
         source: "datajud",
         dataset: latest.dataset ?? latest.check.dataset,
         updatedAt: latest.updatedAt,
         checkedAt: latest.check.checkedAt,
-        reasons: [...missing, ...degreeNote, ...superiorNotes],
+      }),
+      inferred: {
+        acronym,
+        name: tribunalName(acronym),
+        basis: "registro_mais_recente",
+        note: `Inferido dos registros encontrados na consulta ao ${acronym}; não confirmado.`,
       },
-      inferred: inferredFromLatest(),
     }
   }
 
   return {
     ...base,
-    current: {
-      status: "confirmed",
-      acronym,
-      name: info?.name ?? acronym,
-      degree: degrees.length === 1 ? degrees[0] : undefined,
-      judicialUnit: units.length === 1 && records.length === 1 ? units[0] : undefined,
-      source: "datajud",
-      dataset: latest.dataset ?? latest.check.dataset,
-      updatedAt: latest.updatedAt,
-      checkedAt: latest.check.checkedAt,
-      reasons: [
+    current: status(
+      "confirmed",
+      [
         `O registro da fonte informa o tribunal ${acronym}${day(latest.updatedAt) ? `, atualizado em ${day(latest.updatedAt)}` : ""}.`,
-        "A última movimentação não indica remessa, redistribuição nem baixa.",
-        ...degreeNote,
+        "A última movimentação não indica saída dos autos deste tribunal.",
+        ...notes,
         ...superiorNotes,
       ],
-    },
+      {
+        acronym,
+        name: info?.name ?? acronym,
+        degree: degrees.length === 1 ? degrees[0] : undefined,
+        judicialUnit: units.length === 1 && records.length === 1 ? units[0] : undefined,
+        source: "datajud",
+        dataset: latest.dataset ?? latest.check.dataset,
+        updatedAt: latest.updatedAt,
+        checkedAt: latest.check.checkedAt,
+      },
+    ),
   }
 }
 
@@ -241,82 +366,182 @@ export function sheetRecords(sheet: ProcessSheet): ExternalRecord[] {
       dataset: sheet.source.dataset,
       movementCount: sheet.movements.length,
       lastMovement: last
-        ? { name: last.name, code: last.code, occurredAt: last.occurredAt, complementKeys: last.complements?.map((c) => c.key).filter((k): k is string => !!k) }
+        ? {
+            name: last.name,
+            code: last.code,
+            occurredAt: last.occurredAt,
+            description: last.description,
+            complementKeys: last.complements?.map((c) => c.key).filter((k): k is string => !!k),
+          }
         : undefined,
     },
   ]
 }
 
-/** Consulta ao tribunal de origem a partir da ficha que a fonte devolveu. */
-export function originCheckFromSheet(sheet: ProcessSheet, checkedAt: string): CheckInput {
-  const tribunal = tribunalOfDataset(sheet.source.dataset) ?? tribunalFor(sheet.cnj) ?? originAcronym(sheet.cnj) ?? "?"
+const toEvidence = (r: ExternalRecord): TribunalRecordEvidence => ({
+  tribunal: r.tribunal,
+  degree: r.degree,
+  judicialUnit: r.judicialUnit,
+  updatedAt: r.updatedAt,
+  dataset: r.dataset,
+  movementCount: r.movementCount,
+  lastMovement: r.lastMovement,
+})
+
+/** Consulta a um índice a partir de registros e cobertura devolvidos pela fonte. */
+export function checkFromRecords(input: {
+  tribunal: string
+  role: TribunalCheck["role"]
+  dataset?: string
+  checkedAt: string
+  records: ExternalRecord[]
+  coverage?: ExternalCoverage
+}): TribunalCheck {
   return {
-    tribunal,
-    role: "origem",
-    status: "found",
+    tribunal: input.tribunal,
+    role: input.role,
+    status: input.records.length ? "found" : "not_found",
     provider: "datajud",
-    dataset: sheet.source.dataset ?? (isCovered(tribunal) ? datasetFor(tribunal) : undefined),
-    checkedAt,
-    records: sheetRecords(sheet),
+    dataset: input.dataset,
+    checkedAt: officeTime(input.checkedAt),
+    coverage: input.coverage,
+    records: input.records.map(toEvidence).map(normalizeRecord),
   }
 }
 
-/** Identificação a partir só da ficha (importação e sincronização: sem consulta ao superior). */
-export function identifyFromSheet(sheet: ProcessSheet, checkedAt: string): TribunalIdentification {
-  return identifyTribunal(sheet.cnj, [originCheckFromSheet(sheet, checkedAt)], checkedAt)
+/** Consulta ao tribunal de origem a partir da ficha que a fonte devolveu. */
+export function originCheckFromSheet(sheet: ProcessSheet, checkedAt: string): TribunalCheck {
+  const tribunal = tribunalOfDataset(sheet.source.dataset) ?? tribunalFor(sheet.cnj) ?? originAcronym(sheet.cnj) ?? "?"
+  return {
+    ...checkFromRecords({ tribunal, role: "origem", dataset: sheet.source.dataset ?? (isCovered(tribunal) ? datasetFor(tribunal) : undefined), checkedAt, records: sheetRecords(sheet), coverage: sheet.coverage }),
+    status: "found",
+  }
+}
+
+export interface FromSheetOptions {
+  /** Identificação já guardada no processo: as consultas a outros índices continuam valendo. */
+  previous?: TribunalIdentification
+  /** Consultas trazidas de fora (ex.: as do relatório da Consulta processual que está sendo aplicado). */
+  checks?: TribunalCheck[]
 }
 
 /**
- * Identificação de um processo salvo. Cadastros anteriores a esta verificação não têm
- * evidência guardada: a origem sai do número e o atual fica `not_checked` — o tribunal
- * do cadastro continua aparecendo como dado do escritório, nunca como "atual".
+ * Identificação a partir da ficha (importação, sincronização, "Atualizar processo").
+ * Nunca descarta consultas guardadas a outros índices: a consulta de origem nova substitui
+ * só a de origem antiga.
  */
-export function tribunalIdentificationOf(process: Pick<Process, "cnj" | "number" | "tribunal" | "tribunalIdentification">): TribunalIdentification | undefined {
+export function identifyFromSheet(sheet: ProcessSheet, checkedAt: string, options: FromSheetOptions = {}): TribunalIdentification {
+  const previous = options.previous && (!options.previous.cnj || options.previous.cnj === sheet.cnj) ? options.previous.checks : undefined
+  const checks = mergeChecks(previous, [...(options.checks ?? []), originCheckFromSheet(sheet, checkedAt)])
+  return identifyTribunal(sheet.cnj, checks, checkedAt)
+}
+
+type IdentifiableProcess = Pick<Process, "cnj" | "number" | "tribunal" | "tribunalIdentification"> & Partial<Pick<Process, "origin" | "source">>
+
+/**
+ * Identificação de um processo salvo. Sem evidência guardada:
+ * - número inválido, código inexistente ou tribunal sem fonte: dito como tal;
+ * - cadastro manual nunca consultado: `not_checked`;
+ * - processo salvo antes desta verificação: `legacy` — o tribunal do cadastro continua
+ *   como dado do escritório, nunca como "atual".
+ */
+export function tribunalIdentificationOf(process: IdentifiableProcess): TribunalIdentification | undefined {
   if (process.tribunalIdentification) return process.tribunalIdentification
   const digits = parseCNJ(process.cnj ?? process.number ?? "")?.digits
   if (!digits) return undefined
   const identification = identifyTribunal(digits, [], "")
-  if (identification.current.status === "unsupported") return identification
+  if (identification.current.status !== "not_checked") return identification
+  const manualOnly = process.origin === "manual" && !process.source?.provider
   return {
     ...identification,
-    current: {
-      status: "not_checked",
-      reasons: [
-        process.tribunal
-          ? `Cadastro anterior à verificação do tribunal atual: o tribunal registrado (${process.tribunal}) não tem evidência de consulta guardada.`
-          : "O tribunal atual ainda não foi verificado na fonte.",
-      ],
-    },
+    current: manualOnly
+      ? { status: "not_checked", reasons: ["Cadastro manual: o tribunal atual ainda não foi verificado na fonte."] }
+      : {
+          status: "legacy",
+          reasons: [
+            process.tribunal
+              ? `Processo salvo antes da verificação do tribunal atual: o tribunal registrado (${process.tribunal}) não tem evidência de consulta guardada.`
+              : "Processo salvo antes da verificação do tribunal atual: não há evidência de consulta guardada.",
+          ],
+        },
   }
 }
 
+/**
+ * Registra uma tentativa de consulta sem apagar a evidência guardada (o monitoramento,
+ * quando a fonte falha, limita ou não encontra o número). `undefined` sem número válido.
+ */
+export function withAttempt(process: IdentifiableProcess, attempt: TribunalAttempt): TribunalIdentification | undefined {
+  const current = tribunalIdentificationOf(process)
+  return current ? { ...current, lastAttempt: { ...attempt, at: officeTime(attempt.at) ?? attempt.at } } : undefined
+}
+
+/* --------------------------------- rótulos --------------------------------- */
+
 /** Rótulos curtos da situação do tribunal atual. */
-export const CURRENT_STATUS_LABEL: Record<TribunalIdentification["current"]["status"], string> = {
+export const CURRENT_STATUS_LABEL: Record<CurrentTribunalStatus, string> = {
   confirmed: "Confirmado pela fonte",
   not_confirmed: "Não confirmado",
   conflicting: "Registros divergentes",
   not_found: "Não localizado na fonte",
   unsupported: "Sem fonte para este tribunal",
+  unknown_tribunal: "Código de tribunal inexistente",
+  invalid_number: "Número CNJ inválido",
   not_checked: "Não verificado",
+  legacy: "Sem verificação registrada",
+}
+
+/** O que cada situação significa — usado no contexto da IA (fato, não instrução). */
+export const CURRENT_STATUS_MEANING: Record<CurrentTribunalStatus, string> = {
+  confirmed: "A fonte tem registro do processo neste tribunal e os critérios de evidência foram atendidos na data da consulta.",
+  not_confirmed: "Há registro na fonte, mas a evidência não basta para dizer onde o processo tramita hoje.",
+  conflicting: "Há registros em mais de um tribunal; a fonte não permite dizer em qual deles o processo tramita hoje.",
+  not_found: "A fonte consultada não tem o número; isso não prova onde o processo está.",
+  unsupported: "O tribunal de origem não tem fonte consultável; o tribunal atual não foi verificado.",
+  unknown_tribunal: "O código de tribunal do número não existe na numeração única.",
+  invalid_number: "O número CNJ é inválido; o tribunal não foi identificado.",
+  not_checked: "Nenhuma consulta à fonte foi concluída; o tribunal atual não foi verificado.",
+  legacy: "O processo foi salvo antes da verificação do tribunal atual; não há evidência de consulta guardada.",
+}
+
+export const ATTEMPT_LABEL: Record<TribunalAttempt["outcome"], string> = {
+  found: "registro encontrado",
+  not_found: "número não localizado",
+  failed: "fonte sem resposta",
+  rate_limited: "fonte limitou as consultas",
+}
+
+/** A última tentativa é posterior à evidência e não a revalidou? */
+export function staleAttempt(id: TribunalIdentification): TribunalAttempt | undefined {
+  const attempt = id.lastAttempt
+  if (!attempt || attempt.outcome === "found") return undefined
+  const evidenceAt = id.current.checkedAt ?? ""
+  return attempt.at > evidenceAt ? attempt : undefined
 }
 
 /** "TJSP — Tribunal de Justiça do Estado de São Paulo" */
 export const tribunalLabel = (acronym?: string, name?: string) => (acronym ? (name && name !== acronym ? `${acronym} — ${name}` : acronym) : undefined)
 
+/* ----------------------------------- IA ------------------------------------ */
+
 /**
- * Tribunal para o contexto da IA: origem, atual e inferido separados, com a fonte.
- * Sem confirmação, o aviso diz para não afirmar onde o processo tramita hoje.
+ * Tribunal para o contexto da IA: origem, atual (com estado e significado), tribunais com
+ * registro quando divergem e a última tentativa. Só fatos — a regra de como usá-los está
+ * no prompt de sistema (regra do tribunal).
  */
 export function describeTribunalForAI(id: TribunalIdentification | undefined) {
   if (!id) return undefined
   const { origin, current, inferred } = id
   const confirmed = current.status === "confirmed"
+  const stale = staleAttempt(id)
   return {
     tribunal_de_origem: origin.acronym
       ? `${tribunalLabel(origin.acronym, origin.name)} (pelo número CNJ — indica onde o processo começou, não onde tramita hoje)`
       : "não identificado pelo número",
     tribunal_atual: {
+      estado: current.status,
       situacao: CURRENT_STATUS_LABEL[current.status],
+      significado: CURRENT_STATUS_MEANING[current.status],
       tribunal: confirmed ? tribunalLabel(current.acronym, current.name) : undefined,
       grau: confirmed ? current.degree : undefined,
       fonte: current.source === "datajud" ? "DataJud (CNJ), consulta pública" : undefined,
@@ -325,8 +550,24 @@ export function describeTribunalForAI(id: TribunalIdentification | undefined) {
       consultado_em: current.checkedAt,
       motivos: current.reasons,
     },
+    tribunais_com_registro:
+      current.status === "conflicting"
+        ? id.candidates?.map((c) => ({
+            tribunal: tribunalLabel(c.acronym, c.name),
+            graus: c.degrees,
+            atualizado_na_fonte: c.updatedAt,
+            consulta: c.role === "origem" ? "tribunal de origem" : "tribunal superior (complementar)",
+          }))
+        : undefined,
     tribunal_inferido:
-      !confirmed && inferred ? { tribunal: tribunalLabel(inferred.acronym, inferred.name), observacao: `${inferred.note} É uma inferência.` } : undefined,
-    aviso: confirmed ? undefined : "Tribunal atual não confirmado pela fonte: não afirme em que tribunal o processo tramita hoje.",
+      !confirmed && current.status !== "conflicting" && inferred
+        ? { tribunal: tribunalLabel(inferred.acronym, inferred.name), observacao: `${inferred.note} É uma inferência.` }
+        : undefined,
+    ultima_tentativa: id.lastAttempt ? { em: id.lastAttempt.at, resultado: ATTEMPT_LABEL[id.lastAttempt.outcome], tribunal: id.lastAttempt.tribunal } : undefined,
+    limitacao: !confirmed
+      ? "O tribunal atual não está confirmado pela fonte."
+      : stale
+        ? `A confirmação é de ${current.checkedAt}; a tentativa de ${stale.at} teve como resultado: ${ATTEMPT_LABEL[stale.outcome]} — a confirmação não foi revalidada.`
+        : undefined,
   }
 }

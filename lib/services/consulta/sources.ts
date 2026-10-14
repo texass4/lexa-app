@@ -102,8 +102,8 @@ export function productionSources({ organizationId, admin, datajudEnabled }: Pro
     // já limitada pelo teto de consultas do escritório).
     superior: datajudEnabled
       ? async (cnj, tribunal) => {
-          const { dataset, records } = await datajudProvider.lookupRecords(cnj, tribunal)
-          return { dataset, records, checkedAt: new Date().toISOString() }
+          const { dataset, records, coverage } = await datajudProvider.lookupRecords(cnj, tribunal)
+          return { dataset, records, coverage, checkedAt: new Date().toISOString() }
         }
       : null,
     communications: djenEnabled() ? djenForOrg(organizationId) : null,

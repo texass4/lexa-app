@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Prazo, Process, Task, TaskColumn } from "@/types"
+import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Prazo, Process, Task, TaskColumn, TribunalCheck } from "@/types"
 import * as account from "@/lib/auth/account"
 import { CLIENT_STATUS } from "@/lib/core/config"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
@@ -137,7 +137,11 @@ interface OfficeActions {
    * Aplica uma ficha reconsultada, importando só o que é novo. `checkedAt` (ISO)
    * é quando a fonte foi conferida — pode vir do cache do escritório.
    */
-  applyProcessSync(processId: string, sheet: ProcessSheet, checkedAt?: string): SyncOutcome
+  /**
+   * Aplica uma ficha reconsultada. `checks`: consultas que acompanham a ficha (as do
+   * relatório da Consulta processual), guardadas como evidência do tribunal.
+   */
+  applyProcessSync(processId: string, sheet: ProcessSheet, checkedAt?: string, options?: { checks?: TribunalCheck[] }): SyncOutcome
   /** Exclui o processo (o banco exclui junto os prazos dele). */
   deleteProcess(id: string): void
   toggleTask(id: string): Task | undefined
@@ -572,13 +576,13 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
         return process
       },
 
-      applyProcessSync(processId, sheet, checkedAt) {
+      applyProcessSync(processId, sheet, checkedAt, options) {
         const current = stateRef.current.processes.find((p) => p.id === processId)
         // Só com o histórico completo: comparar com o resumo trataria movimentações antigas como novas.
         if (!current || current.movementsPartial) return { added: 0 }
 
         const at = checkedAt ? toLocalISO(new Date(checkedAt)) : nowISO()
-        const { process: updated, imported } = mergeProcessSheet(current, sheet, at, { newId: () => uid("m") })
+        const { process: updated, imported } = mergeProcessSheet(current, sheet, at, { newId: () => uid("m"), checks: options?.checks })
 
         commit((s) => ({
           ...s,

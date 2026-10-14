@@ -50,3 +50,16 @@ describe("tribunal de origem pelo número CNJ", () => {
     assert.equal(tre?.site, "https://www.tre-sp.jus.br")
   })
 })
+
+describe("Justiça Militar da União — circunscrições (números SIMULADOS)", () => {
+  it("7.01 a 7.12 são identificados como Circunscrições Judiciárias Militares", () => {
+    assert.equal(originAcronym(syntheticCNJ("7", "01")), "CJM1")
+    assert.equal(originAcronym(syntheticCNJ("7", "12")), "CJM12")
+    assert.equal(originAcronym(syntheticCNJ("7", "13")), undefined)
+    const cjm = originTribunal(syntheticCNJ("7", "11"))
+    assert.equal(cjm?.name, "11ª Circunscrição Judiciária Militar (Justiça Militar da União)")
+    assert.equal(cjm?.segment, "Justiça Militar da União")
+    // Sem domínio próprio inventado: o portal é o da Justiça Militar da União.
+    assert.equal(cjm?.site, "https://www.stm.jus.br")
+  })
+})

@@ -8,6 +8,7 @@
 import { PROCESS_STATUS } from "@/lib/core/config"
 import type { JurisprudenceDecision } from "@/lib/services/jurisprudence/types"
 import type { Process } from "@/types"
+import { describeTribunalForAI, tribunalIdentificationOf } from "@/lib/services/processos/tribunal-identification"
 import type { AISources } from "@/lib/ai/types"
 import { type BuiltContext, SourceRegistry, fmtDate, fmtDateTime, fmtToday } from "./shared"
 
@@ -36,7 +37,9 @@ function describeProcess(registry: SourceRegistry, process: Process) {
     classe: process.className,
     assunto: process.subject,
     area: process.area,
-    tribunal: process.tribunal,
+    // Origem e situação do tribunal com a fonte — o tribunal do cadastro não é, por si, o atual.
+    tribunal_no_cadastro: process.tribunal,
+    tribunal_identificacao: describeTribunalForAI(tribunalIdentificationOf(process)),
     orgao_julgador: process.judicialUnit ?? process.court,
     situacao: PROCESS_STATUS[process.status]?.label,
     ultimas_movimentacoes: [...(process.movements ?? [])]

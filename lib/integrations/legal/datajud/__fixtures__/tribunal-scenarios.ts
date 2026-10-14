@@ -156,3 +156,59 @@ export const simTjdftAlias = simulatedResponse(SIM_TJDFT, [
 ])
 
 export const simEmpty: DataJudSearchResponse = { took: 1, timed_out: false, hits: { total: { value: 0 }, hits: [] } }
+
+/* ---- Regressões da auditoria pós-implementação (todos DADOS SIMULADOS) ---- */
+
+/** Justiça Militar da União — 1ª Circunscrição Judiciária Militar (7.01). */
+export const SIM_CJM1 = syntheticCNJ("7", "01")
+
+/** Remessa explícita ao STJ, a partir do 2º grau do TJSP. */
+export const simTjspRemessaStj = simulatedResponse(SIM_TJSP, [
+  {
+    index: "api_publica_tjsp",
+    tribunal: "TJSP",
+    grau: "G2",
+    updatedAt: "2026-08-01T10:00:00.000Z",
+    movimentos: [movement("Remetidos os Autos (em grau de recurso) para o STJ", "2026-07-31T10:00:00.000Z", 123)],
+  },
+])
+
+/** Baixa definitiva num registro do STJ: os autos voltam à origem. */
+export const simStjBaixa = simulatedResponse(SIM_TJSP, [
+  { index: "api_publica_stj", tribunal: "STJ", grau: "SUP", updatedAt: "2026-09-25T10:00:00.000Z", movimentos: [movement("Baixa Definitiva", "2026-09-24T10:00:00.000Z", 22)] },
+])
+
+/** Resposta com registro, mas com fragmento do índice falho (parcial). */
+export const simPartialWithHits: DataJudSearchResponse = { ...simTjspFirstDegree, _shards: { total: 2, successful: 1, failed: 1 } }
+
+/** Resposta truncada: a fonte diz ter 25 documentos e devolveu 1. */
+export const simTruncated: DataJudSearchResponse = { ...simTjspFirstDegree, hits: { ...simTjspFirstDegree.hits, total: { value: 25, relation: "eq" } } }
+
+/** Um documento de OUTRO número no meio da resposta (não pode virar evidência). */
+export const simWithOtherNumber: DataJudSearchResponse = {
+  took: 1,
+  timed_out: false,
+  hits: {
+    total: { value: 2 },
+    hits: [
+      ...(simTjspFirstDegree.hits?.hits ?? []),
+      {
+        _index: "api_publica_tjsp",
+        _id: "SIMULADO_OUTRO",
+        _source: { numeroProcesso: syntheticCNJ("8", "26", { sequence: "7654321" }), tribunal: "TJRJ", grau: "G2", dataHoraUltimaAtualizacao: "2026-10-01T10:00:00.000Z", movimentos: [] },
+      },
+    ],
+  },
+}
+
+/** Datas perto da meia-noite, com e sem `Z`. */
+export const simMidnight = simulatedResponse(SIM_TJSP, [
+  {
+    index: "api_publica_tjsp",
+    tribunal: "TJSP",
+    grau: "G1",
+    updatedAt: "2026-09-20T23:30:00.000Z",
+    movimentos: [movement("Mero expediente", "2026-09-20T23:10:00.000Z")],
+  },
+  { index: "api_publica_tjsp", tribunal: "TJSP", grau: "G2", updatedAt: "2026-09-20T23:45:00", movimentos: [movement("Conclusão", "2026-09-20T23:40:00")] },
+])

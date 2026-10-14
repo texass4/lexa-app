@@ -19,6 +19,8 @@ import { LookupError } from "../errors"
 import type { DataJudSearchResponse } from "./mapper"
 
 const BASE_URL = "https://api-publica.datajud.cnj.jus.br"
+/** Documentos pedidos por busca (um por grau/instância do número). */
+export const SEARCH_SIZE = 20
 
 export interface DataJudClientOptions {
   apiKey: string
@@ -123,7 +125,12 @@ export function createDataJudClient(options: DataJudClientOptions) {
       } catch {
         return { error: new LookupError("UNAVAILABLE", "HTTP 200 com corpo que não é JSON"), retry: true }
       }
-      if (!isIncompleteMiss(data)) return data
+      if (!isIncompleteMiss(data)) {
+        // Com registros, a resposta parcial segue: o mapper marca a cobertura e a
+        // identificação do tribunal não confirma nada sobre ela.
+        if (data.timed_out || (data._shards?.failed ?? 0) > 0) log("partial_with_hits", { attempt, failed: data._shards?.failed ?? 0, total: data._shards?.total })
+        return data
+      }
       log("partial", { attempt, failed: data._shards?.failed ?? 0, total: data._shards?.total, timedOut: !!data.timed_out })
       return { error: new LookupError("UNAVAILABLE", "resposta parcial (shards falhos)"), retry: true }
     }
@@ -145,7 +152,9 @@ export function createDataJudClient(options: DataJudClientOptions) {
    */
   async function searchByNumber(digits: string, dataset: string): Promise<DataJudSearchResponse> {
     const url = `${(options.baseUrl || BASE_URL).replace(/\/$/, "")}/${dataset}/_search`
-    const body = JSON.stringify({ size: 10, query: { match: { numeroProcesso: digits } } })
+    // Um documento por grau/instância: 20 cobre com folga; acima disso a cobertura sai
+    // como truncada (`mapCoverage`) e nada é confirmado sobre a resposta.
+    const body = JSON.stringify({ size: SEARCH_SIZE, query: { match: { numeroProcesso: digits } } })
     const deadline = now() + config.deadlineMs
     let last: LookupError = new LookupError("UNAVAILABLE", "nenhuma tentativa concluída")
 

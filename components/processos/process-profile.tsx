@@ -55,6 +55,7 @@ import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import { hasValidCheckDigits, onlyDigits } from "@/lib/processos/cnj"
 import { processDistrict } from "@/lib/processos/label"
+import { tribunalIdentificationOf } from "@/lib/services/processos/tribunal-identification"
 import { useStartConsulta } from "./consulta/start-consulta"
 import { PROCESS_STATUS } from "@/lib/core/config"
 import { useCategoryLookup } from "@/components/agenda/use-category"
@@ -67,6 +68,12 @@ import { PRAZO_ALERT_DAYS, processSignals } from "@/lib/dashboard/attention"
 import { nextPrazo } from "@/lib/prazos/prazos"
 import { PrazosPanel } from "@/components/prazos/prazos-panel"
 import { ActivityTimeline } from "@/components/shared/activity-timeline"
+
+/** Etiqueta do tribunal no topo: sem confirmação da fonte, diz que o atual não está confirmado. */
+function tribunalTag(process: Parameters<typeof tribunalIdentificationOf>[0]) {
+  const status = tribunalIdentificationOf(process)?.current.status
+  return !status || status === "confirmed" ? process.tribunal : `${process.tribunal} · atual não confirmado`
+}
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -247,7 +254,7 @@ export function ProcessProfile({ id }: { id: string }) {
         {!narrow && (
           <>
             <Tag>{process.area}</Tag>
-            {process.tribunal && <Tag>{process.tribunal}</Tag>}
+            {process.tribunal && <Tag>{tribunalTag(process)}</Tag>}
             <Tag>{process.judicialUnit ?? process.court}</Tag>
           </>
         )}

@@ -34,3 +34,11 @@ describe("cobertura do DataJud", () => {
     assert.equal(superiorFor(syntheticCNJ("5", "00")), undefined)
   })
 })
+
+describe("Justiça Militar da União na cobertura (números SIMULADOS)", () => {
+  it("CJM sem índice próprio (não inventado); superior complementar é o STM", () => {
+    assert.equal(tribunalFor(syntheticCNJ("7", "01")), undefined)
+    assert.equal(isCovered("CJM1"), false)
+    assert.equal(superiorFor(syntheticCNJ("7", "01")), "STM")
+  })
+})

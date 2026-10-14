@@ -93,36 +93,58 @@ pessoa — pode pedir CAPTCHA, e a Íntegra não acessa por ela.
 | | De onde vem | O que garante |
 |---|---|---|
 | **Origem** | número CNJ (`J.TR`, `lib/processos/tribunals.ts`), sem rede | onde o processo começou — nunca apresentado como "atual" |
-| **Atual** | registros do DataJud (`records` da ficha: todos os documentos do número, um por grau) | só com evidência suficiente (critérios abaixo) |
-| **Inferido** | registro atualizado mais recentemente ou, sem registro, a origem | sempre exibido como inferência |
+| **Atual** | registros do DataJud (todos os documentos do número, um por grau) | só com evidência suficiente (critérios abaixo) |
+| **Inferido** | tribunal dos registros encontrados ou, sem registro, a origem | sempre rotulado como inferência; **nunca** em divergência |
 
 Critérios para o atual ser `confirmed` (todos): algum índice consultado tem registro; todos os
-registros apontam o mesmo tribunal, igual ao do índice (senão `conflicting`); o registro mais
-recente informa o tribunal e tem data de atualização; a última movimentação não indica remessa,
-redistribuição, declínio, devolução nem baixa; nenhuma outra consulta falhou. O grau só é
-informado quando um único grau aparece. Os demais estados: `not_confirmed`, `not_found`
-(ausência não prova onde tramita), `unsupported` (sem índice para o tribunal de origem) e
-`not_checked` (nenhuma consulta concluída, segredo de justiça ou cadastro antigo).
+registros apontam o mesmo tribunal, igual ao do índice (senão `conflicting`, com os tribunais
+listados em `candidates` e nenhum escolhido); o registro mais recente informa o tribunal e tem
+data de atualização; há movimentação e a última não indica **de forma explícita** a saída do
+tribunal (remessa a tribunal superior ou a outra Justiça, declínio de competência, baixa num
+tribunal superior, envio à instância superior a partir do 2º grau — "remessa ao contador",
+"mandado devolvido" e afins não contam); nenhuma outra consulta falhou; as respostas vieram
+completas (`coverage`: sem fragmento falho nem truncamento). O grau só é informado quando um
+único grau aparece.
+
+Estados distintos: `not_confirmed`, `conflicting`, `not_found` (ausência não prova onde tramita),
+`unsupported` (tribunal conhecido, sem fonte), `unknown_tribunal` (código inexistente na
+numeração), `invalid_number` (dígito verificador ou tamanho), `not_checked` (nenhuma consulta
+concluída, segredo de justiça, cadastro manual nunca consultado) e `legacy` (processo salvo antes
+desta verificação).
 
 - **Validade × cobertura:** `parseCNJ` (`lib/processos/cnj.ts`) só diz se o número é bem formado;
-  a identificação da origem cobre todos os segmentos (inclusive TRE, TJM, STF e CNJ), e a
-  cobertura do DataJud (`datajud/tribunals.ts`) diz se há índice para consultar. TRE, Justiça
-  Militar Estadual e Auditorias Militares ficam fora da cobertura até a grafia dos índices ser
-  conferida na documentação oficial do DataJud (o número continua identificado).
+  a identificação da origem cobre todos os segmentos (inclusive TRE, TJM, STF, CNJ e as
+  Circunscrições Judiciárias Militares `7.01`–`7.12`, abaixo do STM), e a cobertura do DataJud
+  (`datajud/tribunals.ts`) diz se há índice para consultar. TRE, Justiça Militar Estadual e CJM
+  ficam fora da cobertura até a grafia dos índices ser conferida na documentação oficial do
+  DataJud (o número continua identificado).
+- **Busca:** `match` em `numeroProcesso`, até 20 documentos (`SEARCH_SIZE`). Documento de outro
+  número é descartado; resposta parcial (fragmentos falhos com registros) ou truncada (total
+  maior que o devolvido) fica marcada na consulta e impede a confirmação.
 - **Tribunal superior (complementar):** a consulta processual também procura o número no
-  índice do superior do segmento (STJ para Estadual/Federal, TST, TSE, STM), em paralelo, com
-  o prazo das fontes complementares. Nada encontrado lá não prova nada; registro lá e na origem
-  vira `conflicting`; falha lá impede a confirmação, mas não derruba a consulta. A importação, a
-  sincronização e o monitoramento não consultam o superior (sem custo extra no cron).
-- **Persistência:** `Process.tribunalIdentification` (dentro de `data`, sem migração), gravado
-  na importação e a cada sincronização; o relatório guarda o mesmo objeto em `report.tribunal`.
-  Processos e relatórios antigos, sem o campo, são lidos por `tribunalIdentificationOf` (origem
-  pelo número, atual `not_checked`) e pela tela/IA com o rótulo antigo.
+  índice do superior do segmento (STJ para Estadual/Federal/Militar Estadual, TST, TSE, STM), em
+  paralelo, com o prazo das fontes complementares. Nada encontrado lá não prova nada; registro lá
+  e na origem vira `conflicting`; falha lá impede a confirmação, mas não derruba a consulta. A
+  importação, a sincronização e o monitoramento não consultam o superior (sem custo extra no cron).
+- **Persistência:** `Process.tribunalIdentification` (dentro de `data`, sem migração). Cada
+  gravação junta a consulta mais recente de **cada índice** (`mergeChecks`): a sincronização só da
+  origem substitui só a consulta de origem e mantém a do superior — uma divergência continua
+  divergência até uma nova consulta àquele índice. "Atualizar processo com a consulta" envia as
+  consultas do relatório (inclusive a do superior) e nunca confirma um tribunal por si.
+- **Tentativas:** `lastAttempt` guarda a última consulta (sucesso ou não). O monitoramento grava a
+  falha (não localizado, 429, fonte fora) sem mexer na evidência; a tela mostra "Última
+  confirmação válida" e "Última tentativa" separadas, e a IA recebe a limitação.
+- **Datas:** as da fonte em horário de parede, lidas literalmente (como na ficha); as da Íntegra
+  (consulta, tentativa) em horário local do escritório. Tudo sem fuso na identificação.
+- **Compatibilidade:** processos e relatórios antigos, sem o campo ou com a forma anterior (sem
+  `cnj`/`coverage`, datas em UTC), são lidos e mesclados normalmente.
 - **Comarca:** a sigla do tribunal deixou de ser gravada em `district`. Registros antigos com a
   sigla não são regravados — `processDistrict` a ignora na leitura (perfil e IA).
-- **IA:** recebe `tribunal_identificacao` (origem, atual com fonte e motivos, inferido) e, sem
-  confirmação, o aviso para não afirmar onde o processo tramita. O tribunal do cadastro vai
-  como `tribunal_no_cadastro`.
+- **IA:** a regra 11 do prompt de sistema diz que a origem nunca é o atual e que só o estado
+  `confirmed` permite afirmar onde o processo tramita. O contexto (`tribunal_identificacao`) leva
+  estado, significado, motivos, fonte e datas, os tribunais com registro em divergência e a
+  última tentativa — só fatos, sem instrução embutida nos dados. O tribunal do cadastro vai como
+  `tribunal_no_cadastro`, inclusive no contexto de jurisprudência.
 
 ### Não integradas (e por quê)
 

@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { fmtDayLabel, fmtNumericDate, fmtShortDate, fmtTime } from "@/lib/core/dates"
 import { degreeLabel, isAutoTracked, ORIGIN_LABEL } from "@/lib/services/processos/labels"
-import { CURRENT_STATUS_LABEL, tribunalIdentificationOf, tribunalLabel } from "@/lib/services/processos/tribunal-identification"
+import { ATTEMPT_LABEL, CURRENT_STATUS_LABEL, staleAttempt, tribunalIdentificationOf, tribunalLabel } from "@/lib/services/processos/tribunal-identification"
 import type { Process, ProcessParty } from "@/types"
 import type { RefreshState } from "./use-process-refresh"
 
@@ -40,15 +40,22 @@ function summaryOrigin(process: Process) {
     : "Informações cadastradas pelo escritório."
 }
 
-/** "03/10/2026" de um ISO (local ou UTC). */
-const day = (iso?: string) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10).split("-").reverse().join("/") : undefined)
+/** "03/10/2026 14:32" de um horário local sem fuso (as datas da identificação já vêm normalizadas). */
+const when = (iso?: string) => {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return undefined
+  const date = iso.slice(0, 10).split("-").reverse().join("/")
+  const time = /T(\d{2}:\d{2})/.exec(iso)?.[1]
+  return time && time !== "00:00" ? `${date} ${time}` : date
+}
 
-/** Tribunal de origem (pelo número) × atual (pela fonte), com o porquê. */
+/** Tribunal de origem (pelo número) × atual (pela fonte), com o porquê e a última tentativa. */
 function TribunalFacts({ process }: { process: Process }) {
   const id = tribunalIdentificationOf(process)
   if (!id) return null
   const { current, inferred } = id
   const confirmed = current.status === "confirmed"
+  const conflicting = current.status === "conflicting"
+  const stale = staleAttempt(id)
   const currentText = confirmed
     ? [tribunalLabel(current.acronym, current.name), current.degree && degreeLabel(current.degree)].filter(Boolean).join(" · ")
     : CURRENT_STATUS_LABEL[current.status]
@@ -61,17 +68,29 @@ function TribunalFacts({ process }: { process: Process }) {
         </div>
         <div className="min-w-0">
           <dt className="text-[11.5px] text-muted-foreground">Tribunal atual</dt>
-          <dd className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[13px] font-medium break-words text-foreground">
-            {currentText}
-            {confirmed && current.checkedAt && <span className="text-[11.5px] font-normal text-muted-foreground">conferido na fonte pública em {day(current.checkedAt)}</span>}
-          </dd>
-          {!confirmed && inferred && (
+          <dd className="mt-0.5 text-[13px] font-medium break-words text-foreground">{currentText}</dd>
+          {confirmed && current.checkedAt && (
+            <p className="mt-0.5 text-[11.5px] text-muted-foreground">Última confirmação válida: {when(current.checkedAt)} (fonte pública)</p>
+          )}
+          {conflicting && id.candidates?.length ? (
             <p className="mt-1 text-[11.5px] text-muted-foreground">
-              Provável (inferência): {tribunalLabel(inferred.acronym, inferred.name)}. {inferred.note}
+              Tribunais com registro: {id.candidates.map((c) => `${c.acronym}${c.degrees.length ? ` (${c.degrees.join(", ")})` : ""}`).join(" · ")}. Nenhum
+              foi escolhido.
+            </p>
+          ) : null}
+          {!confirmed && !conflicting && inferred && (
+            <p className="mt-1 text-[11.5px] text-muted-foreground">
+              Inferido, não confirmado: {tribunalLabel(inferred.acronym, inferred.name)}. {inferred.note}
             </p>
           )}
         </div>
       </dl>
+      {id.lastAttempt && (
+        <p className={cn("mt-2.5 text-[11.5px]", stale ? "text-warning" : "text-muted-foreground")}>
+          Última tentativa de consulta: {when(id.lastAttempt.at)} — {ATTEMPT_LABEL[id.lastAttempt.outcome]}
+          {stale && confirmed ? ". A confirmação acima não foi revalidada." : "."}
+        </p>
+      )}
       {current.reasons.length > 0 && (
         <ul className="mt-2.5 space-y-1 text-[11.5px] leading-relaxed text-muted-foreground">
           {current.reasons.map((reason) => (
@@ -88,7 +107,8 @@ export function ProcessSummaryPanel({ process }: { process: Process }) {
   const facts: Fact[] = [
     { label: "Classe", value: process.className },
     { label: "Assunto", value: process.subject },
-    { label: "Órgão julgador", value: process.judicialUnit ?? process.court },
+    // Na fonte, o órgão vem do registro mais recente — não necessariamente o atual.
+    { label: process.origin === "manual" ? "Órgão julgador" : "Órgão julgador (registro mais recente da fonte)", value: process.judicialUnit ?? process.court },
     { label: process.origin === "manual" ? "Tribunal (cadastro do escritório)" : "Tribunal informado pela fonte", value: process.tribunal },
     { label: "Sistema", value: process.system },
     { label: "Grau", value: degreeLabel(process.degree) },

@@ -59,7 +59,16 @@ export interface ExternalRecord {
   /** Índice em que o registro foi encontrado. */
   dataset?: string
   movementCount: number
-  lastMovement?: { name: string; code?: number; occurredAt: string; complementKeys?: string[] }
+  lastMovement?: { name: string; code?: number; occurredAt: string; description?: string; complementKeys?: string[] }
+}
+
+export interface ExternalCoverage {
+  partial: boolean
+  truncated: boolean
+  /** Registros do número devolvidos. */
+  returned: number
+  /** Total informado pela fonte, quando informado. */
+  total?: number
 }
 
 export interface ExternalProcess {
@@ -113,6 +122,12 @@ export interface ExternalProcess {
    */
   records?: ExternalRecord[]
 
+  /**
+   * A resposta cobriu tudo? `partial`: a fonte avisou que parte do índice não respondeu
+   * (registros podem faltar); `truncated`: há mais registros do que os devolvidos.
+   */
+  coverage?: ExternalCoverage
+
   source: {
     provider: ProviderName
     externalId?: string
@@ -137,5 +152,5 @@ export interface ProcessProvider {
    * segmento). Lista vazia = nada encontrado ali — o que não prova ausência de
    * tramitação. Falhas lançam `LookupError`.
    */
-  lookupRecords?(digits: string, tribunal: string): Promise<{ dataset: string; records: ExternalRecord[] }>
+  lookupRecords?(digits: string, tribunal: string): Promise<{ dataset: string; records: ExternalRecord[]; coverage: ExternalCoverage }>
 }

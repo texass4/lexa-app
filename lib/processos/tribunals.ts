@@ -73,6 +73,9 @@ const ORIGINS: Record<string, string> = (() => {
     map[`8.${pad(i + 1)}`] = uf === "DF" ? "TJDFT" : `TJ${uf}`
     map[`6.${pad(i + 1)}`] = `TRE-${uf}`
   })
+  // Justiça Militar da União: `TR` 01–12 são as Circunscrições Judiciárias Militares
+  // (primeira instância, Auditorias), abaixo do STM — não são tribunais com sigla própria.
+  for (let n = 1; n <= 12; n += 1) map[`7.${pad(n)}`] = `CJM${n}`
   // Só três estados têm Tribunal de Justiça Militar.
   map["9.13"] = "TJMMG"
   map["9.21"] = "TJMRS"
@@ -114,8 +117,13 @@ export function tribunalName(acronym: string): string {
   if (tjm && STATE_NAME[tjm[1]]) return `Tribunal de Justiça Militar do Estado ${STATE_NAME[tjm[1]]}`
   const tj = /^TJ([A-Z]{2})$/.exec(a)
   if (tj && STATE_NAME[tj[1]]) return `Tribunal de Justiça do Estado ${STATE_NAME[tj[1]]}`
+  const cjm = /^CJM(\d{1,2})$/.exec(a)
+  if (cjm) return `${cjm[1]}ª Circunscrição Judiciária Militar (Justiça Militar da União)`
   return a
 }
+
+/** Site institucional quando não segue `<sigla>.jus.br` (as CJMs ficam no portal da Justiça Militar da União). */
+const siteOf = (acronym: string) => (/^CJM\d{1,2}$/.test(acronym) ? "https://www.stm.jus.br" : `https://www.${acronym.toLowerCase()}.jus.br`)
 
 /** Segmento da Justiça (`J`) por extenso. */
 export const segmentName = (segment: string): string | undefined => SEGMENTS[segment]
@@ -124,7 +132,7 @@ export const segmentName = (segment: string): string | undefined => SEGMENTS[seg
 export function tribunalByAcronym(acronym: string | undefined, segment?: string): TribunalInfo | undefined {
   const a = acronym?.trim().toUpperCase()
   if (!a || !/^[A-Z0-9]{2,6}(-[A-Z]{2})?$/.test(a)) return undefined
-  return { acronym: a, name: tribunalName(a), segment: segment ? SEGMENTS[segment] : undefined, site: `https://www.${a.toLowerCase()}.jus.br` }
+  return { acronym: a, name: tribunalName(a), segment: segment ? SEGMENTS[segment] : undefined, site: siteOf(a) }
 }
 
 /** Tribunal de ORIGEM do número CNJ (20 dígitos), ou `undefined` se o código não é conhecido. */

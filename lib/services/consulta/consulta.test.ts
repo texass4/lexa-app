@@ -614,3 +614,55 @@ describe("relatórios guardados antes da separação origem × atual", () => {
     assert.equal(context.resumo.tribunal_identificacao, undefined)
   })
 })
+
+describe("consulta processual — correções da auditoria do tribunal (DADOS SIMULADOS)", () => {
+  const stjRecord = {
+    tribunal: "STJ",
+    degree: "SUP",
+    dataset: "api_publica_stj",
+    updatedAt: "2026-10-01T10:00:00.000Z",
+    movementCount: 1,
+    lastMovement: { name: "Conclusão", occurredAt: "2026-09-30T10:00:00.000Z" },
+  }
+
+  it("divergência: resumo lista os tribunais com registro, sem 'provável'; aplicar não confirma nada", async () => {
+    const d = deps({ superior: async () => ({ dataset: "api_publica_stj", records: [stjRecord], checkedAt: NOW.toISOString() }) })
+    const state = await runWorkflow({ cnj: CNJ, process: office() }, d)
+    const summary = state.report!.summary.currentTribunal!
+    assert.equal(summary.status, "conflicting")
+    assert.equal(summary.label, undefined)
+    assert.equal(summary.inferred, undefined)
+    assert.deepEqual([...(summary.candidates ?? [])].sort(), ["STJ", "TRF1"])
+    assert.equal(state.report!.tribunal!.inferred, undefined)
+    // Aplicar continua possível (movimentações e evidências), mas avisa que não confirma tribunal.
+    assert.equal(state.report!.office?.canApply, true)
+    assert.match(state.report!.office!.applyNote, /continua não confirmado/)
+  })
+
+  it("órgão julgador vem qualificado pelo registro de onde saiu", async () => {
+    const state = await runWorkflow({ cnj: CNJ }, deps())
+    assert.equal(fieldValues(state, "orgao_julgador")[0].note, "registro TRF1, Juizado Especial")
+    assert.match(state.report!.summary.unit ?? "", /^Tefé \(registro TRF1/)
+  })
+
+  it("datas da identificação no relatório: horário do escritório, sem fuso", async () => {
+    const d = deps({ superior: async () => ({ dataset: "api_publica_stj", records: [], checkedAt: NOW.toISOString() }) })
+    const state = await runWorkflow({ cnj: CNJ }, d)
+    const id = state.report!.tribunal!
+    for (const c of id.checks) assert.ok(c.checkedAt && !/Z$/.test(c.checkedAt), c.tribunal)
+    assert.equal(id.checks.find((c) => c.role === "superior")?.checkedAt, "2026-10-09T12:00:00") // 15:00 UTC = 12:00 em São Paulo
+  })
+
+  it("superior com resposta parcial: cobertura guardada e nada confirmado", async () => {
+    const d = deps({
+      primary: async () => {
+        throw new LookupError("NOT_FOUND", "simulado")
+      },
+      superior: async () => ({ dataset: "api_publica_stj", records: [stjRecord], coverage: { partial: true, truncated: false, returned: 1 }, checkedAt: NOW.toISOString() }),
+    })
+    const state = await runWorkflow({ cnj: CNJ }, d)
+    const id = state.report!.tribunal!
+    assert.equal(id.checks.find((c) => c.role === "superior")?.coverage?.partial, true)
+    assert.equal(id.current.status, "not_confirmed")
+  })
+})

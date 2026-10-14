@@ -264,17 +264,32 @@ export interface Process extends TenantEntity {
 /* --------------------------- Tribunal do processo -------------------------- */
 
 /**
- * Situação do tribunal ATUAL:
- * - `confirmed`: os critérios de evidência foram atendidos (`tribunal-identification.ts`);
+ * Situação do tribunal ATUAL (regras em `tribunal-identification.ts`):
+ * - `confirmed`: os critérios de evidência foram atendidos;
  * - `not_confirmed`: há registro na fonte, mas sem evidência suficiente;
- * - `conflicting`: registros ou consultas apontam tribunais diferentes;
+ * - `conflicting`: registros ou consultas apontam tribunais diferentes — nenhum é escolhido;
  * - `not_found`: nenhuma fonte consultada tem o número — não prova onde tramita;
- * - `unsupported`: não há fonte consultável para o tribunal de origem;
- * - `not_checked`: nenhuma consulta concluída (fonte fora do ar, cadastro antigo…).
+ * - `unsupported`: tribunal de origem conhecido, sem fonte consultável;
+ * - `unknown_tribunal`: número válido, mas o código `J.TR` não existe na numeração única;
+ * - `invalid_number`: número com tamanho ou dígito verificador inválido;
+ * - `not_checked`: nenhuma consulta concluída (fonte fora do ar, segredo, cadastro manual);
+ * - `legacy`: processo salvo antes desta verificação, sem evidência guardada.
  */
-export type CurrentTribunalStatus = "confirmed" | "not_confirmed" | "conflicting" | "not_found" | "unsupported" | "not_checked"
+export type CurrentTribunalStatus =
+  | "confirmed"
+  | "not_confirmed"
+  | "conflicting"
+  | "not_found"
+  | "unsupported"
+  | "unknown_tribunal"
+  | "invalid_number"
+  | "not_checked"
+  | "legacy"
 
-/** Um registro encontrado na fonte, guardado como evidência. */
+/**
+ * Um registro encontrado na fonte, guardado como evidência. Datas da fonte em horário de
+ * parede, sem fuso (`AAAA-MM-DDTHH:mm:ss`, como as demais datas da fonte no processo).
+ */
 export interface TribunalRecordEvidence {
   /** Tribunal como o registro informa (ausente quando a fonte não informou). */
   tribunal?: string
@@ -283,7 +298,19 @@ export interface TribunalRecordEvidence {
   /** Última atualização do registro na fonte. */
   updatedAt?: string
   dataset?: string
-  lastMovement?: { name: string; occurredAt: string }
+  movementCount?: number
+  /** Última movimentação do registro (código e complementos para reavaliar a saída do tribunal). */
+  lastMovement?: { name: string; occurredAt: string; code?: number; description?: string; complementKeys?: string[] }
+}
+
+/** Cobertura de uma resposta: parcial (fragmentos falharam ou tempo esgotado) ou truncada. */
+export interface TribunalCheckCoverage {
+  /** A fonte avisou que nem todo o índice respondeu. */
+  partial: boolean
+  /** A fonte tem mais registros do que os devolvidos. */
+  truncated: boolean
+  returned: number
+  total?: number
 }
 
 /** Uma consulta a um índice de tribunal. */
@@ -295,12 +322,24 @@ export interface TribunalCheck {
   status: "found" | "not_found" | "failed" | "not_checked"
   provider: "datajud"
   dataset?: string
-  /** ISO de quando a fonte foi consultada (pode vir do cache do escritório). */
+  /** Quando a fonte foi consultada — horário local do escritório, sem fuso. */
   checkedAt?: string
+  /** Ausente em verificações antigas (tratadas como completas, como eram antes). */
+  coverage?: TribunalCheckCoverage
   records: TribunalRecordEvidence[]
 }
 
+/** Última tentativa de consulta, mesmo sem sucesso — não apaga a evidência anterior. */
+export interface TribunalAttempt {
+  /** Horário local do escritório, sem fuso. */
+  at: string
+  tribunal?: string
+  outcome: "found" | "not_found" | "failed" | "rate_limited"
+}
+
 export interface TribunalIdentification {
+  /** Número a que a identificação se refere (ausente nas primeiras versões). */
+  cnj?: string
   /** Pelo número CNJ — certo enquanto o número for válido; não diz onde tramita hoje. */
   origin: {
     acronym?: string
@@ -322,15 +361,25 @@ export interface TribunalIdentification {
     dataset?: string
     /** Atualização do registro na fonte. */
     updatedAt?: string
-    /** ISO da consulta que sustenta a conclusão. */
+    /** Consulta que sustenta a conclusão — horário local do escritório. */
     checkedAt?: string
     /** Critérios atendidos e o que faltou, em linguagem simples. */
     reasons: string[]
   }
-  /** Palpite quando o atual não está confirmado — sempre exibido como inferência. */
+  /**
+   * Tribunais com registro quando eles divergem (`conflicting`) — listados lado a lado,
+   * sem escolher nenhum.
+   */
+  candidates?: { acronym: string; name: string; degrees: string[]; updatedAt?: string; role: TribunalCheck["role"] }[]
+  /**
+   * Palpite quando o atual não está confirmado e não há divergência — sempre exibido como
+   * inferência. Nunca preenchido em `conflicting`.
+   */
   inferred?: { acronym: string; name: string; basis: "cnj" | "registro_mais_recente"; note: string }
   checks: TribunalCheck[]
-  /** ISO (UTC) de quando a identificação foi montada. */
+  /** Última tentativa de consulta (sucesso ou falha). */
+  lastAttempt?: TribunalAttempt
+  /** Quando a identificação foi montada — horário local do escritório. */
   identifiedAt: string
 }
 

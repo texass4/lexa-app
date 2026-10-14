@@ -114,6 +114,13 @@ function field(key: FieldKey, label: string, values: (ReportValue | undefined)[]
   return { key, label, values: list, conflict: distinct.length > 1 }
 }
 
+/** "registro TJSP, 1º grau" — de onde vêm órgão julgador e grau da ficha. */
+function unitOrigin(sheet?: ProcessSheet) {
+  if (!sheet?.tribunal) return undefined
+  const degree = degreeLabel(sheet.degree)
+  return `registro ${sheet.tribunal.toUpperCase()}${degree ? `, ${degree}` : ""}`
+}
+
 /* --------------------------------- seções -------------------------------- */
 
 function buildFields(input: AssembleInput, verifyUrl?: string): ReportField[] {
@@ -133,6 +140,8 @@ function buildFields(input: AssembleInput, verifyUrl?: string): ReportField[] {
   }
   // Tribunal como o registro da fonte informa — comparado com o cadastro e o DJEN.
   const tribunal = tribunalByAcronym(s?.tribunal)
+  // De qual registro vêm órgão e grau: o mais recente do índice de origem, não "o atual".
+  const recordNote = unitOrigin(s)
 
   const secrecy =
     s?.secrecyLevel !== undefined ? (s.secrecyLevel === 0 ? "Público (nível 0)" : `Sigilo nível ${s.secrecyLevel}`) : undefined
@@ -150,7 +159,7 @@ function buildFields(input: AssembleInput, verifyUrl?: string): ReportField[] {
     field("classe", "Classe", [dj(s?.className), djen(fromComms((c) => c.className)), office(process?.className)]),
     field("assuntos", "Assuntos", [dj((s?.subjects?.length ? s.subjects : s?.subject ? [s.subject] : []).join(" · ") || undefined)]),
     field("orgao_julgador", "Órgão julgador", [
-      dj(s?.judicialUnit),
+      dj(s?.judicialUnit, recordNote),
       djen(fromComms((c) => c.unit)),
       office(process?.judicialUnit ?? process?.court),
     ]),
@@ -237,6 +246,12 @@ function buildOffice(input: AssembleInput): OfficeComparison | undefined {
     row("Valor da causa", process.claimValue > 0 ? formatMoney(process.claimValue) : undefined),
   ].filter((f): f is NonNullable<typeof f> => !!f)
   const canApply = !process.secret && input.primaryStatus === "ok" && !!primary
+  // Aplicar nunca confirma um tribunal: as consultas do relatório viram evidência no processo.
+  const status = input.tribunal?.current.status
+  const tribunalNote =
+    canApply && status && status !== "confirmed"
+      ? ` O tribunal atual continua não confirmado (${CURRENT_STATUS_LABEL[status].toLowerCase()}): as consultas deste relatório ficam guardadas no processo como evidência, sem escolher tribunal.`
+      : ""
   return {
     processId: process.id,
     label: processTitle(process, input.clientName),
@@ -248,9 +263,10 @@ function buildOffice(input: AssembleInput): OfficeComparison | undefined {
       ? "Processo em segredo de justiça: o cadastro do escritório é mantido como está e não recebe dados da consulta pública."
       : !canApply
         ? "A fonte principal não trouxe dados nesta consulta: não há o que atualizar."
-        : manual
-          ? "Atualizar acrescenta as movimentações novas e completa só os campos vazios. O que o escritório preencheu à mão é mantido."
-          : "Atualizar acrescenta as movimentações novas e os dados públicos da fonte. Tipo de ação, responsável, valor da causa e observações do escritório não mudam.",
+        : (manual
+            ? "Atualizar acrescenta as movimentações novas e completa só os campos vazios. O que o escritório preencheu à mão é mantido."
+            : "Atualizar acrescenta as movimentações novas e os dados públicos da fonte. Tipo de ação, responsável, valor da causa e observações do escritório não mudam.") +
+          tribunalNote,
   }
 }
 
@@ -352,10 +368,15 @@ export function assembleReport(input: AssembleInput): EnrichmentReport {
             label: identification.current.status === "confirmed" ? tribunalLabel(identification.current.acronym, identification.current.name) : undefined,
             status: identification.current.status,
             statusLabel: CURRENT_STATUS_LABEL[identification.current.status],
-            inferred: identification.inferred ? tribunalLabel(identification.inferred.acronym, identification.inferred.name) : undefined,
+            // Com divergência, os tribunais encontrados — nenhum escolhido; sem ela, a inferência rotulada.
+            inferred:
+              identification.current.status !== "conflicting" && identification.inferred
+                ? tribunalLabel(identification.inferred.acronym, identification.inferred.name)
+                : undefined,
+            candidates: identification.current.status === "conflicting" ? identification.candidates?.map((c) => c.acronym) : undefined,
           }
         : undefined,
-      unit: magistrate.unit?.value,
+      unit: magistrate.unit ? (magistrate.unit.note ? `${magistrate.unit.value} (${magistrate.unit.note})` : magistrate.unit.value) : undefined,
       situation: sheet?.sourceStatus,
       lastMovement: sheet?.lastMovement ? { title: sheet.lastMovement.name, at: sheet.lastMovement.occurredAt } : undefined,
       movementsTotal: movementsAll.length,
