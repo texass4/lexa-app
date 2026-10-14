@@ -1,5 +1,7 @@
 "use client"
 
+import { ChevronDown } from "lucide-react"
+import { cn } from "cn"
 import { getNow, fmtFullDate, greeting } from "@/lib/core/dates"
 import { getUser, currentUserId } from "@/lib/auth/account"
 import { countByLevel, type AttentionSignal } from "@/lib/dashboard/attention"
@@ -22,8 +24,20 @@ function statusLine(signals: AttentionSignal[], empty: boolean) {
   return "Tudo em dia no escritório"
 }
 
-export function Greeting({ signals, empty = false }: { signals: AttentionSignal[]; empty?: boolean }) {
+/** `onToggleAttention`: a frase de status abre a lista do que merece atenção (logo abaixo). */
+export function Greeting({
+  signals,
+  empty = false,
+  attentionOpen = false,
+  onToggleAttention,
+}: {
+  signals: AttentionSignal[]
+  empty?: boolean
+  attentionOpen?: boolean
+  onToggleAttention?: () => void
+}) {
   const user = getUser(currentUserId())
+  const hasSignals = !empty && signals.length > 0
 
   return (
     <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -33,7 +47,21 @@ export function Greeting({ signals, empty = false }: { signals: AttentionSignal[
         <h1 className="mt-2.5 text-[28px] leading-[1.15] font-semibold tracking-[-0.025em] text-foreground sm:text-[32px]">
           {greeting()}, {user.firstName}.
         </h1>
-        <p className="mt-2 text-[15px] text-muted-foreground">{statusLine(signals, empty)}</p>
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-muted-foreground">
+          <span>{statusLine(signals, empty)}</span>
+          {hasSignals && onToggleAttention && (
+            <button
+              type="button"
+              onClick={onToggleAttention}
+              aria-expanded={attentionOpen}
+              aria-controls="painel-atencao"
+              className="inline-flex items-center gap-1 rounded-md text-[13.5px] font-medium text-brand-strong outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              {attentionOpen ? "Ocultar a lista" : "Ver o que merece atenção"}
+              <ChevronDown className={cn("size-4 transition-transform", attentionOpen && "rotate-180")} />
+            </button>
+          )}
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-5">
         <WeatherChip />

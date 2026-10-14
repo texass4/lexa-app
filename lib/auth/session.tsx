@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ArrowLeft, Clock3, LogOut, RefreshCw, ShieldCheck, ShieldOff, Wrench } from "lucide-react"
+import { ArrowLeft, Clock3, LogOut, RefreshCw, ShieldCheck, ShieldOff, WifiOff, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AuthCard } from "@/components/auth/auth-card"
 import { useSplashReady } from "@/components/layout/app-splash"
@@ -31,6 +31,8 @@ type Status =
   | { kind: "blocked"; reason: "user" | "organization" | "suspended" | "no-organization" }
   | { kind: "maintenance"; message: string }
   | { kind: "super-admin" }
+  /** O banco não respondeu (rede, servidor): não é falta de acesso — dá para tentar de novo. */
+  | { kind: "unavailable" }
 
 const SessionContext = React.createContext<Session | null>(null)
 
@@ -46,7 +48,8 @@ async function loadSession(): Promise<Status> {
     return { kind: "loading" }
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle<ProfileRow>()
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle<ProfileRow>()
+  if (profileError) return { kind: "unavailable" }
   if (!profile) return { kind: "blocked", reason: "no-organization" }
   if (profile.role === "super_admin") {
     // Vindo do botão "CRM" do Admin, explica por que não há CRM para o Super Admin;
@@ -58,11 +61,12 @@ async function loadSession(): Promise<Status> {
   if (!profile.active) return { kind: "blocked", reason: "user" }
 
   // Escritório, equipe e manutenção dependem só do perfil: buscados em paralelo.
-  const [{ data: orgRow }, { data: memberRows }, { data: maintenance }] = await Promise.all([
+  const [{ data: orgRow, error: orgError }, { data: memberRows }, { data: maintenance }] = await Promise.all([
     supabase.from("organizations").select("*").eq("id", profile.organization_id).maybeSingle<OrganizationRow>(),
     supabase.from("profiles").select("*").eq("organization_id", profile.organization_id).order("name"),
     supabase.rpc("platform_maintenance"),
   ])
+  if (orgError) return { kind: "unavailable" }
   if (!orgRow) return { kind: "blocked", reason: "no-organization" }
   const organization = toOrganization(orgRow)
   if (organization.status === "pending") return { kind: "pending", organization }
@@ -172,6 +176,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       <AuthCard title="Manutenção programada" description={status.message}>
         <div className="flex items-center gap-3 rounded-[12px] bg-surface-muted/60 px-3.5 py-3 text-[13px] text-muted-foreground">
           <Wrench className="size-4 shrink-0" /> Seus dados estão seguros. Tente de novo em alguns minutos.
+        </div>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <Button variant="secondary" onClick={signOut}>
+            <LogOut /> Sair
+          </Button>
+          <Button onClick={() => window.location.reload()}>
+            <RefreshCw /> Tentar de novo
+          </Button>
+        </div>
+      </AuthCard>
+    )
+  }
+
+  if (status.kind === "unavailable") {
+    return (
+      <AuthCard title="Não foi possível conectar" description="A Íntegra não conseguiu falar com o servidor agora. Seus dados não foram afetados.">
+        <div className="flex items-center gap-3 rounded-[12px] bg-surface-muted/60 px-3.5 py-3 text-[13px] text-muted-foreground">
+          <WifiOff className="size-4 shrink-0" /> Verifique a conexão com a internet e tente de novo.
         </div>
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
           <Button variant="secondary" onClick={signOut}>

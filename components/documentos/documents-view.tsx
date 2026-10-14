@@ -37,6 +37,7 @@ import { useMediaQuery } from "@/lib/core/hooks"
 import { documentUrl } from "@/lib/documentos/documents"
 import { DocumentsTree, type TreeSelection } from "./documents-tree"
 import { DocumentDetails } from "./document-details"
+import { usePreview } from "@/components/shared/document-preview-sheet"
 
 type Filter = "todos" | "Contrato" | "Procuração" | "Petição" | "Documento pessoal" | "Laudo" | "outros"
 
@@ -627,6 +628,14 @@ const DocumentRow = React.memo(function DocumentRow({
   )
 })
 
+/** Miniatura de imagem na grade (só imagens: PDFs ficam com o ícone para não carregar dezenas de visualizadores). */
+function ImageThumb({ doc }: { doc: LegalDocument }) {
+  const preview = usePreview(doc)
+  if (preview.status !== "ready" || !preview.url) return <FileIcon extension={doc.extension} className="h-14 w-11 text-[10px]" />
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={preview.url} alt="" loading="lazy" className="h-20 w-full rounded-[6px] object-cover" />
+}
+
 /** Cartão da exibição em grade. */
 function DocumentCard({
   doc: d,
@@ -665,7 +674,11 @@ function DocumentCard({
         </div>
       </div>
       <div className="flex justify-center py-3">
-        <FileIcon extension={d.extension} className="h-14 w-11 text-[10px]" />
+        {(d.extension === "jpg" || d.extension === "png") && d.storagePath ? (
+          <ImageThumb doc={d} />
+        ) : (
+          <FileIcon extension={d.extension} className="h-14 w-11 text-[10px]" />
+        )}
       </div>
       <div className="min-w-0 border-t border-border/70 px-3 py-2.5">
         <button

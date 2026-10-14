@@ -14,7 +14,7 @@ import { routePermission } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { LexaAIProvider, useLexaAI } from "@/components/ai/lexa-ai-provider"
-import { DOCKED_PANEL_QUERY, useMediaQuery } from "@/lib/core/hooks"
+import { useAssistantLayout } from "@/components/ai/assistant-layout"
 import { trackVisit } from "@/lib/dashboard/visits"
 import * as React from "react"
 
@@ -31,9 +31,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function ShellLayout({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed } = useUI()
   // Assistente acoplado (telas ≥ 1280 px): o conteúdo abre espaço à direita em vez de ficar coberto.
-  const { isOpen: assistantOpen } = useLexaAI()
-  const wide = useMediaQuery(DOCKED_PANEL_QUERY)
-  const assistantDocked = assistantOpen && wide
+  const { isOpen: assistantOpen, expanded } = useLexaAI()
+  const assistant = useAssistantLayout(expanded)
+  const assistantDocked = assistantOpen && assistant.docked
   const { can, user } = useSession()
   // "Desde sua última visita": marca presença enquanto a Íntegra estiver aberto.
   React.useEffect(() => trackVisit(user.id), [user.id])
@@ -57,8 +57,9 @@ function ShellLayout({ children }: { children: React.ReactNode }) {
           // Altura total: a coluna fica presa à tela e só as áreas internas rolam.
           fullHeight ? "h-dvh overflow-hidden" : "min-h-dvh",
           !sidebarCollapsed && "lg:pl-[248px]",
-          assistantDocked && "xl:pr-[400px]",
         )}
+        // Assistente acoplado: o conteúdo abre exatamente a largura do painel.
+        style={assistantDocked ? { paddingRight: assistant.width } : undefined}
       >
         <Topbar />
         <main

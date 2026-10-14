@@ -21,6 +21,7 @@ export function SideSheet({
   footer,
   className,
   docked = false,
+  dockedWidth = DOCKED_PANEL_WIDTH,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -30,6 +31,8 @@ export function SideSheet({
   footer?: React.ReactNode
   className?: string
   docked?: boolean
+  /** Largura da coluna quando acoplado. */
+  dockedWidth?: number
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={!docked} disablePointerDismissal={docked}>
@@ -38,10 +41,11 @@ export function SideSheet({
           <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#10263d]/30 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 dark:bg-black/50" />
         )}
         <DialogPrimitive.Popup
+          style={docked ? { width: dockedWidth } : undefined}
           className={cn(
             "fixed flex flex-col overflow-hidden border-border bg-popover outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]",
             docked
-              ? "inset-y-0 right-0 z-40 w-[400px] border-l data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full"
+              ? "inset-y-0 right-0 z-40 border-l transition-[transform,width] data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full"
               : cn(
                   "z-50 shadow-float",
                   "inset-x-0 top-[max(env(safe-area-inset-top),10px)] bottom-0 rounded-t-[20px] border-t data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",

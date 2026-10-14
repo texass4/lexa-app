@@ -152,3 +152,90 @@ Auditadas: 35/35. Situação por rota: coluna "Status" do inventário.
 ## Pendências de backend
 
 Ver "Dependências de backend identificadas" no inventário.
+
+## Refinamento visual — diagnóstico (antes das alterações)
+
+| Ponto | O que foi encontrado | Origem | Decisão |
+|---|---|---|---|
+| "McDonalds" sob a marca | É o nome do escritório (`organizations.name`), digitado no cadastro ou em Configurações › Escritório. Não há seed nem valor fixo com esse nome no repositório. | dado real do escritório | Não alterar o dado. O nome sai do lugar de "subtítulo da marca" (lia-se "Íntegra McDonalds") e passa a aparecer como **escritório atual**, separado do logo. |
+| Identificadores processuais | No escritório de teste: 64 números CNJ válidos (dígito verificador confere) e 2 processos sem número, cadastrados à mão. A interface mostrava o código interno "#103065" — ou qualquer texto digitado — no lugar do número, como se fosse oficial. | `processNumberLabel` | CNJ válido → formatado; 20 dígitos com DV errado → "(dígito não confere)"; outro texto → "(fora do padrão CNJ)"; sem número → "Sem número · cód. interno #…". Com teste. |
+| Indicador "Prazos até domingo: 13" | Soma os 11 vencidos e os 2 da semana; na tela Prazos, "Até domingo" são só os 2. | rótulo | Rótulo "Prazos a cumprir" com "11 vencidos · 2 até domingo". |
+| Indicador "Tarefas pendentes: 60" | Conta o escritório, mas o link abre "Minhas tarefas" (9 atrasadas) e o selo da barra lateral é pessoal. | escopo misturado | Indicador pessoal ("Suas tarefas"), igual ao selo e à tela de destino. |
+| Visualizações rápidas de tarefas | Contam o escritório e abrem a lista pessoal. | link | `?escopo=escritorio` na tela Tarefas. |
+| Compromissos hoje / Em atraso | Conferem com Agenda e Financeiro › Em atraso. | — | mantidos |
+| Agenda vazia | Estado vazio sem ação; o compromisso não abria detalhes; responsável sem foto; local e pessoa misturados numa linha. | componente | Timeline refeita (ver abaixo). |
+| Painel da IA | Acoplado a partir de 1280 px com 400 px: com a barra lateral aberta, sobravam ~570 px de conteúdo. | regra de largura | Acopla só quando sobram ≥ 760 px de conteúdo; expandir (560 px) segue a mesma regra, senão vira painel sobreposto. |
+| Tipografia | `--subtle` (#7B8A9E) tem contraste 3,5:1 em branco — abaixo de AA para texto pequeno, e é usado em 11–12 px. | token | `--subtle` mais escuro (#64748B, 4,8:1). |
+| Repetição de cartões | 10 cartões grandes iguais no Início; a faixa "A Íntegra acompanha…" repete os indicadores. | composição | Indicadores numa faixa compacta; faixa removida — "o que merece atenção" abre pela frase de status do topo; movimentações viram aba da atividade. |
+
+## Refinamento visual — o que mudou
+
+**Início**
+- Indicadores numa faixa compacta (título, valor, situação, ação no hover), com regras corrigidas:
+  "Prazos a cumprir" (vencidos + até domingo, explicado no rodapé) e "Suas tarefas" (pessoais, como o
+  selo da barra lateral e a tela de destino).
+- Agenda como área principal (8/12 em telas largas): linha do tempo com horário de início e fim,
+  marcador na cor da categoria e linha contínua, marcador "agora" com a hora, situação (Agora / em X
+  min / Concluído), tipo, local, responsável com foto ou iniciais, pessoa envolvida, cliente ou
+  processo e "Abrir cliente/processo"; clicar abre o detalhe do compromisso (o mesmo da Agenda).
+  Dia vazio: ilustração com ícone, explicação e "Novo compromisso" (com permissão) / "Ver a semana".
+- Tarefas ao lado, começando nas da pessoa; filtros quebram linha em vez de cortar.
+- Faixa "A Íntegra acompanha…" removida: "Ver o que merece atenção" fica na frase de status do topo
+  e abre a mesma lista de antes (preferência salva).
+- "O que mudou": atividade da equipe e movimentações processuais num painel com duas abas.
+- Visualizações rápidas como lista (sem mini-cartões); listas do escritório abrem com
+  `?escopo=escritorio` na tela Tarefas.
+- Linhas largas não esticam mais os painéis (sem grandes vazios em cartões).
+- Erro ao carregar: estado próprio com "Tentar de novo".
+
+**Dados**
+- Nome do escritório em bloco próprio ("Escritório · Prado & Lima Advocacia") na barra lateral e na
+  gaveta do celular, fora do logo. O dado não foi alterado.
+- Número do processo honesto em todas as telas (`processNumberLabel`, com teste).
+- Sessão: falha de conexão com o banco mostrava "Acesso desativado — conta sem escritório"; agora
+  mostra "Não foi possível conectar" com "Tentar de novo" (`lib/auth/session.tsx`).
+
+**Assistente Íntegra**
+- Cabeçalho com o contexto da conversa, "Nova", **expandir/reduzir** (400 ↔ 560 px) e fechar.
+- Acoplado só quando sobram ≥ 760 px para a página (descontada a barra lateral); senão abre por cima.
+  Medido: 1440 px → 792 px de conteúdo; expandido em 1440 → sobreposto (1192 px de conteúdo);
+  1680 expandido → acoplado (872 px). Sem rolagem horizontal em nenhum caso.
+- Linha de situação reflete a IA de verdade (verde quando responde; "indisponível" quando não).
+- Aba Contexto: "Outras conversas desta sessão" (as conversas por contexto que já existiam,
+  agora acessíveis). Sugestões sob o título "Perguntas sugeridas para esta tela".
+- Aviso "Íntegra IA indisponível" virou uma linha discreta em todas as telas (antes um cartão).
+- Anexos: não existem no produto — nenhum botão foi adicionado.
+
+**Documentos**
+- Painel de detalhes com pré-visualização real (PDF ou imagem, via URL temporária); arquivo
+  ausente no armazenamento é dito como tal. Grade mostra miniatura real de imagens.
+
+**Global**
+- `--subtle` #7B8A9E → #64748B (contraste 3,5:1 → 4,8:1 em fundo branco).
+
+**Admin** (capturado pela primeira vez, com super admin só no ambiente local de teste)
+- 11 telas validadas em 1440 e 390 px; corrigido estouro de 9 px em Configurações (selo de credencial).
+
+## Refinamento visual — validação
+
+| Cenário | Resultado |
+|---|---|
+| Timeline com 7 eventos (dados de teste locais, removidos depois) | rola até "agora", marcador da hora, situações corretas |
+| Timeline vazia (Escritório Beta) | estado vazio com ação |
+| Usuário com foto (imagem abstrata de teste, removida depois) / sem foto | foto no topo, tarefas e timeline / iniciais |
+| Listas vazias (Escritório Beta) e preenchidas | ok |
+| Assistente aberto, expandido, contexto e fechado em 1280/1440/1680/390 | sem rolagem horizontal |
+| Colaborador sem financeiro (Eduardo) | sem "Em atraso", sem inadimplentes, sem Financeiro no menu, `/financeiro` "Sem acesso" |
+| Erro de carregamento (REST bloqueado no navegador) | "Não foi possível conectar" → "Tentar de novo" recupera |
+| Rotas do app em 390, 768, 1024, 1440 | rolagem horizontal 0; sem erros de console (exceto o 404 esperado) |
+| lint · typecheck · testes · build | limpo · limpo · 769/769 · ok |
+
+**Não validado:** respostas reais da IA (sem chave configurada neste ambiente — só o estado
+"indisponível"); resultados da Jurisprudência (base vazia aqui; a integração com o `.db` não foi
+tocada); pré-visualização com arquivo real no armazenamento (os documentos de teste não têm arquivo).
+
+## Pendências
+
+- Atendimento, Financeiro, Consulta processual e Jurisprudência: receberam os ajustes globais
+  (contraste, aviso da IA, estados); ainda sem revisão específica de hierarquia página a página.
+- Diálogos (novo processo, cliente, tarefa, compromisso) e abertura: não revisados um a um.

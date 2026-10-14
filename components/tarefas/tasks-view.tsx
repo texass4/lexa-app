@@ -95,7 +95,10 @@ export function TasksView() {
     setLastFilterParam(filterParam)
     if (isFilter(filterParam)) setFilter(filterParam)
   }
-  const [scope, setScope] = React.useState<Scope>(() => (openTask && openTask.assigneeId !== currentUserId() ? "escritorio" : "minhas"))
+  // `?escopo=escritorio` (listas do escritório no Início) abre já no escopo do escritório.
+  const [scope, setScope] = React.useState<Scope>(() =>
+    params.get("escopo") === "escritorio" || (openTask && openTask.assigneeId !== currentUserId()) ? "escritorio" : "minhas",
+  )
   const [query, setQuery] = React.useState("")
   const [editing, setEditingState] = React.useState<{ task?: Task; open: boolean }>({ open: false })
   const setEditing = (t?: Task) => setEditingState((s) => (t ? { task: t, open: true } : { ...s, open: false }))

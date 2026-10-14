@@ -33,6 +33,11 @@ interface LexaAIValue {
   close(): void
   /** A tela pode tratar as fontes citadas (ex.: abrir a movimentação ali mesmo). Devolve o cancelamento. */
   registerSourceHandler(handler: SourceHandler): () => void
+  /** Painel mais largo (a preferência vale até fechar a aba). */
+  expanded: boolean
+  setExpanded(expanded: boolean): void
+  /** Outras conversas abertas nesta sessão (cada contexto mantém a sua), da mais recente. */
+  recent: AIContext[]
 }
 
 const LexaAIContext = React.createContext<LexaAIValue | null>(null)
@@ -64,6 +69,7 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const routeContext = useRouteContext()
   const [isOpen, setOpen] = React.useState(false)
+  const [expanded, setExpanded] = React.useState(false)
   // Contexto pedido por uma ação (ex.: tarefa → processo). Vale só na tela em que foi pedido.
   const [override, setOverride] = React.useState<{ context: AIContext; path: string } | null>(null)
   // Contextos em que a pessoa já conversou: cada um mantém a própria conversa (e a pergunta em andamento).
@@ -121,9 +127,10 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
     [router],
   )
 
+  const recent = React.useMemo(() => visited.filter((c) => scopeKey(c.scope) !== activeKey), [visited, activeKey])
   const value = React.useMemo<LexaAIValue>(
-    () => ({ status, ready: isAIReady(status), context, isOpen, open, ask, close, registerSourceHandler }),
-    [status, context, isOpen, open, ask, close, registerSourceHandler],
+    () => ({ status, ready: isAIReady(status), context, isOpen, open, ask, close, registerSourceHandler, expanded, setExpanded, recent }),
+    [status, context, isOpen, open, ask, close, registerSourceHandler, expanded, recent],
   )
 
   // O contexto da tela sempre tem uma conversa pronta; os já usados continuam montados.

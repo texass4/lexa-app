@@ -93,7 +93,8 @@ export function OpenTasks() {
   const { user } = useSession()
   const { openDialog } = useUI()
   const [tab, setTab] = React.useState<TaskTab>("todas")
-  const [mine, setMine] = React.useState(false)
+  // Começa nas tarefas da pessoa (como o indicador e o selo da barra lateral); "Só minhas" desligado mostra o escritório.
+  const [mine, setMine] = React.useState(true)
   // Lista estável: ao concluir, a tarefa fica riscada até sair da tela (não "salta" da mão).
   const [ids] = React.useState(() => tasks.filter((t) => t.status === "pendente").map((t) => t.id))
   const now = getNow()
@@ -136,6 +137,7 @@ export function OpenTasks() {
       <div className="px-5 pb-2 sm:px-6">
         <ChipTabs
           ariaLabel="Filtrar tarefas"
+          wrap
           className="min-w-0"
           value={tab}
           onChange={setTab}

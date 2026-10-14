@@ -20,7 +20,7 @@ type Preview = { status: "loading" } | { status: "missing" } | { status: "ready"
 const PREVIEWABLE = new Set<LegalDocument["extension"]>(["pdf", "jpg", "png", "txt"])
 
 /** Busca uma URL temporária do arquivo (e o conteúdo, se for texto). */
-function usePreview(doc: LegalDocument): Preview {
+export function usePreview(doc: LegalDocument): Preview {
   const [loaded, setLoaded] = React.useState<{ key: string; preview: Preview }>()
   const key = `${doc.id}:${doc.storagePath ?? ""}`
 

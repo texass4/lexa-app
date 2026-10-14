@@ -4,12 +4,13 @@ import { describe, it } from "node:test"
 import { SIM_TJSP } from "@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios"
 import { humanizeProcessMention, processDistrict, processNumberLabel, processSubject, processTitle } from "./label"
 
-const base = { type: "Ação de cobrança", area: "Cível" as const, number: "00012345620268240001", code: "#103023" }
+// Número CNJ com dígito verificador válido.
+const base = { type: "Ação de cobrança", area: "Cível" as const, number: "50123657220264047200", code: "#103023" }
 
 describe("identificação humana do processo", () => {
   it("cliente — tipo de ação, com o número como informação secundária", () => {
     assert.equal(processTitle(base, "João da Silva"), "João da Silva — Ação de cobrança")
-    assert.equal(processNumberLabel(base), "0001234-56.2026.8.24.0001")
+    assert.equal(processNumberLabel(base), "5012365-72.2026.4.04.7200")
   })
 
   it("sem tipo usa a classe da fonte e, por fim, a área — nunca inventa", () => {
@@ -18,9 +19,14 @@ describe("identificação humana do processo", () => {
     assert.equal(processTitle({ ...base, type: "", area: "Trabalhista" }, "Maria"), "Maria — Processo trabalhista")
   })
 
-  it("sem cliente mostra só o assunto; sem número, o código interno", () => {
+  it("sem cliente mostra só o assunto; sem número, o código interno dito como tal", () => {
     assert.equal(processTitle(base, undefined), "Ação de cobrança")
-    assert.equal(processNumberLabel({ ...base, number: "" }), "#103023")
+    assert.equal(processNumberLabel({ ...base, number: "" }), "Sem número · cód. interno #103023")
+  })
+
+  it("não apresenta como oficial um número inválido ou incompleto", () => {
+    assert.equal(processNumberLabel({ ...base, number: "00012345620268240001" }), "0001234-56.2026.8.24.0001 (dígito não confere)")
+    assert.equal(processNumberLabel({ ...base, number: "123/2024" }), "123/2024 (fora do padrão CNJ)")
   })
 })
 

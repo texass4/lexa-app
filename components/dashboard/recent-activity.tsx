@@ -11,7 +11,8 @@ import { byId } from "@/lib/store/indexes"
 import { humanizeProcessMention, processTitle } from "@/lib/processos/label"
 import type { Activity } from "@/types"
 
-export function RecentActivity({ limit = 7 }: { limit?: number }) {
+/** `embedded`: só a lista (dentro do painel de atividade do Início). */
+export function RecentActivity({ limit = 7, embedded = false }: { limit?: number; embedded?: boolean }) {
   const { activities, processes, clients } = useOfficeData()
   const items = activities.slice(0, limit)
   // Registros antigos citam "Processo #103023": na tela, o processo aparece pelo cliente e assunto.
@@ -20,9 +21,8 @@ export function RecentActivity({ limit = 7 }: { limit?: number }) {
     return process ? humanizeProcessMention(text, process.code, processTitle(process, byId(clients, process.clientId)?.name)) : text
   }
 
-  return (
-    <Panel>
-      <PanelHeader title="Atividade recente" description={items.length ? "O que se moveu no escritório" : "Movimentações do escritório"} />
+  const body = (
+    <>
       {items.length === 0 && <EmptyState compact title="Nenhuma atividade ainda." description="Cadastros, tarefas e consultas aparecem aqui." />}
       <ol className={items.length ? "relative px-5 pb-4" : "hidden"}>
         <span aria-hidden className="absolute top-3 bottom-7 left-[33px] w-px bg-border" />
@@ -55,6 +55,13 @@ export function RecentActivity({ limit = 7 }: { limit?: number }) {
           ))}
         </AnimatePresence>
       </ol>
+    </>
+  )
+  if (embedded) return body
+  return (
+    <Panel>
+      <PanelHeader title="Atividade recente" description={items.length ? "O que se moveu no escritório" : "Movimentações do escritório"} />
+      {body}
     </Panel>
   )
 }

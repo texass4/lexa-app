@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
+import { Building2, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { cn } from "cn"
 import { Logo } from "@/components/brand/logo"
 import { SidebarNav, SidebarShortcuts } from "./sidebar-nav"
@@ -36,8 +36,19 @@ export function Sidebar() {
           className="touch-target relative rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50"
         >
           <Logo collapsed className={cn(!collapsed && "lg:hidden")} />
-          {!collapsed && <Logo size="lg" subtitle={getOrganization().name} className="max-lg:hidden" />}
+          {!collapsed && <Logo size="lg" className="max-lg:hidden" />}
         </Link>
+      </div>
+
+      {/* O escritório em uso, separado da marca (antes aparecia como subtítulo do logo). */}
+      <div className={cn("shrink-0 px-3 pb-2", labels)}>
+        <div className="flex items-center gap-2.5 rounded-control border border-sidebar-border bg-surface-muted/50 px-3 py-2" title={getOrganization().name}>
+          <Building2 className="size-4 shrink-0 text-sidebar-muted" aria-hidden />
+          <span className="min-w-0">
+            <span className="block text-[10.5px] font-semibold tracking-[0.08em] text-subtle uppercase">Escritório</span>
+            <span className="block truncate text-[13px] font-medium text-sidebar-foreground">{getOrganization().name}</span>
+          </span>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto px-3 pt-2 pb-4 no-scrollbar">

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { AlarmClock, CalendarRange, CircleAlert, Flag, Hourglass, Receipt, type LucideIcon } from "lucide-react"
+import { AlarmClock, CalendarRange, ChevronRight, CircleAlert, Flag, Hourglass, Receipt, type LucideIcon } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { useOfficeData } from "@/lib/store/office-store"
@@ -59,7 +59,7 @@ export function QuickViews() {
       alert: true,
     },
     {
-      href: "/tarefas?filtro=atrasadas",
+      href: "/tarefas?filtro=atrasadas&escopo=escritorio",
       label: "Tarefas atrasadas",
       count: pending.filter((t) => taskBucket(t, now) === "atrasadas").length,
       icon: AlarmClock,
@@ -67,7 +67,7 @@ export function QuickViews() {
       alert: true,
     },
     {
-      href: "/tarefas?filtro=alta",
+      href: "/tarefas?filtro=alta&escopo=escritorio",
       label: "Prioridade alta",
       count: pending.filter((t) => t.priority === "alta").length,
       icon: Flag,
@@ -88,7 +88,7 @@ export function QuickViews() {
   return (
     <Panel className="flex flex-col">
       <PanelHeader title="Visualizações rápidas" description="Listas filtradas, com a contagem de agora" />
-      <ul className="flex flex-col gap-1.5 px-4 pb-4 sm:px-5 sm:pb-5">
+      <ul className="divide-y divide-border/70 px-2 pb-3 sm:px-3">
         {shown.map((v) => {
           const Icon = v.icon
           const hot = v.alert && v.count > 0
@@ -96,7 +96,7 @@ export function QuickViews() {
             <li key={v.href}>
               <Link
                 href={v.href}
-                className="group flex items-center gap-3 rounded-[10px] border border-border bg-surface px-3 py-2.5 outline-none transition-[border-color,background-color] hover:border-border-strong hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-brand/40"
+                className="group flex items-center gap-3 rounded-[8px] px-3 py-2.5 outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 <span
                   className={cn(
@@ -108,6 +108,7 @@ export function QuickViews() {
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{v.label}</span>
                 <span className={cn("tabular text-[14px] font-semibold", hot ? "text-danger" : "text-foreground")}>{formatNumber(v.count)}</span>
+                <ChevronRight className="size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" />
               </Link>
             </li>
           )

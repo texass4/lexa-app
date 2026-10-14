@@ -1,12 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { ArrowRight, ArrowUp, Check, Copy, ListChecks, Mic, RotateCcw, ShieldCheck, Square } from "lucide-react"
+import { ArrowRight, ArrowUp, Check, Copy, ListChecks, Maximize2, MessagesSquare, Mic, Minimize2, RotateCcw, ShieldCheck, Square } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { UnderlineTabs } from "@/components/ui/underline-tabs"
-import { DOCKED_PANEL_QUERY, useMediaQuery } from "@/lib/core/hooks"
+import { ASSISTANT_WIDTH, useAssistantLayout } from "./assistant-layout"
 import { AIPrivacyNote } from "./ai-privacy"
 import { Button } from "@/components/ui/button"
 import { ChoiceChips } from "@/components/ui/choice-chips"
@@ -194,8 +194,10 @@ export function AIChatSheet({
 }) {
   const [draft, setDraft] = React.useState("")
   const [tab, setTab] = React.useState<"conversa" | "contexto">("conversa")
-  // Telas largas: o assistente fica acoplado ao lado do conteúdo (não cobre a página).
-  const docked = useMediaQuery(DOCKED_PANEL_QUERY)
+  // Acoplado ao lado do conteúdo só quando sobra espaço para a página (`useAssistantLayout`).
+  const { expanded, setExpanded, recent, open: openConversation } = useLexaAI()
+  const layout = useAssistantLayout(expanded)
+  const docked = layout.docked
   const endRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const ready = isAIReady(status)
@@ -240,18 +242,33 @@ export function AIChatSheet({
       open={open}
       onOpenChange={onOpenChange}
       title="Assistente Íntegra"
-      className="sm:w-[480px]"
+      className={expanded ? "sm:w-[min(560px,calc(100vw-1rem))]" : "sm:w-[480px]"}
       docked={docked}
+      dockedWidth={layout.width}
       header={
         <div className="border-b border-border">
           <div className="flex items-center gap-3 px-5 pt-4 pb-2 pr-14">
             <AIMark />
-            <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.01em]">Assistente Íntegra</h2>
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-[16px] leading-tight font-semibold tracking-[-0.01em]">Assistente Íntegra</h2>
+              <p className="truncate text-[12px] text-muted-foreground">{context.subtitle}</p>
+            </div>
             {chat.messages.length > 0 && tab === "conversa" && (
-              <Button variant="ghost" size="xs" onClick={chat.reset} aria-label="Começar nova conversa">
+              <Button variant="ghost" size="xs" onClick={chat.reset} aria-label="Começar nova conversa" title="Começar nova conversa">
                 <RotateCcw /> Nova
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="max-sm:hidden"
+              onClick={() => setExpanded(!expanded)}
+              aria-pressed={expanded}
+              aria-label={expanded ? "Reduzir o painel" : "Expandir o painel"}
+              title={expanded ? `Reduzir (${ASSISTANT_WIDTH.normal} px)` : `Expandir (${ASSISTANT_WIDTH.expanded} px)`}
+            >
+              {expanded ? <Minimize2 /> : <Maximize2 />}
+            </Button>
           </div>
           <UnderlineTabs
             ariaLabel="Assistente"
@@ -266,8 +283,8 @@ export function AIChatSheet({
           />
           {tab === "conversa" && (
             <p className="flex items-center gap-1.5 truncate px-5 py-2 text-[12px] text-muted-foreground">
-              <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
-              <span className="truncate">Usando dados de {context.subtitle}</span>
+              <span className={cn("size-1.5 shrink-0 rounded-full", ready ? "bg-success" : "bg-subtle")} aria-hidden />
+              <span className="truncate">{ready ? `Responde com os dados de ${context.subtitle}` : "Íntegra IA indisponível no momento"}</span>
             </p>
           )}
           {tab === "conversa" && ready && onModeChange && modes && modes.length > 1 && (
@@ -361,6 +378,29 @@ export function AIChatSheet({
             <p className="text-foreground">{MODE_HINT[mode]}</p>
             <p className="text-muted-foreground">Toda informação vem com a referência de onde saiu; o que não está nos dados aparece como ausente.</p>
           </section>
+          {recent.length > 0 && (
+            <section className="space-y-1.5">
+              <h3 className="text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">Outras conversas desta sessão</h3>
+              <ul className="divide-y divide-border/70 rounded-[10px] border border-border">
+                {recent.map((ctx) => (
+                  <li key={`${ctx.scope.type}:${ctx.subtitle}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openConversation(ctx)
+                        setTab("conversa")
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40"
+                    >
+                      <MessagesSquare className="size-4 shrink-0 text-subtle" />
+                      <span className="min-w-0 flex-1 truncate text-foreground">{ctx.subtitle}</span>
+                      <ArrowRight className="size-3.5 shrink-0 text-subtle" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section className="space-y-2 rounded-[10px] border border-border bg-surface-muted/60 p-3">
             <p className="flex items-center gap-2 font-medium text-foreground">
               <ShieldCheck className="size-4 text-success" /> Privacidade
@@ -393,7 +433,9 @@ export function AIChatSheet({
                   </>
                 )}
               </p>
-              <h3 className="mt-6 mb-2 text-[12px] font-semibold text-foreground">Sugestões para você</h3>
+              <h3 className="mt-6 mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">
+              Perguntas sugeridas para esta tela
+            </h3>
               <div className="flex flex-col gap-2">
                 {(mode === "jurisprudence" ? jurisprudencePrompts(context.scope.type) : context.prompts).map((prompt) => (
                   <button

@@ -5,7 +5,7 @@
  */
 
 import type { Process } from "@/types"
-import { formatCNJ, onlyDigits } from "./cnj"
+import { formatCNJ, hasValidCheckDigits, onlyDigits } from "./cnj"
 import { originAcronym } from "./tribunals"
 
 type Labelled = Pick<Process, "type" | "area" | "number" | "code"> & Partial<Pick<Process, "className" | "subject">>
@@ -24,11 +24,17 @@ export function processTitle(process: Labelled, clientName?: string): string {
   return client ? `${client} — ${subject}` : subject
 }
 
-/** Número para exibir como informação secundária: o CNJ formatado ou, sem número, o código interno (#103023). */
+/**
+ * Número para exibir como informação secundária, sem apresentar como oficial o que não é:
+ * CNJ válido → formatado; 20 dígitos com dígito verificador errado → formatado com o aviso;
+ * outro texto → marcado como fora do padrão; sem número → o código interno, dito como tal.
+ */
 export function processNumberLabel(process: Labelled): string {
-  const digits = onlyDigits(process.number ?? "")
-  if (digits.length === 20) return formatCNJ(digits)
-  return process.number?.trim() || process.code || "Sem número"
+  const raw = process.number?.trim() ?? ""
+  const digits = onlyDigits(raw)
+  if (digits.length === 20) return hasValidCheckDigits(digits) ? formatCNJ(digits) : `${formatCNJ(digits)} (dígito não confere)`
+  if (raw) return `${raw} (fora do padrão CNJ)`
+  return process.code ? `Sem número · cód. interno ${process.code}` : "Sem número"
 }
 
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")

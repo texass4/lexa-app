@@ -60,5 +60,14 @@ export function useMediaQuery(query: string) {
   )
 }
 
-/** Telas largas o bastante para o assistente ficar acoplado ao lado do conteúdo. */
-export const DOCKED_PANEL_QUERY = "(min-width: 1280px)"
+/** Largura da janela (0 no servidor), atualizada ao redimensionar. */
+export function useWindowWidth() {
+  return React.useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener("resize", onChange)
+      return () => window.removeEventListener("resize", onChange)
+    },
+    () => window.innerWidth,
+    () => 0,
+  )
+}

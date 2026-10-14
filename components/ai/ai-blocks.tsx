@@ -127,19 +127,21 @@ export function AIErrorNotice({ error, onRetry, className }: { error: AIRequestE
 /** Aviso fixo quando a IA está desligada ou sem chave — nada de resposta simulada (o motivo técnico fica no log). */
 export function AIUnavailable({ status, className }: { status: AIStatus; className?: string }) {
   const disabled = !status.enabled
+  // Uma linha discreta: avisa sem ocupar a área da tela com um cartão inteiro.
   return (
-    <div className={cn("flex items-start gap-3 rounded-[12px] border border-border bg-surface-muted/50 px-3.5 py-3", className)}>
-      <Settings2 className="mt-0.5 size-4 shrink-0 text-subtle" />
-      <div className="min-w-0 text-[13px] leading-snug">
-        <p className="font-medium text-foreground">Íntegra IA indisponível</p>
-        <p className="mt-0.5 text-muted-foreground">
-          {disabled
-            ? "A Íntegra IA está desativada no momento. Fale com o suporte da Íntegra para ativá-la."
-            : // Ligada, mas sem chave configurada (`isAIReady`): tentar de novo não resolveria.
-              "A Íntegra IA ainda não foi configurada para o escritório. Fale com o suporte da Íntegra para ativá-la."}
-        </p>
-      </div>
-    </div>
+    <p
+      role="status"
+      className={cn("flex items-start gap-2 rounded-[10px] border border-border bg-surface-muted/50 px-3 py-2 text-[12.5px] leading-snug text-muted-foreground", className)}
+    >
+      <Settings2 className="mt-px size-3.5 shrink-0 text-subtle" aria-hidden />
+      <span>
+        <span className="font-medium text-foreground">Íntegra IA indisponível.</span>{" "}
+        {disabled
+          ? "Está desativada no momento — fale com o suporte da Íntegra para ativá-la."
+          : // Ligada, mas sem chave configurada (`isAIReady`): tentar de novo não resolveria.
+            "Ainda não foi configurada para o escritório — fale com o suporte da Íntegra."}
+      </span>
+    </p>
   )
 }
 

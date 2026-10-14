@@ -5,6 +5,8 @@ import { Download, Eye, Link2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { FileIcon } from "@/components/shared/file-icon"
+import { usePreview } from "@/components/shared/document-preview-sheet"
+import { Skeleton } from "@/components/ui/skeleton"
 import { DocumentActions } from "@/components/shared/document-list"
 import { useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
@@ -15,6 +17,36 @@ import { formatFileSize } from "@/lib/core/format"
 import { getUser } from "@/lib/auth/account"
 import { processTitle } from "@/lib/processos/label"
 import type { LegalDocument } from "@/types"
+
+/**
+ * Miniatura real quando há arquivo que o navegador exibe com segurança (imagem ou PDF);
+ * senão, o ícone do tipo — e, se o arquivo não estiver no armazenamento, o aviso.
+ */
+function DetailsPreview({ doc }: { doc: LegalDocument }) {
+  const preview = usePreview(doc)
+  const visual = doc.extension === "pdf" || doc.extension === "jpg" || doc.extension === "png"
+  if (!visual || preview.status === "missing" || (preview.status === "ready" && !preview.url)) {
+    return (
+      <>
+        <FileIcon extension={doc.extension} className="h-16 w-12 text-[11px]" />
+        {doc.storagePath && preview.status === "missing" && visual && (
+          <p className="text-[11.5px] text-warning">Pré-visualização indisponível: arquivo não encontrado ou sem acesso.</p>
+        )}
+      </>
+    )
+  }
+  if (preview.status === "loading") return <Skeleton className="h-[200px] w-full rounded-[8px]" />
+  return doc.extension === "pdf" ? (
+    <iframe
+      title={`Pré-visualização de ${doc.name}`}
+      src={`${preview.url}#toolbar=0&navpanes=0`}
+      className="h-[240px] w-full rounded-[8px] border border-border bg-surface"
+    />
+  ) : (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={preview.url} alt={`Pré-visualização de ${doc.name}`} className="max-h-[240px] w-auto rounded-[8px] border border-border object-contain" />
+  )
+}
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -52,8 +84,8 @@ export function DocumentDetails({ doc, onClose }: { doc: LegalDocument; onClose:
           <X className="size-4" />
         </button>
       </header>
-      <div className="flex flex-col items-center gap-3 border-b border-border bg-surface-muted/40 px-4 py-6 text-center">
-        <FileIcon extension={doc.extension} className="h-16 w-12 text-[11px]" />
+      <div className="flex flex-col items-center gap-3 border-b border-border bg-surface-muted/40 px-4 py-5 text-center">
+        <DetailsPreview doc={doc} />
         <p className="max-w-full text-[14px] leading-snug font-semibold break-words text-foreground">{doc.name}</p>
         <p className="text-[12px] text-muted-foreground">
           {doc.kind} · {doc.extension.toUpperCase()} · {formatFileSize(doc.sizeBytes)}

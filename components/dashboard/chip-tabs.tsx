@@ -9,12 +9,15 @@ export function ChipTabs<T extends string>({
   onChange,
   ariaLabel,
   className,
+  wrap = false,
 }: {
   tabs: { value: T; label: string; count?: number }[]
   value: T
   onChange: (value: T) => void
   ariaLabel: string
   className?: string
+  /** Quebra em linhas em vez de rolar (colunas estreitas: nenhum filtro fica cortado). */
+  wrap?: boolean
 }) {
   const onKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return
@@ -25,7 +28,7 @@ export function ChipTabs<T extends string>({
     el?.focus()
   }
   return (
-    <div role="tablist" aria-label={ariaLabel} className={cn("flex gap-1.5 overflow-x-auto no-scrollbar", className)}>
+    <div role="tablist" aria-label={ariaLabel} className={cn("flex gap-1.5", wrap ? "flex-wrap" : "overflow-x-auto no-scrollbar", className)}>
       {tabs.map((t, i) => {
         const active = t.value === value
         return (

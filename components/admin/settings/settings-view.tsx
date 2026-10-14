@@ -44,14 +44,14 @@ function Row({ title, description, children }: { title: string; description?: Re
         <p className="text-[13.5px] font-medium">{title}</p>
         {description && <div className="mt-0.5 text-[12.5px] leading-relaxed text-muted-foreground">{description}</div>}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="min-w-0 sm:shrink-0">{children}</div>
     </div>
   )
 }
 
 function SecretStatus({ ok, name }: { ok: boolean; name: string }) {
   return (
-    <p className="flex items-center gap-2 text-[12px] text-muted-foreground">
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
       <KeyRound className="size-3.5" />
       Credencial ({name}):{" "}
       <StatusBadge tone={ok ? "success" : "neutral"} size="sm">

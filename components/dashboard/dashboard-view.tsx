@@ -4,20 +4,20 @@ import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "cn"
 import { Greeting } from "./greeting"
-import { InsightBanner } from "./insight-banner"
 import { KpiCards } from "./kpi-cards"
 import { RecentProcesses } from "./recent-processes"
 import { QuickViews } from "./quick-views"
-import { RecentMovements } from "./recent-movements"
 import { TodayAgenda } from "./today-agenda"
 import { OpenTasks } from "./open-tasks"
 import { FinancePanel } from "./finance-panel"
 import { WeekPrazos } from "./week-prazos"
-import { RecentActivity } from "./recent-activity"
+import { ActivityFeed } from "./activity-feed"
 import { AttentionPanel } from "./attention-panel"
 import { FadeIn } from "@/components/ui/motion"
 import { Skeleton, SkeletonCard, SkeletonStats } from "@/components/ui/skeleton"
-import { useOfficeData } from "@/lib/store/office-store"
+import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { Panel } from "@/components/ui/panel"
+import { ErrorState } from "@/components/ui/empty-state"
 import { useSession } from "@/lib/auth/session"
 import { officeSignals } from "@/lib/dashboard/attention"
 
@@ -42,18 +42,33 @@ function DashboardSkeleton() {
 }
 
 /** Dois cartões lado a lado (7 + 5 colunas), com a mesma altura; se a pessoa só pode ver um, ele ocupa a linha. */
-function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React.ReactNode; delay?: number }) {
+/** `wide`: a coluna da esquerda ganha mais espaço (8 + 4), para a agenda e a tabela de processos. */
+function Row({ left, right, delay = 0, wide = false }: { left?: React.ReactNode; right?: React.ReactNode; delay?: number; wide?: boolean }) {
   if (!left && !right) return null
   const both = !!left && !!right
   return (
     <div className="grid gap-4 @4xl/main:grid-cols-12 @4xl/main:gap-6">
       {left && (
-        <FadeIn delay={delay} className={cn("min-w-0 [&>*]:h-full", both ? "@4xl/main:col-span-7" : "@4xl/main:col-span-12")}>
+        <FadeIn
+          delay={delay}
+          className={cn(
+            "min-w-0",
+            !wide && "[&>*]:h-full",
+            both ? (wide ? "@4xl/main:col-span-7 @6xl/main:col-span-8" : "@4xl/main:col-span-7") : "@4xl/main:col-span-12",
+          )}
+        >
           {left}
         </FadeIn>
       )}
       {right && (
-        <FadeIn delay={delay + 0.04} className={cn("min-w-0 [&>*]:h-full", both ? "@4xl/main:col-span-5" : "@4xl/main:col-span-12")}>
+        <FadeIn
+          delay={delay + 0.04}
+          className={cn(
+            "min-w-0",
+            !wide && "[&>*]:h-full",
+            both ? (wide ? "@4xl/main:col-span-5 @6xl/main:col-span-4" : "@4xl/main:col-span-5") : "@4xl/main:col-span-12",
+          )}
+        >
           {right}
         </FadeIn>
       )}
@@ -63,6 +78,7 @@ function Row({ left, right, delay = 0 }: { left?: React.ReactNode; right?: React
 
 export function DashboardView() {
   const data = useOfficeData()
+  const { retryLoad } = useOfficeActions()
   const { can, user } = useSession()
   // A lista do que merece atenção começa fechada (os cartões abaixo já mostram agenda,
   // tarefas e prazos); quem abrir, encontra aberta da próxima vez.
@@ -73,6 +89,12 @@ export function DashboardView() {
       return false
     }
   })
+  if (!data.hydrated && data.loadError)
+    return (
+      <Panel className="mt-4">
+        <ErrorState title="Não foi possível carregar o painel." onRetry={retryLoad} />
+      </Panel>
+    )
   if (!data.hydrated) return <DashboardSkeleton />
 
   const signals = officeSignals(data, { userId: user.id, can })
@@ -90,7 +112,7 @@ export function DashboardView() {
   return (
     <div className="min-w-0 space-y-6">
       <FadeIn>
-        <Greeting signals={signals} empty={empty} />
+        <Greeting signals={signals} empty={empty} attentionOpen={insights} onToggleAttention={toggleInsights} />
       </FadeIn>
 
       {!empty && (
@@ -99,29 +121,30 @@ export function DashboardView() {
         </FadeIn>
       )}
 
-      <FadeIn delay={0.04} className="space-y-4">
-        <InsightBanner expanded={insights} onToggle={toggleInsights} />
-        <AnimatePresence initial={false}>
-          {insights && (
-            <motion.div
-              id="painel-atencao"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden"
-            >
-              <AttentionPanel signals={signals} empty={empty} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </FadeIn>
+      <AnimatePresence initial={false}>
+        {insights && (
+          <motion.div
+            id="painel-atencao"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <AttentionPanel signals={signals} empty={empty} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Do mais urgente ao contexto: agenda e tarefas do dia, processos, prazos e dinheiro, depois o que mudou. */}
-      <Row left={can("agenda.view") && <TodayAgenda />} right={can("tasks.view") && <OpenTasks />} delay={0.08} />
-      <Row left={can("processes.view") && <RecentProcesses />} right={<QuickViews />} delay={0.1} />
-      <Row left={can("processes.view") && <WeekPrazos />} right={can("finance.view") && <FinancePanel />} delay={0.12} />
-      <Row left={can("processes.view") && <RecentMovements />} right={<RecentActivity />} delay={0.16} />
+      {/* Por prioridade: a agenda (protagonista) com as tarefas ao lado; depois processos, o que mudou e dinheiro. */}
+      <Row left={can("agenda.view") && <TodayAgenda />} right={can("tasks.view") && <OpenTasks />} delay={0.06} wide />
+      <Row left={can("processes.view") && <RecentProcesses />} right={<QuickViews />} delay={0.1} wide />
+      <Row left={<ActivityFeed />} right={can("processes.view") && <WeekPrazos />} delay={0.14} />
+      {can("finance.view") && (
+        <FadeIn delay={0.16}>
+          <FinancePanel />
+        </FadeIn>
+      )}
     </div>
   )
 }
