@@ -118,25 +118,37 @@ export function NewConversationDialog({
   open,
   onOpenChange,
   onCreated,
+  clientId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (conversation: WhatsAppConversation) => void
+  /** Cliente já escolhido (ex.: veio do "Conversar pelo WhatsApp" do cadastro). */
+  clientId?: string
 }) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Nova conversa" description="Escreva para um cliente ou um número." icon={<MessageSquarePlus />} size="sm" bare>
-      <NewConversationForm onClose={() => onOpenChange(false)} onCreated={onCreated} />
+      <NewConversationForm initialClientId={clientId} onClose={() => onOpenChange(false)} onCreated={onCreated} />
     </Modal>
   )
 }
 
-function NewConversationForm({ onClose, onCreated }: { onClose: () => void; onCreated: (c: WhatsAppConversation) => void }) {
+function NewConversationForm({
+  initialClientId,
+  onClose,
+  onCreated,
+}: {
+  initialClientId?: string
+  onClose: () => void
+  onCreated: (c: WhatsAppConversation) => void
+}) {
   const { clients } = useOfficeData()
-  const [clientId, setClientId] = React.useState("")
+  const withPhone = clients.filter((c) => c.phone?.replace(/\D/g, "").length >= 10).sort((a, b) => a.name.localeCompare(b.name))
+  // Só pré-seleciona quem tem telefone (os demais nem aparecem na lista).
+  const [clientId, setClientId] = React.useState(() => (withPhone.some((c) => c.id === initialClientId) ? initialClientId! : ""))
   const [phone, setPhone] = React.useState("")
   const [error, setError] = React.useState("")
   const [saving, setSaving] = React.useState(false)
-  const withPhone = clients.filter((c) => c.phone?.replace(/\D/g, "").length >= 10).sort((a, b) => a.name.localeCompare(b.name))
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()

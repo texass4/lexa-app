@@ -228,12 +228,6 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
           <Row title="Consulta automática ao DataJud" description={<SecretStatus ok={data.secrets.datajud} name="DATAJUD_API_KEY" />}>
             <ToggleSwitch label="DataJud" checked={s.features.datajud} onChange={(v) => set("features", { datajud: v })} />
           </Row>
-          <Row
-            title="Captura de intimações (DJEN)"
-            description="API pública de Comunicações Processuais do CNJ. Ligue só depois de confirmar com o CNJ que o uso comercial é permitido — a fonte não publica termos de uso. O servidor precisa rodar no Brasil (a fonte bloqueia outros países). Cada intimação capturada entra na Triagem."
-          >
-            <ToggleSwitch label="DJEN" checked={s.features.djen} onChange={(v) => set("features", { djen: v })} />
-          </Row>
           <Row title="Integração WhatsApp" description="Em preparação: o consumo já é medido por escritório (usage_events).">
             <ToggleSwitch label="WhatsApp" checked={s.features.whatsapp} onChange={(v) => set("features", { whatsapp: v })} />
           </Row>
@@ -287,7 +281,7 @@ function SettingsForm({ data, onSaved }: { data: SettingsData; onSaved: (s: Plat
                   onChange={(e) => set("whatsapp", { businessNumber: e.target.value })}
                 />
               </Field>
-              <SecretStatus ok={data.secrets.whatsapp} name="ZAPI_TOKEN" />
+              <SecretStatus ok={data.secrets.whatsapp} name="META_APP_SECRET, WHATSAPP_WEBHOOK_VERIFY_TOKEN, WHATSAPP_CREDENTIALS_KEY" />
             </div>
           </Section>
         </div>

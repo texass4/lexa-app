@@ -155,3 +155,22 @@ describe("helpers do cliente", () => {
     assert.equal(isIncompleteMiss(trf1Response), false)
   })
 })
+
+describe("cliente HTTP — cobertura da busca (DADOS SIMULADOS)", () => {
+  it("resposta parcial COM registros é devolvida (sem nova ida à fonte) para o mapper marcar a cobertura", async () => {
+    const withHits = { ...trf1Response, _shards: { total: 5, successful: 4, failed: 1 } }
+    const { client, calls } = harness([json(withHits)])
+    const data = await client.searchByNumber(CNJ, "api_publica_trf1")
+    assert.equal(calls.length, 1)
+    assert.equal(data._shards?.failed, 1)
+    assert.equal(isIncompleteMiss(data), false)
+  })
+
+  it("pede até SEARCH_SIZE documentos por número", async () => {
+    const { SEARCH_SIZE } = await import("./client")
+    const { client, calls } = harness([json(trf1Response)])
+    await client.searchByNumber(CNJ, "api_publica_trf1")
+    assert.equal(JSON.parse(String(calls[0].body)).size, SEARCH_SIZE)
+    assert.equal(SEARCH_SIZE, 20)
+  })
+})

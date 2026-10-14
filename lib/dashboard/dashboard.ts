@@ -3,7 +3,7 @@
  * `dashboard.test.ts`). Nada aqui é estimado nem vem de IA: são contagens e somas.
  */
 
-import type { Invoice, Prazo, Process, Task } from "@/types"
+import type { Invoice, Prazo, Process, ProcessMovement, Task } from "@/types"
 import { diffInDays, getNow, parse } from "@/lib/core/dates"
 import { daysSinceMovement, isActiveProcess, PRAZO_ALERT_DAYS, RECENT_DAYS } from "@/lib/dashboard/attention"
 import { daysToPrazo, isOpenPrazo } from "@/lib/prazos/prazos"
@@ -39,48 +39,30 @@ export function dashboardKpis(data: DashboardData, now: Date = getNow()) {
   }
 }
 
-/* ---------------------------- Processos recentes --------------------------- */
+/* -------------------------- Movimentações recentes -------------------------- */
 
-export type RecentState = "prazo" | "nova" | "movimentacao" | "sem-novidades"
-
-export const RECENT_STATE_LABEL: Record<RecentState, string> = {
-  prazo: "Prazo próximo",
-  nova: "Nova movimentação",
-  movimentacao: "Movimentação",
-  "sem-novidades": "Sem novidades",
-}
-
-/** Movimentação "nova": nos últimos 2 dias. */
-const NEW_MOVEMENT_DAYS = 2
-
-export interface RecentProcess {
+export interface RecentMovement {
   process: Process
-  state: RecentState
-  /** Prazo aberto mais próximo, quando vence em até `PRAZO_ALERT_DAYS.week` dias. */
-  prazo?: Prazo
+  movement: ProcessMovement
 }
 
-/** Processos ativos com a movimentação mais recente primeiro, cada um com o seu estado. */
-export function recentProcesses(data: Pick<DashboardData, "processes" | "deadlines">, now: Date = getNow(), limit = 4): RecentProcess[] {
-  return data.processes
-    .filter(isActiveProcess)
-    .sort((a, b) => (b.lastMovementAt ?? "").localeCompare(a.lastMovementAt ?? ""))
-    .slice(0, limit)
-    .map((process) => {
-      const prazo = data.deadlines
-        .filter((d) => d.processId === process.id && isOpenPrazo(d))
-        .sort((a, b) => a.fatalDate.localeCompare(b.fatalDate))
-        .find((d) => daysToPrazo(d, now) <= PRAZO_ALERT_DAYS.week)
-      const days = daysSinceMovement(process, now)
-      const state: RecentState = prazo
-        ? "prazo"
-        : days !== undefined && days >= 0 && days <= NEW_MOVEMENT_DAYS
-          ? "nova"
-          : days !== undefined && days >= 0 && days <= RECENT_DAYS
-            ? "movimentacao"
-            : "sem-novidades"
-      return { process, state, prazo }
-    })
+/**
+ * As movimentações mais recentes dos processos do escritório, da mais nova para a
+ * mais antiga. No Painel os processos vêm resumidos (só a última movimentação de
+ * cada um, `movementsPartial`), então a lista mostra no máximo uma por processo.
+ */
+/** Registro interno do cadastro manual ("Processo cadastrado", `addProcess`) — não é movimentação do processo. */
+const isRegistrationMarker = (m: ProcessMovement) => m.kind === "distribution" && !m.origin && !m.code && m.title === "Processo cadastrado"
+
+export function recentMovements(processes: readonly Process[], limit = 5): RecentMovement[] {
+  const latest: RecentMovement[] = []
+  for (const process of processes) {
+    const movement = process.movements
+      .filter((m) => !isRegistrationMarker(m))
+      .reduce<ProcessMovement | undefined>((best, m) => (!best || m.at > best.at ? m : best), undefined)
+    if (movement) latest.push({ process, movement })
+  }
+  return latest.sort((a, b) => b.movement.at.localeCompare(a.movement.at)).slice(0, limit)
 }
 
 /** "agora", "14 min", "3 h", "2 d", "12/09" — tempo desde a última movimentação. */
@@ -114,7 +96,15 @@ export function officeDigest(data: Pick<DashboardData, "processes" | "deadlines"
 
 /* -------------------------------- Tarefas --------------------------------- */
 
-export type TaskTab = "todas" | "atrasadas" | "hoje" | "amanha"
+export type TaskTab = "todas" | "atrasadas" | "hoje" | "amanha" | "semana"
+
+/** Aba de uma tarefa em aberto. "Esta semana" vai de hoje até domingo (as atrasadas ficam na própria aba). */
+export function inTaskTab(task: Task, tab: TaskTab, now: Date = getNow()) {
+  const bucket = taskBucket({ ...task, status: "pendente" }, now)
+  if (tab === "todas") return true
+  if (tab === "semana") return bucket === "hoje" || bucket === "amanha" || bucket === "semana"
+  return bucket === tab
+}
 
 /** Tarefas em aberto por aba, das mais urgentes para as mais distantes. */
 export function openTasksByTab(tasks: Task[], now: Date = getNow()): Record<TaskTab, Task[]> {
@@ -124,6 +114,7 @@ export function openTasksByTab(tasks: Task[], now: Date = getNow()): Record<Task
     atrasadas: pending.filter((t) => taskBucket(t, now) === "atrasadas"),
     hoje: pending.filter((t) => taskBucket(t, now) === "hoje"),
     amanha: pending.filter((t) => taskBucket(t, now) === "amanha"),
+    semana: pending.filter((t) => inTaskTab(t, "semana", now)),
   }
 }
 

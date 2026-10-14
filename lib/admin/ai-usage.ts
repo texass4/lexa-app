@@ -148,8 +148,15 @@ export const OPERATION_LABEL: Record<string, string> = {
   "process.next-actions": "Próximos passos",
   "client.summary": "Resumo do cliente",
   "office.overview": "Panorama do escritório",
+  "finance.analysis": "Análise do financeiro",
+  "jurisprudence.analysis": "Análise de jurisprudência",
+  "jurisprudence.related": "Jurisprudência semelhante ao processo",
+  "consulta.summary": "Resumo da consulta processual",
+  "voice.transcribe": "Transcrição de voz (Conversa)",
   "chat.process": "Chat — processo",
   "chat.client": "Chat — cliente",
   "chat.office": "Chat — escritório",
-  "triage.interpret": "Triagem automática",
+  "chat.jurisprudence-search": "Chat — modo Jurisprudência",
+  // Recurso já removido: o rótulo fica para o histórico de consumo.
+  "triage.interpret": "Triagem automática (descontinuada)",
 }

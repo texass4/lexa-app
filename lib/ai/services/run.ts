@@ -12,6 +12,8 @@ import { AIError, isAIError } from "@/lib/ai/errors"
 import { CACHE_TTL_MS, InFlight, type AICache } from "@/lib/ai/guard"
 import { groundingWarnings, collectStrings, keepKnownRefs, refsInText } from "@/lib/ai/grounding"
 import { logAIEvent, type AILogger } from "@/lib/ai/log"
+import type { QueryCache, RetrievalResult } from "@/lib/ai/jurisprudence-pipeline"
+import { contextKeys, sanitizeAIOutput } from "@/lib/ai/output-sanitizer"
 import { meteredCall, type AIMeter } from "@/lib/ai/metering"
 import { PROMPT_VERSION, buildSystemPrompt, dataMessage } from "@/lib/ai/prompts/system"
 import { SchemaError, type Schema } from "@/lib/ai/schema"
@@ -36,6 +38,10 @@ export interface AIServiceDeps {
   signal?: AbortSignal
   now?: Date
   log?: AILogger
+  /** Diagnóstico da recuperação de jurisprudência (padrão: `logComparative`, só ids, contagens e conceitos). */
+  jurisprudenceLog?: (result: RetrievalResult) => void
+  /** Cache das consultas de jurisprudência (padrão: o do servidor, chave sempre com o escritório). */
+  jurisprudenceCache?: QueryCache
 }
 
 // Pedidos iguais ao mesmo tempo neste servidor viram uma chamada só.
@@ -68,7 +74,8 @@ export async function track<T extends { cached?: boolean }>(
     return result as unknown as T
   } catch (error) {
     const known = isAIError(error) ? error : new AIError("UNEXPECTED", { cause: error })
-    log({ ...base, durationMs: Date.now() - started, ok: false, code: known.code, providerStatus: known.providerStatus })
+    const attempts = known.attempts?.map((a) => `${a.model} ${a.status ?? a.code} ${(a.ms / 1000).toFixed(1)}s`).join(" > ")
+    log({ ...base, durationMs: Date.now() - started, ok: false, code: known.code, providerStatus: known.providerStatus, attempts })
     throw known
   }
 }
@@ -93,6 +100,8 @@ export async function runStructured<T>(options: StructuredOptions<T>): Promise<A
   const tier = options.tier ?? "standard"
   const context = sanitizeAIContext(built.context)
   const contextText = JSON.stringify(context)
+  // Limpeza final dos textos (nomes internos dos dados, nome antigo do produto).
+  const clean = <V,>(value: V) => sanitizeAIOutput(value, { contextKeys: contextKeys(context) })
   const provider = deps.provider
   const model = provider.modelFor?.(tier) ?? provider.model
   const call = { organizationId: deps.repo.organizationId, userId: deps.userId, operation }
@@ -102,7 +111,8 @@ export async function runStructured<T>(options: StructuredOptions<T>): Promise<A
     const hit = await deps.cache.get<AIResult<T>>(key)
     if (hit) {
       await deps.meter.cacheHit(call, provider.name, model).catch(() => undefined)
-      return { ...hit, cached: true, usage: undefined }
+      // Resultado guardado antes desta limpeza existir também sai limpo.
+      return { ...hit, data: clean(hit.data), cached: true, usage: undefined }
     }
 
     return (await inFlight.run(key, async () => {
@@ -123,6 +133,7 @@ export async function runStructured<T>(options: StructuredOptions<T>): Promise<A
         throw error
       }
       if (options.finalize) data = options.finalize(data, built.sources)
+      data = clean(data)
 
       const result: AIResult<T> = {
         data,

@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useUI } from "@/lib/store/ui-store"
 import { invoiceStatus, type clientFinance } from "@/lib/store/selectors"
 import { INVOICE_STATUS } from "@/lib/core/config"
@@ -159,7 +160,7 @@ export function FinanceTab({ client, finance: f }: { client: Client; finance: Re
             const Icon = ICON[current]
             const status = INVOICE_STATUS[current]
             const { day, month } = fmtDayMonthParts(inv.dueDate)
-            const process = inv.processId ? data.processes.find((p) => p.id === inv.processId) : undefined
+            const process = inv.processId ? byId(data.processes, inv.processId) : undefined
             const method = inv.method ? ` · ${inv.method}` : ""
             return (
               <li key={inv.id} className="relative flex items-center gap-4 py-2.5">

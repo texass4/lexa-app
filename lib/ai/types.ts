@@ -88,7 +88,8 @@ export interface ChatReply {
 
 /* --------------------------------- fontes --------------------------------- */
 
-export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice"
+/** `consulta`: uma fonte da Consulta processual (DataJud, DJEN, cadastro do escritório). */
+export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice" | "jurisprudence" | "consulta"
 
 /**
  * Registro real da Íntegra que o modelo recebeu com uma referência curta ("M3").
@@ -149,6 +150,36 @@ export interface OfficeOverviewResult extends AIResult<OfficeOverview> {
   metrics: OfficeMetrics
 }
 
+/* ------------------------------- financeiro ------------------------------- */
+
+/** Leitura do financeiro: interpretação dos números calculados — nunca números novos. */
+export interface FinanceAnalysis {
+  leitura: string
+  pontos_atencao: AttentionPoint[]
+  sugestoes: string[]
+  perguntas_para_verificar: string[]
+}
+
+/** Números do financeiro calculados das faturas reais (a IA só interpreta). */
+export interface FinanceMetrics {
+  month: string
+  previousMonth: string
+  receivedThisMonth: number
+  expectedThisMonth: number
+  /** Recebido no mês anterior até o mesmo dia de hoje. */
+  receivedPreviousSamePeriod: number
+  openAmount: number
+  overdueAmount: number
+  overdueInvoices: number
+  clientsWithOverdue: number
+  dueNext30Days: number
+  dueNext30DaysInvoices: number
+}
+
+export interface FinanceAnalysisResult extends AIResult<FinanceAnalysis> {
+  metrics: FinanceMetrics
+}
+
 /* ---------------------------------- chat ---------------------------------- */
 
 export type ChatRole = "user" | "assistant"
@@ -158,7 +189,17 @@ export interface AIMessage {
   content: string
 }
 
-export type ChatScope = { type: "process"; id: string } | { type: "client"; id: string } | { type: "office" }
+export type ChatScope = { type: "process"; id: string } | { type: "client"; id: string } | { type: "office" } | { type: "jurisprudence"; id: string }
+
+/**
+ * De onde a conversa tira as respostas, escolhido pela pessoa no chat:
+ * - `all`: dados do escritório da conversa e, quando a pergunta é sobre decisões, a base de jurisprudência;
+ * - `office`: só os dados do escritório (nunca pesquisa jurisprudência);
+ * - `jurisprudence`: só a base de jurisprudência, pesquisada a cada pergunta (sem dados do escritório).
+ * Numa conversa sobre uma decisão, o modo não se aplica.
+ */
+export const CHAT_MODES = ["all", "office", "jurisprudence"] as const
+export type ChatMode = (typeof CHAT_MODES)[number]
 
 export const CHAT_LIMITS = {
   /** Mensagens anteriores enviadas ao modelo (o resto fica só na tela). */
@@ -194,3 +235,125 @@ export type AIErrorCode =
   | "BLOCKED"
   | "UNAVAILABLE"
   | "UNEXPECTED"
+  /** Conversa por voz: a gravação não tinha fala inteligível. */
+  | "NO_SPEECH"
+  /** Conversa por voz: áudio fora do formato, curto ou longo demais. */
+  | "INVALID_AUDIO"
+
+/* ------------------------------ jurisprudência ----------------------------- */
+
+/** Leitura de UMA decisão real da base. A IA interpreta; não é a fonte. */
+export interface JurisprudenceAnalysis {
+  resumo: string
+  tese_principal: string
+  resultado: string
+  pontos_relevantes: string[]
+  fundamentos_mencionados: string[]
+  relevancia_para_pesquisa: string
+  /** Só quando um processo foi informado. */
+  comparacao_com_processo: string
+  informacoes_ausentes: string[]
+}
+
+export type Similarity = "alta" | "media" | "baixa"
+
+/** Leitura de um conjunto de resultados reais frente a um processo. */
+/** Resumo da Consulta processual: o que está confirmado, o que é inferência e o que falta. */
+export interface EnrichmentSummary {
+  resumo: string
+  fatos_confirmados: { texto: string; refs: string[] }[]
+  inferencias: { texto: string; refs: string[] }[]
+  /** Preenchido pela Íntegra a partir do relatório (não pelo modelo). */
+  ausentes: string[]
+  cuidados: string[]
+}
+
+/** Trecho de uma decisão usado na análise: literal só se CONFERIDO com o texto da base. */
+export interface StrategyExcerpt {
+  texto: string
+  tipo: "literal" | "parafrase"
+  /** Preenchida pela Íntegra quando o trecho dito literal não confere com a decisão. */
+  nota?: string
+}
+
+export interface StrategyPrecedent {
+  ref: string
+  por_que_importa: string
+  semelhancas: string[]
+  distincoes: string[]
+  compatibilidade: string
+  limitacoes: string[]
+  trechos: StrategyExcerpt[]
+}
+
+export interface StrategyThesis {
+  tese: string
+  justificativa: string
+  requisitos: string[]
+  elementos_do_caso: string[]
+  refs: string[]
+  distincoes: string[]
+  riscos: string[]
+  informacoes_necessarias: string[]
+}
+
+/** Análise comparativa: só sobre precedentes REAIS recuperados da base; a IA interpreta. */
+export interface JurisprudenceStrategy {
+  sintese: string
+  precedentes: StrategyPrecedent[]
+  teses_favoraveis: StrategyThesis[]
+  contrarios_e_distincoes: { ref: string; fundamento_contrario: string; distincao_possivel: string; como_demonstrar: string }[]
+  riscos: { texto: string; refs: string[] }[]
+  lacunas_probatorias: { fato: string; situacao: "informado" | "prova mencionada" | "sem prova informada" | "contraditorio"; observacao: string }[]
+  cenarios: { se: string; entao: string; refs: string[] }[]
+  proximos_pontos: string[]
+  informacoes_ausentes: string[]
+}
+
+/** O que a pesquisa encontrou, calculado pela Íntegra (não pelo modelo) — a tela mostra junto. */
+export interface StrategyRetrievalView {
+  status: "ok" | "sem_resultados" | "nao_executada" | "indisponivel" | "cancelada"
+  support: "suficiente" | "parcial" | "insuficiente"
+  message: string
+  caso: {
+    profundidade: "simples" | "completa"
+    questoes: { questao: string; tese?: string; ampla: boolean; roteiro: { texto: string; situacao: string; detalhe?: string }[] }[]
+    fatos: { fato: string; origem: "pergunta" | "processo"; trecho?: string }[]
+    provas: { prova: string; situacao: "mencionada" | "ausente"; origem: "pergunta" | "processo" }[]
+    posicao: "autor" | "reu" | "nao_informada"
+    fase?: string
+    lacunas: string[]
+  }
+  precedentes: {
+    ref: string
+    id: string
+    label: string
+    href: string
+    questao: string
+    tribunal: string
+    orgao?: string
+    relator?: string
+    dataJulgamento?: string
+    publicacao?: string
+    assunto?: string
+    nivel: "aplicavel" | "relacionada"
+    posicao: "acolhe" | "rejeita" | "indeterminada"
+    posicaoCliente: "favoravel" | "contraria" | "indeterminada"
+    trechoPosicao?: string
+    ressalva?: string
+    resultado?: string
+    trecho?: { campo: "ementa" | "tese"; texto: string; cortado: boolean }
+    fatosEmComum: string[]
+    distincoes: string[]
+    metadadosAusentes: string[]
+    pontuacao: number
+  }[]
+  consultas: { questao: string; tipo: string; conceitos: string[]; resultados: number; situacao: string }[]
+  metricas: { candidatas: number; unicas: number; duplicatas: number; pertinentes: number; selecionadas: number; aplicaveis: number; contrarias: number; cobertura: number; ms: number }
+}
+
+export interface RelatedJurisprudenceAnalysis {
+  visao_geral: string
+  decisoes: { ref: string; semelhanca: Similarity; motivo: string }[]
+  cuidados: string[]
+}

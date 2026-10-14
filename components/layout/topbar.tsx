@@ -7,11 +7,13 @@ import { Kbd } from "@/components/ui/kbd"
 import { Logo } from "@/components/brand/logo"
 import { NewMenu } from "./new-menu"
 import { NotificationsMenu } from "./notifications-menu"
+import { HelpMenu } from "./help-menu"
 import { LexaTrigger } from "@/components/ai/lexa-trigger"
 import { UserMenu } from "./user-menu"
 import { ROUTE_META } from "./nav-config"
 import { useUI } from "@/lib/store/ui-store"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useIsMac } from "@/lib/core/hooks"
 import { BRAND } from "@/lib/core/brand"
 
@@ -21,12 +23,13 @@ function useBreadcrumb() {
   const data = useOfficeData()
   const [, root, id] = pathname.split("/")
   if (id && root === "clientes") {
-    const c = data.clients.find((x) => x.id === id)
+    const c = byId(data.clients, id)
     return { title: c?.name ?? "Cliente", parent: { label: ROUTE_META["/clientes"].title, href: "/clientes" } }
   }
   if (id === "prazos" && root === "tarefas") return { title: "Prazos", parent: { label: "Tarefas", href: "/tarefas" } }
+  if (id === "consulta" && root === "processos") return { title: "Consulta processual", parent: { label: ROUTE_META["/processos"].title, href: "/processos" } }
   if (id && root === "processos") {
-    const p = data.processes.find((x) => x.id === id)
+    const p = byId(data.processes, id)
     return { title: p ? `Processo ${p.code}` : "Processo", parent: { label: ROUTE_META["/processos"].title, href: "/processos" } }
   }
   return undefined
@@ -40,20 +43,20 @@ export function Topbar() {
   const isMac = useIsMac()
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
-      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 md:h-[72px] lg:gap-5 lg:px-8 xl:px-10">
+    <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur-md supports-[backdrop-filter]:bg-surface/80">
+      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:gap-5 lg:px-8">
         {/* Mobile: menu + logo */}
         <button
           type="button"
           onClick={() => setMobileNavOpen(true)}
           aria-label="Abrir menu"
-          className="-ml-1.5 flex size-10 items-center justify-center rounded-control text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
+          className="-ml-1.5 flex size-10 shrink-0 items-center justify-center rounded-control text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
         >
           <Menu className="size-5" strokeWidth={1.8} />
         </button>
         <Link
           href="/dashboard"
-          className="flex items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
+          className="touch-target relative flex items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand/45 md:hidden"
           aria-label={`${BRAND.name} — painel`}
         >
           <Logo size="sm" />
@@ -63,7 +66,7 @@ export function Topbar() {
         <div className="hidden min-w-0 flex-1 items-center gap-5 md:flex">
           {crumb && (
             <nav aria-label="Trilha" className="flex min-w-0 max-w-[45%] shrink-0 items-center gap-1.5 text-[13.5px]">
-              <Link href={crumb.parent.href} className="shrink-0 text-muted-foreground outline-none hover:text-foreground focus-visible:underline">
+              <Link href={crumb.parent.href} className="touch-target relative shrink-0 text-muted-foreground outline-none hover:text-foreground focus-visible:underline">
                 {crumb.parent.label}
               </Link>
               <ChevronRight className="size-3.5 shrink-0 text-subtle" />
@@ -73,10 +76,10 @@ export function Topbar() {
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="group hidden h-11 min-w-[200px] max-w-[560px] flex-1 items-center gap-2.5 rounded-[12px] border border-border/90 bg-surface px-4 text-[13.5px] text-subtle shadow-xs outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex"
+            className="group hidden h-11 min-w-[200px] max-w-[600px] flex-1 items-center gap-2.5 rounded-control border border-border bg-background px-4 text-[14px] text-subtle outline-none transition-[border-color,background-color] hover:border-border-strong hover:bg-surface hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:flex"
           >
             <Search className="size-[17px] text-muted-foreground" strokeWidth={1.8} />
-            <span className="flex-1 truncate text-left">Buscar cliente, processo, documento…</span>
+            <span className="flex-1 truncate text-left">Pesquisar processos, clientes, documentos e tarefas…</span>
             <span className="flex items-center gap-0.5">
               <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
               <Kbd>K</Kbd>
@@ -84,17 +87,21 @@ export function Topbar() {
           </button>
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        {/* Celular: ícones de 36 px com área de toque de 44 px (`touch-target`), para tudo caber em 320 px. */}
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
             aria-label="Buscar"
-            className="flex size-10 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 lg:hidden"
+            className="touch-target relative flex size-9 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 sm:size-10 lg:hidden"
           >
             <Search className="size-[18px]" strokeWidth={1.8} />
           </button>
           <LexaTrigger />
           <NotificationsMenu />
+          <div className="hidden sm:block">
+            <HelpMenu />
+          </div>
           <div className="mx-1.5 hidden h-7 w-px bg-border md:block" aria-hidden />
           <div className="hidden md:block">
             <UserMenu variant="header" />

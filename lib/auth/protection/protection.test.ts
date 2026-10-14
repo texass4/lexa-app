@@ -80,6 +80,15 @@ describe("desafio anti-bot", () => {
 })
 
 describe("limite de tentativas", () => {
+  it("consulta processual: limite por pessoa sem bloquear o colega do mesmo escritório", async () => {
+    setRateStoreForTests(memoryStore)
+    const user = [LIMITS.processLookupUser, "u-consulta-ficticia"] as const
+    const org = [LIMITS.processLookupOrg, "org-consulta-ficticia"] as const
+    for (let i = 0; i < LIMITS.processLookupUser.limit; i += 1) await enforce([...user], [...org])
+    await assert.rejects(enforce([...user], [...org]), (error: unknown) => error instanceof HttpError && error.status === 429)
+    await enforce([LIMITS.processLookupUser, "u-colega-ficticio"], [...org])
+  })
+
   it("bloqueia a partir do limite, com a mesma mensagem genérica", async () => {
     setRateStoreForTests(memoryStore)
     for (let i = 0; i < LIMITS.signupIp.limit; i++) await enforce([LIMITS.signupIp, "203.0.113.7"])

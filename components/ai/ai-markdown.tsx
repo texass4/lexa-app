@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import type { AISources } from "@/lib/ai/types"
+import { chatBlocks } from "@/lib/ai/markdown"
 import { SourceChip, type SourceHandler } from "./ai-blocks"
 
 /**
@@ -34,43 +35,13 @@ function Inline({ text, sources, onOpen }: { text: string; sources: AISources; o
   )
 }
 
-type Block = { type: "p"; text: string } | { type: "h"; text: string } | { type: "ul" | "ol"; items: string[] }
-
-function parse(markdown: string): Block[] {
-  const blocks: Block[] = []
-  let paragraph: string[] = []
-  const flush = () => {
-    if (paragraph.length) blocks.push({ type: "p", text: paragraph.join(" ") })
-    paragraph = []
-  }
-
-  for (const raw of markdown.split("\n")) {
-    const line = raw.trim()
-    const heading = /^#{1,6}\s+(.*)$/.exec(line)
-    const bullet = /^[-*•]\s+(.*)$/.exec(line)
-    const numbered = /^\d+[.)]\s+(.*)$/.exec(line)
-    if (!line) {
-      flush()
-    } else if (heading) {
-      flush()
-      blocks.push({ type: "h", text: heading[1] })
-    } else if (bullet || numbered) {
-      flush()
-      const type = bullet ? "ul" : "ol"
-      const last = blocks[blocks.length - 1]
-      const item = (bullet ?? numbered)![1]
-      if (last?.type === type) last.items.push(item)
-      else blocks.push({ type, items: [item] })
-    } else {
-      paragraph.push(line)
-    }
-  }
-  flush()
-  return blocks
-}
-
-export function AIMarkdown({ text, sources, onOpen }: { text: string; sources: AISources; onOpen?: SourceHandler }) {
-  const blocks = React.useMemo(() => parse(text), [text])
+/**
+ * `streaming`: o texto ainda está sendo gerado — só aparece a parte que já não pode virar
+ * marcador interno. Em qualquer caso, o texto passa pela limpeza final (também o que veio
+ * do histórico ou de uma resposta antiga): nenhum nome interno dos dados chega à tela.
+ */
+export function AIMarkdown({ text, sources, onOpen, streaming = false }: { text: string; sources: AISources; onOpen?: SourceHandler; streaming?: boolean }) {
+  const blocks = React.useMemo(() => chatBlocks(text, { sources, streaming }), [text, sources, streaming])
   return (
     <div className="space-y-2.5 text-[13.5px] leading-relaxed break-words text-foreground">
       {blocks.map((block, i) => {

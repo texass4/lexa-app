@@ -2,12 +2,14 @@ import type { Activity, Appointment, Client, Invoice, InvoiceStatus, LegalDocume
 import type { PersistedState } from "@/lib/store/storage"
 import { getNow, diffInDays, isSameDay, monthName, monthShort, parse, toLocalISO } from "@/lib/core/dates"
 import { nextPrazo } from "@/lib/prazos/prazos"
+import { byId } from "@/lib/store/indexes"
+import { processNumberLabel, processTitle } from "@/lib/processos/label"
 
 /** O que os seletores precisam do store (o `OfficeState` inteiro também serve). */
 type OfficeState = PersistedState
 
-const findClient = (s: OfficeState, id?: string) => (id ? s.clients.find((c) => c.id === id) : undefined)
-const findProcess = (s: OfficeState, id?: string) => (id ? s.processes.find((p) => p.id === id) : undefined)
+const findClient = (s: OfficeState, id?: string) => byId(s.clients, id)
+const findProcess = (s: OfficeState, id?: string) => byId(s.processes, id)
 
 export function describeRelated(s: OfficeState, related?: RelatedEntity) {
   if (!related) return undefined
@@ -18,7 +20,8 @@ export function describeRelated(s: OfficeState, related?: RelatedEntity) {
   const p = findProcess(s, related.id)
   if (!p) return undefined
   const c = findClient(s, p.clientId)
-  return { label: `Processo ${p.code}`, kind: c?.name ?? "Processo", href: `/processos/${p.id}` }
+  // "João da Silva — Ação de cobrança"; o número fica como informação secundária.
+  return { label: processTitle(p, c?.name), kind: processNumberLabel(p), href: `/processos/${p.id}` }
 }
 
 /**
@@ -66,7 +69,7 @@ export function delinquentClientIds(invoices: Invoice[], now: Date = getNow()) {
 export function relatedClientId(s: Pick<OfficeState, "processes">, related?: RelatedEntity) {
   if (!related) return undefined
   if (related.type === "client") return related.id
-  return s.processes.find((p) => p.id === related.id)?.clientId || undefined
+  return byId(s.processes, related.id)?.clientId || undefined
 }
 
 export interface ClientHub {
@@ -141,6 +144,8 @@ const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
 /** Mês em que a fatura foi (ou deve ser) recebida. */
 const receivedIn = (i: Invoice) => (i.paidAt ?? i.dueDate).slice(0, 7)
+/** Dia (`YYYY-MM-DD`) em que a fatura foi (ou deve ser) recebida. */
+const receivedOn = (i: Invoice) => (i.paidAt ?? i.dueDate).slice(0, 10)
 
 export interface MonthRevenue {
   /** `YYYY-MM` */
@@ -168,17 +173,30 @@ export function monthlyRevenue(invoices: Invoice[], now: Date = getNow(), months
   })
 }
 
-/** Números do mês atual. `growth` é `undefined` quando não há mês anterior para comparar. */
-export function financeSummary(invoices: Invoice[], now: Date = getNow()) {
+/**
+ * Números do mês atual. `growth` compara com o mesmo período do mês anterior e é
+ * `undefined` quando não houve recebimento nesse período.
+ *
+ * Indicadores do Financeiro e do Painel. `billedBefore`: o faturado anterior aos
+ * lançamentos recebidos (somado no banco), para a inadimplência valer sobre tudo.
+ */
+export function financeSummary(invoices: Invoice[], now: Date = getNow(), options: { billedBefore?: number } = {}) {
   const [previous, current] = monthlyRevenue(invoices, now, 2)
-  const billed = sum(invoices.filter((i) => i.status !== "cancelado"))
+  const billed = sum(invoices.filter((i) => i.status !== "cancelado")) + (options.billedBefore ?? 0)
   const overdue = sum(invoices.filter((i) => invoiceStatus(i, now) === "atrasado"))
+  // Mesmo período do mês anterior (até o mesmo dia): no dia 6, comparar com o mês
+  // anterior inteiro faria qualquer mês parecer uma queda.
+  const lastDay = new Date(now.getFullYear(), now.getMonth(), 0).getDate()
+  const until = `${previous.key}-${String(Math.min(now.getDate(), lastDay)).padStart(2, "0")}`
+  const samePeriod = sum(invoices.filter((i) => i.status === "pago" && receivedIn(i) === previous.key && receivedOn(i) <= until))
   return {
     month: current.label,
     previousMonth: previous.label,
     expected: current.prevista,
     received: current.recebida,
-    growth: previous.recebida > 0 ? ((current.recebida - previous.recebida) / previous.recebida) * 100 : undefined,
+    /** Recebido no mês anterior até o mesmo dia — a base de `growth`. */
+    previousSamePeriod: samePeriod,
+    growth: samePeriod > 0 ? ((current.recebida - samePeriod) / samePeriod) * 100 : undefined,
     /** Percentual do valor faturado que está vencido e não pago. */
     defaultRate: billed > 0 ? (overdue / billed) * 100 : 0,
   }

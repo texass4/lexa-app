@@ -25,9 +25,9 @@ Supabase (RLS isola por escritório e por permissão)
 Servidor (Route Handlers em app/api/*)
   auth/guard (requireMember · requireActor · requireAdmin · aiRoute · segredo)
       ↓
-  lib/services/<domínio>/*             regras de servidor (consulta de processos, e-mail, WhatsApp, triagem…)
+  lib/services/<domínio>/*             regras de servidor (consulta de processos, e-mail, WhatsApp, jurisprudência…)
       ↓
-  lib/integrations/*                   clientes HTTP de terceiros (DataJud, DJEN, Z-API)
+  lib/integrations/*                   clientes HTTP de terceiros (DataJud, Meta/WhatsApp)
 ```
 
 **Princípios**
@@ -44,8 +44,8 @@ Servidor (Route Handlers em app/api/*)
 
 | Página (rota) | Tela (`components/`) | Regras (`lib/`) | Servidor / API |
 |---|---|---|---|
-| Início `/dashboard` | `dashboard/` | `dashboard/dashboard.ts`, `dashboard/attention.ts`, `dashboard/visits.ts` | `api/ai/office/*` (panorama) |
-| Triagem `/triagem` | `triagem/` | `triagem/`, `intimacoes/` | `services/triagem/`, `services/intimacoes/`, `api/cron/process-sync` |
+| Início `/dashboard` | `dashboard/` | `dashboard/dashboard.ts`, `dashboard/attention.ts`, `dashboard/visits.ts`, `processos/label.ts` | `api/ai/office/*` (panorama) |
+| Jurisprudência `/jurisprudencia` | `jurisprudencia/` | — | `services/jurisprudence/`, `api/jurisprudence/*`, `api/cron/jurisprudence-sync`, `ai/services/jurisprudence.ts` |
 | Clientes `/clientes`, `/clientes/[id]` | `clientes/`, `clientes/profile/` | `clientes/clients.ts`, `clientes/client-import.ts` | `api/ai/client/summary` |
 | Atendimento `/atendimento` | `atendimento/` | `whatsapp/` | `services/whatsapp/`, `integrations/whatsapp/`, `api/whatsapp/*` |
 | Processos `/processos`, `/processos/[id]` | `processos/` | `processos/cnj.ts` | `services/processos/`, `integrations/legal/`, `api/processes/*`, `api/ai/process/*` |
@@ -83,7 +83,7 @@ Peças transversais:
 ```
 lexa-app/
 ├── app/                         rotas (só páginas finas, layouts e Route Handlers)
-│   ├── (app)/                   área logada: dashboard, triagem, clientes, atendimento, processos,
+│   ├── (app)/                   área logada: dashboard, clientes, atendimento, processos,
 │   │                            tarefas (+ prazos), agenda, documentos, financeiro, configuracoes
 │   ├── (auth)/                  login, cadastro, recuperar-senha, redefinir-senha
 │   ├── (admin)/admin/           Íntegra Admin (papel conferido no servidor)
@@ -93,21 +93,21 @@ lexa-app/
 │   ├── layout.tsx               raiz: fontes, tema, Providers
 │   └── manifest.ts, icon.svg…   ícones e manifest
 ├── components/
-│   ├── <módulo>/                uma pasta por página: dashboard, triagem, clientes, atendimento,
+│   ├── <módulo>/                uma pasta por página: dashboard, clientes, atendimento,
 │   │                            processos, tarefas, prazos, agenda, documentos, financeiro,
 │   │                            configuracoes, auth, admin
 │   ├── layout/  ai/  shared/  ui/  brand/
 │   └── providers.tsx            tema, stores, toasts e animações
 ├── lib/
 │   ├── <módulo>/                regras puras por página: dashboard, clientes, processos, prazos,
-│   │                            agenda, documentos, financeiro, triagem, intimacoes, whatsapp
+│   │                            agenda, documentos, financeiro, intimacoes (OAB), whatsapp
 │   ├── core/                    utilitários comuns
 │   ├── store/  auth/  ai/  admin/  supabase/
-│   ├── services/                servidor: email, intimacoes, processos, triagem, whatsapp
-│   └── integrations/            legal/ (DataJud, DJEN) · whatsapp/ (Z-API)
+│   ├── services/                servidor: email, jurisprudence, processos, whatsapp
+│   └── integrations/            legal/ (DataJud) · whatsapp/meta (Cloud API)
 ├── types/                       tipos das entidades
 ├── supabase/
-│   ├── migrations/              SQL do banco em ordem (0001 → 0013): tabelas, RLS, funções, Storage
+│   ├── migrations/              SQL do banco em ordem (0001 → 0018): tabelas, RLS, funções, Storage
 │   └── templates/               e-mails do Supabase Auth (gerados por `npm run email:templates`)
 ├── public/brand/                ícones do manifest, kit da marca (SVG) e fundo da barra lateral
 ├── scripts/                     scripts de e-mail (templates do Supabase, teste de SMTP)
@@ -150,8 +150,17 @@ lexa-app/
   ```
 - Diálogos globais (criar cliente, tarefa, prazo, compromisso, documento, processo, lançamento): `useUI().openDialog("task", { processId })`.
 - Permissões na interface: `useSession().can("finance.edit")` ou `<Can permission="finance.edit">`.
-- Visual: reutilize `components/ui` (`PageHeader`, `Panel`, `MetricCard`, `Button`, `StatusBadge`, `FilterTabs`, `DataTable`, `EmptyState`, `Skeleton`, `Modal`, `SideSheet`, `Field`). Cores e raios saem dos tokens (`bg-surface`, `text-muted-foreground`, `rounded-card`, `shadow-card`). Não use cores soltas (`#hex`) nos componentes.
+- Visual: reutilize `components/ui` (`PageHeader`, `Panel`, `IndicatorStrip`, `Button`, `StatusBadge`, `FilterTabs`, `DataTable`, `EmptyState`, `Skeleton`, `Modal`, `SideSheet`, `Field`). Cores e raios saem dos tokens (`bg-surface`, `text-muted-foreground`, `rounded-card`, `shadow-card`). Não use cores soltas (`#hex`) nos componentes.
 - Estados obrigatórios em toda lista: carregando (`Skeleton` até `hydrated`), vazio (`EmptyState` com o próximo passo) e erro.
+- Responsividade (testada em 320, 375, 390, 768, 1024, 1280, 1440 e 1920 px):
+  - Divisões da página em colunas e troca tabela ↔ cartões usam a largura do conteúdo, não da janela: `<main>` é o container `@container/main` (`components/layout/app-shell.tsx`). Use `@4xl/main:grid-cols-12` (≥ 896 px de conteúdo) em vez de `lg:` — com a barra lateral aberta em 1024 px, as colunas empilham em vez de espremer.
+  - Tabela larga (`min-w-[860px]`) só aparece com `@4xl/main:block`; antes disso, a mesma lista em cartões (`@4xl/main:hidden`). Ações de cada linha nunca podem ficar escondidas por rolagem horizontal.
+  - Toque: controle menor que 44 px recebe `touch-target` (área de clique ampliada só em telas de toque, sem mudar o visual; o elemento precisa ser `relative`/`absolute`). Já vem em `Button`, `AnimatedCheckbox`, `ChoiceChips`, `FilterTabs`, gatilhos de `DropdownMenu`, fechar de `Modal`/`SideSheet` e dias do calendário; itens de `DropdownMenu` têm 40 px no toque.
+    - `touch-target` usa `::after`: num elemento com `truncate`/`overflow-hidden` (ou dentro de um pai que corta), a área é cortada. Nesses casos, corte o texto num `<span>` interno ou amplie com padding só no toque (`pointer-coarse:-my-2 pointer-coarse:py-2`).
+    - Quando a área ampliada cobriria o centro de outro controle (vizinhos a menos de ~44 px), aumente o próprio controle com `pointer-coarse:` (ex.: `pointer-coarse:h-8`) em vez de ampliar a área.
+    - Linha de lista com uma ação principal (ex.: `DocumentList`): o botão principal cobre a linha inteira (`after:absolute after:inset-0` com a linha `relative`) e os links secundários ficam por cima (`relative`).
+  - No celular, prefira reorganizar a cortar: valor e situação abaixo do nome, indicadores em duas colunas (`IndicatorStrip`), títulos em até duas linhas (`PanelHeader`).
+  - Detalhe do processo (`components/processos/process-profile.tsx`): com menos de 896 px de conteúdo, a tela segue "essencial → contexto → detalhes": identificação, prazo/responsável/valor e ações no topo; última movimentação e pontos de atenção (abrem sob demanda); o resto em abas fixas (Movimentações, Prazos e tarefas, Documentos, Dados, Histórico), com a timeline compacta. Os blocos são os mesmos do desktop — só a arrumação muda.
 
 ### Regras e dados
 
@@ -184,11 +193,13 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 |---|---|---|
 | `auth/signup`, `auth/recover`, `auth/events` | pública / sessão | cadastro, recuperação de senha, auditoria de login |
 | `me/email`, `team/users/*` | `requireMember` | conta da pessoa e equipe do escritório |
-| `processes/search`, `processes/[id]/sync`, `processes/monitoring` | `requireMember("processes.*")` | consulta de processo pelo CNJ e monitoramento |
+| `processes/search`, `processes/[id]/sync`, `processes/monitoring` | `requireMember("processes.*")`; consulta com limite por pessoa (60/10 min) e por escritório (1000/h) | consulta de processo pelo CNJ e monitoramento |
 | `ai/*` | `aiRoute` | Íntegra IA (medição, limites e cache no banco) |
 | `whatsapp/*` | `requireActor` | Central de Atendimento |
-| `whatsapp/webhook` | segredo do webhook | eventos da Z-API |
-| `cron/process-sync` | `Bearer CRON_SECRET` | monitoramento, captura do DJEN e interpretação da Triagem |
+| `whatsapp/meta/webhook` | assinatura `X-Hub-Signature-256` (App Secret) | eventos da Meta (WhatsApp oficial) |
+| `cron/process-sync` | `Bearer CRON_SECRET` | monitoramento das movimentações dos processos |
+| `process-enrichment` · `process-enrichment/[id]` | `requireMember` (`processes.edit` para iniciar, `processes.view` para ler) | Consulta processual: inicia a execução (responde na hora, roda com `after`) e devolve etapas/fontes/relatório; ver `docs/CONSULTA_PROCESSUAL.md` |
+| `cron/jurisprudence-sync` | `Bearer CRON_SECRET` | alimenta a base de jurisprudência pelas fontes oficiais (STJ) — 1×/dia; ver `docs/JURISPRUDENCIA.md` |
 | `admin/*` | `requireAdmin` | Íntegra Admin |
 
 ---
@@ -196,9 +207,10 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 ## 6. Dados
 
 - Cada coleção do escritório é uma tabela `(organization_id, id, data jsonb, created_at, updated_at)`. A RLS libera só o escritório da pessoa e só os módulos que ela pode ver.
-- O store carrega as coleções ao entrar, grava só o que mudou (agrupado em 300 ms) e recebe as mudanças da equipe pelo Realtime. Edições conferem a versão (`updated_at`): se outra pessoa gravou antes, a gravação é recusada com aviso.
-- WhatsApp, Triagem, intimações, monitoramento, consumo de IA e Admin têm tabelas próprias (ver as migrações).
-- Arquivos: Storage, em `documents/<organization_id>/…` e `whatsapp/<organization_id>/…`, sempre com URL assinada.
+- O store carrega na abertura só o que a primeira tela usa (recortes recentes; processos sem o histórico de movimentações) e o resto sob demanda, quando a tela ou o registro é aberto (`lib/store/on-demand.ts`); o histórico das listagens vem do banco em páginas de 50, com contagens e busca feitas no banco (`lib/store/history-lists.ts`, migração 0017; detalhes em MODULOS.md). Grava só o que mudou (agrupado em 300 ms) e recebe as mudanças da equipe pelo Realtime. Edições conferem a versão (`updated_at`): se outra pessoa gravou antes, a gravação é recusada com aviso.
+- WhatsApp, monitoramento, consumo de IA e Admin têm tabelas próprias (ver as migrações). As tabelas da antiga Triagem (`triage_items`, `intimacoes`…) continuam no banco, sem uso, para não apagar dados.
+- Arquivos: Storage, em `documents/<organization_id>/…` e `whatsapp/<organization_id>/…`, sempre com URL assinada. `documents` e `avatars` só aceitam os formatos oferecidos na tela (migração 0023; a lista de Documentos está em `DOCUMENT_MIME`, `lib/documentos/documents.ts`).
+- Privilégios: os papéis da API (`anon`, `authenticated`) não têm TRUNCATE, TRIGGER nem REFERENCES no schema `public` (a RLS não vale para TRUNCATE) — migração 0023, conferida por `supabase/tests/privilegios.sql`. Tabela nova criada pelo SQL Editor já nasce assim; se for criada por outro papel, rode a 0023 de novo.
 
 ---
 
@@ -212,7 +224,7 @@ Em português, explicando **por que** o código é assim (regra jurídica, limit
 
 **Novo campo num cadastro**: tipo em `types/index.ts` → formulário → ação no `office-store.tsx` → exibição. O `jsonb` não precisa de migração.
 
-**Nova coleção**: tipo → `PersistedState` e `TABLES` em `lib/store/storage.ts` → tabela, índices e políticas numa nova migração em `supabase/migrations/` (próximo número).
+**Nova coleção**: tipo → `PersistedState` e `TABLES` em `lib/store/storage.ts` → tabela, índices e políticas numa nova migração em `supabase/migrations/` (próximo número), incluindo a tabela na publicação `supabase_realtime` e o gatilho `realtime_deletion` com a permissão de leitura dela (ver `0018_realtime_exclusoes.sql`).
 
 **Nova ação de negócio**: método em `OfficeActions` (`lib/store/office-store.tsx`), registrando uma `Activity` quando fizer sentido.
 

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Prazo, Process, Task, TaskColumn } from "@/types"
+import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Prazo, Process, Task, TaskColumn, TribunalCheck } from "@/types"
 import * as account from "@/lib/auth/account"
 import { CLIENT_STATUS } from "@/lib/core/config"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
@@ -19,10 +19,22 @@ import { getSupabase } from "@/lib/supabase/client"
 import { useSession } from "@/lib/auth/session"
 import { withoutFinance } from "@/lib/financeiro/access"
 import { useSplashReady } from "@/components/layout/app-splash"
-import { COLLECTION_LABELS, loadState, type Collection, type PersistedState, type Snapshot } from "./storage"
-import { OfficeSync, REVALIDATE_AFTER_HIDDEN_MS, type SaveResult, type SyncNotice } from "./office-sync"
+import {
+  COLLECTION_LABELS,
+  fetchAll,
+  fetchStats,
+  initialScopes,
+  loadScopes,
+  windowBounds,
+  type Collection,
+  type PersistedState,
+  type Scope,
+  type Snapshot,
+  type WindowBounds,
+} from "./storage"
+import { OfficeSync, REVALIDATE_AFTER_HIDDEN_MS, type PageState, type PagedList, type SaveResult, type SyncNotice } from "./office-sync"
 
-export type { SaveResult } from "./office-sync"
+export type { PageState, PagedList, SaveResult } from "./office-sync"
 
 /**
  * Store da aplicação, com os dados do escritório de quem está logado — uma cópia
@@ -80,7 +92,8 @@ export type AppointmentCategoryInput = Pick<AppointmentCategory, "name" | "color
 export type NewProcessInput = Pick<
   Process,
   "number" | "clientId" | "area" | "type" | "court" | "district" | "opposingParty" | "ownerId" | "status" | "claimValue"
->
+> &
+  Partial<Pick<Process, "tribunal" | "degree" | "judicialUnit" | "secret" | "notes">>
 export type NewDocumentInput = Pick<LegalDocument, "name" | "kind" | "clientId" | "processId" | "extension" | "sizeBytes" | "storagePath">
 export type TaskColumnInput = Pick<TaskColumn, "name" | "color" | "isDone">
 
@@ -124,7 +137,11 @@ interface OfficeActions {
    * Aplica uma ficha reconsultada, importando só o que é novo. `checkedAt` (ISO)
    * é quando a fonte foi conferida — pode vir do cache do escritório.
    */
-  applyProcessSync(processId: string, sheet: ProcessSheet, checkedAt?: string): SyncOutcome
+  /**
+   * Aplica uma ficha reconsultada. `checks`: consultas que acompanham a ficha (as do
+   * relatório da Consulta processual), guardadas como evidência do tribunal.
+   */
+  applyProcessSync(processId: string, sheet: ProcessSheet, checkedAt?: string, options?: { checks?: TribunalCheck[] }): SyncOutcome
   /** Exclui o processo (o banco exclui junto os prazos dele). */
   deleteProcess(id: string): void
   toggleTask(id: string): Task | undefined
@@ -172,6 +189,24 @@ interface OfficeActions {
   deleteInvoice(id: string): void
   markNotificationRead(id: string): void
   markAllNotificationsRead(): void
+  /** Carrega recortes que ainda não estão na memória (histórico sob demanda). */
+  ensureScopes(scopes: Scope[]): Promise<void>
+  /** O recorte já foi carregado. */
+  isLoaded(scopeId: string): boolean
+  /** Troca o resumo de processos pelo registro completo (com todas as movimentações). */
+  ensureFullProcesses(ids: string[]): Promise<void>
+  /** Os dados como estão agora (para quem esperou uma carga sob demanda antes de ler). */
+  currentState(): PersistedState
+  /** Início das janelas da abertura: o que é anterior é o histórico (lido em páginas). */
+  windowBounds(): WindowBounds
+  /** Próxima página de uma lista do histórico (ou de uma busca no banco). */
+  loadNextPage<T>(list: PagedList<T>): Promise<void>
+  /** Até onde a lista já foi lida. */
+  pageState(listId: string): PageState | undefined
+  /** Contagens do histórico, calculadas no banco (funções `*_history_*`). */
+  fetchStats<T>(fn: string, args: Record<string, string>): Promise<T>
+  /** A coleção inteira direto do banco, sem passar pelo store (exportar relatório). */
+  fetchAll<T extends { id: string }>(key: Collection): Promise<T[]>
 }
 
 const DataContext = React.createContext<OfficeState | null>(null)
@@ -183,19 +218,30 @@ const base = () => ({ organizationId: account.currentOrgId(), createdAt: nowISO(
 
 /**
  * Primeira carga dos dados, iniciada antes de a sessão terminar de carregar
- * (`SessionProvider`). O store usa esta promessa em vez de abrir outra.
+ * (`SessionProvider`). O store usa esta promessa em vez de abrir outra. Só os recortes
+ * da abertura (`initialScopes`); o histórico vem sob demanda (`ensureScopes`).
  */
-let preloaded: Promise<Snapshot> | null = null
+let preloaded: Promise<{ snapshot: Snapshot; scopes: Scope[] }> | null = null
+
+/** Janelas da carga em uso (a mesma data das `initialScopes`). */
+let bounds: WindowBounds = windowBounds(getNow())
+
+function startInitialLoad() {
+  const now = getNow()
+  bounds = windowBounds(now)
+  const scopes = initialScopes(now)
+  return loadScopes(getSupabase(), scopes).then((snapshot) => ({ snapshot, scopes }))
+}
 
 export function preloadOfficeData() {
-  preloaded ??= loadState(getSupabase())
+  preloaded ??= startInitialLoad()
   // Evita "unhandled rejection" se ninguém chegar a consumir (ex.: sem acesso).
   preloaded.catch(() => {})
 }
 
 /** A carga antecipada, ou uma nova. Continua disponível até alguém aplicá-la (StrictMode monta duas vezes). */
 function initialLoad() {
-  preloaded ??= loadState(getSupabase())
+  preloaded ??= startInitialLoad()
   return preloaded
 }
 /** Campos do cadastro com nome legível — para descrever a edição na timeline. */
@@ -447,9 +493,13 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
 
       async addProcess(input) {
         const at = nowISO()
+        const digits = input.number.replace(/\D/g, "")
         const draft: Process = {
           ...base(),
           ...input,
+          // Cadastro do escritório: a consulta pública pode complementar, nunca substituir (`process-sync.ts`).
+          origin: "manual",
+          ...(digits.length === 20 ? { cnj: digits } : {}),
           id: uid("p"),
           // O banco gera o código (`0007_process_code.sql`).
           code: "",
@@ -526,12 +576,13 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
         return process
       },
 
-      applyProcessSync(processId, sheet, checkedAt) {
+      applyProcessSync(processId, sheet, checkedAt, options) {
         const current = stateRef.current.processes.find((p) => p.id === processId)
-        if (!current) return { added: 0 }
+        // Só com o histórico completo: comparar com o resumo trataria movimentações antigas como novas.
+        if (!current || current.movementsPartial) return { added: 0 }
 
         const at = checkedAt ? toLocalISO(new Date(checkedAt)) : nowISO()
-        const { process: updated, imported } = mergeProcessSheet(current, sheet, at, { newId: () => uid("m") })
+        const { process: updated, imported } = mergeProcessSheet(current, sheet, at, { newId: () => uid("m"), checks: options?.checks })
 
         commit((s) => ({
           ...s,
@@ -1129,6 +1180,16 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
       markAllNotificationsRead() {
         commit((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }))
       },
+
+      ensureScopes: (scopes) => sync.ensureScopes(scopes),
+      isLoaded: (scopeId) => sync.isLoaded(scopeId),
+      ensureFullProcesses: (ids) => sync.ensureFullProcesses(ids),
+      currentState: () => stateRef.current,
+      windowBounds: () => bounds,
+      loadNextPage: (list) => sync.loadNextPage(list),
+      pageState: (listId) => sync.pageState(listId),
+      fetchStats: (fn, args) => fetchStats(getSupabase(), fn, args),
+      fetchAll: (key) => fetchAll(getSupabase(), key),
     }
   }, [sync])
 
@@ -1141,7 +1202,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
     }
     // A primeira carga reaproveita a que começou junto com a sessão; novas tentativas buscam de novo.
     initialLoad()
-      .then((snapshot) => {
+      .then(({ snapshot, scopes }) => {
         if (cancelledRef.current) return
         preloaded = null
         // O que foi criado antes de terminar de carregar entra junto (e é gravado a seguir).
@@ -1151,7 +1212,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
           ;(next as unknown as Record<string, unknown>)[key] = mergeById<{ id: string }>(current[key], snapshot.state[key])
         }
         stateRef.current = next
-        sync.hydrate(snapshot)
+        sync.hydrate(snapshot, scopes)
         setState(next)
       })
       .catch((error) => {

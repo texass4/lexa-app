@@ -46,7 +46,7 @@ import {
 } from "@/lib/core/dates"
 import { formatCurrency } from "@/lib/core/format"
 import { getUser } from "@/lib/auth/account"
-import { whatsappLink, whatsappNumber } from "@/lib/clientes/clients"
+import { clientConversationHref, whatsappLink, whatsappNumber } from "@/lib/clientes/clients"
 import { maskPhone } from "@/lib/core/masks"
 import type { Client, ClientWhatsAppSummary } from "@/types"
 import { Can, useSession } from "@/lib/auth/session"
@@ -83,7 +83,7 @@ function InfoRow({
               () => toast.error("Não foi possível copiar."),
             )
           }}
-          className="flex size-7 items-center justify-center rounded-[7px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/40 group-hover:opacity-100 max-md:opacity-100"
+          className="touch-target relative flex size-7 items-center justify-center rounded-[7px] text-subtle opacity-0 outline-none transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/40 group-hover:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100"
         >
           <Copy className="size-3.5" />
         </button>
@@ -262,7 +262,7 @@ export function OverviewTab({
                       <button
                         type="button"
                         onClick={() => onNavigate("compromissos")}
-                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                        className="touch-target relative rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                       >
                         Ver todos
                       </button>
@@ -325,7 +325,7 @@ export function OverviewTab({
                       <button
                         type="button"
                         onClick={() => onNavigate("tarefas")}
-                        className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                        className="touch-target relative rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                       >
                         Ver todas
                       </button>
@@ -360,7 +360,7 @@ export function OverviewTab({
                   <button
                     type="button"
                     onClick={() => onNavigate("timeline")}
-                    className="rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="touch-target relative rounded-md px-1.5 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     Ver timeline
                   </button>
@@ -398,10 +398,11 @@ export function OverviewTab({
 }
 
 /**
- * WhatsApp do cliente. Sem integração ativa, só abre a conversa pelo wa.me; quando
- * houver (Z-API ou outra), a conversa vinculada entra por `conversation`.
+ * WhatsApp do cliente. "Conversar pelo WhatsApp" abre a Central de Atendimento já na
+ * conversa dele; sem acesso ao Atendimento, abre pelo wa.me.
  */
 function WhatsAppPanel({ client, conversation }: { client: Client; conversation?: ClientWhatsAppSummary }) {
+  const { can } = useSession()
   const link = whatsappLink(client)
   const number = whatsappNumber(client)
   return (
@@ -420,9 +421,13 @@ function WhatsAppPanel({ client, conversation }: { client: Client; conversation?
             O histórico de conversas aparecerá aqui quando a integração com o WhatsApp for ativada.
           </p>
         )}
-        {link ? (
+        {link && can("whatsapp.view") ? (
+          <Link href={clientConversationHref(client.id)} className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full")}>
+            <MessageCircle /> Conversar pelo WhatsApp
+          </Link>
+        ) : link ? (
           <a href={link} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full")}>
-            <MessageCircle /> Abrir conversa
+            <MessageCircle /> Conversar pelo WhatsApp
           </a>
         ) : (
           <p className="text-[12px] text-subtle">Cadastre um celular ou WhatsApp para abrir a conversa.</p>

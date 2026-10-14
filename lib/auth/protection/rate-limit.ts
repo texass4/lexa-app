@@ -40,6 +40,14 @@ export const LIMITS = {
   inviteUser: { id: "invite:user", limit: 30, windowSeconds: HOUR },
   inviteOrg: { id: "invite:org", limit: 100, windowSeconds: 24 * HOUR },
   emailChangeUser: { id: "email-change:user", limit: 5, windowSeconds: HOUR },
+  /**
+   * Consulta processual pelo navegador ("Novo processo", "Atualizar", atualização ao abrir
+   * um processo). Cada consulta pode prender a fonte externa por até ~60 s: com folga para
+   * o uso normal, sem deixar uma pessoa (ou um script com a sessão dela) martelar a fonte.
+   * O monitoramento automático não passa por aqui.
+   */
+  processLookupUser: { id: "process-lookup:user", limit: 60, windowSeconds: 10 * 60 },
+  processLookupOrg: { id: "process-lookup:org", limit: 1000, windowSeconds: HOUR },
 } satisfies Record<string, RateRule>
 
 export const TOO_MANY = "Muitas tentativas. Aguarde alguns minutos e tente de novo."

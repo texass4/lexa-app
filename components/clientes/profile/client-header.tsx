@@ -33,7 +33,7 @@ import { SourceIcon } from "@/components/clientes/source-icon"
 import { CLIENT_STATUS } from "@/lib/core/config"
 import { fmtLongDate } from "@/lib/core/dates"
 import { getUser } from "@/lib/auth/account"
-import { whatsappLink } from "@/lib/clientes/clients"
+import { clientConversationHref, whatsappLink } from "@/lib/clientes/clients"
 import { DIALOG_PERMISSION, useUI, type DialogKind } from "@/lib/store/ui-store"
 import type { Client } from "@/types"
 import { Can, useSession } from "@/lib/auth/session"
@@ -85,7 +85,7 @@ export function ClientHeader({
       <div className="relative p-5 sm:p-7">
         <Link
           href="/clientes"
-          className="mb-5 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:underline md:hidden"
+          className="touch-target relative mb-5 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:underline md:hidden"
         >
           <ArrowLeft className="size-3.5" /> Clientes
         </Link>
@@ -139,18 +139,29 @@ export function ClientHeader({
                 <Phone />
               </a>
             )}
-            {whatsapp && (
-              <a
-                href={whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Abrir WhatsApp de ${client.name}`}
-                title="Abrir conversa no WhatsApp"
-                className={cn(buttonVariants({ variant: "secondary", size: "icon" }))}
-              >
-                <MessageCircle />
-              </a>
-            )}
+            {/* Com acesso ao Atendimento, a conversa abre lá (já no cliente); sem acesso, pelo wa.me. */}
+            {whatsapp &&
+              (can("whatsapp.view") ? (
+                <Link
+                  href={clientConversationHref(client.id)}
+                  aria-label={`Conversar pelo WhatsApp com ${client.name}`}
+                  title="Conversar pelo WhatsApp"
+                  className={cn(buttonVariants({ variant: "secondary", size: "icon" }))}
+                >
+                  <MessageCircle />
+                </Link>
+              ) : (
+                <a
+                  href={whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Conversar pelo WhatsApp com ${client.name}`}
+                  title="Conversar pelo WhatsApp"
+                  className={cn(buttonVariants({ variant: "secondary", size: "icon" }))}
+                >
+                  <MessageCircle />
+                </a>
+              ))}
             <Can permission="tasks.edit">
               <Button variant="secondary" onClick={() => openDialog("task", { clientId: client.id })}>
                 <ListChecks /> Nova tarefa

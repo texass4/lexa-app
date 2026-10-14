@@ -10,7 +10,7 @@ export type ConnectionHealth = "loading" | "connected" | "disconnected" | "uncon
 export function connectionHealth(info: InstanceInfo | null, loading: boolean): ConnectionHealth {
   if (loading && !info) return "loading"
   if (!info?.instance) return "unconfigured"
-  if (info.live?.error) return "error"
+  if (info.live?.error || info.instance.status === "error") return "error"
   return info.instance.status === "connected" ? "connected" : "disconnected"
 }
 

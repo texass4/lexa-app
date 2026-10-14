@@ -333,7 +333,7 @@ export function fakeSupabase(tables: Record<string, Row[]> = seedTables()) {
       return builder
     },
   }
-  return { supabase: client as unknown as SupabaseClient, writes, queries }
+  return { supabase: client as unknown as SupabaseClient, writes, queries, tables }
 }
 
 /* ------------------------------ provedor falso ---------------------------- */

@@ -7,11 +7,13 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { UnderlineTabs } from "@/components/ui/underline-tabs"
-import { fetchConversation } from "@/lib/whatsapp/client"
+import { fetchClientConversation, fetchConversation } from "@/lib/whatsapp/client"
+import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import type { WhatsAppConversation } from "@/types"
 import { InboxProvider, useInbox } from "./inbox-provider"
 import { ConversationList, type InboxFilter } from "./conversation-list"
-import { ConversationView, EmptyConversation } from "./conversation-view"
+import { ClientWithoutConversation, ConversationView, EmptyConversation } from "./conversation-view"
 import { ContextPanel } from "./context-panel"
 import { AiPanel } from "./ai-panel"
 import { AssignDialog, NewConversationDialog } from "./dialogs"
@@ -35,6 +37,8 @@ function useMediaQuery(query: string) {
 /**
  * Central de Atendimento: Conversas → Conversa → Contexto jurídico.
  * A conversa aberta fica na URL (`?c=<id>`), para compartilhar e voltar com o navegador.
+ * `?cliente=<id>` (o "Conversar pelo WhatsApp" do cadastro) abre a conversa mais recente
+ * desse cliente; sem conversa, mostra o aviso com o atalho para iniciar uma.
  */
 export function AtendimentoView() {
   return (
@@ -51,6 +55,10 @@ function Workspace() {
   const pathname = usePathname()
   const wide = useMediaQuery(WIDE)
   const selectedId = params.get("c") ?? undefined
+  const clientParam = selectedId ? undefined : (params.get("cliente") ?? undefined)
+  const { clients } = useOfficeData()
+  // Cliente pedido pela URL que não tem conversa (ou cuja busca falhou).
+  const [withoutConversation, setWithoutConversation] = React.useState<string>()
   const [filter, setFilter] = React.useState<InboxFilter>("all")
   const [panel, setPanel] = React.useState<PanelTab | null>("context")
   const [sheetOpen, setSheetOpen] = React.useState(false)
@@ -76,6 +84,36 @@ function Workspace() {
       cancelled = true
     }
   }, [selectedId, selected, status, upsertConversation, select])
+
+  // Veio do cadastro do cliente: abre a conversa dele (a da lista ou, se não estiver carregada, a do banco).
+  React.useEffect(() => {
+    if (!clientParam || status !== "ready") return
+    const local = conversations.find((c) => c.contact.clientId === clientParam)
+    if (local) {
+      select(local.id)
+      return
+    }
+    let cancelled = false
+    const none = () => !cancelled && setWithoutConversation(clientParam)
+    fetchClientConversation(clientParam)
+      .then((c) => {
+        if (cancelled) return
+        if (c) {
+          upsertConversation(c)
+          select(c.id)
+        } else none()
+      })
+      .catch((error) => {
+        console.error("[atendimento] Falha ao buscar a conversa do cliente:", error)
+        none()
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [clientParam, conversations, status, upsertConversation, select])
+
+  // Aberto para um cliente: no celular, a coluna da conversa aparece no lugar da lista.
+  const focusClient = !selected && !!clientParam
 
   const showPanel = (tab: PanelTab) => {
     if (wide) setPanel((current) => (current === tab ? null : tab))
@@ -122,12 +160,15 @@ function Workspace() {
     <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border border-border/90 bg-card shadow-card">
       <aside
         aria-label="Caixa de entrada"
-        className={cn("flex min-h-0 w-full shrink-0 flex-col border-border md:w-[300px] md:border-r xl:w-[320px]", selected && "max-md:hidden")}
+        className={cn(
+          "flex min-h-0 w-full shrink-0 flex-col border-border md:w-[300px] md:border-r xl:w-[320px]",
+          (selected || focusClient) && "max-md:hidden",
+        )}
       >
         <ConversationList selectedId={selectedId} onSelect={select} onNew={() => setNewOpen(true)} filter={filter} onFilterChange={setFilter} />
       </aside>
 
-      <section aria-label="Conversa" className={cn("flex min-w-0 flex-1 flex-col", !selected && "max-md:hidden")}>
+      <section aria-label="Conversa" className={cn("flex min-w-0 flex-1 flex-col", !selected && !focusClient && "max-md:hidden")}>
         {selected ? (
           <ConversationView
             key={selected.id}
@@ -137,6 +178,14 @@ function Workspace() {
             onShowContext={() => showPanel("context")}
             onShowAi={() => showPanel("ai")}
             panel={wide ? panel : sheetOpen ? panel : null}
+          />
+        ) : focusClient ? (
+          <ClientWithoutConversation
+            client={byId(clients, clientParam)}
+            // Atendimento indisponível (tabelas ausentes, falha ao carregar): o aviso aparece em vez de carregar para sempre.
+            loading={status === "loading" || (status === "ready" && withoutConversation !== clientParam)}
+            onStart={() => setNewOpen(true)}
+            onBack={() => select(undefined)}
           />
         ) : (
           <EmptyConversation />
@@ -157,6 +206,7 @@ function Workspace() {
 
       {selected && <AssignDialog open={assignOpen} onOpenChange={setAssignOpen} conversation={selected} onChanged={onChanged} />}
       <NewConversationDialog
+        clientId={clientParam}
         open={newOpen}
         onOpenChange={setNewOpen}
         onCreated={(c) => {

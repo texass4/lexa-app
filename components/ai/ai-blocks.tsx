@@ -135,7 +135,8 @@ export function AIUnavailable({ status, className }: { status: AIStatus; classNa
         <p className="mt-0.5 text-muted-foreground">
           {disabled
             ? "A Íntegra IA está desativada no momento. Fale com o suporte da Íntegra para ativá-la."
-            : "Não foi possível concluir a análise. Tente novamente em instantes."}
+            : // Ligada, mas sem chave configurada (`isAIReady`): tentar de novo não resolveria.
+              "A Íntegra IA ainda não foi configurada para o escritório. Fale com o suporte da Íntegra para ativá-la."}
         </p>
       </div>
     </div>

@@ -3,12 +3,14 @@
 import Link from "next/link"
 import { ArrowUpRight, Sparkles } from "lucide-react"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useSession } from "@/lib/auth/session"
 import { todaysAppointments } from "@/lib/store/selectors"
 import { addDays, fmtFullDate, fmtStartsIn, fmtTime, getNow, parse, startOfDay } from "@/lib/core/dates"
 import { officeContext } from "@/components/ai/ai-context"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { useCategoryLookup } from "./use-category"
+import { processSubject, processTitle } from "@/lib/processos/label"
 
 /**
  * "O que tenho para fazer?" antes do calendário: o que resta hoje, o próximo
@@ -24,8 +26,8 @@ export function AgendaToday() {
   const next = remaining[0]
   const weekEnd = addDays(startOfDay(now), 7)
   const linkedThisWeek = data.appointments.filter((a) => parse(a.start) >= now && parse(a.start) < weekEnd && (a.processId || a.clientId)).length
-  const client = next?.clientId ? data.clients.find((c) => c.id === next.clientId) : undefined
-  const process = next?.processId ? data.processes.find((p) => p.id === next.processId) : undefined
+  const client = next?.clientId ? byId(data.clients, next.clientId) : undefined
+  const process = next?.processId ? byId(data.processes, next.processId) : undefined
   const category = next ? lookup(next.categoryId) : undefined
 
   return (
@@ -59,7 +61,7 @@ export function AgendaToday() {
                 {client && can("clients.view") && (
                   <Link
                     href={`/clientes/${client.id}`}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
+                    className="touch-target relative inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
                   >
                     {client.name} <ArrowUpRight className="size-3.5" />
                   </Link>
@@ -67,9 +69,10 @@ export function AgendaToday() {
                 {process && can("processes.view") && (
                   <Link
                     href={`/processos/${process.id}`}
-                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
+                    className="touch-target relative inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
                   >
-                    Processo {process.code} <ArrowUpRight className="size-3.5" />
+                    {/* O cliente já aparece ao lado: o processo entra pelo assunto. */}
+                    {client ? processSubject(process) : processTitle(process)} <ArrowUpRight className="size-3.5" />
                   </Link>
                 )}
                 {next.location && <span className="truncate text-subtle">{next.location}</span>}

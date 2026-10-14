@@ -3,7 +3,7 @@
 import * as React from "react"
 import { createLocalStore } from "@/lib/core/hooks"
 import type { Permission } from "@/lib/auth/permissions"
-import type { Priority } from "@/types"
+import type { Priority, TribunalCheck } from "@/types"
 
 export type DialogKind = "client" | "task" | "prazo" | "appointment" | "document" | "process" | "invoice" | "document-preview"
 
@@ -23,6 +23,8 @@ export interface DialogDefaults {
   clientId?: string
   processId?: string
   date?: string
+  /** `HH:MM` local — horário clicado na Agenda (o compromisso nasce nesse horário). */
+  time?: string
   /** Coluna do quadro em que a tarefa deve nascer. */
   columnId?: string
   /** Documento a pré-visualizar (`dialog "document-preview"`). */
@@ -37,6 +39,11 @@ export interface DialogDefaults {
   prazoId?: string
   /** Número CNJ já conhecido (cadastro de processo a partir de uma intimação). */
   number?: string
+  /**
+   * Consultas da Consulta processual para este número (cadastro a partir do relatório):
+   * entram como evidência do tribunal, para uma divergência não virar confirmação.
+   */
+  tribunalEvidence?: { cnj: string; checks: TribunalCheck[] }
 }
 
 interface UIState {

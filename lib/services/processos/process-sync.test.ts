@@ -48,6 +48,28 @@ describe("aplicar ficha reconsultada", () => {
     assert.equal(again.process.movements, first.process.movements)
   })
 
+  it("cadastro do escritório: a fonte complementa, mas não substitui o que foi preenchido à mão", () => {
+    const manual: Process = {
+      ...base,
+      origin: "manual",
+      source: undefined,
+      className: undefined,
+      tribunal: "TJSC (informado)",
+      degree: "G2",
+      judicialUnit: "Órgão do escritório",
+    }
+    const merged = mergeProcessSheet(manual, sheet, "2026-09-29T08:00:00", { newId }).process
+    assert.equal(merged.tribunal, "TJSC (informado)")
+    assert.equal(merged.degree, "G2")
+    assert.equal(merged.judicialUnit, "Órgão do escritório")
+    // Vazio no cadastro: a fonte preenche.
+    assert.equal(merged.className, sheet.className)
+    assert.equal(merged.origin, "manual")
+    // Importado: a fonte é a referência.
+    const imported = mergeProcessSheet({ ...base, tribunal: "Antigo" }, sheet, "2026-09-29T08:00:00", { newId }).process
+    assert.equal(imported.tribunal, sheet.tribunal ?? "Antigo")
+  })
+
   it("marca a sincronização automática só quando veio do monitoramento", () => {
     assert.equal(mergeProcessSheet(base, sheet, "2026-09-29T08:00:00", { newId }).process.autoSyncedAt, undefined)
     const auto = mergeProcessSheet(base, sheet, "2026-09-29T08:00:00", { newId, automatic: true }).process
@@ -73,5 +95,109 @@ describe("aplicar ficha reconsultada", () => {
   it("frase da atividade", () => {
     assert.equal(newMovementsMessage(1, "#103000"), "Nova movimentação no processo #103000.")
     assert.equal(newMovementsMessage(3, "#103000"), "3 novas movimentações no processo #103000.")
+  })
+})
+
+describe("tribunal: origem × atual na sincronização e na importação (DADOS SIMULADOS)", () => {
+  it("sincronização grava a identificação com evidência e não troca o tribunal do cadastro manual", async () => {
+    const sim = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const simSheet = buildProcessSheet(mapSearchResponse(sim.simTjspFirstDegree, sim.SIM_TJSP) as ExternalProcess)
+    const manual: Process = { ...base, cnj: sim.SIM_TJSP, number: simSheet.number, origin: "manual", source: undefined, tribunal: "TJSP (informado pelo escritório)" }
+    const { process } = mergeProcessSheet(manual, simSheet, "2026-10-14T08:00:00", { newId })
+    assert.equal(process.tribunal, "TJSP (informado pelo escritório)")
+    assert.equal(process.tribunalIdentification?.origin.acronym, "TJSP")
+    assert.equal(process.tribunalIdentification?.current.status, "confirmed")
+    assert.equal(process.tribunalIdentification?.current.checkedAt, "2026-10-14T08:00:00")
+    // Comarca do cadastro intocada.
+    assert.equal(process.district, manual.district)
+  })
+
+  it("processo antigo sem identificação ganha uma na próxima sincronização", () => {
+    assert.equal(base.tribunalIdentification, undefined)
+    const { process } = mergeProcessSheet(base, sheet, "2026-10-14T08:00:00", { newId })
+    assert.equal(process.tribunalIdentification?.origin.acronym, "TRF1")
+    assert.ok(process.tribunalIdentification?.current.status)
+  })
+
+  it("importação não usa a sigla do tribunal como comarca", async () => {
+    const { buildProcessDraft } = await import("./import")
+    const draft = buildProcessDraft(sheet, { clientId: "c", ownerId: "u", area: "Cível" }, "2026-10-14T08:00:00")
+    assert.equal(draft.district, "")
+    assert.equal(draft.tribunal, "TRF1")
+    assert.equal(draft.tribunalIdentification?.origin.acronym, "TRF1")
+    // Comarca informada por alguém é mantida.
+    assert.equal(buildProcessDraft(sheet, { clientId: "c", ownerId: "u", area: "Cível", district: "Tefé" }, "2026-10-14T08:00:00").district, "Tefé")
+  })
+})
+
+describe("relatório divergente aplicado e sincronizações seguintes (DADOS SIMULADOS)", () => {
+  it("aplicar com as consultas do relatório guarda a divergência; sincronizar depois não a apaga; valores manuais ficam", async () => {
+    const sim = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const { mapRecords } = await import("@/lib/integrations/legal/datajud/mapper")
+    const { checkFromRecords, tribunalIdentificationOf } = await import("./tribunal-identification")
+    const simSheet = buildProcessSheet(mapSearchResponse(sim.simTjspFirstDegree, sim.SIM_TJSP) as ExternalProcess)
+    const stj = checkFromRecords({ tribunal: "STJ", role: "superior", dataset: "api_publica_stj", checkedAt: "2026-10-14T12:00:00.000Z", records: mapRecords(sim.simStjRecord, sim.SIM_TJSP) })
+    const manual: Process = { ...base, cnj: sim.SIM_TJSP, number: simSheet.number, origin: "manual", source: undefined, tribunal: "TJSP (informado)", judicialUnit: "Vara do escritório" }
+
+    const applied = mergeProcessSheet(manual, simSheet, "2026-10-14T09:00:00", { newId, checks: [stj] }).process
+    assert.equal(applied.tribunalIdentification?.current.status, "conflicting")
+    assert.equal(applied.tribunalIdentification?.current.acronym, undefined)
+    assert.equal(applied.tribunalIdentification?.inferred, undefined)
+    assert.deepEqual(applied.tribunalIdentification?.checks.map((c) => [c.role, c.tribunal, c.records.length]), [
+      ["origem", "TJSP", 1],
+      ["superior", "STJ", 1],
+    ])
+    // Valores do escritório preservados.
+    assert.equal(applied.tribunal, "TJSP (informado)")
+    assert.equal(applied.judicialUnit, "Vara do escritório")
+
+    const synced = mergeProcessSheet(applied, simSheet, "2026-10-20T09:00:00", { newId, automatic: true }).process
+    const id = tribunalIdentificationOf(synced)!
+    assert.equal(id.current.status, "conflicting", "a sincronização só da origem não confirma o TJSP")
+    assert.equal(id.checks.find((c) => c.role === "origem")?.checkedAt, "2026-10-20T09:00:00")
+    assert.equal(id.checks.find((c) => c.role === "superior")?.checkedAt, "2026-10-14T09:00:00")
+    assert.deepEqual(id.candidates?.map((c) => c.acronym).sort(), ["STJ", "TJSP"])
+  })
+
+  it("nova consulta ao superior sem registro desfaz a divergência (evidência mais nova vence)", async () => {
+    const sim = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const { mapRecords } = await import("@/lib/integrations/legal/datajud/mapper")
+    const { checkFromRecords } = await import("./tribunal-identification")
+    const simSheet = buildProcessSheet(mapSearchResponse(sim.simTjspFirstDegree, sim.SIM_TJSP) as ExternalProcess)
+    const stjFound = checkFromRecords({ tribunal: "STJ", role: "superior", dataset: "api_publica_stj", checkedAt: "2026-10-14T12:00:00.000Z", records: mapRecords(sim.simStjRecord, sim.SIM_TJSP) })
+    const stjEmpty = checkFromRecords({ tribunal: "STJ", role: "superior", dataset: "api_publica_stj", checkedAt: "2026-11-01T12:00:00.000Z", records: [] })
+    const start: Process = { ...base, cnj: sim.SIM_TJSP, number: simSheet.number }
+    const first = mergeProcessSheet(start, simSheet, "2026-10-14T09:00:00", { newId, checks: [stjFound] }).process
+    const second = mergeProcessSheet(first, simSheet, "2026-11-01T09:00:00", { newId, checks: [stjEmpty] }).process
+    assert.equal(second.tribunalIdentification?.current.status, "confirmed")
+    assert.equal(second.tribunalIdentification?.current.acronym, "TJSP")
+  })
+})
+
+describe("cadastro a partir de um relatório divergente (DADOS SIMULADOS)", () => {
+  it("a importação guarda a divergência do relatório; número diferente descarta a evidência", async () => {
+    const sim = await import("@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios")
+    const { mapRecords } = await import("@/lib/integrations/legal/datajud/mapper")
+    const { buildProcessDraft } = await import("./import")
+    const { checkFromRecords, checksForNumber, identifyTribunal, originCheckFromSheet, tribunalIdentificationOf } = await import("./tribunal-identification")
+    const simSheet = buildProcessSheet(mapSearchResponse(sim.simTjspFirstDegree, sim.SIM_TJSP) as ExternalProcess)
+    // O relatório da Consulta processual: origem + STJ com registro → divergência.
+    const stj = checkFromRecords({ tribunal: "STJ", role: "superior", dataset: "api_publica_stj", checkedAt: "2026-10-14T12:00:00.000Z", records: mapRecords(sim.simStjRecord, sim.SIM_TJSP) })
+    const report = identifyTribunal(sim.SIM_TJSP, [originCheckFromSheet(simSheet, "2026-10-14T12:00:00.000Z"), stj], "2026-10-14T12:00:00.000Z")
+    assert.equal(report.current.status, "conflicting")
+    const evidence = { cnj: simSheet.number, checks: report.checks } // o relatório manda o número formatado
+
+    // "Cadastrar processo" → o formulário consulta a origem de novo e importa.
+    const draft = buildProcessDraft(simSheet, { clientId: "c", ownerId: "u", area: "Cível", tribunalChecks: checksForNumber(evidence, simSheet.cnj) }, "2026-10-14T09:05:00")
+    const id = tribunalIdentificationOf({ ...draft, cnj: simSheet.cnj })!
+    assert.equal(id.current.status, "conflicting", "o cadastro não vira 'confirmado' pela consulta só da origem")
+    assert.equal(id.current.acronym, undefined)
+    assert.deepEqual(id.candidates?.map((c) => c.acronym).sort(), ["STJ", "TJSP"])
+
+    // A pessoa trocou o número no formulário: a evidência do relatório não vale.
+    assert.equal(checksForNumber(evidence, sim.SIM_TRF1), undefined)
+    assert.equal(checksForNumber(undefined, simSheet.cnj), undefined)
+    // Sem evidência, a importação só da origem segue as regras normais (sem divergência inventada).
+    assert.equal(buildProcessDraft(simSheet, { clientId: "c", ownerId: "u", area: "Cível" }, "2026-10-14T09:05:00").tribunalIdentification?.current.status, "confirmed")
   })
 })

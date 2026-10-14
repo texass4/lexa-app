@@ -50,8 +50,7 @@ function useLawyerOabs(userId: string) {
 }
 
 /**
- * Inscrições na OAB (várias por advogado). Cada inscrição ativa é consultada todo dia
- * no DJEN para capturar intimações.
+ * Inscrições na OAB (várias por advogado).
  */
 export function OabManager({ userId, required, canEdit = true }: { userId: string; required?: boolean; canEdit?: boolean }) {
   const { oabs, loading, unavailable, reload } = useLawyerOabs(userId)
@@ -98,10 +97,10 @@ export function OabManager({ userId, required, canEdit = true }: { userId: strin
   }
 
   return (
-    <div className="space-y-3">
+    <div className="@container space-y-3">
       {required && !loading && !active.length && (
         <p role="status" className="rounded-[10px] border border-warning/25 bg-warning-soft/50 px-3 py-2 text-[12.5px] text-foreground">
-          Obrigatória para advogados: sem uma inscrição ativa, as intimações do DJEN não chegam para você.
+          Obrigatória para advogados: cadastre ao menos uma inscrição ativa.
         </p>
       )}
       {oabs.length > 0 && (
@@ -132,7 +131,7 @@ export function OabManager({ userId, required, canEdit = true }: { userId: strin
         </ul>
       )}
       {canEdit && (
-        <form onSubmit={add} noValidate className="grid grid-cols-[1fr_96px_auto] items-end gap-2">
+        <form onSubmit={add} noValidate className="grid grid-cols-[minmax(0,1fr)_96px] items-end gap-2 @sm:grid-cols-[minmax(0,1fr)_96px_auto]">
           <Field label="Número da OAB" htmlFor={`oab-number-${userId}`} error={error}>
             <TextInput
               id={`oab-number-${userId}`}
@@ -154,7 +153,8 @@ export function OabManager({ userId, required, canEdit = true }: { userId: strin
               ))}
             </NativeSelect>
           </Field>
-          <Button type="submit" variant="secondary" disabled={busy}>
+          {/* Espaço estreito: número e UF lado a lado, "Adicionar" na linha de baixo. */}
+          <Button type="submit" variant="secondary" disabled={busy} className="col-span-2 @sm:col-span-1">
             <Plus /> Adicionar
           </Button>
         </form>

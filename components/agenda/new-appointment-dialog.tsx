@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextArea, TextInput } from "@/components/ui/field"
 import { getMembers, currentUserId } from "@/lib/auth/account"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useRemovedWhileEditing } from "@/lib/store/on-demand"
+import { byId } from "@/lib/store/indexes"
 import { getNow, toLocalISO } from "@/lib/core/dates"
 import type { Appointment, Process } from "@/types"
 import { CategoryPicker } from "./category-picker"
@@ -15,7 +17,11 @@ import { CategoryPicker } from "./category-picker"
 /** Duração sugerida ao escolher o horário de início. */
 const DEFAULT_DURATION = 60
 
-type Defaults = { clientId?: string; processId?: string; date?: string }
+type Defaults = { clientId?: string; processId?: string; date?: string; time?: string }
+
+/** Horário padrão quando o formulário abre sem um horário escolhido (botão "Novo compromisso"). */
+const DEFAULT_TIME = "14:00"
+const isTime = (value?: string): value is string => !!value && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
 
 function addMinutes(time: string, minutes: number) {
   const [h, m] = time.split(":").map(Number)
@@ -49,8 +55,9 @@ function initialState(appointment: Appointment | undefined, defaults: Defaults |
     title: "",
     categoryId: undefined as string | undefined,
     date: defaults?.date ?? toLocalISO(getNow()).slice(0, 10),
-    time: "14:00",
-    endTime: addMinutes("14:00", DEFAULT_DURATION),
+    // Clique num horário da Agenda: começa nele (dá para trocar antes de salvar).
+    time: isTime(defaults?.time) ? defaults.time : DEFAULT_TIME,
+    endTime: addMinutes(isTime(defaults?.time) ? defaults.time : DEFAULT_TIME, DEFAULT_DURATION),
     clientId: defaults?.clientId ?? (defaults?.processId ? (processes.find((p) => p.id === defaults.processId)?.clientId ?? "") : ""),
     processId: defaults?.processId ?? "",
     ownerId: currentUserId(),
@@ -62,6 +69,7 @@ function initialState(appointment: Appointment | undefined, defaults: Defaults |
 function AppointmentForm({ appointment, defaults, onClose }: { appointment?: Appointment; defaults?: Defaults; onClose: () => void }) {
   const data = useOfficeData()
   const { addAppointment, updateAppointment, versionOf } = useOfficeActions()
+  useRemovedWhileEditing("appointments", appointment?.id)
 
   const [form, setForm] = React.useState(() => initialState(appointment, defaults, data.processes))
   const [error, setError] = React.useState("")
@@ -85,7 +93,7 @@ function AppointmentForm({ appointment, defaults, onClose }: { appointment?: App
       setTimeError("O término precisa ser depois do início.")
       return
     }
-    const client = data.clients.find((c) => c.id === form.clientId)
+    const client = byId(data.clients, form.clientId)
     const payload = {
       title: form.title.trim(),
       categoryId: form.categoryId,

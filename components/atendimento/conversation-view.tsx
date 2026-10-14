@@ -12,6 +12,7 @@ import {
   FilePlus2,
   Info,
   ListPlus,
+  MessageSquarePlus,
   Scale,
   Search,
   Sparkles,
@@ -23,7 +24,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,11 +46,11 @@ import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { getUser } from "@/lib/auth/account"
 import { normalize } from "@/lib/core/format"
-import { SYSTEM_STATUSES, STATUS_TONE, statusOption } from "@/lib/whatsapp/config"
+import { insideServiceWindow, SYSTEM_STATUSES, STATUS_TONE, statusOption } from "@/lib/whatsapp/config"
 import { attachmentKindFor } from "@/lib/whatsapp/files"
 import { formatPhone } from "@/lib/whatsapp/phone"
 import { uploadOutgoing, whatsappApi } from "@/lib/whatsapp/client"
-import type { WhatsAppConversation, WhatsAppMessage } from "@/types"
+import type { Client, WhatsAppConversation, WhatsAppMessage } from "@/types"
 import { useInbox } from "./inbox-provider"
 import { useMessages } from "./use-messages"
 import { MessageList } from "./message-list"
@@ -128,7 +129,16 @@ export function ConversationView({
   onShowAi: () => void
   panel: "context" | "ai" | null
 }) {
-  const { upsertConversation, patchConversation } = useInbox()
+  const { upsertConversation, patchConversation, instance: connection } = useInbox()
+  // Regras do WhatsApp oficial valem para conversas do número oficial (não para as da conexão antiga).
+  const official = connection?.instance?.provider === "meta" && connection.instance.id === conversation.instanceId
+  // Relógio da janela de 24 h (WhatsApp oficial): reavalia a cada minuto com a conversa aberta.
+  const [now, setNow] = React.useState(() => Date.now())
+  React.useEffect(() => {
+    if (!official) return
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [official])
   const { can, user, organization } = useSession()
   const { processes } = useOfficeData()
   const { openDialog } = useUI()
@@ -249,7 +259,23 @@ export function ConversationView({
     }
   }
 
-  const replyBlocked = health === "unconfigured" ? "WhatsApp não configurado" : health === "disconnected" ? "WhatsApp desconectado" : health === "error" ? "Conexão indisponível" : undefined
+  const outsideWindow = official && !insideServiceWindow(conversation.lastInboundAt, now)
+  // Conversa de outro número (a conexão antiga, desativada): fica o histórico e as notas internas.
+  const legacy = !!connection?.instance && connection.instance.id !== conversation.instanceId
+  const replyBlocked =
+    legacy
+      ? "Conversa de uma conexão antiga do WhatsApp, desativada"
+      : health === "unconfigured"
+      ? "WhatsApp não configurado"
+      : health === "disconnected"
+        ? "WhatsApp desconectado"
+        : health === "error"
+          ? "Conexão indisponível"
+          : outsideWindow
+            ? conversation.lastInboundAt
+              ? "Mais de 24 h desde a última mensagem do cliente: o WhatsApp só permite modelo aprovado"
+              : "O cliente ainda não escreveu: o WhatsApp só permite iniciar com modelo aprovado"
+            : undefined
 
   return (
     <div
@@ -294,7 +320,7 @@ export function ConversationView({
           <button
             type="button"
             onClick={onAssign}
-            className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
+            className="touch-target relative inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             {assignee ? <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="xs" /> : <UserRoundCheck className="ml-1 size-3.5 text-subtle" />}
             <span className="max-w-[110px] truncate">{assignee ? assignee.firstName : "Atribuir"}</span>
@@ -411,7 +437,7 @@ export function ConversationView({
       {/* Status e responsável no mobile/tablet */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 lg:hidden">
         <StatusMenu conversation={conversation} onChanged={upsertConversation} disabled={!canEdit} />
-        <button type="button" onClick={onAssign} className="inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium outline-none">
+        <button type="button" onClick={onAssign} className="touch-target relative inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium outline-none">
           {assignee ? <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="xs" /> : <UserRoundCheck className="ml-1 size-3.5 text-subtle" />}
           {assignee ? assignee.firstName : "Atribuir"}
         </button>
@@ -477,6 +503,7 @@ export function ConversationView({
         replyDisabledReason={replyBlocked ? `${replyBlocked} — só notas internas.` : undefined}
         droppedFile={dropped}
         onDroppedFileHandled={() => setDropped(undefined)}
+        textOnly={official}
       />
 
       {dragging && (
@@ -505,9 +532,67 @@ export function EmptyConversation() {
       <p className="mt-2 max-w-sm text-[13.5px] leading-relaxed text-muted-foreground">
         Escolha uma conversa para responder, registrar notas internas e ver processos, tarefas e documentos do cliente — tudo no mesmo lugar.
       </p>
-      <Link href="/clientes" className="mt-5 text-[12.5px] font-medium text-brand-strong underline-offset-4 hover:underline">
+      <Link href="/clientes" className="touch-target relative mt-5 text-[12.5px] font-medium text-brand-strong underline-offset-4 hover:underline">
         Ver clientes do escritório
       </Link>
+    </div>
+  )
+}
+
+/**
+ * Aberto pelo "Conversar pelo WhatsApp" de um cliente que ainda não tem conversa:
+ * diz isso com clareza e oferece iniciar uma (com o cliente já escolhido).
+ */
+export function ClientWithoutConversation({
+  client,
+  loading,
+  onStart,
+  onBack,
+}: {
+  client?: Client
+  loading: boolean
+  onStart: () => void
+  onBack: () => void
+}) {
+  const name = client?.name ?? "Este cliente"
+  const hasPhone = (client?.phone?.replace(/\D/g, "").length ?? 0) >= 10
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center px-2 pt-2 md:hidden">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft /> Conversas
+        </Button>
+      </div>
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center" aria-live="polite">
+        {loading ? (
+          <p className="flex items-center gap-2 text-[13.5px] text-muted-foreground">
+            <span className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-foreground" aria-hidden />
+            Abrindo a conversa de {name}…
+          </p>
+        ) : (
+          <>
+            {client && <UserAvatar name={client.name} size="lg" className="mb-4" />}
+            <h2 className="font-display text-[20px] leading-tight font-semibold tracking-[-0.02em]">{name} ainda não tem conversa</h2>
+            <p className="mt-2 max-w-sm text-[13.5px] leading-relaxed text-muted-foreground">
+              {hasPhone
+                ? "Nenhuma conversa do WhatsApp está vinculada a este cliente. Inicie uma pelo número do cadastro."
+                : "Nenhuma conversa do WhatsApp está vinculada a este cliente, e o cadastro não tem celular."}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {hasPhone && (
+                <Button onClick={onStart}>
+                  <MessageSquarePlus /> Iniciar conversa
+                </Button>
+              )}
+              {client && (
+                <Link href={`/clientes/${client.id}`} className={buttonVariants({ variant: hasPhone ? "ghost" : "secondary" })}>
+                  Ver cadastro do cliente
+                </Link>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

@@ -27,6 +27,8 @@ const AI_ERROR_MESSAGES: Record<AIErrorCode, string> = {
   BLOCKED: "A Íntegra IA não pôde responder a este pedido. Reformule a pergunta.",
   UNAVAILABLE: "A Íntegra IA está temporariamente indisponível. Tente novamente em alguns instantes.",
   UNEXPECTED: "Não foi possível concluir a análise agora. Tente novamente.",
+  NO_SPEECH: "Não identificamos fala na gravação. Fale mais perto do microfone e tente de novo.",
+  INVALID_AUDIO: "Não foi possível usar esta gravação. Grave de novo (entre meio segundo e 1 minuto).",
 }
 
 const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
@@ -49,6 +51,8 @@ const AI_ERROR_STATUS: Record<AIErrorCode, number> = {
   BLOCKED: 422,
   UNAVAILABLE: 503,
   UNEXPECTED: 500,
+  NO_SPEECH: 422,
+  INVALID_AUDIO: 400,
 }
 
 export class AIError extends Error {
@@ -57,6 +61,8 @@ export class AIError extends Error {
   readonly retryAfter?: number
   /** Status HTTP devolvido pelo provedor, quando houver — vai para o log (não é sensível). */
   readonly providerStatus?: number
+  /** Modelos tentados até o erro (preenchido pelo provedor) — só para o log. */
+  attempts?: { model: string; code: string; status?: number; ms: number }[]
 
   constructor(code: AIErrorCode, options: { message?: string; retryAfter?: number; providerStatus?: number; cause?: unknown } = {}) {
     super(options.message ?? AI_ERROR_MESSAGES[code], { cause: options.cause })

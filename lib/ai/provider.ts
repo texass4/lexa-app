@@ -23,6 +23,12 @@ export interface AIRequest {
   signal?: AbortSignal
   /** `light`: operação simples — usa o modelo mais barato (`AI_MODEL_LIGHT`). */
   tier?: AITier
+  /** Tempo máximo desta chamada (padrão: `AI_TIMEOUT_MS`). */
+  timeoutMs?: number
+  /** Tempo máximo de cada modelo: passou, o próximo da lista tenta (dentro de `timeoutMs`). */
+  attemptTimeoutMs?: number
+  /** `minimal`: tarefa mecânica (ex.: transcrever) — o mínimo de raciocínio que o modelo aceita. */
+  reasoning?: "minimal"
 }
 
 export interface AIUsage {
@@ -40,6 +46,20 @@ export interface AIProviderResult<T> {
   usage?: AIUsage
 }
 
+/** Áudio para transcrever (já validado pelo servidor). */
+export interface AITranscriptionRequest {
+  audio: Uint8Array
+  mimeType: string
+  /** Instruções de sistema da transcrição. */
+  system: string
+  /** Pedido em texto que acompanha o áudio. */
+  prompt: string
+  /** Duração do áudio: limita o tamanho da resposta (uma transcrição não passa disso). */
+  seconds: number
+  signal?: AbortSignal
+  tier?: AITier
+}
+
 export interface AIProvider {
   readonly name: string
   readonly model: string
@@ -49,6 +69,8 @@ export interface AIProvider {
   generateText(request: AIRequest): Promise<AIProviderResult<string>>
   /** JSON seguindo `schema`. Devolve o objeto ainda não validado — quem chama valida. */
   generateJSON(request: AIRequest & { schema: JsonSchema }): Promise<AIProviderResult<unknown>>
+  /** Áudio → texto. Ausente = o provedor configurado não transcreve áudio. */
+  transcribe?(request: AITranscriptionRequest): Promise<AIProviderResult<string>>
 }
 
 let cached: { key: string; provider: AIProvider } | undefined

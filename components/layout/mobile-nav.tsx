@@ -1,12 +1,13 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { LayoutGrid, Menu, Scale, UsersRound, X } from "lucide-react"
 import { cn } from "cn"
 import { Logo } from "@/components/brand/logo"
-import { SidebarNav } from "./sidebar-nav"
+import { SidebarNav, SidebarShortcuts } from "./sidebar-nav"
 import { UserMenu } from "./user-menu"
 import { isActive, routePermission } from "./nav-config"
 import { useSession } from "@/lib/auth/session"
@@ -19,20 +20,23 @@ export function MobileDrawer() {
   return (
     <DialogPrimitive.Root open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#0d1b31]/40 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
-        <DialogPrimitive.Popup className="sidebar-surface sidebar-columns fixed inset-y-0 left-0 z-50 flex w-[min(300px,86vw)] flex-col text-sidebar-foreground shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-[#10263d]/35 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
+        <DialogPrimitive.Popup className="sidebar-surface fixed inset-y-0 left-0 z-50 flex w-[min(300px,86vw)] flex-col text-sidebar-foreground shadow-float outline-none transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full md:hidden">
           <DialogPrimitive.Title className="sr-only">Menu de navegação</DialogPrimitive.Title>
           <div className="flex h-[72px] items-center justify-between px-4">
-            <Logo tone="inverse" subtitle={getOrganization().name} />
+            <Logo subtitle={getOrganization().name} />
             <DialogPrimitive.Close
               aria-label="Fechar menu"
-              className="flex size-9 items-center justify-center rounded-control text-sidebar-muted outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
+              className="touch-target relative flex size-9 items-center justify-center rounded-control text-sidebar-muted outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/60"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-3 pt-3 pb-4">
             <SidebarNav mode="expanded" layoutId="drawer-active" onNavigate={() => setMobileNavOpen(false)} />
+            <React.Suspense>
+              <SidebarShortcuts mode="expanded" onNavigate={() => setMobileNavOpen(false)} />
+            </React.Suspense>
           </div>
           <div className="px-3 pb-[max(env(safe-area-inset-bottom),12px)]">
             <div className="border-t border-sidebar-border pt-2">

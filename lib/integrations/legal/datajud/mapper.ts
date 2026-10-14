@@ -11,7 +11,7 @@
 
 import { onlyDigits } from "@/lib/processos/cnj"
 import type { MovementComplement, MovementJudicialUnit } from "@/types"
-import type { ExternalMovement, ExternalParty, ExternalProcess } from "../types"
+import type { ExternalCoverage, ExternalMovement, ExternalParty, ExternalProcess, ExternalRecord } from "../types"
 
 /* ------------------------- formato bruto da fonte ------------------------- */
 
@@ -82,7 +82,8 @@ export interface DataJudSearchResponse {
   /** Shards que falharam ainda devolvem HTTP 200, só que com hits faltando. */
   _shards?: { total?: number; successful?: number; failed?: number }
   hits?: {
-    total?: { value?: number }
+    /** `relation: "gte"` = pelo menos `value` (contagem não exata). */
+    total?: { value?: number; relation?: string }
     hits?: DataJudHit[]
   }
 }
@@ -208,23 +209,80 @@ export function mapMovements(source: DataJudRawSource): ExternalMovement[] {
  * Um mesmo número pode ter vários documentos (graus diferentes, reprocessos).
  * Escolhe o mais recentemente atualizado; empate, o que tem mais movimentações.
  */
-function pickBestHit(response: DataJudSearchResponse): DataJudHit | null {
-  const hits = (response?.hits?.hits ?? []).filter((hit) => !!hit?._source)
-  if (!hits.length) return null
-
-  return hits.reduce((best, hit) => {
-    const bestAt = isoDate(best._source?.dataHoraUltimaAtualizacao) ?? ""
-    const hitAt = isoDate(hit._source?.dataHoraUltimaAtualizacao) ?? ""
-    if (hitAt !== bestAt) return hitAt > bestAt ? hit : best
-    const bestCount = best._source?.movimentos?.length ?? 0
-    const hitCount = hit._source?.movimentos?.length ?? 0
-    return hitCount > bestCount ? hit : best
+/**
+ * Documentos do número pedido. A busca é por `numeroProcesso`; um documento com outro
+ * número (resposta inesperada do índice) não vira evidência deste processo. Sem número
+ * pedido (`requested` vazio), todos valem.
+ */
+const hitsOf = (response: DataJudSearchResponse, requested = "") => {
+  const digits = onlyDigits(requested)
+  return (response?.hits?.hits ?? []).filter((hit) => {
+    if (!hit?._source) return false
+    const number = onlyDigits(text(hit._source.numeroProcesso) ?? "")
+    return !digits || !number || number === digits
   })
+}
+
+/** Mais recente primeiro; empate → mais movimentações. */
+function compareHits(a: DataJudHit, b: DataJudHit) {
+  const aAt = isoDate(a._source?.dataHoraUltimaAtualizacao) ?? ""
+  const bAt = isoDate(b._source?.dataHoraUltimaAtualizacao) ?? ""
+  if (aAt !== bAt) return bAt.localeCompare(aAt)
+  return (b._source?.movimentos?.length ?? 0) - (a._source?.movimentos?.length ?? 0)
+}
+
+/** Resumo de um documento da fonte — evidência, não conclusão. */
+function toRecord(hit: DataJudHit): ExternalRecord {
+  const source = hit._source ?? {}
+  const [last] = mapMovements(source)
+  const keys = last?.complements?.map((c) => c.key).filter((key): key is string => !!key)
+  return {
+    tribunal: text(source.tribunal)?.toUpperCase(),
+    degree: text(source.grau),
+    judicialUnit: text(source.orgaoJulgador?.nome),
+    updatedAt: isoDate(source.dataHoraUltimaAtualizacao),
+    dataset: text(hit._index),
+    movementCount: source.movimentos?.length ?? 0,
+    lastMovement: last
+      ? { name: last.name, code: last.code, occurredAt: last.occurredAt, description: last.description, complementKeys: keys?.length ? keys : undefined }
+      : undefined,
+  }
+}
+
+/** Todos os registros do número na resposta, do mais recente ao mais antigo. */
+export function mapRecords(response: DataJudSearchResponse, requestedCnj = ""): ExternalRecord[] {
+  return [...hitsOf(response, requestedCnj)].sort(compareHits).map(toRecord)
+}
+
+/**
+ * A resposta cobre todos os registros? Parcial quando a fonte avisa que fragmentos do
+ * índice falharam ou o tempo esgotou (com registros — sem nenhum, o cliente já trata como
+ * indisponível); truncada quando o total informado passa do que veio.
+ */
+export function mapCoverage(response: DataJudSearchResponse, requestedCnj = ""): ExternalCoverage {
+  const all = (response?.hits?.hits ?? []).filter((hit) => !!hit?._source).length
+  const returned = hitsOf(response, requestedCnj).length
+  const total = typeof response?.hits?.total?.value === "number" ? response.hits.total.value : undefined
+  return {
+    partial: !!response?.timed_out || (response?._shards?.failed ?? 0) > 0,
+    truncated: (total !== undefined && total > all) || response?.hits?.total?.relation === "gte",
+    returned,
+    total,
+  }
+}
+
+/**
+ * Documento que preenche a ficha: o atualizado mais recentemente. É só o registro de
+ * onde vêm os dados exibidos — não prova em que tribunal ou grau o processo está hoje
+ * (os demais registros seguem em `records`).
+ */
+function pickBestHit(response: DataJudSearchResponse, requestedCnj: string): DataJudHit | null {
+  return [...hitsOf(response, requestedCnj)].sort(compareHits)[0] ?? null
 }
 
 /** Resposta bruta → `ExternalProcess`. `null` quando a fonte não achou nada. */
 export function mapSearchResponse(response: DataJudSearchResponse, requestedCnj: string): ExternalProcess | null {
-  const hit = pickBestHit(response)
+  const hit = pickBestHit(response, requestedCnj)
   if (!hit?._source) return null
 
   const source = hit._source
@@ -246,6 +304,7 @@ export function mapSearchResponse(response: DataJudSearchResponse, requestedCnj:
     className: text(source.classe?.nome),
     // A fonte devolve uma lista de assuntos; o primeiro é o principal.
     subject: source.assuntos?.map((a) => text(a?.nome)).find((name): name is string => !!name),
+    subjects: (source.assuntos ?? []).map((a) => text(a?.nome)).filter((name): name is string => !!name),
     system: text(source.sistema?.nome),
     format: text(source.formato?.nome),
     filedAt: isoDate(source.dataAjuizamento),
@@ -255,6 +314,8 @@ export function mapSearchResponse(response: DataJudSearchResponse, requestedCnj:
     status: situationName(source.situacao),
     secrecyLevel: typeof source.nivelSigilo === "number" ? source.nivelSigilo : undefined,
     movements,
+    records: mapRecords(response, requestedCnj),
+    coverage: mapCoverage(response, requestedCnj),
     source: {
       provider: "datajud",
       externalId: text(source.id) ?? text(hit._id),

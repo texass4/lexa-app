@@ -28,8 +28,8 @@ integrations/legal/datajud/provider.ts    ProcessProvider: client.ts (timeout, r
 sheet.ts → import.ts                       ficha normalizada → processo da Íntegra
 
 Central de Atendimento (WhatsApp)
-    tela → /api/whatsapp/* → lib/services/whatsapp → Z-API → WhatsApp
-    WhatsApp → Z-API → /api/whatsapp/webhook → banco → Realtime → tela
+    tela → /api/whatsapp/* → lib/services/whatsapp → Meta (Cloud API) → WhatsApp
+    WhatsApp → Meta → /api/whatsapp/meta/webhook (assinado) → banco → Realtime → tela
 
 E-mail (convite, recuperação de senha)
     tela → Route Handler → lib/auth/mailer.ts → lib/services/email → Nodemailer → SMTP
@@ -51,9 +51,10 @@ Regra: **página não tem lógica**. `app/(app)/processos/page.tsx` só renderiz
 |---|---|
 | `/dashboard` | `components/dashboard/dashboard-view.tsx` |
 | `/clientes`, `/clientes/[id]` | `components/clientes/…` |
-| `/atendimento` (`?c=<conversa>`) | `components/atendimento/atendimento-view.tsx` |
+| `/atendimento` (`?c=<conversa>` · `?cliente=<id>` abre a conversa mais recente do cliente) | `components/atendimento/atendimento-view.tsx` |
 | `/processos`, `/processos/[id]` | `components/processos/processes-view.tsx`, `process-profile.tsx` |
-| `/triagem` (`?id=<evento>`) | `components/triagem/triagem-view.tsx` (Triagem jurídica: DJEN, DataJud) |
+| `/processos/consulta` (`?execucao=<id>`) | `components/processos/consulta/consulta-view.tsx` (Consulta processual) |
+| `/triagem` | redireciona para `/processos` (a Triagem foi removida; links antigos de atividades não quebram) |
 | `/tarefas` · `/agenda` · `/documentos` · `/financeiro` · `/configuracoes` | `components/<módulo>/*-view.tsx` |
 | `/configuracoes?secao=perfil` · `usuarios` · `permissoes` | `components/configuracoes/profile-section.tsx`, `members-manager.tsx`, `permissions-section.tsx` |
 | `/login` · `/cadastro` · `/recuperar-senha` · `/redefinir-senha` | `components/auth/*-form.tsx` |
@@ -67,7 +68,7 @@ Menu lateral e título do header: `components/layout/nav-config.ts`. Barra infer
 
 Não há processos fictícios. Todo processo vem da consulta automática ou de cadastro manual.
 
-**Regra de interface:** o usuário vê "Íntegra → processos → informações". Nome da fonte (DataJud), status HTTP, códigos internos, JSON e mensagens de erro técnicas **nunca** aparecem na tela — ficam nos logs do servidor (`[process-lookup] …`). Rótulos neutros em `lib/services/processos/labels.ts` (ex.: origem `datajud` → "Consulta automática").
+**Regra de interface:** o usuário vê "Íntegra → processos → informações". Nome da fonte (DataJud), status HTTP, códigos internos, JSON e mensagens de erro técnicas **nunca** aparecem na tela (exceção deliberada: o relatório da Consulta processual nomeia a fonte oficial de cada dado — é procedência, pedida pelo produto; continua sem status HTTP nem detalhe técnico) — ficam nos logs do servidor (`[process-lookup] …`). Rótulos neutros em `lib/services/processos/labels.ts` (ex.: origem `datajud` → "Consulta automática").
 
 **Consultar** — "Novo processo" → digitar o CNJ → **Preencher** (ou Enter):
 
@@ -75,9 +76,13 @@ Não há processos fictícios. Todo processo vem da consulta automática ou de c
 2. `POST /api/processes/search` → `lookup-service.ts`, com stale-while-revalidate: cache fresco responde na hora; cache vencido responde na hora e atualiza em segundo plano (`after`).
 3. A ficha é salva na hora (`importProcess`). Se o CNJ já existe, é atualizado (`applyProcessSync`), nunca duplicado.
 
+**Cadastrar à mão** — o mesmo "Novo processo", sem depender da consulta (processos em segredo de justiça não estão nela): cliente, número (opcional; informado, só o formato e o dígito verificador do CNJ são conferidos — não precisa existir na consulta), tipo de ação/classe, área, tribunal, grau, órgão julgador, parte contrária, responsável, status, valor da causa, descrição/observações e **segredo de justiça (Sim/Não)**. Salva mesmo se a consulta não encontrou o processo ou estava fora do ar. O processo nasce com `origin: "manual"` ("Cadastrado pelo escritório" no perfil; o resumo diz "Informações cadastradas pelo escritório"). Em segredo de justiça (`secret`), "Preencher" e "Atualizar" ficam desligados e o processo nunca entra no monitoramento automático (que só pega processos importados da consulta e, desde a migração 0024, também exclui os importados que o escritório marcou como segredo de justiça); as rotas de consulta recusam no servidor processo em segredo de justiça, mesmo chamadas fora da tela; e o relatório da consulta processual não guarda partes, comunicações nem complementos de processo com sigilo informado pela fonte ou com nível de sigilo não informado (ver `docs/CONSULTA_PROCESSUAL.md`). Se um cadastro manual com CNJ for atualizado depois, a regra de `mergeProcessSheet` é explícita: o que o escritório preencheu (tribunal, grau, órgão, classe…) prevalece e a fonte só completa o que estava vazio; as movimentações públicas entram normalmente.
+
+**Consultar processo** — workflow que reúne DataJud, comunicações oficiais (DJEN, desligada por padrão), jurisprudência e o cadastro do escritório num relatório com a fonte e a data de cada dado, magistrado só por menção explícita em publicação oficial, e "Não disponível na fonte consultada" para o resto. Execução no servidor com etapas visíveis, registrada em `process_enrichment_runs` (migração 0020). Detalhes, fontes, custos e limitações: `docs/CONSULTA_PROCESSUAL.md`.
+
 **Abrir um processo** — `use-process-refresh.ts`: o que está salvo aparece imediatamente; se a última consulta não é de hoje (mesma regra do monitoramento, `monitoring-policy.ts › isCheckDue`), uma atualização roda em segundo plano ("Atualizando informações…"), sem bloquear a página. Continua mesmo se a pessoa sair da tela. Só movimentações novas entram (hash em `movements.ts`; a regra de mescla é `process-sync.ts › mergeProcessSheet`, a mesma do servidor).
 
-**Atualizar** — botão no perfil → `POST /api/processes/[id]/sync` com `force` → vai à fonte (salvo se alguém do escritório acabou de fazer isso há menos de 1 min). Um processo cadastrado à mão com CNJ válido também pode ser atualizado e passa a ser acompanhado.
+**Atualizar** — botão no perfil → `POST /api/processes/[id]/sync` com `force` → vai à fonte (salvo se alguém do escritório acabou de fazer isso há menos de 1 min). Um processo cadastrado à mão com CNJ válido também pode ser atualizado e passa a ser acompanhado (menos em segredo de justiça).
 
 **Serviço de consulta** (`lib/services/processos/lookup-service.ts`, só servidor):
 
@@ -98,6 +103,8 @@ Detalhes da fonte que valem lembrar:
 - Sob carga, a fonte responde **200 com shards falhos e sem resultados**. O cliente trata isso como falha temporária e tenta de novo — não como "não encontrado".
 
 Variáveis de ambiente (só servidor): `DATAJUD_API_KEY`; opcionais `PROCESS_LOOKUP_TIMEOUT_MS` e `DATAJUD_BASE_URL`.
+
+Limite: as rotas `processes/search` e `processes/[id]/sync` aceitam até 60 consultas por pessoa a cada 10 minutos e 1000 por escritório por hora (`LIMITS.processLookup*`, `lib/auth/protection/rate-limit.ts`); acima disso respondem 429 com a mensagem padrão de "muitas tentativas". O monitoramento automático não passa por esse limite.
 
 ### Monitoramento automático
 
@@ -125,32 +132,9 @@ agendador → /api/cron/process-sync → monitor.ts (runProcessMonitor)
 
 Estado: `monitor-status.ts` — "Ativo" só com consulta ligada, `CRON_SECRET`, `DATAJUD_API_KEY`, migração 0009 e uma execução concluída nas últimas 26 h. Admin › Monitoramento mostra estado, fila e as execuções (avaliados, consultados, do cache, novidades, erros, 429, 503, duração); Configurações › Integrações mostra o cartão "Monitoramento processual" com o estado real.
 
-### Triagem jurídica (`/triagem`)
+### Triagem (removida)
 
-Uma caixa única com os eventos que podem exigir ação do escritório: `evento → interpretação → atenção → decisão → ação`. Não é uma caixa de notificações: só entra o que pode pedir providência, e cada evento tem estado persistido.
-
-```
-DJEN (intimações por OAB) ─┐
-DataJud (movimentações)   ├→ save_triage_items → triage_items → Íntegra IA (uma vez) → Triagem (tempo real)
-próximas fontes           ─┘                                         → advogado decide → Prazo (Etapa 4) + tarefa
-```
-
-| | |
-|---|---|
-| Modelo único | `triage_items` (`0012_triagem.sql`) + `lib/triagem/model.ts`. Toda fonte grava pelo mesmo caminho (`save_triage_items`): tipo (`intimacao`, `movimentacao`), origem (`djen`, `datajud`), chave na fonte (nunca duplica), data, processo, responsável, trecho do original. Nova fonte = nova função em `lib/triagem/sources.ts`, sem regra de triagem própria |
-| Estados | `pendente`, `em_revisao`, `decidido` (`prazo_criado` ou `sem_prazo`), `ignorado` — no banco. Quem decidiu e quando: o banco grava a pessoa logada (não dá para informar outra). Decidido com prazo não reabre; sem prazo e ignorado, sim |
-| Abas | A revisar (pendente com processo) · Sem processo · Revisar (em revisão) · Decididos. "Somente minhas" = responsável. Ordem: urgência (prazo sugerido em até 5 dias), exige ação, prazo, data |
-| DJEN | `lib/services/intimacoes/capture.ts`, no agendador da Etapa 5: OABs ativas, uma consulta por número+UF (mesmo em dois escritórios), janela com 1 dia de sobra, retry/backoff, 429 para a execução, falha de uma OAB não para as outras. `intimacoes` guarda a comunicação como veio (teor original, imutável); `save_intimacoes` cria o evento na mesma transação |
-| DataJud | `monitor.ts` (Etapa 5): das movimentações novas, as que pedem atenção (julgamento, audiência, prazo, citação, trânsito em julgado; não "conclusos", "mero expediente", juntadas) e dos últimos 30 dias entram como evento, no máximo 10 por processo |
-| Vínculo | pelo CNJ, só com UM processo do escritório com o número. Nenhum → "Sem processo" (cadastrar e vincular pela própria tela). Mais de um → revisão. Processo cadastrado depois → `relink_triage_items` na execução seguinte. Nada é criado sozinho |
-| Íntegra IA | `lib/triagem/interpret.ts` + `lib/services/triagem/interpret.ts`, no agendador, depois da captura, com o modelo leve, 30 s por evento e a mesma medição/limite do plano (escritório sem cota espera o mês virar, sem gastar tentativa): resumo em uma frase, "exige ação?" e o prazo **copiado** do teor. O trecho citado precisa existir no original e trazer o número — senão é descartado. A data nunca vem da IA (é calculada pelas regras). Divergência ou dúvida → `em_revisao` com o motivo. Guardado em `triage_items.ai`, gerado uma vez; abrir a tela não chama o modelo. Falhou: o evento continua com o original; nova tentativa em 15 min, 1 h, 4 h |
-| Prazo | `lib/intimacoes/deadline.ts`: publicação = 1º dia útil após a disponibilização (Lei 11.419/2006, art. 4º, §3º); contagem a partir do dia útil seguinte (§4º; CPC 224, §3º); dias úteis (CPC 219), recesso de 20/12 a 20/01 (CPC 220), feriados nacionais (+ Lei 5.010/66 na Justiça Federal). Horas, mais de um prazo, "prazo legal", prazo em dobro, matéria penal ou nenhum prazo → revisão, sem data. Confirmar cria o Prazo da Etapa 4 (origem `intimacao` ou `movimentacao`, `triageItemId` único no banco) e a tarefa; rejeitar não cria nada |
-| Timeline | vincular uma intimação registra UMA atividade no processo (id determinístico). Movimentações já estão na timeline. O perfil do processo tem o painel "Triagem" com tipo, origem, data, resumo e responsável |
-| Auditoria | `triage_events`, só por gatilho: registrou, visualizou (uma vez por pessoa), vinculou, atribuiu, marcou revisão, confirmou prazo, decidiu sem prazo, ignorou, reabriu, interpretou |
-| Isolamento | RLS: ver com `processes.view`, decidir com `processes.edit`; origem, sugestão e interpretação só o servidor grava (`triage_items_guard`). `djen_oab_state` e as funções de captura/IA só service role |
-| Ritmo | DJEN: 30 OABs por execução, 1 s entre consultas, sem consultas novas depois de 90 s (`DJEN_*`). IA: até 15 eventos por execução, sem pedidos novos depois de 240 s da chamada |
-
-A fonte do DJEN é a API pública de Comunicações Processuais do CNJ (`comunicaapi.pje.jus.br`): gratuita, sem chave, limite por IP (429 → 60 s), bloqueio fora do Brasil e teto de 10 mil resultados. A captura fica desligada (`features.djen`) até o escritório confirmar os termos de uso com o CNJ e hospedar a função no Brasil. Admin › Monitoramento tem a aba "Intimações (DJEN)".
+A Triagem (caixa de intimações do DJEN e movimentações relevantes) saiu do produto: menu, tela, contador, painel no processo, sinal do Painel, captura do DJEN e interpretação automática pela IA. O monitoramento de processos continua igual (as movimentações novas entram no processo e geram atividade). Os dados já gravados ficam no banco, sem uso: `triage_items`, `triage_events`, `intimacoes`, `djen_oab_state` (migrações `0011`/`0012`); os prazos criados pela Triagem continuam com `origin` e `triageItemId`. As inscrições na OAB (`lawyer_oabs`) continuam no cadastro dos advogados. `/triagem` redireciona para Processos.
 
 ---
 
@@ -161,12 +145,22 @@ const data = useOfficeData()          // clients, processes, tasks, taskColumns,
 const { addTask, importProcess } = useOfficeActions()
 ```
 
-- **Os dados moram no Supabase** — o store é só a cópia local. Cada coleção é uma tabela (`organization_id`, `id`, `data jsonb`, `updated_at`). `lib/store/storage.ts` carrega o que a RLS deixa a pessoa ver e grava só o que mudou (`diffState`, comparando por identidade — o store é imutável). A gravação é agrupada (300 ms) e em fila; se o banco recusar (sem permissão, falha), aparece um aviso e a tela recarrega o que está salvo.
+- **Os dados moram no Supabase** — o store é só a cópia local. Cada coleção é uma tabela (`organization_id`, `id`, `data jsonb`, `updated_at`). `lib/store/storage.ts` carrega o que a RLS deixa a pessoa ver (em recortes, abaixo) e grava só o que mudou (`diffState`, comparando por identidade — o store é imutável). A gravação é agrupada (300 ms) e em fila; se o banco recusar (sem permissão, falha), aparece um aviso e a tela recarrega o que está salvo.
 - **Equipe ao mesmo tempo** (`lib/store/office-sync.ts`, a única camada que grava, assina o Realtime e revalida):
-  - *Tempo real*: um canal por escritório, INSERT/UPDATE/DELETE das 10 coleções, sempre com filtro `organization_id=eq.…` (sem ele, o Realtime entrega exclusões de qualquer escritório). Tudo é aplicado por id: o eco da própria gravação não duplica.
+  - *Tempo real*: um canal por escritório, INSERT/UPDATE das coleções, sempre com filtro `organization_id=eq.…`. Tudo é aplicado por id: o eco da própria gravação não duplica.
+  - *Exclusões* (migração `0018`): o Realtime do Supabase não aplica RLS a DELETE, então a publicação não envia DELETE; cada exclusão grava por gatilho um aviso em `realtime_deletions` (coleção + id) que chega como INSERT — pela RLS, só a quem é do escritório e pode ver a coleção (lançamentos e atividades financeiras: `finance.view`). `office-sync` e Atendimento tiram o registro ao receber o aviso. Formulário de edição aberto sobre registro excluído por outra pessoa avisa na hora (`useRemovedWhileEditing`). Teste com dois navegadores: `docs/TESTES_MULTIUSUARIO.md`.
   - *Versão*: `updated_at` muda a cada gravação (`bump_row_version`, migração `0006`). Alterar/excluir é `update … where id = … and updated_at = <versão conhecida>` — atômico no banco. Nenhuma linha afetada = outra pessoa gravou antes: a gravação é recusada, aparece "Este registro foi alterado por outra pessoa." e só aquele registro é recarregado.
   - *Formulários de edição* guardam `versionOf(coleção, id)` ao abrir e passam `{ baseVersion }` para a ação (`updateTask`, `updateClient`, `updateProcess`, renomear coluna/categoria), que devolve `SaveResult` (`saved`/`conflict`/`removed`/`error`) depois que o banco confirma. Em `conflict`, o formulário mostra o registro atual.
-  - *Revalidação*: ao (re)conectar o Realtime e ao voltar à aba depois de 3 min (`REVALIDATE_AFTER_HIDDEN_MS`), baixa só id + versão e busca apenas o que mudou.
+  - *Revalidação*: ao (re)conectar o Realtime e ao voltar à aba depois de 3 min (`REVALIDATE_AFTER_HIDDEN_MS`), baixa só id + versão dos recortes carregados (o que veio sob demanda é conferido pelo id) e busca apenas o que mudou.
+- **Carga inicial mínima, o resto sob demanda** (`initialScopes` em `storage.ts`, hooks em `lib/store/on-demand.ts`, migração `0016`). Abrir o Íntegra não baixa o histórico do escritório; cada recorte é lido uma vez por sessão e depois segue pelo Realtime:
+  - *Na abertura*: clientes; processos pelo resumo `processes_summary` (só a movimentação mais recente, marca `movementsPartial`); colunas e categorias; tarefas pendentes ou concluídas há até 30 dias; prazos abertos ou encerrados há até 30 dias; compromissos a partir de 45 dias atrás; documentos dos últimos 14 dias; lançamentos em aberto e os de 6 meses/ano corrente; as 300 atividades e as 500 notificações mais recentes (não lidas ou de 30 dias).
+  - *Sob demanda*: detalhe do processo (`useProcessDetail`: histórico completo de movimentações e tudo o que é dele); perfil do cliente e painel do cliente no Atendimento (`useClientDetail`); Agenda (`useAppointmentsRange`, só períodos anteriores à janela); exportar cliente.
+  - *Histórico em páginas* (`lib/store/history-lists.ts`, `usePagedHistory`, migração `0017`): Tarefas (concluídas), Prazos (cumpridos/perdidos), Documentos, Financeiro (recebidos/cancelados) e as atividades (timeline do cliente, histórico do processo) leem do banco 50 por vez, do mais recente para o mais antigo — cada lista é exatamente o complemento da janela da abertura. A tela mostra só os registros com chave de ordem `>= cursor` (mais recentes que a última página lida: nada falta, sem buracos) e o "Mostrar mais" (`LimitedList`) desenha primeiro o que já está na memória e depois pede a próxima página.
+  - *Contagens e totais*: janela (na memória, ao vivo) + histórico contado no banco (`task_history_counts`, `deadline_history_counts`, `document_history_stats`, `invoice_history_stats` — RLS de quem chama). A inadimplência soma o faturado anterior (`financeSummary(…, { billedBefore })`). Exportar o Financeiro lê tudo direto do banco (`fetchAll`), sem passar pelo store.
+  - *Busca*: na memória com `matches` e, a partir de 2 letras, também no banco (`searchFilter`): a coluna `search` (texto sem acento, gerada pelo banco) ou o vínculo com clientes/processos cujo nome/número bate (até 50 ids). A busca global (`command-menu`) mostra até 8 por grupo.
+  - *Desenho*: listas longas desenham 50 por vez (`components/ui/show-more.tsx`); buscas por id e agrupamentos usam `lib/store/indexes.ts` (índice por versão da coleção — nunca `find` dentro de `map`); linhas de tabela pesadas são `React.memo`; animação de posição (`layout`) só em listas curtas.
+  - *Histórico protegido*: um processo gravado a partir do resumo leva `movementsPartial`; o gatilho `processes_keep_movements` mantém as movimentações do banco e só junta as novas. Comparar movimentações (consulta de um processo já cadastrado) exige o histórico completo (`ensureFullProcesses`).
+  - Nova tela que lista histórico: crie a lista em `history-lists.ts` (complemento da janela), use `usePagedHistory` + `LimitedList` e conte o histórico no banco — não amplie `initialScopes` nem leia a coleção inteira.
   - *Código do processo* (`#103000`…): gerado pelo banco no INSERT (contador por escritório, migração `0007`); `addProcess`/`importProcess` esperam o banco para ter o código. Único por escritório.
   - Teste com Supabase real: `npm run test:integration` (ver o cabeçalho de `tests/integration/office-sync.integration.ts`).
 - **Prazos** (`types/index.ts › Prazo`, tabela `deadlines`, migração `0008`): a única fonte de prazos — `Process.nextDeadline` não existe mais. Próximo prazo = o aberto de menor data fatal (`lib/prazos/prazos.ts › nextPrazo`). Vínculos (processo, cliente, responsável, tarefa, quem criou) são colunas com chave estrangeira derivadas de `data` pelo banco; o cliente acompanha o do processo. Criar prazo (`addPrazo`) cria junto a tarefa vinculada por id (data interna, responsável do prazo); cumprir/perder (`setPrazoStatus`) registra atividade `deadline` nas timelines do processo e do cliente. Alertas em `lib/dashboard/attention.ts` (5 dias, 2 dias, hoje, vencido e "Prazo sem tarefa").
@@ -177,7 +171,7 @@ const { addTask, importProcess } = useOfficeActions()
 - Pessoa e escritório logados: `currentUserId()`, `currentOrgId()`, `getUser(id)`, `getMembers()` (`lib/auth/account.ts`), preenchidos pelo `SessionProvider`. Dentro de componentes, prefira `useSession()`.
 
 Novo campo num cadastro: tipo em `types/index.ts` → formulário → ação no store → exibição (o jsonb não precisa de migração).
-Nova coleção: tipo → `PersistedState` + `TABLES` em `storage.ts` → tabela e políticas na migração.
+Nova coleção: tipo → `PersistedState` + `TABLES` em `storage.ts` → tabela, políticas, publicação do Realtime e gatilho `realtime_deletion` na migração.
 Nova ação de negócio: método em `OfficeActions` + implementação, registrando uma `Activity` quando fizer sentido.
 
 ### Categorias de compromisso
@@ -188,7 +182,11 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 ---
 
-## 4b. Central de Atendimento (WhatsApp via Z-API)
+## 4b. Central de Atendimento (WhatsApp)
+
+**Provedor:** só o **WhatsApp oficial** (WhatsApp Business Cloud API, da Meta). Cada escritório conecta o próprio número em Atendimento › Configurar; o token fica cifrado por escritório (`whatsapp_credentials`) e o webhook é `POST /api/whatsapp/meta/webhook`, com assinatura. A arquitetura, as regras da Meta (janela de 24 h, só texto nesta etapa), a configuração e o que falta estão em **`docs/WHATSAPP_CLOUD_API.md`**. A conexão antiga (Z-API, não oficial) foi **removida**: as conversas dela continuam no banco como histórico (com notas internas), sem envio nem recebimento.
+
+**Vínculo com cliente:** telefone **não** vincula sozinho. A tela sugere o cliente de mesmo telefone e alguém confirma.
 
 **Tela** — `/atendimento`, três áreas: conversas (`conversation-list.tsx`) → conversa (`conversation-view.tsx`: cabeçalho com ações rápidas, busca, `message-list.tsx`, `composer.tsx`) → contexto jurídico (`context-panel.tsx`) com a aba Íntegra IA (`ai-panel.tsx`). Abaixo de 1280 px o contexto abre como painel lateral; no celular, lista e conversa se alternam. O `AppShell` dá altura total a essa rota.
 
@@ -196,7 +194,7 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 | Tabela | O quê |
 |---|---|
-| `whatsapp_instances` | conexão com a Z-API (sem token) e status |
+| `whatsapp_instances` | número oficial do escritório (Phone Number ID, WABA ID) e status; o token fica em `whatsapp_credentials` (cifrado, só o servidor) |
 | `whatsapp_contacts` | telefone do contato; `client_id` quando vinculado a um cliente |
 | `whatsapp_conversations` | uma por contato e instância; status, responsável, não lidas, prévia |
 | `whatsapp_messages` | recebidas, enviadas, notas internas (`note`) e registros (`event`) |
@@ -208,17 +206,17 @@ Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da pa
 
 Isolamento: RLS de leitura (`current_org_id()` + `whatsapp.view`) e **chaves estrangeiras compostas** `(organization_id, id)` — o banco recusa qualquer referência entre escritórios. O navegador só lê; toda escrita passa por `/api/whatsapp/*` (`requireActor` → serviço → service role). A tela recebe mudanças pelo Realtime do Supabase (`inbox-provider.tsx`), que respeita a mesma RLS.
 
-**Envio** — `POST /api/whatsapp/conversations/:id/messages` (`services/whatsapp/outbound.ts`): grava `pending`, chama a Z-API e vira `sent`/`failed`; entregue/lida chegam pelo webhook e só avançam (`whatsapp_apply_status`). Anexos: o navegador sobe em `whatsapp/<org>/outgoing/…` e a Z-API recebe um link assinado de 1 h. **Notas internas** são gravadas e param ali — o banco impede que uma nota tenha id do WhatsApp.
+**Envio** — `POST /api/whatsapp/conversations/:id/messages` (`services/whatsapp/outbound.ts`): confere as regras da Meta (janela de 24 h, só texto), grava `pending`, chama a Meta e vira `sent`/`failed`; entregue/lida chegam pelo webhook e só avançam (`whatsapp_apply_status`). **Notas internas** são gravadas e param ali — o banco impede que uma nota tenha id do WhatsApp.
 
-**Recebimento** — a Z-API chama `POST /api/whatsapp/webhook?token=<ZAPI_WEBHOOK_SECRET>` (rota pública no `proxy.ts`). O segredo é comparado em tempo constante e o `instanceId` do corpo define o escritório. `parseZapiWebhook` traduz o evento; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, **vincula sozinho ao cliente de mesmo telefone** (com e sem o nono dígito — `lib/whatsapp/phone.ts`), cria a conversa e grava a mensagem (idempotente). Sem cliente, fica "Contato novo": transformar em cliente é sempre uma ação confirmada na tela. Mídias recebidas são copiadas para o Storage depois da resposta (`after`), porque os links da Z-API expiram.
+**Recebimento** — a Meta chama `POST /api/whatsapp/meta/webhook` (rota pública no `proxy.ts`), assinado com o App Secret; o Phone Number ID do evento define o escritório. `parseMetaWebhook` traduz; `services/whatsapp/inbound.ts` identifica o contato pelo telefone, cria a conversa e grava a mensagem (idempotente). O contato novo fica "Contato novo": a tela sugere o cliente de mesmo telefone (com e sem o nono dígito, `lib/whatsapp/phone.ts`), e vincular ou transformar em cliente é sempre uma ação confirmada. Mídias recebidas são baixadas da Meta (com o token do escritório) para o Storage depois da resposta (`after`).
 
-**Instância** — a do `.env` pertence ao escritório de `ZAPI_ORGANIZATION_ID` (criada sozinha no primeiro uso). Credenciais nunca vão ao banco nem ao navegador; `providerFor()` (`services/whatsapp/instances.ts`) é o ponto a estender para vários números. Quem tem `office.manage` vê na Central o diagnóstico, o QR Code e o botão que cadastra os webhooks na Z-API.
+**Conexão** — quem tem `office.manage` conecta, revalida e desconecta o número em Atendimento › status da conexão (`meta-connection.tsx` → `/api/whatsapp/instance/meta` → `services/whatsapp/meta-connection.ts`). "Conectado" só depois de a Meta confirmar número, posse e assinatura do aplicativo.
 
 **Permissões** — `whatsapp.view` (ler), `whatsapp.edit` (responder, notas, tags, status, assumir conversa sem responsável), `whatsapp.assign` (distribuir e trocar responsável). Padrões por papel em `role_defaults` (0002) e `lib/auth/permissions.ts`.
 
 **Íntegra IA** — `POST /api/whatsapp/ai` (`services/whatsapp/ai.ts`, Claude via `@anthropic-ai/sdk`, saída estruturada com zod). Resume, sugere resposta, identifica tarefas e processos, analisa imagens/PDFs recebidos e escreve resumo interno. **Nunca executa nada**: a resposta sugerida vai para o campo (só sai com "Enviar") e criar tarefa / salvar nota pedem confirmação.
 
-Variáveis: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_ORGANIZATION_ID`, `ZAPI_WEBHOOK_SECRET`, opcionais `ZAPI_WEBHOOK_BASE_URL` e `ANTHROPIC_API_KEY` (veja `.env.example`).
+Variáveis (da plataforma, uma vez): `META_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_CREDENTIALS_KEY`, opcionais `META_GRAPH_API_VERSION` e `ANTHROPIC_API_KEY` (veja `.env.example`).
 
 ---
 
@@ -228,7 +226,7 @@ O cliente é a entidade central: processos (`clientId`), tarefas (`related`), do
 
 - Regras do cadastro (CPF/CNPJ com dígito verificador, duplicidade, telefone, endereço, tags, WhatsApp): `lib/clientes/clients.ts`. O formulário único de criar/editar é `components/clientes/client-form.tsx`. O banco repete a checagem do documento (`0004_clients_hub.sql`); a violação volta como aviso próprio (`SyncResult.conflicts`).
 - Fatura "a vencer" com vencimento passado conta como atrasada: use `invoiceStatus()`, nunca `invoice.status` direto.
-- Lançamentos financeiros: diálogo global `"invoice"` (`components/financeiro/new-invoice-dialog.tsx`), gravando em `invoices` — o mesmo dado do módulo Financeiro. Cada lançamento tem categoria (`INVOICE_CATEGORIES`: Honorários, Êxito, Custas, Consulta, Outros), observação e situação: previsto (`pendente`), recebido (`pago`) ou cancelado (`cancelado`). Cancelado fica fora de previsto, em aberto e inadimplência (`isOpenInvoice`); a lista do Financeiro separa A receber, Recebidos, Em atraso e Cancelados (`invoiceListTab`), com busca e exclusão.
+- Lançamentos financeiros: diálogo global `"invoice"` (`components/financeiro/new-invoice-dialog.tsx`), gravando em `invoices` — o mesmo dado do módulo Financeiro. Cada lançamento tem categoria (`INVOICE_CATEGORIES`: Honorários, Êxito, Custas, Consulta, Outros), observação e situação: previsto (`pendente`), recebido (`pago`) ou cancelado (`cancelado`). Cancelado fica fora de previsto, em aberto e inadimplência (`isOpenInvoice`); a lista do Financeiro separa A receber, Recebidos, Em atraso e Cancelados (`invoiceListTab`), com busca e exclusão. No topo, uma faixa com recebido no mês (comparado ao **mesmo período** do mês anterior), previsto, a receber em 30 dias e em atraso; o alerta de atraso abre a aba Em atraso (`?aba=atrasados`), e "Análise da Íntegra" (sob demanda) interpreta os mesmos números.
 - `updateClient` registra na timeline mudança de status, de responsável e de dados; atividades de tarefa, documento e compromisso vinculados a processo levam o `clientId` do processo.
 - WhatsApp: link oficial (wa.me) no cadastro; a conversa em si fica na Central de Atendimento (seção 4b).
 - **Contato** (status `contato`): pessoa sem CPF/CNPJ — criada no formulário, pela importação ou em "Transformar em cliente" na Central. O documento, quando informado, continua validado e único. `resolveClientStatus` mantém o status coerente (sem documento: Contato ou Inativo; ao ganhar documento, Novo). Para vincular processo, anexar contrato ou lançar honorários, o CPF/CNPJ é exigido (`documentRequiredIssue`) — e o banco repete a regra (`0010_contacts.sql`, só em vínculos novos ou alterados), além de impedir que um cliente com processo, fatura ou contrato perca o documento.
@@ -248,11 +246,11 @@ const { openDialog } = useUI()
 openDialog("task", { processId })   // "client" | "task" | "appointment" | "document" | "process" | "invoice"
 ```
 
-**Painel** (`components/dashboard/`) — cabeçalho (data, saudação, clima da cidade do escritório via Open-Meteo, sem chave; some sem cidade ou sem resposta, e "Novo"), faixa de resumo (`insight-banner.tsx`: contagens reais; "Ver insights" abre "O que merece sua atenção"), indicadores (Clientes, Processos, Tarefas, Financeiro), Processos recentes + Agenda de hoje, Tarefas em aberto + Financeiro, Prazos da semana + Atividade recente e o Panorama da IA. A partir de 1536 px, o assistente da Íntegra IA fica fixo à direita (`office-ai-dock.tsx`, sobre o `components/ai/ai-dock.tsx` compartilhado, mesma conversa do botão "IA"). O perfil do cliente usa o mesmo assistente (`components/clientes/profile/client-ai-dock.tsx`), com as perguntas do cliente e os sinais de atenção dele no destaque; abaixo de 1536 px ele fica no fim da visão geral. Os números saem de `lib/dashboard/dashboard.ts` (testado).
+**Painel** (`components/dashboard/`) — uma coluna só: cabeçalho (data, saudação, clima da cidade do escritório via Open-Meteo, sem chave; some sem cidade ou sem resposta, e "Novo"), faixa de indicadores do que pede ação (`kpi-cards.tsx`: prazos até domingo, tarefas, valores em atraso — cada um leva à lista que o resolve), faixa de resumo (`insight-banner.tsx`: contagens reais) com "O que merece sua atenção" logo abaixo (abre e fecha pela faixa), Prazos da semana + Agenda de hoje, Tarefas em aberto + Financeiro, Movimentações recentes (`recent-movements.tsx`: a última movimentação real de cada processo, com cliente, assunto, número, órgão e data; leva ao processo) + Atividade recente. A Íntegra IA entra por um lugar só, o "Perguntar" do topo (a mesma conversa de todas as telas, com as perguntas do escritório — inclusive o panorama). O perfil do cliente tem o assistente à direita (`components/clientes/profile/client-ai-dock.tsx`, sobre o `components/ai/ai-dock.tsx` compartilhado); o detalhe do processo também (`components/processos/process-ai-dock.tsx`). Os números saem de `lib/dashboard/dashboard.ts` (testado). Onde o processo aparece sozinho (Painel, sinais, tarefas, agenda, prazos), ele é identificado por `lib/processos/label.ts`: "Cliente — Tipo de ação" (ou classe, ou "Processo <área>"), com o número como informação secundária — só dados cadastrados, nada inventado.
 
 **Layout** — barra lateral marinho fixa (`sidebar.tsx`: 256 px, 76 px recolhida ou entre 768 e 1023 px; no mobile vira o drawer de `mobile-nav.tsx`, com a barra inferior de atalhos), topo limpo (`topbar.tsx`: trilha nas telas de detalhe, busca `Ctrl K`, Íntegra IA, notificações, perfil e "Novo") e conteúdo em off-white, com cartões brancos. O rodapé da barra lateral usa a imagem das colunas (`public/brand/sidebar-columns.webp`); a Íntegra IA fica no botão "IA" do topo e no painel.
 
-Design system — reutilize, não invente: `page-header`, `panel`, `metric-card` (indicador com selo colorido e linha de cor), `button`, `status-badge` (pílulas), `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens em `app/globals.css`:
+Design system — reutilize, não invente: `page-header`, `panel`, `indicator-strip` (faixa de indicadores numa superfície só, cada um levando à lista que o resolve), `button`, `status-badge` (pílulas), `filter-tabs`, `underline-tabs`, `search-field`, `data-table`, `empty-state`, `skeleton`, `modal`, `side-sheet`, `field`, `user-avatar`, `motion` (`FadeIn`). Classes com `cn()` (`import { cn } from "cn"`). Tokens em `app/globals.css`:
 
 - **Superfícies**: `rounded-card` (16 px) e `shadow-card` em cartões; `shadow-raised` no hover de cartões clicáveis; `shadow-float` em menus e diálogos; `rounded-control` (10 px) em botões e campos (altura 36–40 px).
 - **Utilitários**: `.sidebar-surface` (marinho com brilho dourado; barra lateral, drawer, painel do login, Admin) e `.ai-surface` (véu azul das áreas da Íntegra IA).
@@ -351,7 +349,7 @@ Notificações (o envio de e-mail já existe — `sendEmail` em `lib/services/em
 
 **Regra da interface:** o que não existe aparece como "Em breve" ou não aparece. Nenhum botão, status ou mensagem de sucesso simula uma funcionalidade. Em Configurações › Integrações, o WhatsApp mostra o estado real, com a mesma leitura da Central de Atendimento (`lib/whatsapp/connection.ts`).
 
-Autenticação, e-mail transacional (SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), a Triagem (intimações do DJEN — captura desligada por padrão; depende da hospedagem no Brasil — e movimentações relevantes), o salvamento dos processos, os prazos, o WhatsApp (Z-API), a Íntegra IA e todo o painel Admin são reais.
+Autenticação, e-mail transacional (SMTP), banco, isolamento, arquivos de documentos, a consulta de processos, o monitoramento automático (depende do agendador da hospedagem), o salvamento dos processos, os prazos, o WhatsApp oficial (Cloud API da Meta; depende da configuração do aplicativo da Meta), a Íntegra IA e todo o painel Admin são reais.
 
 ## 9. Como rodar
 
@@ -385,15 +383,15 @@ lib/ai/services/*  →  services/run.ts      cache no banco (cache.ts) + pedido 
 lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/genai; modelo por nível (standard/light)
 ```
 
-**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `chat`, `GET /api/ai/status` (ligada/configurada; não chama o modelo) e `GET /api/ai/usage` (uso do mês contra o plano). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
+**Rotas** — `POST /api/ai/process/summary` · `process/analyze-movement` · `process/next-actions` · `client/summary` · `office/overview` · `finance/analysis` (exige `finance.view`; números das faturas calculados por `computeFinanceMetrics`, a IA só interpreta) · `chat`, `transcribe` (áudio → texto, veja "Conversa por voz"), `GET /api/ai/status` (ligada/configurada; não chama o modelo) e `GET /api/ai/usage` (uso do mês contra o plano). Erro sempre como `{ error: { code, message } }` (`lib/ai/errors.ts`), nunca detalhe interno.
 
-**Modelo reserva** — `AI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva, repete o principal uma vez. O log (`model`) mostra quem respondeu.
+**Modelo reserva** — `AI_FALLBACK_MODEL` (lista): se o principal responder 503 (sobrecarga), 429 (cota) ou 404, `gemini.ts` tenta os reservas dentro do mesmo tempo máximo; sem reserva configurado, o modelo leve faz esse papel (se for o mesmo do principal, repete o principal uma vez). O log (`model`) mostra quem respondeu.
 
-**Trocar de provedor** — implemente `AIProvider` (`generateText` e `generateJSON`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
+**Trocar de provedor** — implemente `AIProvider` (`generateText`, `generateJSON` e, para a voz, `transcribe`) e escolha-o em `createAIProvider` (`lib/ai/provider.ts`). Contexto, prompts, schemas, rotas e telas não mudam.
 
 **Regras do modelo** — prompt único em `lib/ai/prompts/system.ts` (fato × inferência × limitação; sem prazos, jurisprudência ou fatos inventados; dados tratados como dados). Mudou o texto? Suba `PROMPT_VERSION`. Instruções de cada funcionalidade em `prompts/tasks.ts`; formato das respostas em `schemas/`.
 
-**Provedor e modelos** — um provedor só no núcleo (Gemini): toda chamada passa por `lib/ai/provider.ts`, e os nomes de modelo só existem em `lib/ai/config.ts`, lidos do ambiente: `AI_MODEL` (análises e chat) e `AI_MODEL_LIGHT` (operações simples: Triagem automática e análise de uma movimentação; padrão Flash-Lite, sem raciocínio). Se o leve falhar, o principal responde. A Central de Atendimento (WhatsApp) usa a Anthropic em `lib/services/whatsapp/ai.ts` e fica fora desta camada por enquanto.
+**Provedor e modelos** — um provedor só no núcleo (Gemini): toda chamada passa por `lib/ai/provider.ts`, e os nomes de modelo só existem em `lib/ai/config.ts`, lidos do ambiente: `AI_MODEL` (análises e chat; padrão `gemini-3.5-flash`) e `AI_MODEL_LIGHT` (operações simples: análise de uma movimentação e transcrição de voz; padrão `gemini-3.5-flash-lite`, raciocínio mínimo). Se o leve falhar, o principal responde. Os modelos 2.5 só atendem contas que já os usavam (chave nova recebe 404), e apelidos `-latest` trocam de modelo sozinhos — evite os dois. Na família 3 a temperatura fica no padrão do Google (baixar causa repetição, segundo a documentação). A Central de Atendimento (WhatsApp) usa a Anthropic em `lib/services/whatsapp/ai.ts` e fica fora desta camada por enquanto.
 
 **Custo e consumo** — cada chamada é reservada no banco antes de ir ao modelo (`ai_reserve`, `0013_ia_consumo.sql`) e registrada depois (`ai_finish`) em `usage_events`: escritório, pessoa (ou nenhuma, se automática), operação, provedor, modelo, tokens de entrada/saída/cache, custo estimado em US$ (`lib/ai/pricing.ts`, sobreposto por `AI_PRICES`), duração e erro — nunca prompt ou resposta. Admin › Consumo de IA mostra por escritório e período.
 
@@ -407,10 +405,29 @@ lib/ai/provider.ts  →  lib/ai/gemini.ts    único arquivo que importa @google/
 
 **Tarefas sugeridas** — nunca são gravadas pela IA: "Criar tarefa" abre `openDialog("task", { title, description, priority, processId })`, o mesmo formulário da Íntegra.
 
-**Chat** — sem estado no servidor: o navegador manda o escopo (`process`, `client` ou `office`) e o histórico curto; o contexto é remontado do banco a cada pergunta.
+**Chat** — sem estado no servidor: o navegador manda o escopo (`process`, `client` ou `office`), o histórico curto e o **modo** escolhido no topo da conversa; o contexto é remontado do banco a cada pergunta. Modos (`lib/ai/types.ts`, `CHAT_MODES`): **All** (padrão — dados do escritório e, quando a pergunta pede decisões, a base de jurisprudência), **Escritório** (só dados do escritório; nunca pesquisa jurisprudência) e **Jurisprudência** (só a base de jurisprudência, pesquisada a cada pergunta; num processo, ele só dá o tema e as decisões vinculadas — os dados dele não vão ao modelo; exige `processes.view`). A escolha fica lembrada no navegador; numa conversa sobre uma decisão não há seletor.
 
 **Camada na interface** — há um único painel de conversa, em `LexaAIProvider` (`components/ai/lexa-ai-provider.tsx`, montado no `AppShell`). O contexto vem da rota: `/processos/[id]` → processo, `/clientes/[id]` → cliente, o resto → escritório, com perguntas próprias de cada tela (`components/ai/ai-context.ts`). Abra com `useLexaAI().open()` ou envie uma pergunta com `ask(prompt, contexto?)` — sempre a partir de um clique. A conversa pertence ao contexto (`key` do escopo): trocar de processo começa outra. Uma tela que quer tratar as fontes citadas (ex.: abrir a movimentação ali mesmo) usa `useAISourceHandler`. Gatilhos: botão "IA" no topo, Ctrl K ("Perguntar à Íntegra: …"), assistente lateral do Painel e do cliente, painel do Processo, detalhe da tarefa e Agenda.
 
+**Conversa por voz** — botão de microfone ao lado de "Enviar" (só aparece com a IA pronta). Fluxo: clique → o navegador pede o microfone (nunca antes do clique) → grava (`MediaRecorder`, até 60 s, indicador "Gravando · m:ss" com Cancelar/Concluir) → o próprio navegador converte para WAV PCM 16 bits mono 16 kHz (`components/ai/use-voice-input.ts` + `lib/ai/audio.ts`) → `POST /api/ai/transcribe` (corpo `audio/wav` bruto) → o texto entra no campo, somado ao que já estava digitado, para revisar e enviar pelo fluxo normal — nunca é enviado sozinho. Não usamos `SpeechRecognition` do navegador: não existe no Firefox, é parcial no Safari e, no Chrome, manda o áudio a um serviço fora do aviso de privacidade.
+- **Servidor** (`app/api/ai/transcribe/route.ts` → `lib/ai/services/transcribe.ts`): exige sessão e IA ligada; recusa tipo diferente de `audio/wav`, mais de ~1,9 MB, e lê o cabeçalho de verdade (`inspectWav`: PCM, mono, 16 kHz, 16 bits, 0,5–61 s) antes de chamar o modelo; 30 transcrições por pessoa a cada 10 min. A transcrição passa pela reserva e pelo consumo como qualquer chamada (operação `voice.transcribe`, modelo leve, mesmos reservas).
+- **Provedor**: `GeminiProvider.transcribe` envia o WAV como `inlineData` no `generateContent` (WAV é formato de áudio documentado da API; WebM/Opus não é garantido, por isso a conversão). Nada vai à File API, nada é gravado: o áudio existe só na memória do pedido. Outro provedor implementa `transcribe` em `AIProvider`; sem ele, a rota responde "não configurado".
+- **Erros**: permissão negada, sem microfone, microfone ocupado, navegador sem suporte (ou fora de HTTPS), gravação curta, silêncio (detectado no navegador, sem gastar cota), `NO_SPEECH` (o modelo devolve `[sem fala]`), falha de rede e de transcrição — todos com "Tentar de novo" e sem apagar o texto digitado. Fechar a conversa ou sair da tela cancela a gravação e desliga o microfone.
+
 **Documentos** — ainda não entram na análise (só nome, tipo e data). Para ler o conteúdo, o caminho é um novo context builder que baixe o arquivo do Storage no servidor e o envie como parte da mensagem.
 
-Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts` e `lib/ai/services/services.test.ts`.
+Diagnóstico com a chave real: `npm run ai:check` (texto e áudio de teste em cada modelo, com tempo e erro do provedor; `-- --wav=arquivo.wav` transcreve um WAV seu). Num erro, o log `[lexa-ia]` traz `attempts`: cada modelo tentado, com status e tempo.
+
+Variáveis: `GEMINI_API_KEY`, `AI_MODEL`, `AI_MODEL_LIGHT`, `AI_FALLBACK_MODEL`, `AI_PRICES`, `AI_ENABLED`, `AI_TIMEOUT_MS` (veja `.env.example`). Testes: `lib/ai/core.test.ts`, `lib/ai/services/services.test.ts`, `lib/ai/audio.test.ts` e `lib/ai/services/transcribe.test.ts`.
+
+## Jurisprudência
+
+`/jurisprudencia` (menu Escritório, exige `processes.view`): pesquisa em linguagem natural
+ou por termos na base indexada de decisões oficiais (hoje STJ — dados abertos), filtros
+(órgão julgador, classe, área, tribunal, grau, assunto, período), ordem por relevância ou
+data, 20 por página; decisão completa num painel lateral com Salvar, Vincular ao processo
+(`processes.edit`), Ver fonte original e Análise da Íntegra (sob demanda). Salvas e
+vínculos são do escritório (RLS). No processo, "Jurisprudência relacionada" (vinculadas +
+pesquisa a partir do processo + análise de semelhança). Vincular registra
+"vinculou uma jurisprudência ao processo." na linha do tempo. Fonte, sincronização, dados,
+variáveis, testes e limitações: `docs/JURISPRUDENCIA.md`. Migrações: `0019_jurisprudencia.sql` e `0022_jurisprudencia_relevancia.sql` (recuperação da IA).

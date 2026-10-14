@@ -18,12 +18,20 @@ export interface ConversationStatusOption {
 export interface WhatsAppInstance {
   id: ID
   organizationId: ID
-  provider: "zapi"
+  /** `meta`: WhatsApp Business Cloud API (oficial). `zapi`: conexão antiga removida (só histórico). */
+  provider: "zapi" | "meta"
+  /** Meta: Phone Number ID. */
   externalId: string
+  /** Meta: WABA ID. */
+  businessAccountId?: string
   name: string
   phone?: string
-  status: "unknown" | "connected" | "disconnected"
+  /** `error`: configurada, mas a última verificação no provedor falhou. */
+  status: "unknown" | "connected" | "disconnected" | "error"
   statusDetail?: string
+  verifiedName?: string
+  qualityRating?: string
+  lastCheckedAt?: string
   connectedAt?: string
   lastEventAt?: string
 }
@@ -73,7 +81,7 @@ export interface WhatsAppAttachment {
   sizeBytes?: number
   /** Arquivo no bucket `whatsapp`; ausente enquanto o download não termina. */
   storagePath?: string
-  /** Cópia temporária do provedor (30 dias na Z-API). */
+  /** Cópia temporária do provedor, até o arquivo ser guardado no Storage. */
   remoteUrl?: string
   thumbnailUrl?: string
   durationSeconds?: number

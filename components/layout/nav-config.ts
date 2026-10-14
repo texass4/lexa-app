@@ -1,8 +1,8 @@
 import {
+  BookOpenText,
   CalendarDays,
   FolderOpen,
   Hourglass,
-  Inbox,
   LayoutGrid,
   ListChecks,
   MessagesSquare,
@@ -19,7 +19,7 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   /** Contador que só aparece quando pede ação (ver `SidebarNav`). */
-  badgeKey?: "tasks" | "processes" | "prazos" | "triagem" | "agenda"
+  badgeKey?: "tasks" | "processes" | "prazos" | "agenda"
   /** Sem ela, o item some do menu e a rota mostra "sem acesso". */
   permission?: Permission
   /** Telas dentro deste item (abrem pela setinha ao lado dele). */
@@ -28,15 +28,9 @@ export interface NavItem {
 
 const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
-    label: "Visão geral",
-    items: [{ href: "/dashboard", label: "Início", icon: LayoutGrid }],
-  },
-  {
-    label: "Escritório",
+    label: "Trabalho",
     items: [
-      { href: "/triagem", label: "Triagem", icon: Inbox, badgeKey: "triagem", permission: "processes.view" },
-      { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
-      { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
+      { href: "/dashboard", label: "Início", icon: LayoutGrid },
       {
         href: "/processos",
         label: "Processos",
@@ -44,6 +38,8 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         badgeKey: "processes",
         permission: "processes.view",
       },
+      { href: "/clientes", label: "Clientes", icon: UsersRound, permission: "clients.view" },
+      { href: "/agenda", label: "Agenda", icon: CalendarDays, badgeKey: "agenda", permission: "agenda.view" },
       {
         href: "/tarefas",
         label: "Tarefas",
@@ -52,13 +48,9 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         permission: "tasks.view",
         children: [{ href: "/tarefas/prazos", label: "Prazos", icon: Hourglass, badgeKey: "prazos", permission: "processes.view" }],
       },
-      { href: "/agenda", label: "Agenda", icon: CalendarDays, badgeKey: "agenda", permission: "agenda.view" },
-    ],
-  },
-  {
-    label: "Gestão",
-    items: [
       { href: "/documentos", label: "Documentos", icon: FolderOpen, permission: "documents.view" },
+      { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
+      { href: "/jurisprudencia", label: "Jurisprudência", icon: BookOpenText, permission: "processes.view" },
       { href: "/financeiro", label: "Financeiro", icon: Wallet, permission: "finance.view" },
     ],
   },
@@ -68,15 +60,34 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   },
 ]
 
+/**
+ * Atalhos da barra lateral: listas reais já filtradas (os filtros por URL existem nas telas).
+ * O número ao lado é calculado com os dados do escritório (`SidebarShortcuts`).
+ */
+export interface Shortcut {
+  href: string
+  label: string
+  icon: LucideIcon
+  permission: Permission
+  countKey: "prazosSemana" | "tarefasHoje" | "processosPrazo" | "documentos"
+}
+
+export const SHORTCUTS: Shortcut[] = [
+  { href: "/tarefas?filtro=hoje", label: "Tarefas de hoje", icon: ListChecks, permission: "tasks.view", countKey: "tarefasHoje" },
+  { href: "/tarefas/prazos?filtro=semana", label: "Prazos da semana", icon: Hourglass, permission: "processes.view", countKey: "prazosSemana" },
+  { href: "/processos?filtro=prazos", label: "Processos com prazo", icon: Scale, permission: "processes.view", countKey: "processosPrazo" },
+  { href: "/documentos?pasta=recentes", label: "Documentos recentes", icon: FolderOpen, permission: "documents.view", countKey: "documentos" },
+]
+
 export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/dashboard": { title: "Visão geral", section: "Painel" },
   "/clientes": { title: "Clientes", section: "Escritório" },
   "/atendimento": { title: "Central de atendimento", section: "WhatsApp" },
   "/processos": { title: "Processos", section: "Escritório" },
-  "/triagem": { title: "Triagem", section: "Escritório" },
   "/tarefas": { title: "Tarefas", section: "Escritório" },
   "/tarefas/prazos": { title: "Prazos", section: "Tarefas" },
   "/agenda": { title: "Agenda", section: "Escritório" },
+  "/jurisprudencia": { title: "Jurisprudência", section: "Escritório" },
   "/documentos": { title: "Documentos", section: "Gestão" },
   "/financeiro": { title: "Financeiro", section: "Gestão" },
   "/configuracoes": { title: "Configurações", section: "Sistema" },

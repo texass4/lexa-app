@@ -94,6 +94,7 @@ export function Composer({
   replyDisabledReason,
   droppedFile,
   onDroppedFileHandled,
+  textOnly = false,
 }: {
   conversationId: string
   replyTo?: WhatsAppMessage
@@ -106,6 +107,8 @@ export function Composer({
   replyDisabledReason?: string
   droppedFile?: File
   onDroppedFileHandled: () => void
+  /** O número só envia texto (WhatsApp oficial nesta etapa): sem anexos nem áudio gravado. */
+  textOnly?: boolean
 }) {
   const [draft, setDraft] = useDraft(conversationId)
   const [file, setFile] = React.useState<File>()
@@ -121,12 +124,16 @@ export function Composer({
 
   const attach = React.useCallback((f?: File | null) => {
     if (!f) return
+    if (textOnly) {
+      toast("Por enquanto, este número envia só texto pela Íntegra.", { description: "O envio de anexos chega na próxima etapa." })
+      return
+    }
     if (f.size > MAX_ATTACHMENT_BYTES) {
       toast.error("O arquivo passa de 64 MB.")
       return
     }
     setFile(f)
-  }, [])
+  }, [textOnly])
 
   // Arquivo solto sobre a conversa.
   React.useEffect(() => {
@@ -209,8 +216,8 @@ export function Composer({
 
   return (
     <div className={cn("shrink-0 border-t px-3 pt-2.5 pb-3 transition-colors sm:px-4", note ? "border-brand/25 bg-brand-soft/45" : "border-border bg-card")}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex rounded-control border border-border bg-surface-muted/60 p-[2px]">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex shrink-0 rounded-control border border-border bg-surface-muted/60 p-[2px]">
           {(["reply", "note"] as const).map((mode) => (
             <button
               key={mode}
@@ -219,7 +226,7 @@ export function Composer({
               aria-selected={draft.mode === mode}
               onClick={() => setDraft({ mode })}
               className={cn(
-                "relative inline-flex h-6 items-center gap-1.5 rounded-[7px] px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                "touch-target relative inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-2.5 text-[12px] font-medium outline-none pointer-coarse:h-8 transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 draft.mode === mode ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -233,7 +240,7 @@ export function Composer({
             </button>
           ))}
         </div>
-        <span className={cn("text-[11.5px]", note ? "text-brand-strong" : "text-subtle")}>
+        <span className={cn("min-w-[9rem] flex-1 text-right text-[11.5px] leading-snug", note ? "text-brand-strong" : "text-subtle")}>
           {note ? "Só a equipe vê. Nunca vai para o WhatsApp." : blocked ? replyDisabledReason : "Enter envia · Shift+Enter quebra a linha"}
         </span>
       </div>
@@ -304,7 +311,7 @@ export function Composer({
             note ? "border-brand/35 focus-within:border-brand/60 focus-within:ring-brand/15" : "border-border focus-within:border-brand/50 focus-within:ring-brand/12",
           )}
         >
-          {!note && (
+          {!note && !textOnly && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label="Anexar arquivo"
@@ -352,7 +359,7 @@ export function Composer({
             aria-label={note ? "Nota interna" : "Mensagem"}
             className="max-h-44 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-[14px] leading-[20px] text-foreground outline-none placeholder:text-subtle disabled:opacity-60 sm:text-[13.5px]"
           />
-          {!note && !draft.text.trim() && !file ? (
+          {!note && !textOnly && !draft.text.trim() && !file ? (
             <Button variant="ghost" size="icon" aria-label="Gravar áudio" disabled={blocked || busy} onClick={recorder.start} className="rounded-[10px]">
               <Mic className="size-[18px]" />
             </Button>

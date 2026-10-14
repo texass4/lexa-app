@@ -7,6 +7,8 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect, TextInput } from "@/components/ui/field"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { useRemovedWhileEditing } from "@/lib/store/on-demand"
+import { byId } from "@/lib/store/indexes"
 import { documentRequiredIssue } from "@/lib/clientes/clients"
 import { ensureExtension } from "@/lib/core/format"
 import type { DocumentKind, LegalDocument } from "@/types"
@@ -30,6 +32,7 @@ function EditDocumentForm({ doc, onClose }: { doc: LegalDocument; onClose: () =>
   const [errors, setErrors] = React.useState<{ name?: string; clientId?: string }>({})
   // Versão quando o formulário abriu: se alguém alterou o documento antes, a edição é recusada.
   const [baseVersion, setBaseVersion] = React.useState(() => versionOf("documents", doc.id))
+  useRemovedWhileEditing("documents", doc.id)
   const [saving, setSaving] = React.useState(false)
 
   // Processo sempre do cliente escolhido; escolher o processo traz o cliente dele.
@@ -43,10 +46,7 @@ function EditDocumentForm({ doc, onClose }: { doc: LegalDocument; onClose: () =>
     // Contrato exige CPF/CNPJ do cliente (vínculo novo ou alterado; o banco também confere).
     const linkChanged = form.clientId !== (doc.clientId ?? "") || form.kind !== doc.kind
     if (form.kind === "Contrato" && linkChanged) {
-      const issue = documentRequiredIssue(
-        data.clients.find((c) => c.id === form.clientId),
-        "contrato",
-      )
+      const issue = documentRequiredIssue(byId(data.clients, form.clientId), "contrato")
       if (issue) next.clientId = issue
     }
     setErrors(next)
@@ -110,7 +110,7 @@ function EditDocumentForm({ doc, onClose }: { doc: LegalDocument; onClose: () =>
                 const clientId = e.target.value
                 setErrors((x) => ({ ...x, clientId: undefined }))
                 setForm((f) => {
-                  const process = data.processes.find((p) => p.id === f.processId)
+                  const process = byId(data.processes, f.processId)
                   // O processo de outro cliente deixa de valer.
                   return { ...f, clientId, processId: process && clientId && process.clientId !== clientId ? "" : f.processId }
                 })
@@ -130,7 +130,7 @@ function EditDocumentForm({ doc, onClose }: { doc: LegalDocument; onClose: () =>
               value={form.processId}
               onChange={(e) => {
                 const processId = e.target.value
-                const process = data.processes.find((p) => p.id === processId)
+                const process = byId(data.processes, processId)
                 setForm((f) => ({ ...f, processId, clientId: process?.clientId || f.clientId }))
               }}
             >

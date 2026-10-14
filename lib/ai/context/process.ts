@@ -10,6 +10,8 @@ import { AIError } from "@/lib/ai/errors"
 import { PROCESS_STATUS } from "@/lib/core/config"
 import { formatCurrency } from "@/lib/core/format"
 import { isAutoTracked } from "@/lib/services/processos/labels"
+import { describeTribunalForAI, tribunalIdentificationOf } from "@/lib/services/processos/tribunal-identification"
+import { processDistrict } from "@/lib/processos/label"
 import { prazosOfProcess } from "@/lib/prazos/prazos"
 import { toLocalISO } from "@/lib/core/dates"
 import type { Appointment, Client, LegalDocument, Prazo, Process, ProcessParty, Task } from "@/types"
@@ -109,11 +111,13 @@ function describeProcess(data: ProcessData, now: Date) {
     classe: process.className ?? process.type,
     assunto: process.subject,
     area: process.area,
-    tribunal: process.tribunal,
+    // Tribunal do cadastro (do escritório ou da fonte) — não é, por si, o tribunal atual.
+    tribunal_no_cadastro: process.tribunal,
+    tribunal_identificacao: describeTribunalForAI(tribunalIdentificationOf(process)),
     grau: process.degree,
     sistema: process.system,
     orgao_julgador: process.judicialUnit ?? process.court,
-    comarca: process.district,
+    comarca: processDistrict(process),
     data_ajuizamento: fmtDate(process.distributedAt),
     situacao_no_escritorio: PROCESS_STATUS[process.status]?.label,
     situacao_na_fonte: process.source?.sourceStatus,
@@ -184,7 +188,8 @@ export function buildMovementContext(data: ProcessData, movementId: string, now:
       numero: info.numero,
       classe: info.classe,
       assunto: info.assunto,
-      tribunal: info.tribunal,
+      tribunal_no_cadastro: info.tribunal_no_cadastro,
+      tribunal_identificacao: info.tribunal_identificacao,
       grau: info.grau,
       orgao_julgador: info.orgao_julgador,
       situacao_no_escritorio: info.situacao_no_escritorio,

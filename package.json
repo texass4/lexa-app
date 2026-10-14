@@ -9,10 +9,13 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --test --import ./tests/register.mjs \"lib/**/*.test.ts\"",
-    "test:rls": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f supabase/tests/financeiro_privacidade.sql -f supabase/tests/cadastro_protecao.sql",
+    "test:rls": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f supabase/tests/financeiro_privacidade.sql -f supabase/tests/cadastro_protecao.sql -f supabase/tests/realtime_exclusoes.sql -f supabase/tests/jurisprudencia.sql -f supabase/tests/jurisprudencia_relevancia.sql -f supabase/tests/jurisprudencia_questoes.sql -f supabase/tests/consulta_processual.sql -f supabase/tests/whatsapp_cloud.sql -f supabase/tests/privilegios.sql -f supabase/tests/monitoramento_sigilo.sql",
     "test:integration": "node --test --test-concurrency=1 --import ./tests/register.mjs \"tests/integration/*.integration.ts\"",
     "email:templates": "node --import ./tests/register.mjs scripts/supabase-email-templates.ts",
-    "email:verify": "node --env-file-if-exists=.env.local --import ./tests/register.mjs scripts/verify-smtp.ts"
+    "email:verify": "node --env-file-if-exists=.env.local --import ./tests/register.mjs scripts/verify-smtp.ts",
+    "ai:check": "node --env-file-if-exists=.env.local --import ./tests/register.mjs scripts/ai-check.ts",
+    "jurisprudence:eval": "node --env-file-if-exists=.env.local --import ./tests/register.mjs scripts/jurisprudence-eval.ts",
+    "jurisprudence:benchmark": "node --env-file-if-exists=.env.local --import ./tests/register.mjs scripts/jurisprudence-benchmark.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -25,7 +28,7 @@
     "cn": "^0.4.0",
     "framer-motion": "^13.4.1",
     "lucide-react": "^1.47.0",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "nodemailer": "^10.0.13",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -41,7 +44,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

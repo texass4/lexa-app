@@ -5,6 +5,7 @@ import { ArrowDownRight, ArrowUpRight, Landmark } from "lucide-react"
 import { cn } from "cn"
 import { Panel, PanelHeader } from "@/components/ui/panel"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { financeSummary, monthlyRevenue, openReceivables } from "@/lib/store/selectors"
 import { overdueInvoices } from "@/lib/dashboard/dashboard"
 import { formatCurrency } from "@/lib/core/format"
@@ -75,7 +76,7 @@ export function FinancePanel() {
                   {growth >= 0 ? <ArrowUpRight className="size-3.5" strokeWidth={2.2} /> : <ArrowDownRight className="size-3.5" strokeWidth={2.2} />}
                   {Math.abs(growth).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
                 </span>{" "}
-                vs. mês anterior
+                vs. mesmo período de {summary.previousMonth.split(" ")[0].toLowerCase()}
               </>
             )}
           </p>
@@ -98,18 +99,24 @@ export function FinancePanel() {
         {late.length ? (
           <ul className="mt-2 space-y-0.5">
             {late.slice(0, 3).map(({ invoice, daysLate }) => {
-              const client = data.clients.find((c) => c.id === invoice.clientId)
+              const client = byId(data.clients, invoice.clientId)
               return (
                 <li key={invoice.id}>
                   <Link
                     href={client ? `/clientes/${client.id}` : "/financeiro"}
-                    className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[10px] px-2 py-1.5 text-[12.5px] outline-none transition-colors hover:bg-accent/70 focus-visible:ring-2 focus-visible:ring-brand/40"
+                    className="touch-target relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] px-2 py-1.5 sm:grid-cols-[minmax(0,1fr)_auto_auto] text-[12.5px] outline-none transition-colors hover:bg-accent/70 focus-visible:ring-2 focus-visible:ring-brand/40"
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <span aria-hidden className="size-2 shrink-0 rounded-full border border-subtle" />
-                      <span className="truncate text-foreground">{client?.name ?? "Cliente"}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-foreground">{client?.name ?? "Cliente"}</span>
+                        {/* Celular: o atraso vem abaixo do nome, para o nome não ser cortado. */}
+                        <span className="tabular block text-[11px] font-medium text-danger sm:hidden">
+                          {daysLate} {daysLate === 1 ? "dia" : "dias"} de atraso
+                        </span>
+                      </span>
                     </span>
-                    <span className="tabular rounded-full bg-danger-soft px-2 py-px text-[11px] font-medium text-danger">
+                    <span className="tabular rounded-full bg-danger-soft px-2 py-px text-[11px] font-medium text-danger max-sm:hidden">
                       {daysLate} {daysLate === 1 ? "dia" : "dias"}
                     </span>
                     <span className="tabular w-[84px] text-right font-medium text-foreground">{formatCurrency(invoice.amount)}</span>

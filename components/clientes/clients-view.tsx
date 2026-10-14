@@ -76,6 +76,8 @@ export function ClientsView() {
   const [filter, setFilter] = React.useState<Filter>("todos")
   const [importing, setImporting] = React.useState(false)
   const [query, setQuery] = React.useState("")
+  // A busca percorre milhares de clientes: o campo responde na hora e a lista acompanha.
+  const search = React.useDeferredValue(query)
   const [ownerId, setOwnerId] = React.useState("")
   const [area, setArea] = React.useState<PracticeArea | "">("")
   const [kind, setKind] = React.useState<Client["kind"] | "">("")
@@ -126,7 +128,7 @@ export function ClientsView() {
 
   const searchable = React.useCallback(
     (c: Client) => {
-      const q = query.trim()
+      const q = search.trim()
       if (!q) return true
       const digits = onlyDigits(q)
       if (digits.length >= 3 && digits.length === q.replace(/[\s.\-/()]/g, "").length) {
@@ -135,7 +137,7 @@ export function ClientsView() {
       }
       return matches(q, c.name, c.area, c.email, c.document, c.phone, c.whatsapp, c.contact?.name, processText.get(c.id), ...(c.tags ?? []))
     },
-    [query, processText],
+    [search, processText],
   )
 
   const testStatus = React.useCallback(
@@ -184,7 +186,7 @@ export function ClientsView() {
   }
 
   // Mudou o filtro, volta para a primeira página.
-  const filterKey = [filter, query, ownerId, area, kind, links].join("|")
+  const filterKey = [filter, search, ownerId, area, kind, links].join("|")
   const [lastKey, setLastKey] = React.useState(filterKey)
   if (filterKey !== lastKey) {
     setLastKey(filterKey)
@@ -272,7 +274,7 @@ export function ClientsView() {
             className="w-full lg:w-[340px]"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-2 sm:flex sm:flex-wrap sm:items-center">
           <NativeSelect
             aria-label="Filtrar por responsável"
             value={ownerId}
@@ -368,7 +370,8 @@ export function ClientsView() {
       ) : (
         <FadeIn>
           {/* Desktop */}
-          <TableShell className="hidden md:block">
+          {/* Tabela só com espaço para todas as colunas (≥ 896 px de conteúdo); antes disso, a lista em cartões. */}
+          <TableShell className="hidden @4xl/main:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] border-separate border-spacing-0">
                 <thead>
@@ -377,7 +380,7 @@ export function ClientsView() {
                       <button
                         type="button"
                         onClick={() => toggleSort("name")}
-                        className="inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
+                        className="touch-target relative inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
                       >
                         Cliente {sortIcon("name")}
                       </button>
@@ -390,7 +393,7 @@ export function ClientsView() {
                       <button
                         type="button"
                         onClick={() => toggleSort("activity")}
-                        className="inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
+                        className="touch-target relative inline-flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground"
                       >
                         Última atividade {sortIcon("activity")}
                       </button>
@@ -423,7 +426,7 @@ export function ClientsView() {
           </TableShell>
 
           {/* Mobile */}
-          <ul className="space-y-2.5 md:hidden">
+          <ul className="space-y-2.5 @4xl/main:hidden">
             {visible.map(({ client: c, activeProcesses, lastActivity, delinquent }) => {
               const status = CLIENT_STATUS[c.status]
               return (

@@ -43,6 +43,34 @@ export interface ExternalMovement {
   raw?: unknown
 }
 
+/**
+ * Resumo de um registro do processo na fonte (no DataJud, um documento por grau ou
+ * instância). Serve de evidência para identificar o tribunal atual — sozinho, o mais
+ * recente não prova onde o processo tramita.
+ */
+export interface ExternalRecord {
+  /** Sigla do tribunal como o registro informa (ausente se a fonte não informou). */
+  tribunal?: string
+  /** Grau como a fonte informa (ex.: "G1", "G2", "JE"). */
+  degree?: string
+  judicialUnit?: string
+  /** ISO da última atualização do registro na fonte. */
+  updatedAt?: string
+  /** Índice em que o registro foi encontrado. */
+  dataset?: string
+  movementCount: number
+  lastMovement?: { name: string; code?: number; occurredAt: string; description?: string; complementKeys?: string[] }
+}
+
+export interface ExternalCoverage {
+  partial: boolean
+  truncated: boolean
+  /** Registros do número devolvidos. */
+  returned: number
+  /** Total informado pela fonte, quando informado. */
+  total?: number
+}
+
 export interface ExternalProcess {
   /** 20 dígitos, sem pontuação. */
   cnj: string
@@ -54,6 +82,8 @@ export interface ExternalProcess {
 
   className?: string
   subject?: string
+  /** Todos os assuntos, na ordem da fonte (o primeiro é o principal). */
+  subjects?: string[]
 
   system?: string
   /** Eletrônico / físico, quando informado. */
@@ -86,6 +116,18 @@ export interface ExternalProcess {
 
   movements: ExternalMovement[]
 
+  /**
+   * Todos os registros que a fonte devolveu para o número, do mais recente ao mais
+   * antigo. Os demais campos vêm do primeiro; os outros ficam aqui como evidência.
+   */
+  records?: ExternalRecord[]
+
+  /**
+   * A resposta cobriu tudo? `partial`: a fonte avisou que parte do índice não respondeu
+   * (registros podem faltar); `truncated`: há mais registros do que os devolvidos.
+   */
+  coverage?: ExternalCoverage
+
   source: {
     provider: ProviderName
     externalId?: string
@@ -105,4 +147,11 @@ export interface ProcessProvider {
    * o processo; falhas lançam `LookupError` (`../errors`).
    */
   lookup(digits: string): Promise<ExternalProcess | null>
+  /**
+   * Registros do número no índice de um tribunal específico (ex.: o superior do
+   * segmento). Lista vazia = nada encontrado ali — o que não prova ausência de
+   * tramitação. Falhas lançam `LookupError`.
+   */
+  /** `signal`: cancelamento do chamador (sem novas tentativas depois dele). */
+  lookupRecords?(digits: string, tribunal: string, options?: { signal?: AbortSignal }): Promise<{ dataset: string; records: ExternalRecord[]; coverage: ExternalCoverage }>
 }

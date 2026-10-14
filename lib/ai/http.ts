@@ -41,7 +41,9 @@ function toAIError(error: unknown): AIError {
 
 export function aiRoute<C = unknown>(
   permission: Permission | null,
-  handler: (context: { request: NextRequest; body: unknown; deps: AIServiceDeps; params: C }) => Promise<unknown>,
+  handler: (context: { request: NextRequest; body: unknown; deps: AIServiceDeps; params: C; organizationId: string }) => Promise<unknown>,
+  /** `raw`: o corpo não é JSON (ex.: áudio) — quem lê é o próprio handler. */
+  { body: bodyKind = "json" }: { body?: "json" | "raw" } = {},
 ) {
   return async (request: NextRequest, routeContext: { params: Promise<C> }) => {
     try {
@@ -49,10 +51,12 @@ export function aiRoute<C = unknown>(
       getAIConfig()
 
       let body: unknown
-      try {
-        body = await request.json()
-      } catch {
-        throw new AIError("BAD_REQUEST")
+      if (bodyKind === "json") {
+        try {
+          body = await request.json()
+        } catch {
+          throw new AIError("BAD_REQUEST")
+        }
       }
 
       const can = (p: Permission) => hasPermission(profile, p)
@@ -67,7 +71,7 @@ export function aiRoute<C = unknown>(
         cacheKey,
         signal: request.signal,
       }
-      const result = await handler({ request, body, deps, params: await routeContext.params })
+      const result = await handler({ request, body, deps, params: await routeContext.params, organizationId })
       return NextResponse.json(result)
     } catch (error) {
       const known = toAIError(error)

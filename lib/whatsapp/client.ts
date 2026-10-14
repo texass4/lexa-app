@@ -5,7 +5,7 @@
  *
  * Leitura: direto do Supabase (a RLS só entrega o escritório de quem está logado).
  * Escrita: sempre pelas rotas `/api/whatsapp/*`, que checam permissão e falam com a
- * Z-API — nenhuma credencial do WhatsApp chega aqui.
+ * Meta — nenhuma credencial do WhatsApp chega aqui.
  */
 
 import { getSupabase } from "@/lib/supabase/client"
@@ -41,12 +41,12 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
 
 export interface InstanceInfo {
   instance: WhatsAppInstance | null
-  live: { connected: boolean; smartphoneConnected?: boolean; error?: string } | null
+  live: { connected: boolean; error?: string } | null
   canManage: boolean
   /** A equipe da Íntegra já ativou a conexão deste escritório (credenciais no servidor). */
   activated: boolean
-  webhookUrl: string | null
-  webhookHttps: boolean | null
+  /** WhatsApp oficial: plataforma habilitada e token do escritório salvo (nunca o token). */
+  meta: { platformReady: boolean; hasToken: boolean }
 }
 
 export interface SendPayload {
@@ -72,9 +72,10 @@ export type AiResponse =
   | { action: "internal_summary"; result: { note: string } }
 
 export const whatsappApi = {
-  instance: () => api<InstanceInfo>("/api/whatsapp/instance"),
-  qrCode: () => api<{ image?: string; needsPasskey?: boolean }>("/api/whatsapp/instance/qr"),
-  registerWebhooks: () => api<{ ok: true }>("/api/whatsapp/instance", { method: "POST", body: { action: "webhooks" } }),
+  instance: (check = false) => api<InstanceInfo>(`/api/whatsapp/instance${check ? "?check=1" : ""}`),
+  connectMeta: (input: { businessAccountId: string; phoneNumberId: string; accessToken?: string }) =>
+    api<{ instance: WhatsAppInstance }>("/api/whatsapp/instance/meta", { method: "POST", body: input }),
+  disconnectMeta: () => api<{ instance: WhatsAppInstance }>("/api/whatsapp/instance/meta", { method: "DELETE" }),
 
   async send(conversationId: string, payload: SendPayload) {
     const { message } = await api<{ message: MessageRow }>(`/api/whatsapp/conversations/${conversationId}/messages`, { method: "POST", body: payload })
@@ -127,6 +128,23 @@ export async function fetchConversation(id: string): Promise<WhatsAppConversatio
   return data ? toConversation(data as ConversationRow) : null
 }
 
+/**
+ * Conversa mais recente com um cliente do escritório (pelo contato vinculado a ele).
+ * `null` quando o cliente ainda não tem conversa.
+ */
+export async function fetchClientConversation(clientId: string): Promise<WhatsAppConversation | null> {
+  const { data, error } = await getSupabase()
+    .from("whatsapp_conversations")
+    .select(CONVERSATION_SELECT.replace("contact:whatsapp_contacts(*)", "contact:whatsapp_contacts!inner(*)"))
+    .eq("contact.client_id", clientId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+  if (error) throw error
+  const row = (data as unknown as ConversationRow[] | null)?.[0]
+  return row ? toConversation(row) : null
+}
+
 export async function fetchTags(): Promise<WhatsAppTag[]> {
   const { data, error } = await getSupabase().from("whatsapp_tags").select("id, name, color").order("name")
   if (error) throw error
@@ -156,7 +174,7 @@ export async function fetchMessage(id: string): Promise<WhatsAppMessage | null> 
 
 const signed = new Map<string, { url: string; expires: number }>()
 
-/** Endereço para exibir um anexo: cópia do escritório (link de 10 min) ou a da Z-API. */
+/** Endereço para exibir um anexo: cópia do escritório (link de 10 min) ou a do provedor, se ainda não copiada. */
 export async function attachmentUrl(attachment: WhatsAppAttachment, { download = false } = {}): Promise<string | null> {
   if (attachment.storagePath) {
     const key = `${attachment.storagePath}:${download}`
@@ -173,7 +191,7 @@ export async function attachmentUrl(attachment: WhatsAppAttachment, { download =
   return attachment.remoteUrl ?? null
 }
 
-/** Sobe um arquivo para a pasta de saída do escritório (a Z-API recebe um link assinado). */
+/** Sobe um arquivo para a pasta de saída do escritório (o provedor recebe um link assinado). */
 export async function uploadOutgoing(organizationId: string, file: Blob, fileName: string) {
   const path = `${organizationId}/outgoing/${crypto.randomUUID()}/${safeFileName(fileName, "arquivo", file.type)}`
   const { error } = await getSupabase().storage.from("whatsapp").upload(path, file, { contentType: file.type || "application/octet-stream" })

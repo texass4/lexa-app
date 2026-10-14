@@ -3,32 +3,28 @@ import { describe, it } from "node:test"
 
 import { LookupError } from "../errors"
 import { createDjenClient, type DjenItem } from "./client"
-import { mapCommunication, readableContent, sourceDate } from "./mapper"
+import { djenCertidaoUrl, mapCommunication, readableContent, sourceDate } from "./mapper"
 
-/** Item no formato da API de Comunicações do CNJ (campos usados pela Íntegra). */
-const djenItem = (patch: Partial<DjenItem> = {}): DjenItem => ({
-  id: 123456789,
-  hash: "9rX21azVqZwaUaCKTyPklMRAKmGWlN",
-  data_disponibilizacao: "2026-09-28",
-  siglaTribunal: "TJSC",
+const CNJ = "00008323520184013202"
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } })
+
+/** Item no formato da API pública (DADO DE TESTE — só existe aqui). */
+const item = (patch: Partial<DjenItem> = {}): DjenItem => ({
+  id: 1,
+  hash: "h1",
+  data_disponibilizacao: "2026-09-30",
+  siglaTribunal: "TRF1",
   tipoComunicacao: "Intimação",
-  nomeOrgao: "1ª Vara Cível da Comarca de Florianópolis",
-  texto: "<p>Fica a parte ré intimada para contestar no prazo de 15 (quinze) dias.</p>",
-  numero_processo: "00008323520184013202",
-  numeroprocessocommascara: "0000832-35.2018.4.01.3202",
+  nomeOrgao: "Tefé",
+  texto: "<p>Intime-se.</p><br>MARIA DE SOUZA LIMA<br>Juíza Federal",
+  numero_processo: CNJ,
   tipoDocumento: "Despacho",
-  nomeClasse: "Procedimento Comum Cível",
-  meio: "D",
-  meiocompleto: "Diário de Justiça Eletrônico Nacional",
-  link: "https://exemplo.jus.br/documento/1",
-  ativo: true,
-  destinatarios: [{ nome: "Empresa Ré Ltda", polo: "P" }],
-  destinatarioadvogados: [{ advogado: { nome: "Ana Advogada", numero_oab: "12345", uf_oab: "SC" } }],
+  nomeClasse: "Procedimento do Juizado Especial Cível",
+  destinatarios: [{ nome: "João da Silva", polo: "A" }],
+  destinatarioadvogados: [{ advogado: { nome: "Ana Advogada", numero_oab: "1234", uf_oab: "am" } }],
   ...patch,
 })
-
-const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } })
 
 function harness(replies: (Response | Error)[]) {
   const urls: string[] = []
@@ -45,68 +41,58 @@ function harness(replies: (Response | Error)[]) {
   return { client, urls, waits }
 }
 
-const query = { numeroOab: "12345", ufOab: "SC", from: "2026-09-21", to: "2026-09-28" }
-
-describe("DJEN — cliente", () => {
-  it("consulta por OAB e janela de disponibilização, página a página", async () => {
-    const page1 = Array.from({ length: 100 }, (_, i) => djenItem({ id: i }))
-    const { client, urls, waits } = harness([json({ count: 101, items: page1 }), json({ count: 101, items: [djenItem({ id: 999 })] })])
-    const items = await client.listByOab(query)
-    assert.equal(items.length, 101)
-    const first = new URL(urls[0])
-    assert.equal(first.pathname, "/api/v1/comunicacao")
-    assert.equal(first.searchParams.get("numeroOab"), "12345")
-    assert.equal(first.searchParams.get("ufOab"), "SC")
-    assert.equal(first.searchParams.get("dataDisponibilizacaoInicio"), "2026-09-21")
-    assert.equal(first.searchParams.get("itensPorPagina"), "100")
-    assert.equal(new URL(urls[1]).searchParams.get("pagina"), "2")
-    assert.deepEqual(waits, [1000]) // pausa entre páginas
+describe("DJEN — cliente por número de processo", () => {
+  it("consulta pelo número (20 dígitos) e lê as páginas até o total informado", async () => {
+    const { client, urls } = harness([json({ count: 2, items: [item()] }), json({ count: 2, items: [item({ id: 2 })] })])
+    const result = await client.searchByProcess(CNJ)
+    assert.equal(result.items.length, 2)
+    assert.equal(result.total, 2)
+    assert.match(urls[0], /\/comunicacao\?numeroProcesso=00008323520184013202&pagina=1&itensPorPagina=100/)
+    assert.match(urls[1], /pagina=2/)
   })
 
-  it("429: não insiste e informa a espera (1 min sem Retry-After)", async () => {
-    const { client, urls } = harness([json({}, 429)])
-    await assert.rejects(client.listByOab(query), (e: unknown) => e instanceof LookupError && e.code === "RATE_LIMIT" && e.retryAfterMs === 60_000)
+  it("429 para na hora, com a espera pedida pela fonte", async () => {
+    const { client, urls } = harness([new Response("", { status: 429, headers: { "Retry-After": "120" } })])
+    await assert.rejects(client.searchByProcess(CNJ), (e: unknown) => e instanceof LookupError && e.code === "RATE_LIMIT" && e.retryAfterMs === 120_000)
     assert.equal(urls.length, 1)
   })
 
-  it("403 (fora do Brasil) para sem repetir", async () => {
-    const { client, urls } = harness([json({}, 403)])
-    await assert.rejects(client.listByOab(query), (e: unknown) => e instanceof LookupError && e.code === "AUTHENTICATION")
+  it("403 (acesso de fora do Brasil) não é repetido", async () => {
+    const { client, urls } = harness([new Response("", { status: 403 })])
+    await assert.rejects(client.searchByProcess(CNJ), (e: unknown) => e instanceof LookupError && e.code === "AUTHENTICATION")
     assert.equal(urls.length, 1)
   })
 
-  it("503 tenta de novo com backoff e desiste com o status", async () => {
-    const { client, urls } = harness([json({}, 503)])
-    await assert.rejects(client.listByOab(query), (e: unknown) => e instanceof LookupError && e.status === 503)
-    assert.equal(urls.length, 3)
+  it("timeout e 503 são repetidos com espera crescente; persistindo, falha passageira", async () => {
+    const timeout = Object.assign(new Error("timeout"), { name: "TimeoutError" })
+    const { client, waits } = harness([timeout, new Response("", { status: 503 }), new Response("", { status: 503 })])
+    await assert.rejects(client.searchByProcess(CNJ), (e: unknown) => e instanceof LookupError && e.code === "UNAVAILABLE")
+    assert.deepEqual(waits, [1000, 2000])
   })
 
-  it("resposta incompleta não conta como lida", async () => {
-    const { client } = harness([json({ count: 5, items: [djenItem()] }), json({ count: 5, items: [] })])
-    await assert.rejects(client.listByOab(query), (e: unknown) => e instanceof LookupError && e.code === "UNAVAILABLE")
+  it("404 = nenhuma comunicação", async () => {
+    const { client } = harness([new Response("", { status: 404 })])
+    assert.deepEqual(await client.searchByProcess(CNJ), { items: [], total: 0 })
   })
 })
 
-describe("DJEN — comunicação", () => {
-  it("mapeia os campos da fonte e guarda o teor original", () => {
-    const c = mapCommunication(djenItem())!
-    assert.equal(c.externalId, "123456789")
-    assert.equal(c.cnj, "00008323520184013202")
-    assert.equal(c.availableAt, "2026-09-28")
-    assert.equal(c.content, "<p>Fica a parte ré intimada para contestar no prazo de 15 (quinze) dias.</p>")
-    assert.equal(c.officialUrl, "https://comunicaapi.pje.jus.br/api/v1/comunicacao/9rX21azVqZwaUaCKTyPklMRAKmGWlN/certidao")
-    assert.deepEqual(c.lawyers, [{ name: "Ana Advogada", number: "12345", uf: "SC" }])
-    assert.equal(c.cancelled, false)
-  })
-
-  it("datas nos dois formatos da fonte; sem o essencial, não guarda", () => {
+describe("DJEN — mapeamento", () => {
+  it("normaliza datas, texto, partes e advogados; link oficial só https", () => {
+    const c = mapCommunication(item())!
+    assert.equal(c.date, "2026-09-30")
+    assert.equal(c.cnj, CNJ)
+    assert.equal(c.text, "Intime-se.\n\nMARIA DE SOUZA LIMA\nJuíza Federal")
+    assert.deepEqual(c.recipients, [{ name: "João da Silva", pole: "A" }])
+    assert.deepEqual(c.lawyers, [{ name: "Ana Advogada", oab: "AM 1.234" }])
+    assert.equal(c.url, djenCertidaoUrl("h1"))
+    assert.equal(mapCommunication(item({ link: "http://inseguro.test/doc" }))!.url, djenCertidaoUrl("h1"))
+    assert.equal(mapCommunication(item({ link: "https://pje.jus.br/doc/1" }))!.url, "https://pje.jus.br/doc/1")
     assert.equal(sourceDate({ datadisponibilizacao: "28/09/2026" }), "2026-09-28")
-    assert.equal(mapCommunication(djenItem({ texto: "" })), null)
-    assert.equal(mapCommunication(djenItem({ data_disponibilizacao: undefined })), null)
-    assert.equal(mapCommunication(djenItem({ ativo: false }))!.cancelled, true)
+    assert.equal(readableContent("a&nbsp;&amp;&nbsp;b"), "a & b")
   })
 
-  it("teor para leitura sem HTML", () => {
-    assert.equal(readableContent("<p>Linha 1<br>Linha&nbsp;2</p><p>Fim &amp; ok</p>"), "Linha 1\nLinha 2\nFim & ok")
+  it("cancelada e sem id: marcada / descartada", () => {
+    assert.equal(mapCommunication(item({ ativo: false }))!.cancelled, true)
+    assert.equal(mapCommunication({ ...item(), id: undefined as unknown as number }), null)
   })
 })

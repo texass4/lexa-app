@@ -27,5 +27,5 @@ export async function POST(request: Request, context: RouteContext<"/api/process
   if (!ID_PATTERN.test(id)) {
     return NextResponse.json({ ok: false, reason: "invalid", message: LOOKUP_MESSAGES.invalid }, { status: 400 })
   }
-  return handleLookup(request, (body) => ({ maxAgeMs: body.force === true ? MIN_REFRESH_INTERVAL_MS : FRESH_FOR_MS }), `sync ${id}`)
+  return handleLookup(request, (body) => ({ maxAgeMs: body.force === true ? MIN_REFRESH_INTERVAL_MS : FRESH_FOR_MS }), `sync ${id}`, { processId: id })
 }

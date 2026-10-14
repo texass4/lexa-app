@@ -131,7 +131,7 @@ function CreateForm({ orgs, defaultOrg, onDone }: { orgs: OrgOption[]; defaultOr
           </Field>
           {lawyer && (
             <>
-              <Field label="Número da OAB" htmlFor="cu-oab" hint="Obrigatória para advogados (intimações do DJEN).">
+              <Field label="Número da OAB" htmlFor="cu-oab" hint="Obrigatória para advogados.">
                 <TextInput
                   id="cu-oab"
                   inputMode="numeric"

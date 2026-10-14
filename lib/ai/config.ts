@@ -4,7 +4,7 @@
  *
  * - `AI_MODEL`: modelo das análises (resumos, próximos passos, chat, panorama);
  * - `AI_MODEL_LIGHT`: modelo mais barato para operações simples e automáticas
- *   (interpretação da Triagem, análise de uma movimentação). `off` = usa `AI_MODEL`;
+ *   (análise de uma movimentação). `off` = usa `AI_MODEL`;
  * - `AI_FALLBACK_MODEL`: reservas, em ordem, quando o principal está fora.
  *
  * `GEMINI_MODEL` e `GEMINI_FALLBACK_MODEL` continuam aceitos (nomes antigos).
@@ -15,9 +15,9 @@ import { AIError } from "./errors"
 import type { AIStatus } from "./types"
 
 /** Modelo padrão das análises. Troque por `AI_MODEL` sem mexer no código. */
-export const DEFAULT_AI_MODEL = "gemini-2.5-flash"
+export const DEFAULT_AI_MODEL = "gemini-3.5-flash"
 /** Modelo padrão das operações simples. Troque por `AI_MODEL_LIGHT`. */
-export const DEFAULT_AI_LIGHT_MODEL = "gemini-2.5-flash-lite"
+export const DEFAULT_AI_LIGHT_MODEL = "gemini-3.5-flash-lite"
 
 /** Tempo máximo de uma chamada ao modelo. */
 const DEFAULT_AI_TIMEOUT_MS = 45_000

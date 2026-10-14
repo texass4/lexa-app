@@ -2,13 +2,14 @@
 
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
-import type { AISource, AIStatus } from "@/lib/ai/types"
+import type { AISource, AIStatus, ChatMode } from "@/lib/ai/types"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { useSession } from "@/lib/auth/session"
 import { isAIReady, type SourceHandler } from "./ai-blocks"
 import { AIChatSheet } from "./ai-chat-sheet"
 import { clientContext, officeContext, processContext, scopeKey, type AIContext } from "./ai-context"
-import { useAIChat, useAIStatus } from "./use-ai"
+import { useAIChat, useAIStatus, useChatMode } from "./use-ai"
 
 /**
  * A Íntegra IA como camada do produto, não como página: um único painel lateral,
@@ -41,8 +42,8 @@ function useRouteContext(): AIContext {
   const data = useOfficeData()
   const { can } = useSession()
   const [, root, id] = pathname.split("/")
-  const process = root === "processos" && id && can("processes.view") ? data.processes.find((p) => p.id === id) : undefined
-  const client = root === "clientes" && id && can("clients.view") ? data.clients.find((c) => c.id === id) : undefined
+  const process = root === "processos" && id && can("processes.view") ? byId(data.processes, id) : undefined
+  const client = root === "clientes" && id && can("clients.view") ? byId(data.clients, id) : undefined
   const processCode = process?.code
   const clientName = client?.name
   return React.useMemo(() => {
@@ -169,7 +170,13 @@ function ChatHost({
   onRequestHandled: (id: number) => void
   onOpenSource: SourceHandler
 }) {
-  const chat = useAIChat(context.scope)
+  // Modo da conversa: Jurisprudência só para quem pode ver processos (é a permissão da base);
+  // numa conversa sobre uma decisão, não há seletor.
+  const { can } = useSession()
+  const [chosen, setMode] = useChatMode()
+  const modes: ChatMode[] = context.scope.type === "jurisprudence" ? [] : can("processes.view") ? ["all", "office", "jurisprudence"] : ["all", "office"]
+  const mode: ChatMode = modes.includes(chosen) ? chosen : "all"
+  const chat = useAIChat(context.scope, mode)
   const { send } = chat
 
   React.useEffect(() => {
@@ -183,7 +190,19 @@ function ChatHost({
     return () => window.clearTimeout(timer)
   }, [request, send, onRequestHandled, status])
 
-  return <AIChatSheet open={open} onOpenChange={onOpenChange} chat={chat} context={context} status={status} onOpenSource={onOpenSource} />
+  return (
+    <AIChatSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      chat={chat}
+      context={context}
+      status={status}
+      onOpenSource={onOpenSource}
+      mode={mode}
+      modes={modes}
+      onModeChange={setMode}
+    />
+  )
 }
 
 export function useLexaAI() {

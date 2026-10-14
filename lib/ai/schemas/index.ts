@@ -8,6 +8,11 @@ import type {
   ActionSuggestion,
   AttentionPoint,
   ClientSummary,
+  EnrichmentSummary,
+  FinanceAnalysis,
+  JurisprudenceAnalysis,
+  JurisprudenceStrategy,
+  RelatedJurisprudenceAnalysis,
   MovementAnalysis,
   NextActions,
   OfficeOverview,
@@ -87,4 +92,107 @@ export const officeOverviewSchema: Schema<OfficeOverview> = object({
   situacao_financeira: text(undefined, 800),
   sugestoes_organizacao: texts("Sugestões práticas.", 6),
   perguntas_para_verificar: texts("Perguntas para o advogado.", 6),
+})
+
+export const financeAnalysisSchema: Schema<FinanceAnalysis> = object({
+  leitura: string({ max: 900, min: 1 }),
+  pontos_atencao: array(attentionPoint, { max: 6 }),
+  sugestoes: texts("Próximos passos práticos, sem números novos.", 5),
+  perguntas_para_verificar: texts("Perguntas para o advogado conferir.", 4),
+})
+
+export const jurisprudenceAnalysisSchema: Schema<JurisprudenceAnalysis> = object({
+  resumo: string({ max: 1200, min: 1 }),
+  tese_principal: text("A tese como está na decisão; vazio se não constar.", 900),
+  resultado: text("Resultado do julgamento como consta do texto; vazio se não constar.", 600),
+  pontos_relevantes: texts("Pontos da própria decisão.", 6),
+  fundamentos_mencionados: texts("Somente dispositivos, súmulas ou precedentes que aparecem no texto da decisão.", 8),
+  relevancia_para_pesquisa: text(undefined, 700),
+  comparacao_com_processo: text("Vazio quando nenhum processo foi informado.", 900),
+  informacoes_ausentes: texts("O que a decisão não informa.", 6),
+})
+
+export const enrichmentSummarySchema: Schema<EnrichmentSummary> = object({
+  resumo: string({ max: 900, min: 1, description: "2 a 4 frases sobre o que a consulta encontrou." }),
+  fatos_confirmados: array(object({ texto: text(undefined, 400), refs }), {
+    description: "Só o que está nos dados, cada um com a referência da fonte (Q1, Q2, J1…).",
+    max: 10,
+  }),
+  inferencias: array(object({ texto: text(undefined, 400), refs }), {
+    description: "Leituras possíveis a partir dos dados, sempre apresentadas como possibilidade.",
+    max: 5,
+  }),
+  ausentes: texts("Informações que nenhuma fonte trouxe.", 12),
+  cuidados: texts("Limites da consulta.", 4),
+})
+
+export const relatedJurisprudenceSchema: Schema<RelatedJurisprudenceAnalysis> = object({
+  visao_geral: string({ max: 900, min: 1 }),
+  decisoes: array(
+    object({
+      ref: string({ max: 12, min: 1, description: "Referência existente nos dados, ex.: J1." }),
+      semelhanca: oneOf(["alta", "media", "baixa"] as const),
+      motivo: text(undefined, 400),
+    }),
+    { max: 12 },
+  ),
+  cuidados: texts("Limites da comparação.", 4),
+})
+
+const jRefs = array(string({ max: 12 }), { description: "Referências das decisões nos dados (J1, J2…) que sustentam o item.", max: 6 })
+
+export const jurisprudenceStrategySchema: Schema<JurisprudenceStrategy> = object({
+  sintese: string({ max: 1200, min: 1, description: "Síntese do problema jurídico: as questões a decidir e o que os dados do caso mostram." }),
+  precedentes: array(
+    object({
+      ref: string({ max: 12, min: 1, description: "Referência existente nos dados, ex.: J1." }),
+      por_que_importa: text("Por que esta decisão importa para a questão do caso.", 600),
+      semelhancas: texts("Semelhanças MATERIAIS (fatos e circunstâncias) entre o caso e o precedente.", 5),
+      distincoes: texts("Diferenças factuais, processuais ou jurídicas que podem alterar a aplicação.", 5),
+      compatibilidade: text("Por que o fundamento pode (ou não) ser útil ao caso.", 600),
+      limitacoes: texts("O que impede a aplicação direta ou reduz a força do precedente.", 4),
+      trechos: array(
+        object({
+          texto: text("Trecho da decisão usado na análise.", 600),
+          tipo: oneOf(["literal", "parafrase"] as const, { description: "literal = copiado exatamente da ementa/tese/trecho; parafrase = suas palavras." }),
+        }),
+        { max: 3 },
+      ),
+    }),
+    { max: 8 },
+  ),
+  teses_favoraveis: array(
+    object({
+      tese: text(undefined, 400),
+      justificativa: text(undefined, 700),
+      requisitos: texts("O que precisa ser demonstrado.", 5),
+      elementos_do_caso: texts("Elementos do caso que sustentam a tese (só o que está nos dados).", 5),
+      refs: jRefs,
+      distincoes: texts("Distinções relevantes que podem enfraquecer a tese.", 4),
+      riscos: texts("Riscos da tese.", 4),
+      informacoes_necessarias: texts("Informações ainda necessárias.", 4),
+    }),
+    { max: 4 },
+  ),
+  contrarios_e_distincoes: array(
+    object({
+      ref: string({ max: 12, min: 1 }),
+      fundamento_contrario: text(undefined, 500),
+      distincao_possivel: text("Diferença demonstrável que justificaria tratamento distinto; vazio se não houver.", 500),
+      como_demonstrar: text("O que seria preciso demonstrar; vazio se não houver distinção.", 400),
+    }),
+    { max: 4 },
+  ),
+  riscos: array(object({ texto: text(undefined, 500), refs: jRefs }), { max: 6 }),
+  lacunas_probatorias: array(
+    object({
+      fato: text(undefined, 300),
+      situacao: oneOf(["informado", "prova mencionada", "sem prova informada", "contraditorio"] as const),
+      observacao: text(undefined, 400),
+    }),
+    { max: 8 },
+  ),
+  cenarios: array(object({ se: text(undefined, 300), entao: text(undefined, 400), refs: jRefs }), { max: 4 }),
+  proximos_pontos: texts("O que o advogado deve avaliar a seguir.", 6),
+  informacoes_ausentes: texts("O que falta nos dados para uma conclusão segura.", 8),
 })

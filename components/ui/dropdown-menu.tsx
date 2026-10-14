@@ -13,8 +13,15 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
   return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
 
-function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
-  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+/** Gatilhos com classe própria (ex.: "…" de 24 px) ganham área de toque de 44 px (`touch-target`). */
+function DropdownMenuTrigger({ className, ...props }: MenuPrimitive.Trigger.Props) {
+  return (
+    <MenuPrimitive.Trigger
+      data-slot="dropdown-menu-trigger"
+      className={typeof className === "string" ? cn("touch-target relative", className) : className}
+      {...props}
+    />
+  )
 }
 
 function DropdownMenuContent({
@@ -79,6 +86,8 @@ function DropdownMenuItem({
       className={cn(
         "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-[8px] px-2 py-1.5 text-[13px] transition-colors outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
         className,
+        // Toque: itens de pelo menos 40 px, mesmo quando a tela pede "h-8" (no mouse, nada muda).
+        "pointer-coarse:min-h-10",
       )}
       {...props}
     />

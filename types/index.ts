@@ -214,6 +214,23 @@ export interface Process extends TenantEntity {
   distributedAt: string
   lastMovementAt: string
   movements: ProcessMovement[]
+  /**
+   * Quem cadastrou as informações: `manual` = o escritório (formulário "Novo processo"),
+   * mesmo que depois a consulta pública complemente. Nesse caso, o que o escritório
+   * preencheu (tribunal, grau, órgão) não é substituído pela sincronização
+   * (`process-sync.ts`). Ausente em processos importados e nos cadastros antigos.
+   */
+  origin?: DataOrigin
+  /** Processo em segredo de justiça: sem consulta pública — nada é sincronizado automaticamente. */
+  secret?: boolean
+  /** Descrição/observações do escritório sobre o processo. */
+  notes?: string
+  /**
+   * Só a movimentação mais recente foi carregada (resumo usado em listas e no Painel,
+   * `processes_summary`). O histórico completo vem ao abrir o processo. Nunca é salvo:
+   * o banco tira a marca e mantém o histórico que já tem (`0016_carga_sob_demanda.sql`).
+   */
+  movementsPartial?: boolean
 
   /* ----- Campos preenchidos por consulta externa (todos opcionais) ----- */
 
@@ -236,6 +253,134 @@ export interface Process extends TenantEntity {
   lastSyncedAt?: string
   /** Última sincronização feita pelo monitoramento automático (servidor). Ausente = nunca. */
   autoSyncedAt?: string
+  /**
+   * Tribunal de origem (pelo número) separado do tribunal atual (pela fonte), com a
+   * evidência de cada um. Ausente em processos cadastrados antes desta verificação —
+   * leia por `tribunalIdentificationOf`, que trata esses registros.
+   */
+  tribunalIdentification?: TribunalIdentification
+}
+
+/* --------------------------- Tribunal do processo -------------------------- */
+
+/**
+ * Situação do tribunal ATUAL (regras em `tribunal-identification.ts`):
+ * - `confirmed`: os critérios de evidência foram atendidos;
+ * - `not_confirmed`: há registro na fonte, mas sem evidência suficiente;
+ * - `conflicting`: registros ou consultas apontam tribunais diferentes — nenhum é escolhido;
+ * - `not_found`: nenhuma fonte consultada tem o número — não prova onde tramita;
+ * - `unsupported`: tribunal de origem conhecido, sem fonte consultável;
+ * - `unknown_tribunal`: número válido, mas o código `J.TR` não existe na numeração única;
+ * - `invalid_number`: número com tamanho ou dígito verificador inválido;
+ * - `not_checked`: nenhuma consulta concluída (fonte fora do ar, segredo, cadastro manual);
+ * - `legacy`: processo salvo antes desta verificação, sem evidência guardada.
+ */
+export type CurrentTribunalStatus =
+  | "confirmed"
+  | "not_confirmed"
+  | "conflicting"
+  | "not_found"
+  | "unsupported"
+  | "unknown_tribunal"
+  | "invalid_number"
+  | "not_checked"
+  | "legacy"
+
+/**
+ * Um registro encontrado na fonte, guardado como evidência. Datas da fonte em horário de
+ * parede, sem fuso (`AAAA-MM-DDTHH:mm:ss`, como as demais datas da fonte no processo).
+ */
+export interface TribunalRecordEvidence {
+  /** Tribunal como o registro informa (ausente quando a fonte não informou). */
+  tribunal?: string
+  degree?: string
+  judicialUnit?: string
+  /** Última atualização do registro na fonte. */
+  updatedAt?: string
+  dataset?: string
+  movementCount?: number
+  /** Última movimentação do registro (código e complementos para reavaliar a saída do tribunal). */
+  lastMovement?: { name: string; occurredAt: string; code?: number; description?: string; complementKeys?: string[] }
+}
+
+/** Cobertura de uma resposta: parcial (fragmentos falharam ou tempo esgotado) ou truncada. */
+export interface TribunalCheckCoverage {
+  /** A fonte avisou que nem todo o índice respondeu. */
+  partial: boolean
+  /** A fonte tem mais registros do que os devolvidos. */
+  truncated: boolean
+  returned: number
+  total?: number
+}
+
+/** Uma consulta a um índice de tribunal. */
+export interface TribunalCheck {
+  /** Sigla do tribunal do índice consultado. */
+  tribunal: string
+  /** `origem`: tribunal do número; `superior`: consulta complementar (a ausência não prova nada). */
+  role: "origem" | "superior"
+  status: "found" | "not_found" | "failed" | "not_checked"
+  provider: "datajud"
+  dataset?: string
+  /** Quando a fonte foi consultada — horário local do escritório, sem fuso. */
+  checkedAt?: string
+  /** Ausente em verificações antigas (tratadas como completas, como eram antes). */
+  coverage?: TribunalCheckCoverage
+  records: TribunalRecordEvidence[]
+}
+
+/** Última tentativa de consulta, mesmo sem sucesso — não apaga a evidência anterior. */
+export interface TribunalAttempt {
+  /** Horário local do escritório, sem fuso. */
+  at: string
+  tribunal?: string
+  outcome: "found" | "not_found" | "failed" | "rate_limited"
+}
+
+export interface TribunalIdentification {
+  /** Número a que a identificação se refere (ausente nas primeiras versões). */
+  cnj?: string
+  /** Pelo número CNJ — certo enquanto o número for válido; não diz onde tramita hoje. */
+  origin: {
+    acronym?: string
+    name?: string
+    segment?: string
+    source: "cnj"
+    /** Há índice consultável para ele na fonte. */
+    covered: boolean
+  }
+  /** Pela fonte consultada — só preenchido com evidência. */
+  current: {
+    status: CurrentTribunalStatus
+    acronym?: string
+    name?: string
+    /** Só quando um único grau aparece nos registros. */
+    degree?: string
+    judicialUnit?: string
+    source?: "datajud"
+    dataset?: string
+    /** Atualização do registro na fonte. */
+    updatedAt?: string
+    /** Consulta que sustenta a conclusão — horário local do escritório. */
+    checkedAt?: string
+    /** Critérios atendidos e o que faltou, em linguagem simples. */
+    reasons: string[]
+  }
+  /**
+   * Tribunais com registro quando eles divergem (`conflicting`) — listados lado a lado,
+   * sem escolher nenhum.
+   */
+  candidates?: { acronym: string; name: string; degrees: string[]; updatedAt?: string; role: TribunalCheck["role"] }[]
+  /**
+   * Palpite quando o atual não está confirmado e não há divergência — sempre exibido como
+   * inferência. Nunca preenchido em `conflicting`.
+   */
+  inferred?: { acronym: string; name: string; basis: "cnj" | "registro_mais_recente"; note: string }
+  checks: TribunalCheck[]
+  /** Última tentativa de consulta (sucesso ou falha). */
+  lastAttempt?: TribunalAttempt
+  /** Quando a identificação foi montada — horário local do escritório. */
+  identifiedAt: string
 }
 
 /* -------------------------------- Tarefas --------------------------------- */
@@ -266,7 +411,7 @@ export interface TaskColumn extends TenantEntity {
 
 /* --------------------------------- Prazos --------------------------------- */
 
-/** De onde veio o prazo: cadastrado à mão, ou confirmado na Triagem a partir de uma intimação ou movimentação. */
+/** De onde veio o prazo: cadastrado à mão, ou a partir de uma intimação ou movimentação. */
 export type PrazoOrigin = "manual" | "intimacao" | "movimentacao"
 
 /** Só prazos `aberto` contam como próximos/pendentes. */
@@ -300,11 +445,11 @@ export interface Prazo extends TenantEntity {
   closedById?: ID
   /** Intimação que originou o prazo (confirmada pelo advogado). Único por escritório. */
   intimacaoId?: ID
-  /** Evento da Triagem que originou o prazo. Um prazo por evento. */
+  /** Evento da antiga Triagem que originou o prazo (registros anteriores). */
   triageItemId?: ID
 }
 
-/* ------------------------------- Intimações ------------------------------- */
+/* ------------------------------ OAB ------------------------------- */
 
 /** Inscrição na OAB de um membro do escritório (tabela `lawyer_oabs`). */
 export interface LawyerOab {
@@ -317,113 +462,6 @@ export interface LawyerOab {
   uf: string
   active: boolean
   createdAt: string
-}
-
-/** Intimação capturada de uma fonte oficial (tabela `intimacoes`): a comunicação como veio — o teor original nunca muda. A triagem dela fica em `TriageItem`. */
-export interface Intimacao {
-  id: ID
-  organizationId: ID
-  source: "djen"
-  externalId: string
-  hash?: string
-  /** Inscrições do escritório que receberam a comunicação. */
-  oabIds: ID[]
-  cnj?: string
-  processNumber?: string
-  tribunal?: string
-  orgao?: string
-  tipoComunicacao?: string
-  tipoDocumento?: string
-  classe?: string
-  meio?: string
-  /** `YYYY-MM-DD` — data de disponibilização na fonte. */
-  availableAt: string
-  /** `YYYY-MM-DD` — data de publicação considerada (1º dia útil seguinte). */
-  publishedAt?: string
-  /** Teor integral, como a fonte publicou. */
-  content: string
-  documentUrl?: string
-  officialUrl?: string
-  parties: { name: string; pole?: string }[]
-  lawyers: { name: string; number: string; uf: string }[]
-  createdAt: string
-}
-
-/* -------------------------------- Triagem --------------------------------- */
-
-/** Tipo do evento jurídico na Triagem. Novas fontes acrescentam tipos aqui. */
-export type TriageKind = "intimacao" | "movimentacao"
-/** Fonte que gerou o evento. */
-export type TriageSource = "djen" | "datajud"
-/**
- * Estado persistido do evento:
- * - `pendente`: aguarda decisão;
- * - `em_revisao`: há dúvida (interpretação, prazo, vínculo) — exige revisão manual;
- * - `decidido`: o advogado confirmou o prazo (`prazo_criado`) ou decidiu que não há (`sem_prazo`);
- * - `ignorado`: não exige atenção.
- */
-export type TriageState = "pendente" | "em_revisao" | "decidido" | "ignorado"
-export type TriageDecision = "prazo_criado" | "sem_prazo"
-export type TriageRequiresAction = "sim" | "nao" | "incerto"
-
-/** Interpretação da Íntegra IA — gerada uma vez, guardada, nunca substitui o original. */
-export interface TriageAI {
-  /** Uma frase. */
-  summary: string
-  requiresAction: TriageRequiresAction
-  /** Por que exige (ou não) ação, nas palavras da IA. */
-  reason?: string
-  /** Prazo que a IA leu no teor — só fica se o trecho existe literalmente no original. */
-  term?: { days: number; unit: "uteis" | "corridos"; excerpt: string }
-  /** Data calculada pelas regras da Íntegra a partir do prazo lido (a IA não calcula datas). */
-  fatalDate?: string
-  /** Como a data foi calculada (mesmas regras da sugestão). */
-  basis?: string[]
-  /** O que a IA disse e foi descartado por não estar no teor. */
-  discarded?: string
-  model?: string
-  generatedAt: string
-}
-
-/** Evento jurídico na Triagem (tabela `triage_items`), de qualquer fonte. */
-export interface TriageItem {
-  id: ID
-  organizationId: ID
-  kind: TriageKind
-  source: TriageSource
-  sourceKey: string
-  /** A comunicação original, quando o evento é uma intimação. */
-  intimacaoId?: ID
-  processId?: ID
-  clientId?: ID
-  linkMethod?: "cnj" | "manual" | "processo"
-  cnj?: string
-  processNumber?: string
-  /** `YYYY-MM-DD` — publicação (intimação) ou data do ato (movimentação). */
-  eventDate: string
-  /** `YYYY-MM-DD` — disponibilização na fonte (intimação). */
-  availableAt?: string
-  title: string
-  /** Trecho legível do original, para a lista. */
-  excerpt?: string
-  tribunal?: string
-  orgao?: string
-  responsibleId?: ID
-  /** Sugestão calculada pelas regras (`lib/intimacoes/deadline.ts`). */
-  suggestion?: import("@/lib/intimacoes/deadline").DeadlineSuggestion
-  ai?: TriageAI
-  aiStatus: "pendente" | "pronto" | "falhou"
-  state: TriageState
-  decision?: TriageDecision
-  /** Por que está em revisão (a Íntegra ou quem marcou). */
-  reviewReason?: string
-  /** Observação de quem decidiu. */
-  decisionNote?: string
-  prazoId?: ID
-  decidedBy?: ID
-  decidedAt?: string
-  createdAt: string
-  updatedAt: string
 }
 
 /* --------------------------------- Agenda --------------------------------- */
@@ -502,6 +540,8 @@ export type ActivityType =
   | "summons"
   | "movement"
   | "deadline"
+  /** Jurisprudência vinculada a um processo. */
+  | "jurisprudence"
 
 export interface Activity extends TenantEntity {
   type: ActivityType

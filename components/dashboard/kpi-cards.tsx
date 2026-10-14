@@ -1,112 +1,128 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { ArrowDownRight, ArrowUpRight, CircleDollarSign, Scale, SquareCheckBig, UsersRound } from "lucide-react"
+import Link from "next/link"
+import { CalendarDays, Hourglass, ListChecks, Wallet, type LucideIcon } from "lucide-react"
 import { cn } from "cn"
-import { MetricCard, type MetricTone } from "@/components/ui/metric-card"
 import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
-import { dashboardKpis } from "@/lib/dashboard/dashboard"
+import { dashboardKpis, overdueInvoices } from "@/lib/dashboard/dashboard"
+import { daysToPrazo, weekPrazos } from "@/lib/prazos/prazos"
+import { todaysAppointments } from "@/lib/store/selectors"
 import { formatCurrency, formatNumber } from "@/lib/core/format"
+import { fmtTime, getNow, parse } from "@/lib/core/dates"
 
-/** "↑ 12 este mês" — a variação do período, verde quando é bom, vermelha quando pede ação. */
-function Delta({ value, label, tone }: { value: React.ReactNode; label: string; tone: "up" | "down" | "alert" | "neutral" }) {
-  const Icon = tone === "down" || tone === "alert" ? ArrowDownRight : ArrowUpRight
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      {tone !== "neutral" && (
-        <span className={cn("inline-flex items-center gap-0.5 font-semibold", tone === "up" ? "text-success" : "text-danger")}>
-          <Icon className="size-3.5" strokeWidth={2.2} />
-          {value}
-        </span>
-      )}
-      {tone === "neutral" && <span className="font-semibold text-foreground">{value}</span>}
-      <span>{label}</span>
-    </span>
-  )
-}
+type Tone = "brand" | "teal" | "amber" | "slate"
 
-interface Card {
+interface Kpi {
   permission: Permission
   href: string
   label: string
-  icon: typeof Scale
-  tone: MetricTone
   value: string
-  foot: React.ReactNode
+  foot: string
+  /** Pede ação (vencido, atrasado): o rodapé fica em vermelho. */
+  alert: boolean
+  icon: LucideIcon
+  tone: Tone
 }
 
+const TONES: Record<Tone, string> = {
+  brand: "bg-brand-soft text-brand-strong",
+  teal: "bg-success-soft text-success",
+  amber: "bg-warning-soft text-warning",
+  slate: "bg-surface-muted text-muted-foreground",
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/**
+ * Os quatro indicadores do topo do Início: só o que pede ação, cada um levando à
+ * lista que o resolve. Todos são contagens dos dados do escritório (nada estimado).
+ */
 export function KpiCards() {
   const data = useOfficeData()
   const { can } = useSession()
-  const k = dashboardKpis(data)
+  const now = getNow()
+  const k = dashboardKpis(data, now)
+  const week = weekPrazos(data.deadlines, now).flatMap((g) => g.prazos)
+  const overduePrazos = week.filter((p) => daysToPrazo(p, now) < 0).length
+  const late = overdueInvoices(data.invoices, now)
+  const lateTotal = late.reduce((acc, { invoice }) => acc + invoice.amount, 0)
+  const today = todaysAppointments(data, now)
+  const next = today.find((a) => parse(a.start) > now)
 
-  const all: Card[] = [
-    {
-      permission: "clients.view",
-      href: "/clientes",
-      label: "Clientes",
-      icon: UsersRound,
-      tone: "brand",
-      value: formatNumber(k.clients.total),
-      foot: k.clients.newThisMonth ? <Delta value={k.clients.newThisMonth} label="este mês" tone="up" /> : <span>nenhum novo este mês</span>,
-    },
+  const all: Kpi[] = [
     {
       permission: "processes.view",
-      href: "/processos",
-      label: "Processos",
-      icon: Scale,
-      tone: "info",
-      value: formatNumber(k.processes.active),
-      foot: k.processes.newThisMonth ? <Delta value={k.processes.newThisMonth} label="este mês" tone="up" /> : <span>nenhum novo este mês</span>,
+      href: overduePrazos ? "/tarefas/prazos?filtro=vencidos" : "/tarefas/prazos?filtro=semana",
+      label: "Prazos até domingo",
+      value: formatNumber(week.length),
+      foot: overduePrazos ? plural(overduePrazos, "vencido", "vencidos") : "nenhum vencido",
+      alert: overduePrazos > 0,
+      icon: Hourglass,
+      tone: "brand",
     },
     {
       permission: "tasks.view",
-      href: "/tarefas",
-      label: "Tarefas",
-      icon: SquareCheckBig,
-      tone: "warning",
+      href: k.tasks.overdue ? "/tarefas?filtro=atrasadas" : "/tarefas",
+      label: "Tarefas pendentes",
       value: formatNumber(k.tasks.pending),
-      foot: k.tasks.overdue ? (
-        <Delta value={k.tasks.overdue} label={k.tasks.overdue === 1 ? "atrasada" : "atrasadas"} tone="alert" />
-      ) : (
-        <Delta value={k.tasks.thisWeek} label="esta semana" tone="neutral" />
-      ),
+      foot: k.tasks.overdue ? plural(k.tasks.overdue, "atrasada", "atrasadas") : `${k.tasks.thisWeek} para esta semana`,
+      alert: k.tasks.overdue > 0,
+      icon: ListChecks,
+      tone: "teal",
+    },
+    {
+      permission: "agenda.view",
+      href: "/agenda",
+      label: "Compromissos hoje",
+      value: formatNumber(today.length),
+      foot: next ? `próximo às ${fmtTime(next.start)}` : today.length ? "nenhum mais hoje" : "agenda livre",
+      alert: false,
+      icon: CalendarDays,
+      tone: "slate",
     },
     {
       permission: "finance.view",
-      href: "/financeiro",
-      label: "Financeiro",
-      icon: CircleDollarSign,
-      tone: "success",
-      value: formatCurrency(k.finance.received),
-      foot:
-        k.finance.growth === undefined ? (
-          <span>recebido este mês</span>
-        ) : (
-          <Delta
-            value={`${Math.abs(k.finance.growth).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
-            label="este mês"
-            tone={k.finance.growth >= 0 ? "up" : "down"}
-          />
-        ),
+      href: "/financeiro?aba=atrasados",
+      label: "Em atraso",
+      value: formatCurrency(lateTotal),
+      foot: late.length ? plural(late.length, "parcela vencida", "parcelas vencidas") : "nenhuma parcela vencida",
+      alert: late.length > 0,
+      icon: Wallet,
+      tone: "amber",
     },
   ]
-  const cards = all.filter((card) => can(card.permission))
+  const shown = all.filter((i) => can(i.permission))
+  if (!shown.length) return null
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 xl:gap-5">
-      {cards.map((card, i) => (
-        <motion.div
-          key={card.label}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, delay: 0.04 * i, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <MetricCard href={card.href} label={card.label} icon={card.icon} tone={card.tone} value={card.value} foot={card.foot} />
-        </motion.div>
-      ))}
-    </div>
+    <section
+      aria-label="Indicadores do que pede ação"
+      className={cn(
+        "grid grid-cols-2 gap-3 sm:gap-4",
+        shown.length >= 4 ? "@4xl/main:grid-cols-4" : shown.length === 3 ? "@2xl/main:grid-cols-3" : "",
+      )}
+    >
+      {shown.map((item) => {
+        const Icon = item.icon
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="group flex min-w-0 items-start gap-3 rounded-card border border-border bg-card p-4 shadow-card outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-raised focus-visible:ring-2 focus-visible:ring-brand/40 sm:p-5"
+          >
+            <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-[10px] max-sm:hidden", TONES[item.tone])}>
+              <Icon className="size-[18px]" strokeWidth={1.8} />
+            </span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-[12.5px] font-medium text-muted-foreground">{item.label}</span>
+              <span className="tabular truncate text-[24px] leading-tight font-semibold tracking-[-0.02em] text-foreground">{item.value}</span>
+              <span className={cn("truncate text-[12px]", item.alert ? "font-medium text-danger" : "text-subtle")}>{item.foot}</span>
+            </span>
+          </Link>
+        )
+      })}
+    </section>
   )
 }

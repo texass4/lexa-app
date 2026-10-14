@@ -21,8 +21,10 @@ import { MOVEMENT_CATEGORY_LABEL, interpretMovements, type MovementCategory } fr
 import type { Permission } from "@/lib/auth/permissions"
 import { isFinancialActivity } from "@/lib/financeiro/access"
 import { daysToPrazo, isOpenPrazo, prazoTask } from "@/lib/prazos/prazos"
+import { prazosByProcess, processesByClient, tasksByRelated } from "@/lib/store/indexes"
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { MONITORING_STALE_AFTER_DAYS } from "@/lib/services/processos/monitoring-policy"
+import { processTitle } from "@/lib/processos/label"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
 
 /** Sem movimentação há mais que isso = processo parado. Também usado pela Íntegra IA. */
@@ -169,7 +171,8 @@ function dueText(days: number) {
   return `venceu há ${Math.abs(days)} dias`
 }
 
-const processLabel = (p: Process) => `Processo ${p.code}`
+/** "João da Silva — Ação de cobrança" (`lib/processos/label.ts`), nunca só o número. */
+const processLabel = (p: Process, clients: readonly Client[]) => processTitle(p, clients.find((c) => c.id === p.clientId)?.name)
 
 /** Última movimentação já interpretada (título legível + categoria). */
 function latestMovement(p: Process) {
@@ -182,11 +185,11 @@ function latestMovement(p: Process) {
  * Sinais dos prazos abertos de um processo: um alerta por prazo a 5 dias, 2 dias, no
  * dia ou vencido, e "Prazo sem tarefa" para cada prazo aberto sem tarefa vinculada.
  */
-function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Process, now: Date = getNow()): AttentionSignal[] {
+function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks" | "clients">, p: Process, now: Date = getNow()): AttentionSignal[] {
   const signals: AttentionSignal[] = []
   const base = { href: `/processos/${p.id}`, processId: p.id, clientId: p.clientId, count: 1 }
-  for (const prazo of data.deadlines) {
-    if (prazo.processId !== p.id || !isOpenPrazo(prazo)) continue
+  for (const prazo of prazosByProcess(data.deadlines, p.id)) {
+    if (!isOpenPrazo(prazo)) continue
     const alert = prazoAlert(prazo, now)
     if (alert) {
       signals.push({
@@ -195,7 +198,7 @@ function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Proce
         kind: alert.kind,
         level: alert.level,
         title: `Prazo ${dueText(alert.days)}`,
-        detail: `${processLabel(p)} · ${prazo.description}`,
+        detail: `${processLabel(p, data.clients)} · ${prazo.description}`,
         at: prazo.fatalDate,
       })
     }
@@ -206,7 +209,7 @@ function prazoSignals(data: Pick<AttentionData, "deadlines" | "tasks">, p: Proce
         kind: "deadline-no-task",
         level: "warning",
         title: "Prazo sem tarefa",
-        detail: `${processLabel(p)} · ${prazo.description} · fatal em ${fmtNumericDate(prazo.fatalDate)}`,
+        detail: `${processLabel(p, data.clients)} · ${prazo.description} · fatal em ${fmtNumericDate(prazo.fatalDate)}`,
         at: prazo.fatalDate,
         action: {
           type: "create-task",
@@ -228,7 +231,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
   if (!isActiveProcess(p)) return []
   const signals: AttentionSignal[] = prazoSignals(data, p, now)
   const base = { href: `/processos/${p.id}`, processId: p.id, clientId: p.clientId, count: 1 }
-  const linked = data.tasks.filter((t) => t.related?.type === "process" && t.related.id === p.id)
+  const linked = tasksByRelated(data.tasks, p.id).filter((t) => t.related?.type === "process")
   const pending = linked.filter((t) => t.status === "pendente")
 
   const overdueTasks = pending.filter((t) => isOverdue(t, now))
@@ -239,7 +242,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
       kind: "task-overdue",
       level: "critical",
       title: overdueTasks.length === 1 ? "Tarefa atrasada" : plural(overdueTasks.length, "tarefa atrasada", "tarefas atrasadas"),
-      detail: overdueTasks.length === 1 ? overdueTasks[0].title : `${processLabel(p)}`,
+      detail: overdueTasks.length === 1 ? overdueTasks[0].title : processLabel(p, data.clients),
       at: overdueTasks[0].dueAt,
       count: overdueTasks.length,
       href: overdueTasks.length === 1 ? `/tarefas?tarefa=${overdueTasks[0].id}` : base.href,
@@ -255,7 +258,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
       kind: "process-moved",
       level: review ? "warning" : "info",
       title: review ? `Movimentação de ${MOVEMENT_CATEGORY_LABEL[last.category].toLowerCase()} para revisar` : "Nova movimentação",
-      detail: last ? `${processLabel(p)} · ${last.title}` : processLabel(p),
+      detail: last ? `${processLabel(p, data.clients)} · ${last.title}` : processLabel(p, data.clients),
       at: p.lastMovementAt,
       action: last && review ? { type: "create-task", label: "Criar tarefa", processId: p.id, title: `Revisar: ${last.title}` } : undefined,
     })
@@ -267,7 +270,7 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
       kind: "process-stale",
       level: "warning",
       title: `Sem movimentação há ${since} dias`,
-      detail: `${processLabel(p)} · ${p.type} · ${checkText(p)}`,
+      detail: `${processLabel(p, data.clients)} · ${checkText(p)}`,
       at: p.lastMovementAt,
     })
   }
@@ -279,11 +282,11 @@ export function processSignals(data: AttentionData, p: Process, now: Date = getN
 
 export function clientSignals(data: AttentionData, client: Client, now: Date = getNow(), can?: AttentionOptions["can"]): AttentionSignal[] {
   const allowed = (p: Permission) => !can || can(p)
-  const processes = allowed("processes.view") ? data.processes.filter((p) => p.clientId === client.id) : []
+  const processes = allowed("processes.view") ? processesByClient(data.processes, client.id) : []
   const signals = processes.flatMap((p) => processSignals(data, p, now))
 
   if (allowed("tasks.view")) {
-    const overdue = data.tasks.filter((t) => t.related?.type === "client" && t.related.id === client.id && isOverdue(t, now))
+    const overdue = tasksByRelated(data.tasks, client.id).filter((t) => t.related?.type === "client" && isOverdue(t, now))
     if (overdue.length) {
       signals.push({
         id: `task-overdue:client:${client.id}`,

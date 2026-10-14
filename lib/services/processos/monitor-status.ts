@@ -63,13 +63,6 @@ export interface MonitoringOverview {
   config: MonitorConfig
   queue: { monitored: number | null; due: number | null; failing: number | null }
   runs: MonitoringRun[]
-  /** Captura de intimações do DJEN (Etapa 8). `null` = migrações 0011/0012 não aplicadas. */
-  intimacoes: {
-    status: MonitorStatus
-    setup: MonitorSetup
-    /** Inscrições na OAB ativas e com falha na última consulta. */
-    oabs: { active: number | null; failing: number | null }
-  } | null
 }
 
 interface RunFacts {

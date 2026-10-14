@@ -16,11 +16,13 @@ import { isOverdue } from "@/lib/store/selectors"
 import type { Task } from "@/types"
 import { useSession } from "@/lib/auth/session"
 import { useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
 import { CLIENT_STATUS, PRAZO_STATUS, PROCESS_STATUS } from "@/lib/core/config"
 import { fmtNumericDate, fmtRelative } from "@/lib/core/dates"
 import { nextPrazo, taskPrazo } from "@/lib/prazos/prazos"
 import { clientContext, processContext, taskPrompts } from "@/components/ai/ai-context"
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
+import { processNumberLabel, processTitle } from "@/lib/processos/label"
 
 /**
  * O que está em volta da tarefa: o processo (prazo, última movimentação) ou o
@@ -31,12 +33,12 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
   const lexa = useLexaAI()
   const { can } = useSession()
   const related = task.related
-  const process = related?.type === "process" && can("processes.view") ? data.processes.find((p) => p.id === related.id) : undefined
+  const process = related?.type === "process" && can("processes.view") ? byId(data.processes, related.id) : undefined
   const client =
     related?.type === "client" && can("clients.view")
-      ? data.clients.find((c) => c.id === related.id)
+      ? byId(data.clients, related.id)
       : process && can("clients.view")
-        ? data.clients.find((c) => c.id === process.clientId)
+        ? byId(data.clients, process.clientId)
         : undefined
 
   if (!process && !client) {
@@ -64,7 +66,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
         >
           <div className="flex items-center justify-between gap-3">
             <p className="min-w-0 truncate text-[13.5px] font-medium">
-              Processo <span className="font-mono">{process.code}</span> · {process.type}
+              {processTitle(process, client?.name)} <span className="tabular font-normal text-subtle">· {processNumberLabel(process)}</span>
             </p>
             <StatusBadge tone={PROCESS_STATUS[process.status].tone} size="sm">
               {PROCESS_STATUS[process.status].label}
@@ -118,7 +120,7 @@ function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => voi
                 onBeforeAsk()
                 lexa.ask(prompt, aiContext)
               }}
-              className="rounded-[8px] px-2 py-1.5 text-left text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface/80 focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative rounded-[8px] px-2 py-1.5 text-left text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface/80 focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {prompt}
             </button>

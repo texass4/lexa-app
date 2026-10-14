@@ -79,7 +79,7 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   React.useEffect(() => {
-    // Carga inicial de sistemas externos (Supabase e Z-API).
+    // Carga inicial de sistemas externos (Supabase e Meta).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload()
     reloadInstance()
@@ -133,6 +133,13 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_message_attachments", filter }, (payload) => {
         if (payload.eventType === "DELETE") return
         listeners.current.forEach((listener) => listener({ kind: "attachment", row: payload.new as AttachmentRow }))
+      })
+      // Exclusões chegam como avisos (migração 0018): o DELETE do Realtime não passa pela RLS.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "realtime_deletions", filter }, (payload) => {
+        const row = payload.new as { organization_id?: string; collection?: string; record_id?: string }
+        if (row.organization_id !== organization.id || !row.record_id) return
+        if (row.collection === "whatsapp_conversations") refreshConversation(row.record_id)
+        if (row.collection === "whatsapp_tags") fetchTags().then(setTags).catch(() => {})
       })
       .subscribe((state) => {
         // Ao reconectar, o que chegou no intervalo vem pela recarga.

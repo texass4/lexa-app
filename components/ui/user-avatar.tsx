@@ -1,12 +1,13 @@
 import { cn } from "cn"
 import { initials } from "@/lib/core/format"
 
+// Iniciais em tons discretos da paleta (azul, petróleo, ardósia, âmbar, violeta) — sempre com o nome por perto.
 const PALETTE = [
-  "bg-[#E8EEFB] text-[#274690] dark:bg-[#16213A] dark:text-[#A9C2FA]",
-  "bg-[#E8ECEF] text-[#3F4E5C] dark:bg-[#1C232A] dark:text-[#A9B8C7]",
-  "bg-[#ECEAE6] text-[#4A4744] dark:bg-[#23221F] dark:text-[#BDB9B2]",
-  "bg-[#E6EDE8] text-[#3B5946] dark:bg-[#18241C] dark:text-[#9CC4A9]",
-  "bg-[#EEE8EC] text-[#5B4453] dark:bg-[#271E24] dark:text-[#C9AEBF]",
+  "bg-[#E6EEFE] text-[#1D4ED8] dark:bg-[#14243F] dark:text-[#9DBCFB]",
+  "bg-[#E2F2EF] text-[#0F766E] dark:bg-[#0F2623] dark:text-[#5FC2B4]",
+  "bg-[#E9EEF4] text-[#334A63] dark:bg-[#1B2B3F] dark:text-[#A9B9CC]",
+  "bg-[#FBF0E1] text-[#9A4A0A] dark:bg-[#2B2012] dark:text-[#E3A560]",
+  "bg-[#EFEBFB] text-[#5B3FB0] dark:bg-[#1E1A33] dark:text-[#AC9AE6]",
 ]
 
 function hash(text: string) {
@@ -35,7 +36,7 @@ export function UserAvatar({
   src?: string
   size?: keyof typeof SIZES
   className?: string
-  /** dark: marinho sobre fundo claro; gold: acento dourado sobre a barra lateral. */
+  /** dark: azul profundo (a pessoa logada, no topo); gold: mantido por compatibilidade — mesmo visual do azul de ação. */
   tone?: "dark" | "gold"
 }) {
   return (
@@ -45,9 +46,9 @@ export function UserAvatar({
         "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold tracking-wide",
         SIZES[size],
         tone === "dark"
-          ? "bg-primary text-primary-foreground"
+          ? "bg-navy text-white dark:bg-brand-soft dark:text-brand-strong"
           : tone === "gold"
-            ? "bg-[#d6b97f] text-[#0d1b31]"
+            ? "bg-brand-soft text-brand-strong"
             : PALETTE[hash(name) % PALETTE.length],
         className,
       )}

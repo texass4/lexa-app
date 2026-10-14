@@ -7,7 +7,7 @@
 
 import { GoogleGenAI, ThinkingLevel, type GenerateContentParameters } from "@google/genai"
 import { AIError } from "./errors"
-import type { AIProvider, AIProviderResult, AIRequest, AIUsage } from "./provider"
+import type { AIProvider, AIProviderResult, AIRequest, AITranscriptionRequest, AIUsage } from "./provider"
 import type { JsonSchema } from "./schema"
 
 /** O pedaço do SDK que usamos — permite testar sem rede. */
@@ -34,6 +34,8 @@ interface GeminiOptions {
   client?: GeminiClientLike
   /** Espera antes de repetir o mesmo modelo (sem reserva configurado). */
   retryDelayMs?: number
+  /** Tempos da transcrição (total e por modelo). Padrão: 30 s e 14 s. */
+  transcribeTimeouts?: { totalMs: number; attemptMs: number }
 }
 
 const DEFAULT_TEMPERATURE = 0.2
@@ -53,6 +55,31 @@ function thinkingFor(model: string) {
   return undefined
 }
 
+/**
+ * Transcrever não pede raciocínio: desliga onde dá (2.5 Flash) ou usa o nível mínimo
+ * (Flash 3 a 3.5). Versões mais novas podem recusar o mínimo — ficam no "low".
+ */
+function minimalThinking(model: string) {
+  if (/-lite\b/.test(model)) return undefined
+  if (/^gemini-2\.5-flash/.test(model)) return { thinkingBudget: 0 }
+  if (/^gemini-3(\.[0-5])?-flash/.test(model)) return { thinkingLevel: ThinkingLevel.MINIMAL }
+  return thinkingFor(model)
+}
+
+/**
+ * A família 3 foi ajustada para a temperatura padrão (1.0): o Google desaconselha baixar,
+ * porque pode causar repetição e respostas piores. Nas anteriores, a nossa (baixa) vale.
+ */
+const temperatureFor = (model: string, requested?: number) => (/^gemini-3/.test(model) ? undefined : (requested ?? DEFAULT_TEMPERATURE))
+
+/** Teto de uma transcrição: fala rápida fica bem abaixo de 8 tokens por segundo. */
+const transcriptTokens = (seconds: number) => Math.min(1024, 128 + Math.ceil(seconds * 8))
+/**
+ * Transcrever um pedido de até 1 min leva poucos segundos; acima disso algo travou.
+ * Cada modelo tem a sua parte do tempo: se o primeiro trava, o seguinte ainda responde.
+ */
+const TRANSCRIBE_TIMEOUTS = { totalMs: 30_000, attemptMs: 14_000 }
+
 /** Falhas que outro modelo (ou uma nova tentativa) pode resolver. */
 const SWITCHABLE = new Set(["UNAVAILABLE", "PROVIDER_RATE_LIMITED", "MODEL_UNAVAILABLE"])
 
@@ -64,6 +91,7 @@ export class GeminiProvider implements AIProvider {
   private readonly client: GeminiClientLike
   private readonly timeoutMs: number
   private readonly retryDelayMs: number
+  private readonly transcribeTimeouts: { totalMs: number; attemptMs: number }
 
   constructor(options: GeminiOptions) {
     if (typeof window !== "undefined") throw new Error("GeminiProvider só pode rodar no servidor.")
@@ -72,6 +100,7 @@ export class GeminiProvider implements AIProvider {
     this.fallbackModels = options.fallbackModels ?? []
     this.timeoutMs = options.timeoutMs
     this.retryDelayMs = options.retryDelayMs ?? 1500
+    this.transcribeTimeouts = options.transcribeTimeouts ?? TRANSCRIBE_TIMEOUTS
     // Sem novas tentativas dentro do SDK: quem decide repetir ou trocar de modelo é `call`.
     this.client = options.client ?? new GoogleGenAI({ apiKey: options.apiKey })
   }
@@ -96,45 +125,99 @@ export class GeminiProvider implements AIProvider {
   }
 
   /**
+   * Áudio → texto com o mesmo modelo multimodal (o áudio vai como `inlineData`, em
+   * memória; nada é enviado à File API nem guardado). Vai pelo nível pedido (o leve,
+   * em geral), com as mesmas reservas, sem raciocínio, resposta do tamanho do áudio
+   * (uma repetição sem fim do modelo para cedo) e tempo máximo próprio, mais curto.
+   */
+  async transcribe(request: AITranscriptionRequest): Promise<AIProviderResult<string>> {
+    const contents = [
+      {
+        role: "user",
+        parts: [{ inlineData: { mimeType: request.mimeType, data: Buffer.from(request.audio).toString("base64") } }, { text: request.prompt }],
+      },
+    ]
+    const { response, model } = await this.call(
+      {
+        system: request.system,
+        messages: [],
+        maxOutputTokens: transcriptTokens(request.seconds),
+        signal: request.signal,
+        tier: request.tier,
+        timeoutMs: Math.min(this.timeoutMs, this.transcribeTimeouts.totalMs),
+        attemptTimeoutMs: this.transcribeTimeouts.attemptMs,
+        reasoning: "minimal",
+      },
+      {},
+      contents,
+    )
+    return { value: readText(response), usage: usage(response, model) }
+  }
+
+  /**
    * Tenta o modelo principal e, se ele estiver sobrecarregado (503), sem cota (429)
    * ou indisponível (404), os reservas em ordem. Sem reserva, repete o principal uma
    * vez. Todas as tentativas dividem o mesmo tempo máximo.
    */
-  private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}) {
-    const timeout = AbortSignal.timeout(this.timeoutMs)
+  private async call(request: AIRequest, extra: GenerateContentParameters["config"] = {}, contents?: GenerateContentParameters["contents"]) {
+    const timeout = AbortSignal.timeout(request.timeoutMs ?? this.timeoutMs)
     const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
     // Leve: se o modelo leve falhar, o principal responde (mais caro, mas o evento não fica sem análise).
+    // Principal sem reserva configurado: o leve é o reserva (ex.: modelo retirado da chave → 404).
     const first = this.modelFor(request.tier)
     const chain =
-      first !== this.model ? [first, this.model] : this.fallbackModels.length ? [this.model, ...this.fallbackModels] : [this.model, this.model]
+      first !== this.model
+        ? [first, this.model]
+        : this.fallbackModels.length
+          ? [this.model, ...this.fallbackModels]
+          : [this.model, this.lightModel]
 
+    // Cada tentativa (modelo, resultado, tempo) vai para o log do erro final.
+    const attempts: NonNullable<AIError["attempts"]> = []
+    const fail = (known: AIError, model: string, began: number) => {
+      attempts.push({ model, code: known.code, status: known.providerStatus, ms: Date.now() - began })
+      known.attempts = attempts
+      return known
+    }
     for (let i = 0; ; i++) {
       const model = chain[i]
+      const began = Date.now()
+      const own = request.attemptTimeoutMs ? AbortSignal.timeout(request.attemptTimeoutMs) : undefined
       try {
-        return { response: await this.attempt(model, request, extra, signal), model }
+        return { response: await this.attempt(model, request, extra, own ? AbortSignal.any([signal, own]) : signal, contents), model }
       } catch (error) {
-        if (request.signal?.aborted) throw new AIError("CANCELLED", { cause: error })
-        if (timeout.aborted) throw new AIError("TIMEOUT", { cause: error })
-        const known = mapGeminiError(error)
+        if (request.signal?.aborted) throw fail(new AIError("CANCELLED", { cause: error }), model, began)
+        if (timeout.aborted) throw fail(new AIError("TIMEOUT", { cause: error }), model, began)
+        // Este modelo passou do tempo dele: o próximo (outro modelo) ainda cabe no tempo total.
+        const known = fail(own?.aborted ? new AIError("TIMEOUT", { cause: error }) : mapGeminiError(error), model, began)
         const next = chain[i + 1]
-        if (!next || !SWITCHABLE.has(known.code) || (next === model && known.code === "MODEL_UNAVAILABLE")) throw known
+        const switchable = SWITCHABLE.has(known.code) || (own?.aborted && next !== model)
+        if (!next || !switchable || (next === model && known.code === "MODEL_UNAVAILABLE")) throw known
         if (next === model) await sleep(this.retryDelayMs, signal)
       }
     }
   }
 
-  private attempt(model: string, request: AIRequest, extra: GenerateContentParameters["config"], signal: AbortSignal) {
+  private attempt(
+    model: string,
+    request: AIRequest,
+    extra: GenerateContentParameters["config"],
+    signal: AbortSignal,
+    contents?: GenerateContentParameters["contents"],
+  ) {
     return this.client.models.generateContent({
       model,
-      contents: request.messages.map((message) => ({
-        role: message.role === "assistant" ? "model" : "user",
-        parts: [{ text: message.content }],
-      })),
+      contents:
+        contents ??
+        request.messages.map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }],
+        })),
       config: {
         systemInstruction: request.system,
-        temperature: request.temperature ?? DEFAULT_TEMPERATURE,
+        temperature: temperatureFor(model, request.temperature),
         maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-        thinkingConfig: thinkingFor(model),
+        thinkingConfig: request.reasoning === "minimal" ? minimalThinking(model) : thinkingFor(model),
         abortSignal: signal,
         ...extra,
       },

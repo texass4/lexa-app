@@ -7,7 +7,7 @@
  */
 
 import { formatCNJ } from "@/lib/processos/cnj"
-import type { ExternalParty, ExternalProcess, ProviderName } from "@/lib/integrations/legal/types"
+import type { ExternalCoverage, ExternalParty, ExternalProcess, ExternalRecord, ProviderName } from "@/lib/integrations/legal/types"
 import type { MovementComplement, MovementDocument, MovementJudicialUnit } from "@/types"
 import { externalMovementHash } from "./movements"
 
@@ -41,9 +41,13 @@ export interface ProcessSheet {
   degree?: string
   className?: string
   subject?: string
+  /** Todos os assuntos informados (o primeiro é o principal). Ausente em fichas antigas do cache. */
+  subjects?: string[]
   /** Termo neutro: a fonte não garante que seja uma vara. */
   judicialUnit?: string
   judicialUnitCode?: number
+  /** Código IBGE do município do órgão julgador, quando a fonte informa. */
+  judicialUnitMunicipality?: number
   system?: string
   format?: string
   /** `YYYY-MM-DD` */
@@ -56,6 +60,13 @@ export interface ProcessSheet {
   parties: SheetParties
   lastMovement?: { name: string; occurredAt: string }
   movements: SheetMovement[]
+  /**
+   * Todos os registros do número na fonte (evidência do tribunal e do grau atuais).
+   * Ausente em fichas antigas do cache — `originCheckFromSheet` usa os campos acima.
+   */
+  records?: ExternalRecord[]
+  /** Cobertura da resposta (parcial/truncada). Ausente em fichas antigas do cache. */
+  coverage?: ExternalCoverage
   source: { provider: ProviderName; externalId?: string; dataset?: string }
 }
 
@@ -69,7 +80,7 @@ const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)
  * dia anterior no Brasil) e mudaria o horário registrado nos autos. Também
  * deixa o resultado independente do fuso do servidor.
  */
-function toLocal(value: string | undefined): string | undefined {
+export function toLocal(value: string | undefined): string | undefined {
   if (!value) return undefined
   const match = WALL_CLOCK.exec(value.trim())
   if (!match) return undefined
@@ -106,8 +117,10 @@ export function buildProcessSheet(external: ExternalProcess): ProcessSheet {
     degree: external.degree,
     className: external.className,
     subject: external.subject,
+    subjects: external.subjects?.length ? external.subjects : undefined,
     judicialUnit: external.judicialUnit?.name,
     judicialUnitCode: external.judicialUnit?.code,
+    judicialUnitMunicipality: external.judicialUnit?.municipalityCode,
     system: external.system,
     format: external.format,
     filedAt: toLocal(external.filedAt)?.slice(0, 10),
@@ -117,6 +130,12 @@ export function buildProcessSheet(external: ExternalProcess): ProcessSheet {
     parties: external.parties ?? { active: [], passive: [], others: [] },
     lastMovement: latest ? { name: latest.name, occurredAt: latest.occurredAt } : undefined,
     movements,
+    records: external.records?.map((record) => ({
+      ...record,
+      updatedAt: toLocal(record.updatedAt),
+      lastMovement: record.lastMovement ? { ...record.lastMovement, occurredAt: toLocal(record.lastMovement.occurredAt) ?? record.lastMovement.occurredAt } : undefined,
+    })),
+    coverage: external.coverage,
     source: external.source,
   }
 }

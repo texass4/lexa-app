@@ -5,8 +5,6 @@ import { loadSettings } from "@/lib/admin/platform"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import { loadMonitorStatus, monitorSetup, type MonitoringOverview, type MonitoringRun } from "@/lib/services/processos/monitor-status"
 import { monitorConfig } from "@/lib/services/processos/monitoring-policy"
-import { hasJobColumn } from "@/lib/services/processos/monitor-store"
-import { hasTriage } from "@/lib/services/triagem/store"
 
 /** Execuções mostradas no painel. */
 const LIMIT = 120
@@ -51,7 +49,7 @@ const toRun = (r: RunRow): MonitoringRun => ({
 
 /**
  * Admin › Monitoramento: estado, fila e as últimas execuções do monitoramento de
- * processos e da captura de intimações (DJEN).
+ * processos.
  * Só números da plataforma — nenhum dado de processo ou de escritório sai daqui.
  */
 export const GET = route(async (request) => {
@@ -77,20 +75,6 @@ export const GET = route(async (request) => {
     count((q) => q.select("process_id", { count: "exact", head: true }).gt("consecutive_failures", 0)),
   ])
 
-  // Captura de intimações: só com as migrações 0011 e 0012 (Triagem) aplicadas. A fonte (DJEN) não tem chave.
-  let intimacoes: MonitoringOverview["intimacoes"] = null
-  if ((await hasJobColumn(admin)) && (await hasTriage(admin))) {
-    const djenSetup = { ...monitorSetup(settings.features.djen), sourceKey: true }
-    const oabCount = (failing: boolean) => {
-      const query = failing
-        ? admin.from("djen_oab_state").select("number", { count: "exact", head: true }).gt("consecutive_failures", 0)
-        : admin.from("lawyer_oabs").select("id", { count: "exact", head: true }).eq("active", true)
-      return query.then(({ count, error }) => (error ? null : (count ?? 0)))
-    }
-    const [djenStatus, active, failingOabs] = await Promise.all([loadMonitorStatus(admin, djenSetup, now, "intimacoes"), oabCount(false), oabCount(true)])
-    intimacoes = { status: djenStatus, setup: djenSetup, oabs: { active, failing: failingOabs } }
-  }
-
-  const body: MonitoringOverview = { status, setup, config: monitorConfig(), queue: { monitored, due, failing }, runs, intimacoes }
+  const body: MonitoringOverview = { status, setup, config: monitorConfig(), queue: { monitored, due, failing }, runs }
   return NextResponse.json(body)
 })

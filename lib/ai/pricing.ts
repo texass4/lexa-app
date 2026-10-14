@@ -21,6 +21,11 @@ export interface ModelPrice {
 }
 
 const DEFAULT_PRICES: Record<string, ModelPrice> = {
+  // Família 3.5 (padrão desde out/2026): valores de referência publicados em jul/2026 —
+  // confira em ai.google.dev/gemini-api/docs/pricing e corrija por AI_PRICES se mudarem.
+  // O áudio (Conversa por voz) é cobrado mais caro que o texto e entra aqui pelo preço de texto.
+  "gemini-3.5-flash": { input: 1.5, output: 9 },
+  "gemini-3.5-flash-lite": { input: 0.3, output: 2.5, cachedInput: 0.03 },
   "gemini-2.5-flash": { input: 0.3, output: 2.5, cachedInput: 0.03 },
   "gemini-2.5-flash-lite": { input: 0.1, output: 0.4, cachedInput: 0.01 },
   "gemini-2.5-pro": { input: 1.25, output: 10, cachedInput: 0.125 },

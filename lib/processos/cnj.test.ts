@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { formatCNJ, hasValidCheckDigits, maskCNJ, onlyDigits } from "@/lib/processos/cnj"
+import { formatCNJ, hasValidCheckDigits, maskCNJ, onlyDigits, parseCNJ } from "@/lib/processos/cnj"
+import { SIM_TJSP, SIM_UNKNOWN, withWrongCheckDigits } from "@/lib/integrations/legal/datajud/__fixtures__/tribunal-scenarios"
 
 /** Processos públicos reais, usados apenas como caso de teste. */
 const REAL_A = "0000832-35.2018.4.01.3202"
@@ -42,5 +43,37 @@ describe("validação do CNJ", () => {
   it("rejeita quantidade de dígitos diferente de 20", () => {
     assert.equal(hasValidCheckDigits("123"), false)
     assert.equal(hasValidCheckDigits(""), false)
+  })
+})
+
+describe("partes do número CNJ (números SIMULADOS)", () => {
+  it("lê sequencial, dígitos, ano, segmento, tribunal e unidade", () => {
+    const parts = parseCNJ(formatCNJ(SIM_TJSP))
+    assert.ok(parts)
+    assert.equal(parts.digits, SIM_TJSP)
+    assert.equal(parts.sequence, "1234567")
+    assert.equal(parts.year, 2021)
+    assert.equal(parts.segment, "8")
+    assert.equal(parts.tribunalCode, "26")
+    assert.equal(parts.unitCode, "0100")
+    assert.equal(parts.checkDigitsValid, true)
+  })
+
+  it("lê o número com dígito verificador errado, mas marca como inválido", () => {
+    const parts = parseCNJ(withWrongCheckDigits(SIM_TJSP))
+    assert.ok(parts)
+    assert.equal(parts.checkDigitsValid, false)
+    assert.equal(hasValidCheckDigits(withWrongCheckDigits(SIM_TJSP)), false)
+  })
+
+  it("validade estrutural não depende de o tribunal existir", () => {
+    // `8.99` não é tribunal, mas o número é bem formado e o DV confere.
+    assert.equal(parseCNJ(SIM_UNKNOWN)?.checkDigitsValid, true)
+  })
+
+  it("devolve null fora de 20 dígitos", () => {
+    assert.equal(parseCNJ("123"), null)
+    assert.equal(parseCNJ(`${SIM_TJSP}1`), null)
+    assert.equal(parseCNJ(""), null)
   })
 })

@@ -13,7 +13,10 @@ import { MonthGrid } from "./month-grid"
 import { AgendaList } from "./agenda-list"
 import { AppointmentDetail } from "./appointment-detail"
 import { AgendaToday } from "./agenda-today"
+import { MiniCalendar } from "./mini-calendar"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { byId } from "@/lib/store/indexes"
+import { useAppointmentsRange } from "@/lib/store/on-demand"
 import { fmtSlot, moveAppointment, moveToDay } from "@/lib/agenda/agenda"
 import { useUI } from "@/lib/store/ui-store"
 import { categoryStyle } from "@/lib/core/config"
@@ -21,6 +24,7 @@ import { addDays, addMonths, getNow, isSameDay, monthName, monthShort, parse, st
 import { currentUserId } from "@/lib/auth/account"
 import type { Appointment } from "@/types"
 import { useSession } from "@/lib/auth/session"
+import { processTitle } from "@/lib/processos/label"
 
 type View = "dia" | "semana" | "mes"
 
@@ -29,15 +33,23 @@ const NONE = "__sem_categoria__"
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
+/** `YYYY-MM-DD` no horário local (como as datas dos compromissos). */
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
 export function AgendaView() {
   const data = useOfficeData()
   const { updateAppointment, versionOf } = useOfficeActions()
   const { openDialog } = useUI()
   const { can } = useSession()
   const editable = can("agenda.edit")
-  const ready = data.hydrated
   const [view, setView] = React.useState<View>("semana")
   const [anchor, setAnchor] = React.useState(() => startOfDay(getNow()))
+  // A abertura traz os compromissos a partir de 45 dias atrás; meses anteriores vêm quando a Agenda chega neles.
+  const periodReady = useAppointmentsRange(
+    ymd(addDays(new Date(anchor.getFullYear(), anchor.getMonth(), 1), -7)),
+    ymd(addDays(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1), 8)),
+  )
+  const ready = data.hydrated && periodReady
   const [hidden, setHidden] = React.useState<Set<string>>(new Set())
   const [onlyMine, setOnlyMine] = React.useState(false)
   const [selected, setSelected] = React.useState<Appointment | undefined>()
@@ -45,7 +57,12 @@ export function AgendaView() {
 
   const categoryIds = React.useMemo(() => new Set(data.appointmentCategories.map((c) => c.id)), [data.appointmentCategories])
   const legendKey = (a: Appointment) => (a.categoryId && categoryIds.has(a.categoryId) ? a.categoryId : NONE)
-  const events = data.appointments.filter((a) => !hidden.has(legendKey(a)) && (!onlyMine || a.ownerId === currentUserId()))
+  const visible = React.useCallback(
+    (a: Pick<Appointment, "ownerId" | "categoryId">) =>
+      !hidden.has(a.categoryId && categoryIds.has(a.categoryId) ? a.categoryId : NONE) && (!onlyMine || a.ownerId === currentUserId()),
+    [hidden, onlyMine, categoryIds],
+  )
+  const events = data.appointments.filter(visible)
 
   const weekStart = startOfWeek(anchor)
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -78,7 +95,11 @@ export function AgendaView() {
         ? isSameDay(weekStart, startOfWeek(getNow()))
         : anchor.getMonth() === getNow().getMonth()
 
-  const processCode = (id?: string) => data.processes.find((p) => p.id === id)?.code
+  /** "João da Silva — Ação de cobrança" no bloco do compromisso (nunca só o número). */
+  const processLabel = (id?: string) => {
+    const process = byId(data.processes, id)
+    return process ? processTitle(process, byId(data.clients, process.clientId)?.name) : undefined
+  }
 
   /** Arrastar na agenda: grava o novo horário (mesma duração) e oferece desfazer. */
   const reschedule = async (a: Appointment, next: { start: string; end: string }) => {
@@ -110,176 +131,250 @@ export function AgendaView() {
     ...(data.appointments.some((a) => legendKey(a) === NONE) ? [{ key: NONE, name: "Sem categoria", color: undefined }] : []),
   ]
 
+  /** Sem `iso`: o dia em foco, no horário padrão. Com `iso` de um horário da grade: data e hora clicadas. */
   const create = (iso?: string) =>
     openDialog("appointment", {
       date: (iso ?? `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`).slice(
         0,
         10,
       ),
+      time: iso && iso.length >= 16 ? iso.slice(11, 16) : undefined,
+    })
+
+  const range =
+    view === "dia"
+      ? { start: anchor, end: addDays(anchor, 1) }
+      : view === "semana"
+        ? { start: weekStart, end: addDays(weekStart, 7) }
+        : { start: new Date(anchor.getFullYear(), anchor.getMonth(), 1), end: new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) }
+
+  const legendButtons = (variant: "chips" | "list") =>
+    legend.map((item) => {
+      const off = hidden.has(item.key)
+      const count = rangeEvents.filter((e) => legendKey(e) === item.key).length
+      return variant === "list" ? (
+        <label
+          key={item.key}
+          className="flex h-8 cursor-pointer items-center gap-2.5 rounded-control px-2 text-[13px] text-foreground transition-colors hover:bg-accent"
+        >
+          <input
+            type="checkbox"
+            checked={!off}
+            onChange={() => toggleType(item.key)}
+            className="size-4 cursor-pointer rounded-[4px]"
+            style={{ accentColor: item.color ?? "var(--subtle)" }}
+          />
+          <span className="min-w-0 flex-1 truncate">{item.name}</span>
+          <span className="tabular text-[11.5px] text-subtle">{count}</span>
+        </label>
+      ) : (
+        <button
+          key={item.key}
+          type="button"
+          aria-pressed={!off}
+          onClick={() => toggleType(item.key)}
+          className={cn(
+            "touch-target relative inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-all pointer-coarse:h-8 focus-visible:ring-2 focus-visible:ring-brand/40",
+            off ? "border-dashed border-border-strong text-subtle" : "border-border bg-surface text-foreground shadow-xs",
+          )}
+        >
+          <span className={cn("size-2 rounded-full transition-opacity", off && "opacity-30")} style={categoryStyle(item.color).dot} />
+          {item.name}
+          {!off && <span className="tabular text-[11px] text-subtle">{count}</span>}
+        </button>
+      )
     })
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="font-display text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] sm:text-[30px]">Agenda</h1>
-          <p className="mt-2 text-[14px] text-muted-foreground">Compromissos e prazos do escritório.</p>
-        </div>
-        {editable && (
-          <Button onClick={() => create()}>
-            <Plus /> Novo compromisso
-          </Button>
-        )}
-      </div>
-
-      {/* Depende do relógio do navegador: só depois de carregar os dados. */}
-      {ready && <AgendaToday />}
-
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-control border border-border bg-surface shadow-xs">
-            <button
-              type="button"
-              aria-label="Período anterior"
-              onClick={() => move(-1)}
-              className="flex size-8 items-center justify-center rounded-l-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <span className="h-4 w-px bg-border" />
-            <button
-              type="button"
-              aria-label="Próximo período"
-              onClick={() => move(1)}
-              className="flex size-8 items-center justify-center rounded-r-[8px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={isCurrent}
-            onClick={() => {
+    <div className="grid gap-6 @5xl/main:grid-cols-[248px_minmax(0,1fr)]">
+      {/* Barra lateral (telas largas): criar, minicalendário, minha agenda e categorias. */}
+      <aside className="hidden @5xl/main:block" aria-label="Navegação da agenda">
+        <div className="sticky top-24 space-y-6">
+          {editable && (
+            <Button size="lg" className="h-11 w-full justify-start rounded-[10px] px-4 shadow-raised" onClick={() => create()}>
+              <Plus /> Novo compromisso
+            </Button>
+          )}
+          <MiniCalendar
+            selected={anchor}
+            rangeStart={range.start}
+            rangeEnd={range.end}
+            visible={visible}
+            onPick={(d) => {
               setDirection(0)
-              setAnchor(startOfDay(getNow()))
+              setAnchor(startOfDay(d))
             }}
-          >
-            Hoje
-          </Button>
-          <h2 className="ml-1 truncate text-[15px] font-semibold tracking-[-0.01em]" aria-live="polite">
-            {title}
-          </h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={onlyMine}
-            onClick={() => setOnlyMine((v) => !v)}
-            className={cn(
-              "h-8 rounded-control border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-              onlyMine ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Somente meus
-          </button>
-          <FilterTabs
-            ariaLabel="Visualização"
-            layoutId="agenda-view"
-            value={view}
-            onChange={(v) => {
-              setDirection(0)
-              setView(v)
-            }}
-            className="mx-0 px-0"
-            options={[
-              { value: "dia", label: "Dia" },
-              { value: "semana", label: "Semana" },
-              { value: "mes", label: "Mês" },
-            ]}
           />
+          <div className="space-y-1">
+            <p className="px-2 pb-1 text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">Agendas</p>
+            <label className="flex h-8 cursor-pointer items-center gap-2.5 rounded-control px-2 text-[13px] text-foreground transition-colors hover:bg-accent">
+              <input
+                type="checkbox"
+                checked={onlyMine}
+                onChange={() => setOnlyMine((v) => !v)}
+                className="size-4 cursor-pointer accent-[var(--brand)]"
+              />
+              Somente meus compromissos
+            </label>
+          </div>
+          {legend.length > 0 && (
+            <div className="space-y-0.5" role="group" aria-label="Categorias">
+              <p className="px-2 pb-1 text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">Categorias</p>
+              {legendButtons("list")}
+            </div>
+          )}
         </div>
-      </div>
+      </aside>
 
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Categorias">
-        {legend.map((item) => {
-          const off = hidden.has(item.key)
-          const count = rangeEvents.filter((e) => legendKey(e) === item.key).length
-          return (
+      <div className="min-w-0 space-y-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between @5xl/main:hidden">
+          <div className="min-w-0">
+            <h1 className="text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] sm:text-[30px]">Agenda</h1>
+            <p className="mt-2 text-[14px] text-muted-foreground">Compromissos e prazos do escritório.</p>
+          </div>
+          {editable && (
+            <Button onClick={() => create()}>
+              <Plus /> Novo compromisso
+            </Button>
+          )}
+        </div>
+        <h1 className="hidden text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] @5xl/main:block">
+          Agenda
+        </h1>
+
+        {/* Depende do relógio do navegador: só depois de carregar os dados. */}
+        {ready && <AgendaToday />}
+
+        {/* Navegação no padrão de calendário: Hoje, ‹ ›, período e modo de exibição. */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isCurrent}
+              onClick={() => {
+                setDirection(0)
+                setAnchor(startOfDay(getNow()))
+              }}
+            >
+              Hoje
+            </Button>
+            <div className="flex items-center">
+              <button
+                type="button"
+                aria-label="Período anterior"
+                onClick={() => move(-1)}
+                className="touch-target relative flex size-8 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Próximo período"
+                onClick={() => move(1)}
+                className="touch-target relative flex size-8 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+            <h2 className="ml-1 truncate text-[18px] font-semibold tracking-[-0.015em]" aria-live="polite">
+              {title}
+            </h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              key={item.key}
               type="button"
-              aria-pressed={!off}
-              onClick={() => toggleType(item.key)}
+              role="switch"
+              aria-checked={onlyMine}
+              onClick={() => setOnlyMine((v) => !v)}
               className={cn(
-                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-brand/40",
-                off ? "border-dashed border-border-strong text-subtle" : "border-border bg-surface text-foreground shadow-xs",
+                "h-8 rounded-control border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40 @5xl/main:hidden",
+                onlyMine ? "border-brand/30 bg-brand-soft text-brand-strong" : "border-border bg-surface text-muted-foreground hover:text-foreground",
               )}
             >
-              <span className={cn("size-2 rounded-full transition-opacity", off && "opacity-30")} style={categoryStyle(item.color).dot} />
-              {item.name}
-              {!off && <span className="tabular text-[11px] text-subtle">{count}</span>}
+              Somente meus
             </button>
-          )
-        })}
+            <FilterTabs
+              ariaLabel="Visualização"
+              layoutId="agenda-view"
+              value={view}
+              onChange={(v) => {
+                setDirection(0)
+                setView(v)
+              }}
+              className="mx-0 px-0"
+              options={[
+                { value: "dia", label: "Dia" },
+                { value: "semana", label: "Semana" },
+                { value: "mes", label: "Mês" },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div
+          className="-mx-4 -my-1.5 flex gap-1.5 overflow-x-auto px-4 py-1.5 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0 @5xl/main:hidden"
+          role="group"
+          aria-label="Categorias"
+        >
+          {legendButtons("chips")}
+        </div>
+
+        {!ready ? (
+          <Skeleton className="h-[560px] w-full rounded-[14px]" />
+        ) : (
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={`${view}-${anchor.toDateString()}-${view === "semana" ? weekStart.toDateString() : ""}`}
+              initial={{ opacity: 0, x: direction * 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: direction * -16 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {view === "semana" && (
+                <>
+                  <div className="hidden md:block">
+                    <TimeGrid
+                      days={weekDays}
+                      events={events}
+                      onSelect={setSelected}
+                      onCreate={editable ? create : undefined}
+                      onMove={moveInGrid}
+                      processLabel={processLabel}
+                    />
+                  </div>
+                  <div className="md:hidden">
+                    <AgendaList days={weekDays} events={events} onSelect={setSelected} />
+                  </div>
+                </>
+              )}
+              {view === "dia" && (
+                <TimeGrid
+                  days={[anchor]}
+                  events={events}
+                  onSelect={setSelected}
+                  onCreate={editable ? create : undefined}
+                  onMove={moveInGrid}
+                  processLabel={processLabel}
+                />
+              )}
+              {view === "mes" && (
+                <MonthGrid
+                  anchor={anchor}
+                  events={events}
+                  onSelect={setSelected}
+                  onDayClick={(d) => {
+                    setDirection(0)
+                    setAnchor(startOfDay(d))
+                    setView("dia")
+                  }}
+                  onMove={moveInMonth}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        )}
       </div>
-
-      {!ready ? (
-        <Skeleton className="h-[560px] w-full rounded-[14px]" />
-      ) : (
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={`${view}-${anchor.toDateString()}-${view === "semana" ? weekStart.toDateString() : ""}`}
-            initial={{ opacity: 0, x: direction * 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction * -16 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {view === "semana" && (
-              <>
-                <div className="hidden md:block">
-                  <TimeGrid
-                    days={weekDays}
-                    events={events}
-                    onSelect={setSelected}
-                    onCreate={editable ? create : undefined}
-                    onMove={moveInGrid}
-                    processCode={processCode}
-                  />
-                </div>
-                <div className="md:hidden">
-                  <AgendaList days={weekDays} events={events} onSelect={setSelected} />
-                </div>
-              </>
-            )}
-            {view === "dia" && (
-              <TimeGrid
-                days={[anchor]}
-                events={events}
-                onSelect={setSelected}
-                onCreate={editable ? create : undefined}
-                onMove={moveInGrid}
-                processCode={processCode}
-              />
-            )}
-            {view === "mes" && (
-              <MonthGrid
-                anchor={anchor}
-                events={events}
-                onSelect={setSelected}
-                onDayClick={(d) => {
-                  setDirection(0)
-                  setAnchor(startOfDay(d))
-                  setView("dia")
-                }}
-                onMove={moveInMonth}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
-      )}
-
       <AppointmentDetail appointment={selected} onClose={() => setSelected(undefined)} />
     </div>
   )

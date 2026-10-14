@@ -8,14 +8,23 @@ import type {
   AIResult,
   AIStatus,
   ChatReply,
+  ChatMode,
   ChatScope,
   ClientSummary,
+  EnrichmentSummary,
   MovementAnalysis,
   NextActions,
   OfficeOverviewResult,
+  FinanceAnalysisResult,
+  JurisprudenceAnalysis,
+  JurisprudenceStrategy,
+  StrategyRetrievalView,
+  RelatedJurisprudenceAnalysis,
+  Similarity,
   ProcessSummary,
 } from "./types"
 import { publicMessage } from "@/lib/core/public-error"
+import { sanitizeAIOutput } from "./output-sanitizer"
 
 export class AIRequestError extends Error {
   readonly code: string
@@ -47,7 +56,16 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
     throw new AIRequestError(error?.code ?? "UNEXPECTED", publicMessage(error?.message, GENERIC), error?.retryAfter)
   }
   if (!payload) throw new AIRequestError("UNEXPECTED", GENERIC)
-  return payload as T
+  return withCleanData(payload) as T
+}
+
+/**
+ * Segunda trava, no navegador: o texto que a IA escreveu (`data`) passa pela mesma
+ * limpeza do servidor antes de chegar a qualquer tela — vale também para resposta de
+ * um servidor ainda sem a limpeza ou guardada antes dela. O resto (fontes, avisos) não muda.
+ */
+function withCleanData(payload: object) {
+  return "data" in payload ? { ...payload, data: sanitizeAIOutput((payload as { data: unknown }).data) } : payload
 }
 
 export const aiApi = {
@@ -56,8 +74,29 @@ export const aiApi = {
     post<AIResult<MovementAnalysis>>("/api/ai/process/analyze-movement", { processId, movementId }, signal),
   nextActions: (processId: string, signal?: AbortSignal) => post<AIResult<NextActions>>("/api/ai/process/next-actions", { processId }, signal),
   clientSummary: (clientId: string, signal?: AbortSignal) => post<AIResult<ClientSummary>>("/api/ai/client/summary", { clientId }, signal),
+  enrichmentSummary: (runId: string, signal?: AbortSignal) =>
+    post<AIResult<EnrichmentSummary>>("/api/ai/process-enrichment/summary", { runId }, signal),
   officeOverview: (signal?: AbortSignal) => post<OfficeOverviewResult>("/api/ai/office/overview", {}, signal),
-  chat: (scope: ChatScope, messages: AIMessage[], signal?: AbortSignal) => post<AIResult<ChatReply>>("/api/ai/chat", { scope, messages }, signal),
+  financeAnalysis: (signal?: AbortSignal) => post<FinanceAnalysisResult>("/api/ai/finance/analysis", {}, signal),
+  jurisprudenceAnalysis: (input: { jurisprudenceId: string; processId?: string; query?: string }, signal?: AbortSignal) =>
+    post<AIResult<JurisprudenceAnalysis>>("/api/ai/jurisprudence/analysis", input, signal),
+  relatedJurisprudence: (input: { processId: string; ids: string[] }, signal?: AbortSignal) =>
+    post<RelatedJurisprudenceResult>("/api/ai/jurisprudence/related", input, signal),
+  jurisprudenceStrategy: (input: { question: string; processId?: string }, signal?: AbortSignal) =>
+    post<JurisprudenceStrategyResult>("/api/ai/jurisprudence/strategy", input, signal),
+  chat: (scope: ChatScope, messages: AIMessage[], signal?: AbortSignal, mode: ChatMode = "all") =>
+    post<AIResult<ChatReply>>("/api/ai/chat", { scope, messages, mode }, signal),
+}
+
+/** Análise comparativa + o que a pesquisa encontrou (calculado pela Íntegra, não pelo modelo). */
+export interface JurisprudenceStrategyResult extends AIResult<JurisprudenceStrategy> {
+  retrieval: StrategyRetrievalView
+}
+
+/** Comparação com o processo + contagem por semelhança (calculada no servidor). */
+export interface RelatedJurisprudenceResult extends AIResult<RelatedJurisprudenceAnalysis> {
+  counts: Record<Similarity, number>
+  analyzed: number
 }
 
 let status: Promise<AIStatus> | undefined

@@ -15,10 +15,13 @@
  *   resultados. Isso é falha passageira, não "processo não encontrado".
  */
 
+import { attemptSignal, cancelledError, pause, throwIfCancelled } from "../cancel"
 import { LookupError } from "../errors"
 import type { DataJudSearchResponse } from "./mapper"
 
 const BASE_URL = "https://api-publica.datajud.cnj.jus.br"
+/** Documentos pedidos por busca (um por grau/instância do número). */
+export const SEARCH_SIZE = 20
 
 export interface DataJudClientOptions {
   apiKey: string
@@ -89,7 +92,7 @@ export function createDataJudClient(options: DataJudClientOptions) {
 
   const backoff = (attempt: number) => Math.min(1000 * 2 ** (attempt - 1), config.maxWaitMs) + random() * 400
 
-  async function attemptOnce(url: string, body: string, timeoutMs: number, attempt: number): Promise<DataJudSearchResponse | Attempt> {
+  async function attemptOnce(url: string, body: string, timeoutMs: number, attempt: number, signal?: AbortSignal): Promise<DataJudSearchResponse | Attempt> {
     const started = now()
     let response: Response
     try {
@@ -103,9 +106,11 @@ export function createDataJudClient(options: DataJudClientOptions) {
         },
         body,
         cache: "no-store",
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: attemptSignal(timeoutMs, signal),
       })
     } catch (error) {
+      // Cancelado pelo chamador: falha final, sem nova tentativa.
+      if (signal?.aborted) return { error: cancelledError(), retry: false }
       const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")
       log("network_error", { attempt, reason: timedOut ? "timeout" : "connection", ms: now() - started })
       return timedOut
@@ -123,7 +128,12 @@ export function createDataJudClient(options: DataJudClientOptions) {
       } catch {
         return { error: new LookupError("UNAVAILABLE", "HTTP 200 com corpo que não é JSON"), retry: true }
       }
-      if (!isIncompleteMiss(data)) return data
+      if (!isIncompleteMiss(data)) {
+        // Com registros, a resposta parcial segue: o mapper marca a cobertura e a
+        // identificação do tribunal não confirma nada sobre ela.
+        if (data.timed_out || (data._shards?.failed ?? 0) > 0) log("partial_with_hits", { attempt, failed: data._shards?.failed ?? 0, total: data._shards?.total })
+        return data
+      }
       log("partial", { attempt, failed: data._shards?.failed ?? 0, total: data._shards?.total, timedOut: !!data.timed_out })
       return { error: new LookupError("UNAVAILABLE", "resposta parcial (shards falhos)"), retry: true }
     }
@@ -143,17 +153,20 @@ export function createDataJudClient(options: DataJudClientOptions) {
    * Busca por número CNJ no índice do tribunal. Devolve a resposta bruta da
    * fonte — quem a traduz é o `mapper.ts`.
    */
-  async function searchByNumber(digits: string, dataset: string): Promise<DataJudSearchResponse> {
+  async function searchByNumber(digits: string, dataset: string, { signal }: { signal?: AbortSignal } = {}): Promise<DataJudSearchResponse> {
     const url = `${(options.baseUrl || BASE_URL).replace(/\/$/, "")}/${dataset}/_search`
-    const body = JSON.stringify({ size: 10, query: { match: { numeroProcesso: digits } } })
+    // Um documento por grau/instância: 20 cobre com folga; acima disso a cobertura sai
+    // como truncada (`mapCoverage`) e nada é confirmado sobre a resposta.
+    const body = JSON.stringify({ size: SEARCH_SIZE, query: { match: { numeroProcesso: digits } } })
     const deadline = now() + config.deadlineMs
     let last: LookupError = new LookupError("UNAVAILABLE", "nenhuma tentativa concluída")
 
     for (let attempt = 1; attempt <= config.maxAttempts; attempt += 1) {
+      throwIfCancelled(signal)
       const remaining = deadline - now()
       if (remaining <= 1000) break
 
-      const outcome = await attemptOnce(url, body, Math.min(config.attemptTimeoutMs, remaining), attempt)
+      const outcome = await attemptOnce(url, body, Math.min(config.attemptTimeoutMs, remaining), attempt, signal)
       if (!("error" in outcome)) return outcome
 
       last = outcome.error
@@ -165,7 +178,7 @@ export function createDataJudClient(options: DataJudClientOptions) {
       // Não vale esperar se não sobra tempo para outra tentativa útil.
       if (now() + wait + 2000 > deadline) break
       log("retry", { attempt, waitMs: Math.round(wait), code: last.code })
-      await sleep(wait)
+      await pause(wait, sleep, signal)
     }
 
     throw last

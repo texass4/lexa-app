@@ -1,0 +1,124 @@
+{
+  "_leia": "Casos de REFERÊNCIA revisados manualmente contra corpus.json (fictício). 'pertinentes': decisões que tratam da questão do caso (inclui as CONTRÁRIAS à tese, que precisam aparecer); 'contrarias': subconjunto desfavorável à tese de quem pergunta; 'aceitaveis': relacionadas, não prejudicam se aparecerem; 'irrelevantes': não podem chegar à IA (mesmas palavras, outro tema/ramo/fatos). 'duplicatas': ids do mesmo processo — no máximo um pode aparecer. Revisão feita ANTES da implementação nova, lendo cada ementa; não altere para acomodar resultado.",
+  "casos": [
+    {
+      "id": "R1-negativacao-fraude",
+      "tipo": "pergunta específica com precedentes diretamente relacionados",
+      "pergunta": "Há jurisprudência sobre dano moral por negativação indevida? O cliente teve o nome incluído em cadastro de inadimplentes por um empréstimo contratado por fraude de terceiro.",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000101", "f0000000-0000-4000-8000-000000000102", "f0000000-0000-4000-8000-000000000103"],
+      "contrarias": ["f0000000-0000-4000-8000-000000000103"],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000108", "f0000000-0000-4000-8000-000000000105", "f0000000-0000-4000-8000-000000000109", "f0000000-0000-4000-8000-000000000104"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000106", "f0000000-0000-4000-8000-000000000107", "f0000000-0000-4000-8000-000000000204", "f0000000-0000-4000-8000-000000000206", "f0000000-0000-4000-8000-000000000703", "f0000000-0000-4000-8000-000000000701", "f0000000-0000-4000-8000-000000000702"],
+      "duplicatas": [["f0000000-0000-4000-8000-000000000101", "f0000000-0000-4000-8000-000000000108"]]
+    },
+    {
+      "id": "R2-sinonimos",
+      "tipo": "sinônimos e expressões jurídicas diferentes",
+      "pergunta": "Precedentes sobre danos extrapatrimoniais pela inclusão do nome em órgão de proteção ao crédito sem débito existente",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000101", "f0000000-0000-4000-8000-000000000102", "f0000000-0000-4000-8000-000000000103"],
+      "contrarias": ["f0000000-0000-4000-8000-000000000103"],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000108", "f0000000-0000-4000-8000-000000000105", "f0000000-0000-4000-8000-000000000109", "f0000000-0000-4000-8000-000000000104"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000106", "f0000000-0000-4000-8000-000000000107", "f0000000-0000-4000-8000-000000000204", "f0000000-0000-4000-8000-000000000206", "f0000000-0000-4000-8000-000000000703", "f0000000-0000-4000-8000-000000000701", "f0000000-0000-4000-8000-000000000702"],
+      "duplicatas": [["f0000000-0000-4000-8000-000000000101", "f0000000-0000-4000-8000-000000000108"]]
+    },
+    {
+      "id": "R3-atraso-imovel",
+      "tipo": "precedente contrário à tese",
+      "pergunta": "Cabe dano moral pelo atraso na entrega de imóvel comprado na planta? A construtora atrasou mais de dois anos após o prazo de tolerância e a família ficou sem moradia.",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000201", "f0000000-0000-4000-8000-000000000202"],
+      "contrarias": ["f0000000-0000-4000-8000-000000000202"],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000203", "f0000000-0000-4000-8000-000000000207"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000204", "f0000000-0000-4000-8000-000000000205", "f0000000-0000-4000-8000-000000000206", "f0000000-0000-4000-8000-000000000101", "f0000000-0000-4000-8000-000000000102", "f0000000-0000-4000-8000-000000000703"]
+    },
+    {
+      "id": "R4-medicamento-sem-registro",
+      "tipo": "mesma matéria com fatos materialmente diferentes (sem registro)",
+      "pergunta": "O Estado é obrigado a fornecer medicamento importado sem registro na Anvisa a paciente sem condições financeiras?",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000302", "f0000000-0000-4000-8000-000000000301"],
+      "contrarias": ["f0000000-0000-4000-8000-000000000302"],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000303"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000304", "f0000000-0000-4000-8000-000000000305", "f0000000-0000-4000-8000-000000000306"]
+    },
+    {
+      "id": "R4b-medicamento-com-registro",
+      "tipo": "mesma matéria com fatos materialmente diferentes (com registro)",
+      "pergunta": "Fornecimento pelo Estado de medicamento com registro na Anvisa, não incorporado ao SUS; há laudo médico e o paciente não tem condições financeiras",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000301"],
+      "contrarias": [],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000303", "f0000000-0000-4000-8000-000000000302"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000304", "f0000000-0000-4000-8000-000000000305", "f0000000-0000-4000-8000-000000000306"]
+    },
+    {
+      "id": "R5-hospital-erro-medico",
+      "tipo": "precedente contrário à tese",
+      "pergunta": "O hospital responde por erro do médico que atendeu o paciente nas suas instalações?",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000402", "f0000000-0000-4000-8000-000000000404"],
+      "contrarias": ["f0000000-0000-4000-8000-000000000402"],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000401"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000403", "f0000000-0000-4000-8000-000000000306"]
+    },
+    {
+      "id": "R6-sem-pertinentes",
+      "tipo": "banco sem decisões pertinentes",
+      "pergunta": "Há jurisprudência sobre usucapião extraordinária de imóvel rural?",
+      "pertinentes": [],
+      "contrarias": [],
+      "aceitaveis": [],
+      "irrelevantes": "*"
+    },
+    {
+      "id": "R7-ampla-demais",
+      "tipo": "consulta que recupera muitos resultados irrelevantes",
+      "pergunta": "Há jurisprudência sobre responsabilidade civil e indenização por danos?",
+      "pertinentes": [],
+      "contrarias": [],
+      "aceitaveis": "*",
+      "irrelevantes": [],
+      "_nota": "Pergunta sem questão jurídica definida: qualquer decisão de responsabilidade civil é 'aceitável', mas NENHUMA pode ser apresentada como diretamente aplicável; o esperado é dizer que falta delimitar a questão."
+    },
+    {
+      "id": "R8-icms-tusd",
+      "tipo": "pergunta específica com precedentes diretamente relacionados",
+      "pergunta": "Qual o entendimento sobre a inclusão da TUSD e da TUST na base de cálculo do ICMS?",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000501", "f0000000-0000-4000-8000-000000000502"],
+      "contrarias": [],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000504"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000503", "f0000000-0000-4000-8000-000000000304"]
+    },
+    {
+      "id": "R9-termo-inicial",
+      "tipo": "pergunta específica com precedentes diretamente relacionados",
+      "pergunta": "Termo inicial de benefício por incapacidade quando houve requerimento administrativo",
+      "pertinentes": ["f0000000-0000-4000-8000-000000000601", "f0000000-0000-4000-8000-000000000602"],
+      "contrarias": [],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000603"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000604", "f0000000-0000-4000-8000-000000000204"]
+    },
+    {
+      "id": "R10-processo",
+      "tipo": "processo do escritório + pergunta de estratégia",
+      "pergunta": "Quais estratégias e precedentes para este caso?",
+      "processo": {
+        "area": "Cível",
+        "type": "Ação declaratória de inexistência de débito c/c indenização",
+        "subject": "Inclusão Indevida em Cadastro de Inadimplentes",
+        "notes": "Cliente afirma que nunca contratou o empréstimo; contrato fraudulento. Nome negativado em 2024."
+      },
+      "pertinentes": ["f0000000-0000-4000-8000-000000000101", "f0000000-0000-4000-8000-000000000102", "f0000000-0000-4000-8000-000000000103"],
+      "contrarias": ["f0000000-0000-4000-8000-000000000103"],
+      "aceitaveis": ["f0000000-0000-4000-8000-000000000108", "f0000000-0000-4000-8000-000000000105", "f0000000-0000-4000-8000-000000000109", "f0000000-0000-4000-8000-000000000104"],
+      "irrelevantes": ["f0000000-0000-4000-8000-000000000106", "f0000000-0000-4000-8000-000000000107", "f0000000-0000-4000-8000-000000000204", "f0000000-0000-4000-8000-000000000206", "f0000000-0000-4000-8000-000000000703"],
+      "duplicatas": [["f0000000-0000-4000-8000-000000000101", "f0000000-0000-4000-8000-000000000108"]]
+    },
+    {
+      "id": "R11-informacao-insuficiente",
+      "tipo": "processo com informações insuficientes",
+      "pergunta": "Quais as chances deste caso?",
+      "processo": { "area": "Cível", "type": "" },
+      "pertinentes": [],
+      "contrarias": [],
+      "aceitaveis": [],
+      "irrelevantes": "*"
+    }
+  ]
+}

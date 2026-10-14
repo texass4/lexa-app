@@ -8,13 +8,16 @@
  */
 
 import { after, NextResponse } from "next/server"
-import { authorizeMember } from "@/lib/auth/server"
+import { authorizeMember, HttpError } from "@/lib/auth/server"
+import { enforce, LIMITS, TOO_MANY } from "@/lib/auth/protection/rate-limit"
 import { LOOKUP_MESSAGES, LookupError, publicLookupError } from "@/lib/integrations/legal/errors"
 import { createSupabaseServer } from "@/lib/supabase/server"
 import { loadSettings } from "@/lib/admin/platform"
 import { LOOKUP_DISABLED_MESSAGE, MAX_CNJ_INPUT, type LookupBody } from "./lookup-contract"
 import { supabaseLookupStore } from "./lookup-cache"
 import { processLookup } from "./process-lookup"
+import { isSecretInOffice, SECRET_LOOKUP_MESSAGE } from "./secret-guard"
+import { onlyDigits } from "@/lib/processos/cnj"
 import type { LookupRequest } from "./lookup-service"
 
 const NO_STORE = { "Cache-Control": "no-store" }
@@ -23,8 +26,11 @@ const json = (body: LookupBody, status = 200) => NextResponse.json(body, { statu
 
 type Policy = Pick<LookupRequest, "maxAgeMs" | "staleWhileRevalidate">
 
-/** `policy` recebe o corpo da requisição (ex.: `{ force: true }` no botão "Atualizar"). */
-export async function handleLookup(request: Request, policy: (body: Record<string, unknown>) => Policy, label: string) {
+/**
+ * `policy` recebe o corpo da requisição (ex.: `{ force: true }` no botão "Atualizar").
+ * `processId`: o processo do cadastro que está sendo atualizado (rota de sincronização).
+ */
+export async function handleLookup(request: Request, policy: (body: Record<string, unknown>) => Policy, label: string, { processId }: { processId?: string } = {}) {
   const auth = await authorizeMember("processes.edit")
   if ("response" in auth) return auth.response
   // O Super Admin pode desligar a consulta (Admin › Configurações › Recursos).
@@ -34,10 +40,27 @@ export async function handleLookup(request: Request, policy: (body: Record<strin
   try {
     const parsed: unknown = await request.json()
     if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>
-  } catch {}
+  } catch {
+    // Corpo que não é JSON vale como vazio: a validação abaixo responde "invalid".
+  }
   const { cnj } = body
   if (typeof cnj !== "string" || cnj.length > MAX_CNJ_INPUT) {
     return json({ ok: false, reason: "invalid", message: LOOKUP_MESSAGES.invalid }, 400)
+  }
+
+  // Segredo de justiça no cadastro: nada vai à fonte pública (também se a rota for chamada sem a tela).
+  const digits = onlyDigits(cnj)
+  const session = await createSupabaseServer()
+  if (digits.length === 20 && (await isSecretInOffice(session, auth.organizationId, digits, processId))) {
+    return json({ ok: false, reason: "unsupported", message: SECRET_LOOKUP_MESSAGE }, 422)
+  }
+
+  // Limite por pessoa e por escritório: cada consulta pode prender a fonte externa por ~60 s.
+  try {
+    await enforce([LIMITS.processLookupUser, auth.userId], [LIMITS.processLookupOrg, auth.organizationId])
+  } catch (error) {
+    if (!(error instanceof HttpError)) throw error
+    return json({ ok: false, reason: "unavailable", message: TOO_MANY }, 429)
   }
 
   try {
@@ -45,7 +68,7 @@ export async function handleLookup(request: Request, policy: (body: Record<strin
       ...policy(body),
       cnj,
       organizationId: auth.organizationId,
-      store: supabaseLookupStore(await createSupabaseServer()),
+      store: supabaseLookupStore(session),
       // A atualização em segundo plano continua depois que a resposta sai.
       defer: (task) => after(() => task),
     })

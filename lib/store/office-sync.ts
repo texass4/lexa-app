@@ -35,13 +35,17 @@ import {
   emptyVersions,
   fetchManifest,
   fetchRecords,
+  fetchVersions,
+  loadPage,
   insertRecord,
-  loadState,
+  loadScope,
+  loadScopes,
   removeById,
   syncState,
   upsertById,
   type Collection,
   type PersistedState,
+  type Scope,
   type ServerRow,
   type Snapshot,
   type StateDiff,
@@ -52,6 +56,29 @@ import {
 } from "./storage"
 
 type Entity = { id: string }
+
+/**
+ * Uma lista do histórico lida em páginas, do mais recente para o mais antigo (ou uma
+ * busca no banco). `scope` traz a coleção, o filtro e a ordem (`order`); `cursor` dá
+ * a chave de ordem de um registro (a mesma coluna de `order`).
+ */
+export interface PagedList<T = Entity> {
+  id: string
+  scope: Omit<Scope, "id" | "latest" | "offset" | "entity">
+  size: number
+  cursor: (item: T) => string
+}
+
+export interface PageState {
+  /** Registros lidos até agora. */
+  loaded: number
+  /** A última página veio incompleta: não há mais nada no banco. */
+  done: boolean
+  /** Chave de ordem do último registro lido: tudo o que é mais recente já está na memória. */
+  cursor?: string
+  /** Total da lista no banco (contado na primeira página). */
+  total?: number
+}
 
 /** Resultado de salvar um registro editado num formulário. */
 export type SaveResult<T> =
@@ -76,6 +103,9 @@ export const REVALIDATE_AFTER_HIDDEN_MS = 3 * 60_000
 const REALTIME_WARNING_AFTER_MS = 30_000
 
 type RowPayload = { organization_id?: string; id?: string; data?: Entity; updated_at?: string }
+/** Linha de `realtime_deletions` (aviso de exclusão, migração 0018). */
+export type DeletionPayload = { organization_id?: string; collection?: string; record_id?: string }
+const COLLECTION_BY_TABLE = new Map<string, Collection>(COLLECTIONS.map((key) => [TABLES[key], key]))
 
 interface Options<S extends PersistedState> {
   supabase: SupabaseClient
@@ -96,6 +126,9 @@ const SERVER_FIELDS: Partial<Record<Collection, string[]>> = {
   processes: ["code"],
   deadlines: ["clientId", "createdById", "taskId", "responsibleId"],
 }
+
+/** Processo só com a movimentação mais recente (resumo). */
+const isPartial = (key: Collection, item: Entity | undefined) => key === "processes" && !!(item as { movementsPartial?: boolean } | undefined)?.movementsPartial
 
 const cloneVersions = (versions: Versions): Versions =>
   Object.fromEntries(COLLECTIONS.map((key) => [key, new Map(versions[key])])) as unknown as Versions
@@ -122,9 +155,16 @@ export class OfficeSync<S extends PersistedState> {
   private revalidateAfterHydrate = false
   private realtimeUp = false
   private realtimeWarning: ReturnType<typeof setTimeout> | undefined
+  /** Recortes já carregados (abertura + sob demanda). A revalidação confere só eles. */
+  private readonly scopes = new Map<string, Scope>()
+  /** Recortes sendo carregados agora (a mesma leitura não sai duas vezes). */
+  private readonly loading = new Map<string, Promise<void>>()
+  private readonly hydratedSignal: Promise<void>
+  private resolveHydrated: () => void = () => {}
 
   constructor(opts: Options<S>) {
     this.opts = opts
+    this.hydratedSignal = new Promise((resolve) => (this.resolveHydrated = resolve))
   }
 
   private get state(): S {
@@ -152,20 +192,119 @@ export class OfficeSync<S extends PersistedState> {
    * Primeira carga. `state` já traz, junto com o banco, o que foi criado antes de a
    * carga terminar (gravado em seguida como novo).
    */
-  hydrate(snapshot: Snapshot) {
+  hydrate(snapshot: Snapshot, scopes: Scope[]) {
     this.saved = snapshot.state
     this.versions = snapshot.versions
     this.external = cloneVersions(snapshot.versions)
+    for (const scope of scopes) this.scopes.set(scope.id, scope)
+    this.resolveHydrated()
     if (this.revalidateAfterHydrate) {
       this.revalidateAfterHydrate = false
       void this.revalidate()
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Sob demanda
+  // -------------------------------------------------------------------------
+
+  /** O recorte já está na memória. */
+  isLoaded(scopeId: string) {
+    return this.scopes.has(scopeId)
+  }
+
+  /**
+   * Carrega recortes que ainda não vieram (ex.: o histórico de um processo ao abri-lo,
+   * todos os documentos ao abrir Documentos). Cada recorte é lido uma vez; o que já
+   * está na memória e tem a mesma versão não é trocado, e alteração local pendente não
+   * é sobrescrita (`applyRemote`). Espera a abertura terminar.
+   */
+  async ensureScopes(scopes: Scope[]): Promise<void> {
+    await this.hydratedSignal
+    await Promise.all(
+      scopes.map((scope) => {
+        if (this.scopes.has(scope.id)) return undefined
+        let pending = this.loading.get(scope.id)
+        if (!pending) {
+          pending = loadScope(this.opts.supabase, scope)
+            .then((rows) => {
+              for (const row of rows) this.applyRemote(scope.key, row)
+              this.scopes.set(scope.id, scope)
+            })
+            .finally(() => this.loading.delete(scope.id))
+          this.loading.set(scope.id, pending)
+        }
+        return pending
+      }),
+    )
+  }
+
+  /** Até onde cada lista paginada do histórico já foi lida (ver `loadNextPage`). */
+  private pages = new Map<string, PageState>()
+
+  pageState(listId: string): PageState | undefined {
+    return this.pages.get(listId)
+  }
+
+  /**
+   * Próxima página de uma lista do histórico (ou de uma busca no banco): os registros
+   * entram no store como os demais e seguem pelo tempo real; a revalidação os confere
+   * pelo id. A primeira página traz também o total da lista.
+   */
+  async loadNextPage<T>(list: PagedList<T>): Promise<void> {
+    await this.hydratedSignal
+    const key = `pagina:${list.id}`
+    const running = this.loading.get(key)
+    if (running) return running
+    const state = this.pages.get(list.id) ?? { loaded: 0, done: false }
+    if (state.done) return
+    const pending = loadPage(
+      this.opts.supabase,
+      { ...list.scope, id: `${list.id}:${state.loaded}`, entity: true, latest: list.size, offset: state.loaded },
+      state.loaded === 0,
+    )
+      .then(({ rows, total }) => {
+        for (const row of rows) this.applyRemote(list.scope.key, row)
+        const last = rows[rows.length - 1]
+        this.pages.set(list.id, {
+          loaded: state.loaded + rows.length,
+          done: rows.length < list.size,
+          cursor: last ? list.cursor(last.data as T) : state.cursor,
+          total: total ?? state.total,
+        })
+      })
+      .finally(() => this.loading.delete(key))
+    this.loading.set(key, pending)
+    return pending
+  }
+
+  /** Processos completos (com todo o histórico de movimentações), no lugar do resumo. */
+  async ensureFullProcesses(ids: string[]): Promise<void> {
+    await this.hydratedSignal
+    const missing = ids.filter((id) => isPartial("processes", this.find("processes", id)))
+    if (!missing.length) return
+    const key = `processes:completo:${[...missing].sort().join(",")}`
+    let pending = this.loading.get(key)
+    if (!pending) {
+      pending = fetchRecords(this.opts.supabase, "processes", missing)
+        .then((rows) => {
+          for (const row of rows) this.applyRemote("processes", row)
+        })
+        .finally(() => this.loading.delete(key))
+      this.loading.set(key, pending)
+    }
+    return pending
+  }
+
+  private find(key: Collection, id: string): Entity | undefined {
+    return (this.state[key] as Entity[]).find((item) => item.id === id)
+  }
+
   /** Troca tudo pelo que está no banco (depois de uma gravação recusada por permissão, regra ou falha). */
   private async reloadAll() {
     try {
-      const snapshot = await loadState(this.opts.supabase)
+      // Os mesmos recortes que estavam na memória (nada além do que a pessoa já abriu).
+      const snapshot = await loadScopes(this.opts.supabase, [...this.scopes.values()])
       this.saved = snapshot.state
       this.versions = snapshot.versions
       this.external = cloneVersions(snapshot.versions)
@@ -421,7 +560,19 @@ export class OfficeSync<S extends PersistedState> {
   private put(key: Collection, row: ServerRow, { force = false, own = false } = {}) {
     if (!this.saved) return
     const known = this.versions[key].get(row.id)
-    if (!force && known && compareVersions(row.updated_at, known) <= 0) return
+    if (!force && known) {
+      const order = compareVersions(row.updated_at, known)
+      // Mesma versão: só vale se o banco trouxe o processo completo no lugar do resumo.
+      const upgrade = order === 0 && isPartial(key, this.find(key, row.id)) && !isPartial(key, row.data)
+      if (order < 0 || (order === 0 && !upgrade)) return
+    }
+    // Resumo mais novo de um processo que estava completo: mantém o histórico já carregado
+    // (o banco nunca o apaga — `0016_carga_sob_demanda.sql`); só os demais campos mudam.
+    const local = this.find(key, row.id)
+    if (isPartial(key, row.data) && local && !isPartial(key, local)) {
+      const full = local as Entity & { movements?: unknown[] }
+      row = { ...row, data: { ...row.data, movements: full.movements, movementsPartial: undefined } as Entity }
+    }
     this.versions[key].set(row.id, row.updated_at)
     if (!own) this.external[key].set(row.id, row.updated_at)
     this.touch(key, row.id)
@@ -499,6 +650,13 @@ export class OfficeSync<S extends PersistedState> {
     this.applyRemote(key, { id: row.id, data: row.data, updated_at: row.updated_at })
   }
 
+  /** Aviso de exclusão (`realtime_deletions`): tira o registro, se for deste escritório e de uma coleção do store. */
+  onDeletion(row: DeletionPayload | undefined) {
+    if (!this.saved || !row || row.organization_id !== this.opts.organizationId || !row.record_id) return
+    const key = COLLECTION_BY_TABLE.get(row.collection ?? "")
+    if (key) this.removeRemote(key, row.record_id)
+  }
+
   /**
    * Assina as mudanças do escritório. Um canal só, com as 10 coleções; o filtro por
    * escritório vale também para exclusões (sem ele, o Realtime entrega exclusões de
@@ -514,6 +672,10 @@ export class OfficeSync<S extends PersistedState> {
         this.onRealtime(key, payload),
       )
     }
+    // Exclusões chegam como avisos (migração 0018): o DELETE do Realtime não passa pela RLS.
+    channel = channel.on<DeletionPayload>("postgres_changes", { event: "INSERT", schema: "public", table: "realtime_deletions", filter }, (payload) =>
+      this.onDeletion(payload.new as DeletionPayload),
+    )
     let closed = false
     channel.subscribe((status, error) => {
       if (closed) return
@@ -566,15 +728,27 @@ export class OfficeSync<S extends PersistedState> {
     const startedAt = this.seq
     const { supabase } = this.opts
     try {
-      const manifests = await Promise.all(COLLECTIONS.map((key) => fetchManifest(supabase, key)))
+      // Janelas (abertura, coleção inteira, período da agenda): id + versão com o mesmo filtro.
+      // Com a coleção inteira carregada, as janelas menores dela não precisam de leitura própria.
+      const loaded = [...this.scopes.values()].filter((scope) => !scope.entity)
+      const whole = new Set(loaded.filter((scope) => !scope.filter && !scope.latest).map((scope) => scope.key))
+      const windows = loaded.filter((scope) => !whole.has(scope.key) || (!scope.filter && !scope.latest))
+      const manifests = await Promise.all(windows.map((scope) => fetchManifest(supabase, scope)))
+      const seen = new Map<Collection, Map<string, string>>(COLLECTIONS.map((key) => [key, new Map()]))
+      windows.forEach((scope, i) => {
+        for (const [id, version] of manifests[i]) seen.get(scope.key)!.set(id, version)
+      })
       await Promise.all(
-        COLLECTIONS.map(async (key, i) => {
-          const manifest = manifests[i]
+        COLLECTIONS.map(async (key) => {
+          const manifest = seen.get(key)!
           const known = this.versions[key]
+          // Registros na memória fora das janelas (abertos sob demanda): conferidos pelo id.
+          const outside = [...known.keys()].filter((id) => !manifest.has(id))
+          const current = outside.length ? await fetchVersions(supabase, key, outside) : new Map<string, string>()
+          for (const [id, version] of current) manifest.set(id, version)
           const changed = [...manifest].filter(([id, version]) => !known.has(id) || compareVersions(version, known.get(id)!) > 0).map(([id]) => id)
-          const gone = [...known.keys()].filter((id) => !manifest.has(id) && (this.touched.get(ref(key, id)) ?? 0) <= startedAt)
-          const rows = changed.length ? await fetchRecords(supabase, key, changed) : []
-          for (const row of rows) this.applyRemote(key, row)
+          const gone = outside.filter((id) => !current.has(id) && (this.touched.get(ref(key, id)) ?? 0) <= startedAt)
+          for (const row of await this.fetchChanged(key, changed)) this.applyRemote(key, row)
           for (const id of gone) this.removeRemote(key, id)
         }),
       )
@@ -587,6 +761,22 @@ export class OfficeSync<S extends PersistedState> {
         void this.revalidate()
       }
     }
+  }
+
+  /** Registros alterados: processo que estava completo vem completo; o resto, como resumo. */
+  private async fetchChanged(key: Collection, ids: string[]): Promise<ServerRow[]> {
+    if (!ids.length) return []
+    if (key !== "processes") return fetchRecords(this.opts.supabase, key, ids)
+    const full = ids.filter((id) => {
+      const local = this.find(key, id)
+      return local && !isPartial(key, local)
+    })
+    const summary = ids.filter((id) => !full.includes(id))
+    const [a, b] = await Promise.all([
+      full.length ? fetchRecords(this.opts.supabase, key, full) : [],
+      summary.length ? fetchRecords(this.opts.supabase, key, summary, "processes_summary") : [],
+    ])
+    return [...a, ...b]
   }
 }
 

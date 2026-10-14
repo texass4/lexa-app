@@ -7,6 +7,7 @@
  */
 
 import { addDays, diffInDays, getNow, parse, startOfWeek } from "@/lib/core/dates"
+import { byId, groupOf, prazosByProcess } from "@/lib/store/indexes"
 import type { Prazo, PrazoOrigin, Task } from "@/types"
 
 const PRAZO_ORIGINS: PrazoOrigin[] = ["manual", "intimacao", "movimentacao"]
@@ -21,7 +22,7 @@ const byFatalDate = (a: Prazo, b: Prazo) => a.fatalDate.localeCompare(b.fatalDat
 
 /** Prazos de um processo: abertos primeiro (o mais urgente no topo), depois os encerrados (mais recentes primeiro). */
 export function prazosOfProcess(prazos: readonly Prazo[], processId: string): Prazo[] {
-  const own = prazos.filter((p) => p.processId === processId)
+  const own = prazosByProcess(prazos, processId)
   return [...own.filter(isOpenPrazo).sort(byFatalDate), ...own.filter((p) => !isOpenPrazo(p)).sort((a, b) => byFatalDate(b, a))]
 }
 
@@ -30,16 +31,19 @@ export function prazosOfProcess(prazos: readonly Prazo[], processId: string): Pr
  * primeiro, para não passar despercebido). `processIds` restringe a esses processos.
  */
 export function nextPrazo(prazos: readonly Prazo[], processIds?: string | ReadonlySet<string>): Prazo | undefined {
-  const inScope = (p: Prazo) =>
-    processIds === undefined || (typeof processIds === "string" ? p.processId === processIds : processIds.has(p.processId))
-  return prazos.filter((p) => isOpenPrazo(p) && inScope(p)).sort(byFatalDate)[0]
+  // Um processo só: o índice por processo evita percorrer todos os prazos do escritório.
+  const candidates = typeof processIds === "string" ? prazosByProcess(prazos, processIds) : prazos
+  const inScope = (p: Prazo) => processIds === undefined || typeof processIds === "string" || processIds.has(p.processId)
+  let next: Prazo | undefined
+  for (const p of candidates) if (isOpenPrazo(p) && inScope(p) && (!next || byFatalDate(p, next) < 0)) next = p
+  return next
 }
 
 /** Tarefa vinculada ao prazo (por id), se ainda existir. */
-export const prazoTask = (prazo: Prazo, tasks: readonly Task[]) => (prazo.taskId ? tasks.find((t) => t.id === prazo.taskId) : undefined)
+export const prazoTask = (prazo: Prazo, tasks: readonly Task[]) => byId(tasks, prazo.taskId)
 
 /** Prazo ao qual a tarefa está vinculada. */
-export const taskPrazo = (task: Task, prazos: readonly Prazo[]) => prazos.find((p) => p.taskId === task.id)
+export const taskPrazo = (task: Task, prazos: readonly Prazo[]) => groupOf(prazos, "taskId", (p) => p.taskId, task.id)[0]
 
 export interface WeekGroup {
   responsibleId: string

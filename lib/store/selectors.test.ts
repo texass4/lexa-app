@@ -85,6 +85,21 @@ describe("financeiro calculado das faturas", () => {
     assert.equal(summary.growth, ((500 - 800) / 800) * 100)
   })
 
+  it("compara com o mesmo período do mês anterior, não com o mês inteiro", () => {
+    const early = new Date(2026, 8, 6, 10, 0) // 06/09: só 6 dias de setembro
+    const invoices = [
+      invoice("a", { dueDate: "2026-09-03", amount: 600, status: "pago", paidAt: "2026-09-03" }),
+      invoice("b", { dueDate: "2026-08-04", amount: 400, status: "pago", paidAt: "2026-08-04" }),
+      invoice("c", { dueDate: "2026-08-25", amount: 5000, status: "pago", paidAt: "2026-08-25" }),
+    ]
+    const summary = financeSummary(invoices, early)
+    assert.equal(summary.previousSamePeriod, 400)
+    assert.equal(summary.growth, 50)
+    // Março (31) contra fevereiro (28): o dia é limitado ao fim do mês anterior.
+    const feb = [invoice("d", { dueDate: "2026-02-28", amount: 100, status: "pago", paidAt: "2026-02-28" })]
+    assert.equal(financeSummary(feb, new Date(2026, 2, 31, 10, 0)).previousSamePeriod, 100)
+  })
+
   it("inadimplência é o vencido sobre o faturado", () => {
     const invoices = [invoice("a", { amount: 750, status: "atrasado" }), invoice("b", { amount: 250, status: "pago", paidAt: "2026-09-01" })]
     assert.equal(financeSummary(invoices, NOW).defaultRate, 75)

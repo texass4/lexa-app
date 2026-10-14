@@ -11,13 +11,13 @@ import type { ProcessSheet } from "@/lib/services/processos/sheet"
 import type { Process } from "@/types"
 
 /** Campos que a consulta preenche — mesmos rótulos no esqueleto e no resultado. */
-const FIELDS = ["Tribunal", "Grau", "Classe", "Órgão julgador", "Ajuizamento", "Movimentações"] as const
+const FIELDS = ["Tribunal na fonte", "Grau", "Classe", "Órgão julgador", "Ajuizamento", "Movimentações"] as const
 
 /** O que o resultado mostra, venha de uma consulta ou de um processo já salvo. */
 export type LookupSummary = Record<(typeof FIELDS)[number], string | undefined>
 
 export const summaryFromSheet = (sheet: ProcessSheet): LookupSummary => ({
-  Tribunal: sheet.tribunal,
+  "Tribunal na fonte": sheet.tribunal,
   Grau: degreeLabel(sheet.degree),
   Classe: sheet.className ?? sheet.subject,
   "Órgão julgador": sheet.judicialUnit,
@@ -26,7 +26,7 @@ export const summaryFromSheet = (sheet: ProcessSheet): LookupSummary => ({
 })
 
 export const summaryFromProcess = (process: Process): LookupSummary => ({
-  Tribunal: process.tribunal,
+  "Tribunal na fonte": process.tribunal,
   Grau: degreeLabel(process.degree),
   Classe: process.className ?? process.subject ?? process.type,
   "Órgão julgador": process.judicialUnit ?? process.court,
@@ -116,7 +116,7 @@ export function LookupFailed({ title, message, onRetry }: { title: string; messa
       <CircleAlert className="mt-px size-4 shrink-0 text-danger" />
       <div className="min-w-0 flex-1">
         <p className="text-[12.5px] font-medium text-foreground">{title}</p>
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{message} Se preferir, preencha os campos manualmente.</p>
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{message} Se preferir, preencha os campos manualmente — processos em segredo de justiça não aparecem na consulta pública.</p>
       </div>
       {onRetry && (
         <Button type="button" variant="ghost" size="sm" className="-my-1 shrink-0" onClick={onRetry}>

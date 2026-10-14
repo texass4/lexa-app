@@ -178,17 +178,34 @@ function EmailForm() {
     toast.success("E-mail de acesso atualizado.")
   }
 
+  // A senha só é pedida para confirmar uma troca: aparece quando o e-mail muda.
+  const changed = email.trim().toLowerCase() !== user.email
+
   return (
-    <form onSubmit={submit} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-      <Field label="E-mail de acesso" htmlFor="p-email" error={error}>
-        <TextInput id="p-email" type="email" autoComplete="email" value={email} aria-invalid={!!error} onChange={(e) => setEmail(e.target.value)} />
-      </Field>
-      <Field label="Senha atual" htmlFor="p-email-pass">
-        <TextInput id="p-email-pass" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      </Field>
-      <Button type="submit" variant="secondary" disabled={busy || email.trim().toLowerCase() === user.email}>
-        <Mail /> {busy ? "Salvando…" : "Trocar e-mail"}
-      </Button>
+    <form onSubmit={submit} noValidate className="space-y-3">
+      <div>
+        <h3 className="text-[13.5px] font-semibold text-foreground">E-mail de acesso</h3>
+        <p className="text-[12px] text-muted-foreground">Usado para entrar e para receber avisos da Íntegra.</p>
+      </div>
+      <div className={cn("grid grid-cols-1 gap-4 sm:items-end", changed ? "sm:grid-cols-[1fr_1fr_auto]" : "sm:grid-cols-[1fr_auto]")}>
+        <Field label="E-mail" htmlFor="p-email" error={error}>
+          <TextInput id="p-email" type="email" autoComplete="email" value={email} aria-invalid={!!error} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        {changed && (
+          <Field label="Confirme com sua senha" htmlFor="p-email-pass">
+            <TextInput
+              id="p-email-pass"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </Field>
+        )}
+        <Button type="submit" variant="secondary" disabled={busy || !changed}>
+          <Mail /> {busy ? "Salvando…" : "Trocar e-mail"}
+        </Button>
+      </div>
     </form>
   )
 }
@@ -223,6 +240,10 @@ function PasswordForm() {
 
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
+      <div>
+        <h3 className="text-[13.5px] font-semibold text-foreground">Senha</h3>
+        <p className="text-[12px] text-muted-foreground">Para trocar, informe a senha que usa hoje e a nova.</p>
+      </div>
       {error && (
         <p role="alert" className="text-[12.5px] text-danger">
           {error}
@@ -268,11 +289,7 @@ function OabPanel() {
     <Panel>
       <PanelHeader
         title="Inscrições na OAB"
-        description={
-          lawyer
-            ? "Obrigatória para advogados. Cada inscrição ativa é consultada diariamente no Diário de Justiça Eletrônico Nacional."
-            : "Se você advoga, cadastre suas inscrições para receber as intimações do DJEN."
-        }
+        description={lawyer ? "Obrigatória para advogados." : "Se você advoga, cadastre suas inscrições na OAB."}
       />
       <div className="px-5 pb-5">
         <OabManager userId={user.id} required={lawyer} />
@@ -330,8 +347,26 @@ export function ProfileSection() {
         <div className="grid grid-cols-1 gap-3 px-5 pb-5 sm:grid-cols-2">
           {(
             [
-              { id: "light", label: "Claro", icon: Sun, preview: "bg-[#F5F6F8]", rail: "bg-[#0B1526]", bar: "bg-white", line: "bg-[#E5E8EE]", accent: "bg-[#2B57C4]" },
-              { id: "dark", label: "Escuro", icon: Moon, preview: "bg-[#0A0F18]", rail: "bg-[#08111F]", bar: "bg-[#111723]", line: "bg-[#212A39]", accent: "bg-[#7FA3F5]" },
+              {
+                id: "light",
+                label: "Claro",
+                icon: Sun,
+                preview: "bg-[#F5F6F8]",
+                rail: "bg-[#0B1526]",
+                bar: "bg-white",
+                line: "bg-[#E5E8EE]",
+                accent: "bg-[#2B57C4]",
+              },
+              {
+                id: "dark",
+                label: "Escuro",
+                icon: Moon,
+                preview: "bg-[#0A0F18]",
+                rail: "bg-[#08111F]",
+                bar: "bg-[#111723]",
+                line: "bg-[#212A39]",
+                accent: "bg-[#7FA3F5]",
+              },
             ] as const
           ).map((t) => (
             <button

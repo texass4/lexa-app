@@ -40,8 +40,8 @@ const FEATURES: [string, string][] = [
     "Panorama do escritório, resumo e próximos passos do processo, análise de movimentação, resumo do cliente e chat — só quando alguém pede.",
   ],
   [
-    "Triagem",
-    'Cada evento novo (intimação do DJEN ou movimentação relevante) é interpretado uma vez, automaticamente, pela Íntegra: resumo, "exige ação?" e o prazo escrito no teor. Nenhum prazo é criado sem confirmação.',
+    "Conversa por voz",
+    "Quando alguém grava a pergunta, o áudio vai para a transcrição e é descartado em seguida — a Íntegra não guarda gravações. O texto volta para o campo, para revisão antes de enviar.",
   ],
   ["Central de Atendimento", "Resumos e sugestões de resposta das conversas do WhatsApp, quando alguém pede — processados pela Anthropic (Claude)."],
 ]

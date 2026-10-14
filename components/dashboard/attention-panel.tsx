@@ -19,7 +19,8 @@ import { fmtActivityTime, fmtRelative, getNow, toLocalISO } from "@/lib/core/dat
 const VISIBLE = 5
 const CHANGES_VISIBLE = 3
 
-function SinceLastVisit() {
+/** "Desde sua última visita". `embedded`: dentro de outro cartão (a coluna da Íntegra IA), sem margens próprias. */
+export function SinceLastVisit({ embedded = false }: { embedded?: boolean }) {
   const data = useOfficeData()
   const { user, can } = useSession()
   // Lida uma vez: a base da sessão não muda enquanto a tela está aberta.
@@ -32,7 +33,7 @@ function SinceLastVisit() {
 
   if (!changes.length) {
     return (
-      <p className="flex items-center gap-2 border-b border-border px-5 pb-3 text-[12.5px] text-subtle">
+      <p className={cn("flex items-center gap-2 text-[12.5px] text-subtle", embedded ? "py-1" : "border-b border-border px-5 pb-3")}>
         <History className="size-3.5" /> Nada mudou desde sua última visita ({since}).
       </p>
     )
@@ -41,7 +42,10 @@ function SinceLastVisit() {
   const shown = expanded ? changes : changes.slice(0, CHANGES_VISIBLE)
 
   return (
-    <section aria-label="Desde sua última visita" className="mx-3 mb-3 rounded-[12px] border border-brand/20 bg-brand-soft/40 px-3 pt-3 pb-2">
+    <section
+      aria-label="Desde sua última visita"
+      className={cn("rounded-[12px] border border-brand/20 bg-brand-soft/40 px-3 pt-3 pb-2", embedded ? "mb-2" : "mx-3 mb-3")}
+    >
       <header className="flex items-center justify-between gap-3 px-1">
         <p className="text-[12.5px] text-muted-foreground">
           <span className="font-semibold text-foreground">{changes.length === 1 ? "1 coisa mudou" : `${changes.length} coisas mudaram`}</span> desde
@@ -100,7 +104,7 @@ function SinceLastVisit() {
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="mt-0.5 flex items-center gap-1 rounded-md px-1 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="touch-target relative mt-0.5 flex items-center gap-1 rounded-md px-1 py-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           {expanded ? "Mostrar menos" : `Ver mais ${changes.length - CHANGES_VISIBLE}`}
           <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
@@ -148,7 +152,7 @@ export function AttentionPanel({
               type="button"
               onClick={() => setShowAll((v) => !v)}
               aria-expanded={showAll}
-              className="mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {showAll ? "Mostrar só o principal" : `Ver todos (${signals.length})`}
               <ChevronDown className={cn("size-3.5 transition-transform", showAll && "rotate-180")} />

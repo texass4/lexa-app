@@ -46,3 +46,19 @@ export function createLocalStore(key: string, fallback: string) {
     },
   }
 }
+
+/** `true` quando a media query casa (ex.: "(min-width: 1280px)"); falso no servidor. */
+export function useMediaQuery(query: string) {
+  return React.useSyncExternalStore(
+    (onChange) => {
+      const list = window.matchMedia(query)
+      list.addEventListener("change", onChange)
+      return () => list.removeEventListener("change", onChange)
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  )
+}
+
+/** Telas largas o bastante para o assistente ficar acoplado ao lado do conteúdo. */
+export const DOCKED_PANEL_QUERY = "(min-width: 1280px)"
