@@ -1,21 +1,7 @@
 "use client"
 
 import * as React from "react"
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Check,
-  ChevronRight,
-  CloudUpload,
-  LayoutGrid,
-  List,
-  ListFilter,
-  Loader2,
-  PanelRight,
-  Search,
-  X,
-} from "lucide-react"
+import { Check, ChevronDown, LayoutGrid, List, Loader2, PanelLeft, PanelRight, Search, SlidersHorizontal, X } from "lucide-react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
@@ -27,7 +13,6 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useOfficeData } from "@/lib/store/office-store"
@@ -47,29 +32,34 @@ import {
   type SortKey,
 } from "@/lib/documentos/library"
 import type { Client, DocumentKind } from "@/types"
+import { FileTypeGlyph } from "./file-type-icon"
 
 export type View = "lista" | "grade"
 
-/** Trilha da localização: cada segmento leva ao lugar correspondente. */
+/** Trilha da localização ("Escritório / Clientes / Ana Martins / Processo 0001234-56"). */
 export function Breadcrumbs({ crumbs, onNavigate }: { crumbs: Crumb[]; onNavigate: (s: LibraryState) => void }) {
   return (
     <nav aria-label="Localização" className="min-w-0">
-      <ol className="flex min-w-0 items-center gap-1 text-[15px]">
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[12.5px] text-muted-foreground">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1
           return (
-            <li key={`${i}-${c.label}`} className={cn("flex min-w-0 items-center gap-1", !last && i > 0 && "@max-3xl/files:hidden")}>
-              {i > 0 && <ChevronRight className={cn("size-4 shrink-0 text-subtle", !last && "@max-3xl/files:hidden")} aria-hidden />}
+            <li key={`${i}-${c.label}`} className="flex min-w-0 items-center gap-1">
+              {i > 0 && (
+                <span className="text-subtle" aria-hidden>
+                  /
+                </span>
+              )}
               {c.target && !last ? (
                 <button
                   type="button"
                   onClick={() => onNavigate(c.target!)}
-                  className="truncate rounded-[6px] px-1 py-0.5 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                  className="max-w-[220px] truncate rounded-[5px] px-0.5 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
                 >
                   {c.label}
                 </button>
               ) : (
-                <span aria-current="location" className="truncate px-1 text-[17px] font-semibold tracking-[-0.015em] text-foreground">
+                <span aria-current="location" className="max-w-[260px] truncate px-0.5 text-foreground/80">
                   {c.label}
                 </span>
               )}
@@ -95,28 +85,30 @@ function FilterGroup({ label, htmlFor, children }: { label: string; htmlFor?: st
 /** Painel de filtros: só campos que o documento realmente guarda. Tudo combina. */
 function FiltersPopover({ state, onChange, clients }: { state: LibraryState; onChange: (next: LibraryState) => void; clients: Client[] }) {
   const data = useOfficeData()
-  const count = activeFilters(state).length
+  // O formato já aparece nos botões da barra: não conta aqui.
+  const count = activeFilters(state).filter((f) => f.key !== "formats").length
   const inClientes = state.section === "clientes"
   const processes = data.processes.filter((p) => (state.clientId ? p.clientId === state.clientId : true))
   const members = getMembers({ includeInactive: true })
   const set = (patch: Partial<LibraryState>) => onChange({ ...state, ...patch })
-  const toggleFormat = (value: string) =>
-    set({ formats: state.formats.includes(value) ? state.formats.filter((f) => f !== value) : [...state.formats, value] })
 
   return (
     <Popover>
       <PopoverTrigger
-        render={
-          <Button variant="secondary" className={cn("shrink-0", count > 0 && "border-brand/40 text-brand-strong")}>
-            <ListFilter /> Filtros
-            {count > 0 && (
-              <span className="tabular flex size-5 items-center justify-center rounded-full bg-brand text-[11px] font-semibold text-brand-foreground">
-                {count}
-              </span>
-            )}
-          </Button>
-        }
-      />
+        aria-label={count ? `Filtros (${count} ativo${count === 1 ? "" : "s"})` : "Filtros"}
+        title="Filtros"
+        className={cn(
+          "relative flex size-9 shrink-0 items-center justify-center rounded-control border bg-surface text-muted-foreground shadow-xs outline-none transition-colors duration-150 hover:border-border-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40",
+          count > 0 ? "border-brand/40 text-brand-strong" : "border-border",
+        )}
+      >
+        <SlidersHorizontal className="size-4" />
+        {count > 0 && (
+          <span className="tabular absolute -top-1.5 -right-1.5 flex size-[18px] items-center justify-center rounded-full bg-brand text-[10.5px] font-semibold text-brand-foreground">
+            {count}
+          </span>
+        )}
+      </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(340px,calc(100vw-2rem))] gap-4 p-4">
         <FilterGroup label="Categoria" htmlFor="filtro-categoria">
           <NativeSelect
@@ -133,26 +125,6 @@ function FiltersPopover({ state, onChange, clients }: { state: LibraryState; onC
             ))}
           </NativeSelect>
         </FilterGroup>
-        <fieldset className="space-y-1.5">
-          <legend className="mb-1.5 text-[11.5px] font-semibold tracking-[0.04em] text-subtle uppercase">Formato</legend>
-          <div className="grid grid-cols-2 gap-1.5">
-            {FORMATS.map((f) => {
-              const on = state.formats.includes(f.value)
-              return (
-                <label
-                  key={f.value}
-                  className={cn(
-                    "flex h-9 cursor-pointer items-center gap-2 rounded-control border px-2.5 text-[12.5px] transition-colors duration-150",
-                    on ? "border-brand/40 bg-brand-soft/60 text-brand-strong" : "border-border hover:border-border-strong",
-                  )}
-                >
-                  <input type="checkbox" checked={on} onChange={() => toggleFormat(f.value)} className="size-3.5 accent-[var(--brand)]" />
-                  <span className="truncate">{f.label.replace(/ \(.*\)$/, "")}</span>
-                </label>
-              )
-            })}
-          </div>
-        </fieldset>
         {!inClientes && (
           <>
             <FilterGroup label="Cliente" htmlFor="filtro-cliente">
@@ -249,7 +221,7 @@ function FiltersPopover({ state, onChange, clients }: { state: LibraryState; onC
 export function FilterChips({ state, onChange }: { state: LibraryState; onChange: (next: LibraryState) => void }) {
   const data = useOfficeData()
   const reduce = useReducedMotion()
-  const filters = activeFilters(state)
+  const filters = activeFilters(state).filter((f) => f.key !== "formats")
   if (!filters.length) return null
   const label = (f: (typeof filters)[number]) => {
     switch (f.key) {
@@ -326,51 +298,112 @@ export function FilterChips({ state, onChange }: { state: LibraryState; onChange
   )
 }
 
+/** As ordens que a pessoa escolhe, com nome humano ("Mais recentes"). */
+const SORT_OPTIONS: { key: SortKey; dir: SortDir; label: string }[] = [
+  { key: "enviado", dir: "desc", label: "Mais recentes" },
+  { key: "enviado", dir: "asc", label: "Mais antigos" },
+  { key: "nome", dir: "asc", label: "Nome (A–Z)" },
+  { key: "nome", dir: "desc", label: "Nome (Z–A)" },
+  { key: "formato", dir: "asc", label: "Tipo" },
+  { key: "categoria", dir: "asc", label: "Categoria" },
+  { key: "tamanho", dir: "desc", label: "Maiores primeiro" },
+  { key: "tamanho", dir: "asc", label: "Menores primeiro" },
+]
+
+export const sortLabel = (sort: { key: SortKey; dir: SortDir }) =>
+  SORT_OPTIONS.find((o) => o.key === sort.key && o.dir === sort.dir)?.label ?? SORTS.find((s) => s.value === sort.key)?.label ?? ""
+
+const control =
+  "flex h-9 shrink-0 items-center gap-1.5 rounded-control border border-border bg-surface px-3 text-[13px] text-foreground shadow-xs outline-none transition-colors duration-150 hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:border-border-strong"
+
 function SortMenu({ sort, onSort }: { sort: { key: SortKey; dir: SortDir }; onSort: (s: { key: SortKey; dir: SortDir }) => void }) {
-  const current = SORTS.find((s) => s.value === sort.key)!
-  const Arrow = sort.dir === "asc" ? ArrowUp : ArrowDown
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="secondary"
-            className="shrink-0"
-            aria-label={`Ordenar: ${current.label}, ${sort.dir === "asc" ? "crescente" : "decrescente"}`}
-          >
-            <ArrowUpDown />
-            <span className="@max-xl/files:hidden">{current.label}</span>
-            <Arrow className="size-3.5 text-muted-foreground" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuTrigger className={control} aria-label={`Ordenar: ${sortLabel(sort)}`}>
+        <span className="text-muted-foreground @max-4xl/files:hidden">Ordenar:</span>
+        <span className="font-medium">{sortLabel(sort)}</span>
+        <ChevronDown className="size-3.5 text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
-          {SORTS.map((s) => (
-            <DropdownMenuItem
-              key={s.value}
-              className="h-8 px-2"
-              onClick={() => onSort({ key: s.value, dir: s.value === sort.key ? sort.dir : s.defaultDir })}
-            >
-              <Check className={cn("size-4", s.value === sort.key ? "opacity-100" : "opacity-0")} /> {s.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Direção</DropdownMenuLabel>
-          <DropdownMenuItem className="h-8 px-2" onClick={() => onSort({ ...sort, dir: "asc" })}>
-            <Check className={cn("size-4", sort.dir === "asc" ? "opacity-100" : "opacity-0")} />
-            {sort.key === "enviado" ? "Mais antigos primeiro" : sort.key === "tamanho" ? "Menores primeiro" : "A → Z"}
-          </DropdownMenuItem>
-          <DropdownMenuItem className="h-8 px-2" onClick={() => onSort({ ...sort, dir: "desc" })}>
-            <Check className={cn("size-4", sort.dir === "desc" ? "opacity-100" : "opacity-0")} />
-            {sort.key === "enviado" ? "Mais recentes primeiro" : sort.key === "tamanho" ? "Maiores primeiro" : "Z → A"}
-          </DropdownMenuItem>
+          {SORT_OPTIONS.map((o) => {
+            const on = o.key === sort.key && o.dir === sort.dir
+            return (
+              <DropdownMenuItem key={`${o.key}:${o.dir}`} className="h-8 px-2" onClick={() => onSort({ key: o.key, dir: o.dir })}>
+                <Check className={cn("size-4", on ? "opacity-100" : "opacity-0")} /> {o.label}
+              </DropdownMenuItem>
+            )
+          })}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+function ViewMenu({ view, onView }: { view: View; onView: (v: View) => void }) {
+  const Icon = view === "lista" ? List : LayoutGrid
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className={cn(control, "px-2.5")} aria-label={`Exibição: ${view === "lista" ? "lista" : "grade"}`} title="Exibição">
+        <Icon className="size-4 text-muted-foreground" />
+        <ChevronDown className="size-3.5 text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Exibir em</DropdownMenuLabel>
+          {(
+            [
+              ["lista", List, "Lista"],
+              ["grade", LayoutGrid, "Grade"],
+            ] as const
+          ).map(([v, I, label]) => (
+            <DropdownMenuItem key={v} className="h-8 px-2" onClick={() => onView(v)}>
+              <I /> {label}
+              <Check className={cn("ml-auto size-4", view === v ? "opacity-100" : "opacity-0")} />
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/** Botões de formato (Todos, PDF, Word, Excel, Outros): um por vez, como no Drive. */
+function FormatPills({ state, onChange }: { state: LibraryState; onChange: (next: LibraryState) => void }) {
+  const current = state.formats.length === 1 ? state.formats[0] : state.formats.length ? "varios" : "todos"
+  const pill =
+    "flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand/40"
+  const on = "border-brand/35 bg-brand-soft text-brand-strong shadow-[0_0_0_3px_color-mix(in_oklab,var(--brand)_8%,transparent)]"
+  const off = "border-border bg-surface text-muted-foreground shadow-xs hover:border-border-strong hover:text-foreground"
+  const icon: Record<string, string> = { pdf: "pdf", word: "docx", excel: "xlsx", outros: "txt" }
+  return (
+    <div role="group" aria-label="Tipo de arquivo" className="flex min-w-0 items-center gap-1.5 overflow-x-auto no-scrollbar">
+      <button
+        type="button"
+        aria-pressed={current === "todos"}
+        onClick={() => onChange({ ...state, formats: [] })}
+        className={cn(pill, current === "todos" ? on : off)}
+      >
+        <span className="flex size-4 items-center justify-center rounded-[4px] bg-brand text-brand-foreground" aria-hidden>
+          <LayoutGrid className="size-2.5" strokeWidth={2.5} />
+        </span>
+        Todos
+      </button>
+      {FORMATS.map((f) => (
+        <button
+          key={f.value}
+          type="button"
+          aria-pressed={current === f.value}
+          title={f.label}
+          onClick={() => onChange({ ...state, formats: current === f.value ? [] : [f.value] })}
+          className={cn(pill, current === f.value ? on : off)}
+        >
+          <FileTypeGlyph extension={icon[f.value]} className={cn("h-4 w-[13px]", f.value === "outros" && "opacity-80")} />
+          {f.short}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -387,8 +420,6 @@ export function DocumentsToolbar({
   clients,
   detailsOpen,
   onToggleDetails,
-  canEdit,
-  onUpload,
   onOpenNav,
 }: {
   state: LibraryState
@@ -403,88 +434,59 @@ export function DocumentsToolbar({
   clients: Client[]
   detailsOpen: boolean
   onToggleDetails?: () => void
-  canEdit: boolean
-  onUpload: () => void
-  onOpenNav: () => void
+  /** Ausente: as pastas já estão à vista (coluna). */
+  onOpenNav?: () => void
 }) {
   const atClientes = state.section === "clientes" && !state.clientId
-  const placeholder = atClientes ? "Buscar cliente…" : "Buscar por nome, categoria, cliente ou processo…"
+  const placeholder = atClientes ? "Buscar cliente…" : "Buscar por nome do arquivo..."
   return (
-    <div className="flex flex-col gap-2.5 @3xl/files:flex-row @3xl/files:items-center">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <Button variant="secondary" size="icon" className="shrink-0 @5xl/main:hidden" aria-label="Abrir navegação de documentos" onClick={onOpenNav}>
-          <List />
-        </Button>
-        <div role="search" className="relative min-w-0 flex-1 @3xl/files:max-w-[440px]">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-subtle" aria-hidden />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && search && onSearch("")}
-            placeholder={placeholder}
-            aria-label={placeholder}
-            className="h-9 w-full rounded-control border border-border bg-surface pr-16 pl-9.5 text-[13px] text-foreground shadow-xs outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-border-strong focus:border-brand/60 focus:ring-4 focus:ring-brand/10 [&::-webkit-search-cancel-button]:hidden"
-          />
-          <span className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
-            {searching && <Loader2 className="size-3.5 animate-spin text-subtle motion-reduce:animate-none" aria-label="Buscando" />}
-            {search && (
-              <button
-                type="button"
-                onClick={() => onSearch("")}
-                aria-label="Limpar busca"
-                className="flex size-6 items-center justify-center rounded-md text-subtle outline-none hover:bg-surface-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </span>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <FiltersPopover state={state} onChange={onChange} clients={clients} />
-        <SortMenu sort={sort} onSort={onSort} />
-        <div role="group" aria-label="Exibição" className="flex shrink-0 rounded-control border border-border bg-surface p-0.5 shadow-xs">
-          {(
-            [
-              ["lista", List, "Lista"],
-              ["grade", LayoutGrid, "Grade"],
-            ] as const
-          ).map(([v, Icon, label]) => (
+    <div className="flex flex-wrap items-center gap-2.5">
+      {onOpenNav && (
+        <button type="button" className={cn(control, "px-2.5")} aria-label="Abrir as pastas de documentos" title="Pastas" onClick={onOpenNav}>
+          <PanelLeft className="size-4 text-muted-foreground" />
+        </button>
+      )}
+      <div role="search" className="relative min-w-[200px] flex-1 basis-[240px] @4xl/main:max-w-[320px]">
+        <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-subtle" aria-hidden />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && search && onSearch("")}
+          placeholder={placeholder}
+          aria-label={atClientes ? "Buscar cliente" : "Buscar por nome do arquivo, categoria, cliente ou processo"}
+          className="h-9 w-full rounded-control border border-border bg-surface pr-16 pl-10 text-[13px] text-foreground shadow-xs outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-border-strong focus:border-brand/60 focus:ring-4 focus:ring-brand/10 [&::-webkit-search-cancel-button]:hidden"
+        />
+        <span className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+          {searching && <Loader2 className="size-3.5 animate-spin text-subtle motion-reduce:animate-none" aria-label="Buscando" />}
+          {search && (
             <button
-              key={v}
               type="button"
-              aria-pressed={view === v}
-              aria-label={`Ver em ${label.toLowerCase()}`}
-              title={label}
-              onClick={() => onView(v)}
-              className={cn(
-                "flex size-8 items-center justify-center rounded-[6px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand/40",
-                view === v ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
-              )}
+              onClick={() => onSearch("")}
+              aria-label="Limpar busca"
+              className="flex size-6 items-center justify-center rounded-md text-subtle outline-none hover:bg-surface-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              <Icon className="size-4" />
+              <X className="size-3.5" />
             </button>
-          ))}
-        </div>
+          )}
+        </span>
+      </div>
+      {!atClientes && <FormatPills state={state} onChange={onChange} />}
+      <div className="ml-auto flex items-center gap-2">
+        <SortMenu sort={sort} onSort={onSort} />
+        <ViewMenu view={view} onView={onView} />
+        <FiltersPopover state={state} onChange={onChange} clients={clients} />
         {onToggleDetails && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("hidden shrink-0 @xl/files:flex", detailsOpen && "bg-brand-soft text-brand-strong")}
+          <button
+            type="button"
+            className={cn(control, "px-2.5", detailsOpen && "border-brand/40 bg-brand-soft text-brand-strong")}
             aria-pressed={detailsOpen}
             aria-label={detailsOpen ? "Fechar painel de detalhes" : "Abrir painel de detalhes"}
             title="Detalhes"
             onClick={onToggleDetails}
           >
-            <PanelRight />
-          </Button>
-        )}
-        {canEdit && (
-          <Button className="shrink-0 @5xl/main:hidden" onClick={onUpload} aria-label="Enviar arquivos">
-            <CloudUpload />
-            <span className="@max-xl/files:hidden">Enviar</span>
-          </Button>
+            <PanelRight className="size-4" />
+          </button>
         )}
       </div>
     </div>

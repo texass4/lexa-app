@@ -3,11 +3,9 @@
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { CloudUpload, FolderOpen, SearchX, Star } from "lucide-react"
-import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { EmptyState, ErrorState } from "@/components/ui/empty-state"
 import { SkeletonTable } from "@/components/ui/skeleton"
-import { LimitedList } from "@/components/ui/show-more"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
@@ -15,6 +13,8 @@ import { useUI } from "@/lib/store/ui-store"
 import { useSession } from "@/lib/auth/session"
 import { getNow } from "@/lib/core/dates"
 import { processSubject } from "@/lib/processos/label"
+import { shortProcessNumber } from "./documents-nav"
+import { Paginated } from "./pagination"
 import {
   breadcrumbs,
   EMPTY_STATE,
@@ -40,8 +40,10 @@ import { isNewDocument, useDocumentLibrary } from "./use-document-library"
 
 const VIEW_KEY = "lexa:documentos:view"
 const SORT_KEY = "lexa:documentos:ordem"
-/** Largura mínima da Central para os detalhes virarem coluna ao lado da lista. */
-const DETAILS_COLUMN_MIN = 1180
+const DETAILS_KEY = "lexa:documentos:detalhes"
+/** Larguras da Central a partir das quais as pastas e os detalhes viram colunas. */
+const NAV_COLUMN_MIN = 880
+const DETAILS_COLUMN_MIN = 1100
 
 function readLocal<T>(key: string, fallback: T, valid: (v: unknown) => v is T): T {
   try {
@@ -109,6 +111,12 @@ export function DocumentsView() {
   const [view, setViewState] = React.useState<View>(() => readLocal(VIEW_KEY, "lista", isView))
   const [selected, setSelected] = React.useState<ReadonlySet<string>>(() => new Set())
   const [detailId, setDetailId] = React.useState<string>()
+  // Telas largas: o painel do documento fica sempre ao lado (como no Drive); dá para fechar.
+  const [detailsHidden, setDetailsHiddenState] = React.useState(() => readLocal(DETAILS_KEY, false, (v): v is boolean => typeof v === "boolean"))
+  const setDetailsHidden = (v: boolean) => {
+    setDetailsHiddenState(v)
+    writeLocal(DETAILS_KEY, v)
+  }
   const [viewerId, setViewerId] = React.useState<string>()
   const [navOpen, setNavOpen] = React.useState(false)
   const [dragging, setDragging] = React.useState(false)
@@ -117,8 +125,15 @@ export function DocumentsView() {
   const lib = useDocumentLibrary(state, search, sort)
   const client = byId(data.clients, state.clientId)
   const process = byId(data.processes, state.processId)
-  const crumbs = breadcrumbs(state, { client: client?.name, process: process ? processSubject(process) : undefined })
+  const crumbs = breadcrumbs(state, { client: client?.name, process: process ? `Processo ${shortProcessNumber(process)}` : undefined })
   const here = crumbs[crumbs.length - 1].label
+  // Trilha do cabeçalho: começa no escritório ("Escritório / Clientes / Ana Martins / Processo …").
+  const trail = [{ ...crumbs[0], label: "Escritório", target: crumbs.length > 1 ? crumbs[0].target : undefined }, ...crumbs.slice(1)]
+  const subtitle = process
+    ? `Gerencie os documentos deste processo${process ? ` (${processSubject(process)})` : ""}. Organize, compartilhe e mantenha tudo seguro.`
+    : client
+      ? "Gerencie os documentos deste cliente. Organize, compartilhe e mantenha tudo seguro."
+      : "Gerencie os documentos do escritório. Organize, compartilhe e mantenha tudo seguro."
 
   const navigate = React.useCallback(
     (next: LibraryState) => {
@@ -195,8 +210,11 @@ export function DocumentsView() {
   }, [selected.size, clearSelection])
 
   const selectedDocs = data.documents.filter((d) => selected.has(d.id))
-  const detail = detailId ? data.documents.find((d) => d.id === detailId) : undefined
+  const navAsColumn = rootWidth >= NAV_COLUMN_MIN
   const detailsAsColumn = rootWidth >= DETAILS_COLUMN_MIN
+  const chosen = detailId ? data.documents.find((d) => d.id === detailId) : undefined
+  // Em coluna, sem escolha: o primeiro selecionado ou o primeiro da lista.
+  const detail = chosen ?? (detailsAsColumn && !detailsHidden ? (selectedDocs[0] ?? lib.rows[0]) : undefined)
   const isNew = React.useCallback((d: LegalDocument) => isNewDocument(d, getNow()), [])
 
   const upload = (files?: File[]) =>
@@ -260,33 +278,27 @@ export function DocumentsView() {
   const partialSort = !!lib.history && !lib.history.done && !(sort.key === "enviado" && sort.dir === "desc")
 
   let content: React.ReactNode
-  if (lib.error)
+  if (lib.error) content = <ErrorState title="Não foi possível carregar os documentos." onRetry={retryLoad} />
+  else if (lib.loading)
     content = (
-      <div className="rounded-card border border-border bg-card">
-        <ErrorState title="Não foi possível carregar os documentos." onRetry={retryLoad} />
+      <div className="p-3">
+        <SkeletonTable />
       </div>
     )
-  else if (lib.loading) content = <SkeletonTable />
   else if (state.section === "favoritos" && lib.favorites.status === "unavailable")
     content = (
-      <div className="rounded-card border border-border bg-card">
-        <EmptyState
-          icon={<Star />}
-          title="Favoritos ainda não estão ativos neste escritório."
-          description="O recurso depende de uma atualização do banco de dados. Os demais documentos continuam disponíveis em Todos os documentos."
-        />
-      </div>
+      <EmptyState
+        icon={<Star />}
+        title="Favoritos ainda não estão ativos neste escritório."
+        description="O recurso depende de uma atualização do banco de dados. Os demais documentos continuam disponíveis em Todos os documentos."
+      />
     )
   else if (state.section === "favoritos" && lib.favorites.status === "error")
-    content = (
-      <div className="rounded-card border border-border bg-card">
-        <ErrorState title="Não foi possível carregar seus favoritos." onRetry={lib.favorites.retry} />
-      </div>
-    )
+    content = <ErrorState title="Não foi possível carregar seus favoritos." onRetry={lib.favorites.retry} />
   else if (!lib.rows.length && !lib.folders.length) {
     const searchingSomething = !!search.trim() || hasFilters(state)
     content = (
-      <div className="rounded-card border border-border bg-card">
+      <div>
         {searchingSomething ? (
           <EmptyState
             icon={<SearchX />}
@@ -355,69 +367,97 @@ export function DocumentsView() {
     )
   } else
     content = (
-      <LimitedList
+      <Paginated
         items={lib.rows}
         listKey={`${paramsKey}|${search}|${sort.key}${sort.dir}|${view}`}
         server={lib.history}
-        total={state.section === "todos" ? lib.total : undefined}
+        total={state.section === "todos" ? lib.total : lib.rows.length + lib.folders.length > 0 ? lib.rows.length : undefined}
       >
-        {(visibleRows) => (view === "grade" ? <FileGrid {...viewProps} rows={visibleRows} /> : <FileList {...viewProps} rows={visibleRows} />)}
-      </LimitedList>
+        {(visibleRows) =>
+          view === "grade" ? (
+            <div className="p-3">
+              <FileGrid {...viewProps} rows={visibleRows} />
+            </div>
+          ) : (
+            <FileList {...viewProps} rows={visibleRows} />
+          )
+        }
+      </Paginated>
     )
 
   const nav = (
-    <DocumentsNav
-      state={state}
-      onNavigate={navigate}
-      counts={lib.counts}
-      clients={lib.clientsWithDocs}
-      processFolders={state.section === "clientes" && state.clientId && !state.processId && !lib.filtered ? lib.folders : []}
-      favoritesStatus={lib.favorites.status}
-      canEdit={canEdit}
-      onUpload={() => upload()}
-    />
+    <DocumentsNav state={state} onNavigate={navigate} counts={lib.counts} clients={lib.clientsWithDocs} favoritesStatus={lib.favorites.status} />
   )
   const backLabel = SECTIONS.some((s) => s.label === here) || crumbs.length > 1 ? here : "Documentos"
 
+  const columns = [navAsColumn && "212px", "minmax(0,1fr)", detail && detailsAsColumn && "244px"].filter(Boolean).join(" ")
+
   return (
     <DocumentsActionsProvider onOpen={(d) => setViewerId(d.id)} onDetails={(d) => setDetailId(d.id)}>
-      <h1 className="sr-only">Documentos</h1>
-      <div ref={rootRef} className="grid min-w-0 gap-6 @5xl/main:grid-cols-[232px_minmax(0,1fr)]">
-        <aside className="hidden @5xl/main:block">
-          <div className="sticky top-24">{nav}</div>
-        </aside>
-
-        <div className={cn("grid min-w-0 items-start gap-5", detail && detailsAsColumn && "grid-cols-[minmax(0,1fr)_320px]")}>
-          <section aria-label={`Arquivos em ${here}`} className="@container/files relative min-w-0 space-y-3.5" {...dragProps}>
-            <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-1">
-              <Breadcrumbs crumbs={crumbs} onNavigate={navigate} />
-              {summary && !lib.loading && <p className="pb-0.5 text-[12.5px] text-muted-foreground">{summary}</p>}
+      <div ref={rootRef} className="min-w-0 space-y-4">
+        <header className="space-y-2">
+          <Breadcrumbs crumbs={trail} onNavigate={navigate} />
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-page-title font-semibold tracking-[-0.02em] text-foreground">Documentos</h1>
+              <p className="mt-1 max-w-[70ch] text-[13.5px] text-muted-foreground">{subtitle}</p>
             </div>
-            <DocumentsToolbar
-              state={state}
-              onChange={navigate}
-              search={search}
-              onSearch={setSearch}
-              searching={lib.searching}
-              sort={sort}
-              onSort={setSort}
-              view={view}
-              onView={setView}
-              clients={lib.clientsWithDocs}
-              detailsOpen={!!detail}
-              onToggleDetails={
-                detail ? () => setDetailId(undefined) : lib.rows[0] ? () => setDetailId((selectedDocs[0] ?? lib.rows[0]).id) : undefined
-              }
-              canEdit={canEdit}
-              onUpload={() => upload()}
-              onOpenNav={() => setNavOpen(true)}
-            />
-            <FilterChips state={state} onChange={navigate} />
-            {partialSort && (
-              <p className="text-[12px] text-subtle">A ordem vale para os documentos já carregados; “Mostrar mais” traz os anteriores.</p>
+            {canEdit && (
+              <Button onClick={() => upload()}>
+                <CloudUpload /> Enviar arquivos
+              </Button>
+            )}
+          </div>
+        </header>
+
+        <DocumentsToolbar
+          state={state}
+          onChange={navigate}
+          search={search}
+          onSearch={setSearch}
+          searching={lib.searching}
+          sort={sort}
+          onSort={setSort}
+          view={view}
+          onView={setView}
+          clients={lib.clientsWithDocs}
+          detailsOpen={!!detail}
+          onToggleDetails={
+            detail
+              ? () => {
+                  setDetailId(undefined)
+                  if (detailsAsColumn) setDetailsHidden(true)
+                }
+              : lib.rows[0]
+                ? () => {
+                    setDetailsHidden(false)
+                    setDetailId((selectedDocs[0] ?? lib.rows[0]).id)
+                  }
+                : undefined
+          }
+          onOpenNav={navAsColumn ? undefined : () => setNavOpen(true)}
+        />
+        <FilterChips state={state} onChange={navigate} />
+        {partialSort && (
+          <p className="text-[12px] text-subtle">A ordem vale para os documentos já carregados; as próximas páginas trazem os anteriores.</p>
+        )}
+
+        <div className="grid min-w-0 items-start gap-3.5" style={{ gridTemplateColumns: columns }}>
+          {navAsColumn && (
+            <aside className="sticky top-24 min-w-0">
+              <div className="max-h-[calc(100dvh-7.5rem)] overflow-y-auto rounded-card border border-border bg-card p-2 thin-scrollbar">{nav}</div>
+            </aside>
+          )}
+
+          <section
+            aria-label={`Arquivos em ${here}`}
+            className="@container/files relative min-w-0 overflow-hidden rounded-card border border-border bg-card"
+            {...dragProps}
+          >
+            {summary && !lib.loading && lib.folders.length > 0 && (
+              <p className="border-b border-border/70 px-4 py-2.5 text-[12.5px] text-muted-foreground">{summary}</p>
             )}
             <div className="transition-opacity duration-150">{content}</div>
-            <SelectionBar docs={selectedDocs} onClear={clearSelection} />
 
             {dragging && (
               <div
@@ -427,7 +467,7 @@ export function DocumentsView() {
                 <div className="rounded-[12px] bg-card px-6 py-4 text-center shadow-float">
                   <CloudUpload className="mx-auto size-6 text-brand" />
                   <p className="mt-2 text-[14px] font-semibold text-foreground">Solte para enviar para {here}</p>
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">PDF, DOC, DOCX, TXT, JPG ou PNG — até 25 MB cada</p>
+                  <p className="mt-0.5 text-[12px] text-muted-foreground">PDF, Word, Excel, TXT, JPG ou PNG — até 25 MB cada</p>
                 </div>
               </div>
             )}
@@ -435,16 +475,24 @@ export function DocumentsView() {
 
           {detail && detailsAsColumn && (
             <div className="sticky top-24 min-w-0">
-              <DocumentDetails doc={detail} onClose={() => setDetailId(undefined)} className="max-h-[calc(100dvh-7.5rem)]" />
+              <DocumentDetails
+                doc={detail}
+                onClose={() => {
+                  setDetailId(undefined)
+                  setDetailsHidden(true)
+                }}
+                className="max-h-[calc(100dvh-7.5rem)]"
+              />
             </div>
           )}
         </div>
+        <SelectionBar docs={selectedDocs} onClear={clearSelection} />
       </div>
 
       {/* Telas menores: detalhes num painel que não tira a pessoa da lista. */}
       {!detailsAsColumn && (
         <SideSheet
-          open={!!detail}
+          open={!!chosen}
           onOpenChange={(open) => !open && setDetailId(undefined)}
           title={detail ? `Detalhes de ${detail.name}` : "Detalhes"}
           className="sm:w-[420px]"
@@ -454,9 +502,11 @@ export function DocumentsView() {
       )}
 
       {/* Navegação no celular e no tablet. */}
-      <SideSheet open={navOpen} onOpenChange={setNavOpen} title="Navegação de documentos" className="sm:w-[340px]">
-        <div className="p-4 pt-12">{nav}</div>
-      </SideSheet>
+      {!navAsColumn && (
+        <SideSheet open={navOpen} onOpenChange={setNavOpen} title="Pastas de documentos" className="sm:w-[340px]">
+          <div className="p-3 pt-12">{nav}</div>
+        </SideSheet>
+      )}
 
       <DocumentViewer documentId={viewerId} onClose={() => setViewerId(undefined)} backLabel={backLabel} />
     </DocumentsActionsProvider>

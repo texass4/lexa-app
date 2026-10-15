@@ -501,7 +501,7 @@ export type DocumentKind = "Contrato" | "Procuração" | "Documento pessoal" | "
 export interface LegalDocument extends TenantEntity {
   name: string
   kind: DocumentKind
-  extension: "pdf" | "docx" | "doc" | "txt" | "jpg" | "png"
+  extension: "pdf" | "docx" | "doc" | "xlsx" | "xls" | "csv" | "txt" | "jpg" | "png"
   sizeBytes: number
   clientId?: ID
   processId?: ID
@@ -509,7 +509,12 @@ export interface LegalDocument extends TenantEntity {
   uploadedAt: string
   /** Caminho do arquivo no bucket `documents` (`<organizationId>/<id>`); ausente = sem conteúdo salvo. */
   storagePath?: string
+  /** Situação marcada pela equipe. Ausente = sem pendência ("OK"). */
+  status?: DocumentStatus
 }
+
+/** Situação do documento na equipe: em revisão, assinado ou sem pendência. */
+export type DocumentStatus = "ok" | "revisao" | "assinado"
 
 /* ------------------------------- Financeiro ------------------------------- */
 

@@ -119,7 +119,7 @@ function UploadForm({ defaults, onClose }: { defaults?: Defaults; onClose: () =>
               <CloudUpload className="size-5" />
             </span>
             <p className="mt-3 text-[13.5px] font-medium">Arraste os arquivos aqui</p>
-            <p className="mt-0.5 text-[12.5px] text-muted-foreground">PDF, DOC, DOCX, TXT, JPG ou PNG — até 25 MB cada</p>
+            <p className="mt-0.5 text-[12.5px] text-muted-foreground">PDF, Word, Excel (XLSX, XLS, CSV), TXT, JPG ou PNG — até 25 MB cada</p>
             <Button variant="secondary" size="sm" className="mt-3" onClick={() => inputRef.current?.click()}>
               Escolher arquivos
             </Button>

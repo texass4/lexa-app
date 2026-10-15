@@ -7,12 +7,15 @@ import type { LegalDocument } from "@/types"
 /**
  * Tipo de cada formato aceito em Documentos — o mesmo para o envio pela tela e para
  * "salvar em Documentos" no Atendimento. O bucket `documents` só aceita estes tipos
- * (migração 0023): mudou aqui, mude lá também.
+ * (migrações 0023 e 0028): mudou aqui, mude lá também.
  */
 export const DOCUMENT_MIME: Record<LegalDocument["extension"], string> = {
   pdf: "application/pdf",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   doc: "application/msword",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xls: "application/vnd.ms-excel",
+  csv: "text/csv; charset=utf-8",
   txt: "text/plain; charset=utf-8",
   jpg: "image/jpeg",
   png: "image/png",

@@ -1,21 +1,19 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
-import { ArrowDown, ArrowUp, ChevronRight, Download, Star } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronRight, Star } from "lucide-react"
 import { cn } from "cn"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { FileIcon } from "@/components/shared/file-icon"
-import { useOfficeData } from "@/lib/store/office-store"
-import { byId } from "@/lib/store/indexes"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { useOfficeActions } from "@/lib/store/office-store"
 import { getUser } from "@/lib/auth/account"
 import { fmtNumericDate, fmtTime } from "@/lib/core/dates"
 import { formatFileSize } from "@/lib/core/format"
-import { processSubject } from "@/lib/processos/label"
-import type { LibraryState, SortDir, SortKey } from "@/lib/documentos/library"
-import type { Client, LegalDocument, Process } from "@/types"
+import { statusOf, type LibraryState, type SortDir, type SortKey } from "@/lib/documentos/library"
+import type { LegalDocument } from "@/types"
 import { DocumentContextMenu, DocumentMenuButton, useDocumentsActions } from "./document-actions"
 import { FolderGlyph } from "./file-thumb"
+import { FileTypeTile, TypeBadge } from "./file-type-icon"
 import type { FolderItem } from "./use-document-library"
 
 export interface FileViewProps {
@@ -57,7 +55,7 @@ function SortHeader({
         type="button"
         onClick={() => onSort(k)}
         className={cn(
-          "-mx-1 inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40",
+          "-mx-1 inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 whitespace-nowrap outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40",
           active && "text-foreground",
         )}
       >
@@ -80,58 +78,56 @@ export function FileList(props: FileViewProps) {
   }, [some])
 
   return (
-    <div className="overflow-hidden rounded-card border border-border bg-card">
-      <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
-        <thead className="@max-3xl/files:hidden">
-          <tr className="bg-surface-muted/60 text-[12px] text-muted-foreground [&>th]:border-b [&>th]:border-border">
-            <th scope="col" className="w-11 py-2 pr-0 pl-4">
-              <label className="touch-target relative flex size-5 cursor-pointer items-center justify-center">
-                <input
-                  ref={headerRef}
-                  type="checkbox"
-                  aria-label="Selecionar todos os documentos exibidos"
-                  checked={all}
-                  disabled={!rows.length}
-                  onChange={(e) =>
-                    onToggleAll(
-                      rows.map((d) => d.id),
-                      e.target.checked,
-                    )
-                  }
-                  className={checkboxClass}
-                />
-              </label>
-            </th>
-            <SortHeader label="Nome" k="nome" sort={sort} onSort={onSort} />
-            <th scope="col" className="hidden w-[21%] px-3 py-2 text-left font-medium @4xl/files:table-cell">
-              Cliente e processo
-            </th>
-            <SortHeader label="Categoria" k="categoria" sort={sort} onSort={onSort} className="hidden w-[140px] @5xl/files:table-cell" />
-            <SortHeader label="Enviado em" k="enviado" sort={sort} onSort={onSort} className="hidden w-[112px] @3xl/files:table-cell" />
-            <th scope="col" className="hidden w-[124px] px-3 py-2 text-left font-medium @6xl/files:table-cell">
-              Enviado por
-            </th>
-            <th scope="col" className="w-[84px] py-2 pr-3" aria-label="Ações" />
-          </tr>
-        </thead>
-        <tbody>
-          {folders.map((f) => (
-            <FolderRow key={`${f.type}:${f.id}`} folder={f} onOpen={props.onOpenFolder} />
-          ))}
-          {rows.map((d, i) => (
-            <FileRowConnected key={d.id} doc={d} index={i} {...props} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <table className="w-full table-fixed border-separate border-spacing-0 text-[13px]">
+      <thead className="hidden @min-[520px]/files:table-header-group">
+        <tr className="text-[12px] text-muted-foreground [&>th]:border-b [&>th]:border-border/80">
+          <th scope="col" className="w-[38px] py-3 pr-0 pl-3">
+            <label className="touch-target relative flex size-5 cursor-pointer items-center justify-center">
+              <input
+                ref={headerRef}
+                type="checkbox"
+                aria-label="Selecionar todos os documentos exibidos"
+                checked={all}
+                disabled={!rows.length}
+                onChange={(e) =>
+                  onToggleAll(
+                    rows.map((d) => d.id),
+                    e.target.checked,
+                  )
+                }
+                className={checkboxClass}
+              />
+            </label>
+          </th>
+          <SortHeader label="Nome" k="nome" sort={sort} onSort={onSort} />
+          <SortHeader label="Tipo" k="formato" sort={sort} onSort={onSort} className="hidden w-[64px] @min-[640px]/files:table-cell" />
+          <th scope="col" className="hidden w-[124px] px-3 py-3 text-left font-medium whitespace-nowrap @min-[520px]/files:table-cell">
+            Responsável
+          </th>
+          <SortHeader label="Modificado em" k="enviado" sort={sort} onSort={onSort} className="hidden w-[116px] @min-[640px]/files:table-cell" />
+          <th scope="col" className="hidden w-[86px] px-3 py-3 text-left font-medium @min-[520px]/files:table-cell">
+            Status
+          </th>
+          <th scope="col" className="w-9 py-3 pr-1.5" aria-label="Ações" />
+        </tr>
+      </thead>
+      <tbody>
+        {folders.map((f) => (
+          <FolderRow key={`${f.type}:${f.id}`} folder={f} onOpen={props.onOpenFolder} />
+        ))}
+        {rows.map((d, i) => (
+          <FileRowConnected key={d.id} doc={d} index={i} {...props} />
+        ))}
+      </tbody>
+    </table>
   )
 }
 
 function FolderRow({ folder, onOpen }: { folder: FolderItem; onOpen: (target: LibraryState) => void }) {
   return (
     <tr className="group cursor-pointer transition-colors duration-150 hover:bg-accent/50" onClick={() => onOpen(folder.target)}>
-      <td className="border-b border-border/70 py-2 pr-0 pl-4" />
-      <td className="border-b border-border/70 px-3 py-2" colSpan={2}>
+      <td className="border-b border-border/60 py-2.5 pr-0 pl-3" />
+      <td className="border-b border-border/60 px-3 py-2.5" colSpan={2}>
         <button
           type="button"
           onClick={(e) => {
@@ -140,7 +136,9 @@ function FolderRow({ folder, onOpen }: { folder: FolderItem; onOpen: (target: Li
           }}
           className="flex w-full min-w-0 items-center gap-3 text-left outline-none focus-visible:underline"
         >
-          <FolderGlyph type={folder.type} className="size-8" />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-brand-soft/70">
+            <FolderGlyph type={folder.type} className="size-6" />
+          </span>
           <span className="min-w-0">
             <span className="block truncate font-medium text-foreground">{folder.label}</span>
             <span className="block truncate text-[11.5px] text-muted-foreground">
@@ -150,10 +148,11 @@ function FolderRow({ folder, onOpen }: { folder: FolderItem; onOpen: (target: Li
           </span>
         </button>
       </td>
-      <td className="hidden border-b border-border/70 @5xl/files:table-cell" />
-      <td className="hidden border-b border-border/70 @3xl/files:table-cell" />
-      <td className="hidden border-b border-border/70 @6xl/files:table-cell" />
-      <td className="border-b border-border/70 pr-4 text-right">
+      <td className="hidden border-b border-border/60 @min-[640px]/files:table-cell" />
+      <td className="hidden border-b border-border/60 @min-[520px]/files:table-cell" />
+      <td className="hidden border-b border-border/60 @min-[640px]/files:table-cell" />
+      <td className="hidden border-b border-border/60 @min-[520px]/files:table-cell" />
+      <td className="border-b border-border/60 pr-4 text-right">
         <ChevronRight
           className="ml-auto size-4 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-foreground"
           aria-hidden
@@ -164,13 +163,12 @@ function FolderRow({ folder, onOpen }: { folder: FolderItem; onOpen: (target: Li
 }
 
 function FileRowConnected({ doc, index, ...props }: FileViewProps & { doc: LegalDocument; index: number }) {
-  const data = useOfficeData()
+  const { versionOf } = useOfficeActions()
   return (
     <FileRow
       doc={doc}
       index={index}
-      client={byId(data.clients, doc.clientId)}
-      process={byId(data.processes, doc.processId)}
+      modifiedAt={modifiedAt(doc, versionOf("documents", doc.id))}
       checked={props.selected.has(doc.id)}
       active={props.activeId === doc.id}
       fresh={props.isNew(doc)}
@@ -179,12 +177,16 @@ function FileRowConnected({ doc, index, ...props }: FileViewProps & { doc: Legal
   )
 }
 
+/** Última alteração do registro (renomear, mover, situação); sem alteração, o envio. */
+export function modifiedAt(doc: LegalDocument, version: string | null) {
+  return version && version > doc.uploadedAt ? version : doc.uploadedAt
+}
+
 /** Uma linha: só redesenha quando o próprio documento (ou o vínculo, a seleção) muda. */
 const FileRow = React.memo(function FileRow({
   doc: d,
   index,
-  client,
-  process,
+  modifiedAt: changed,
   checked,
   active,
   fresh,
@@ -192,8 +194,7 @@ const FileRow = React.memo(function FileRow({
 }: {
   doc: LegalDocument
   index: number
-  client?: Client
-  process?: Process
+  modifiedAt: string
   checked: boolean
   active: boolean
   fresh: boolean
@@ -202,7 +203,8 @@ const FileRow = React.memo(function FileRow({
   const a = useDocumentsActions()
   const by = getUser(d.uploadedById)
   const favorite = a.isFavorite(d.id)
-  const cell = "border-b border-border/70 py-2"
+  const status = statusOf(d)
+  const cell = "border-b border-border/60 py-2.5"
   // Clique na linha: detalhes ao lado. Duplo clique (ou "Abrir"): o visualizador.
   const row = (
     <tr
@@ -216,10 +218,7 @@ const FileRow = React.memo(function FileRow({
         if ((e.target as HTMLElement).closest("a,input")) return
         a.open(d)
       }}
-      className={cn(
-        "group cursor-default transition-colors duration-150",
-        active ? "bg-brand-soft/60" : checked ? "bg-brand-soft/35" : "hover:bg-accent/50",
-      )}
+      className={cn("group cursor-default transition-colors duration-150", active || checked ? "bg-brand-soft/55" : "hover:bg-accent/45")}
     />
   )
   return (
@@ -228,7 +227,7 @@ const FileRow = React.memo(function FileRow({
       render={React.cloneElement(row, {
         children: (
           <>
-            <td className={cn(cell, "w-11 pr-0 pl-4")}>
+            <td className={cn(cell, "w-[38px] pr-0 pl-3")}>
               <label className="touch-target relative flex size-5 cursor-pointer items-center justify-center">
                 <input
                   type="checkbox"
@@ -244,82 +243,58 @@ const FileRow = React.memo(function FileRow({
               </label>
             </td>
             <td className={cn(cell, "px-3")}>
-              <div className="flex min-w-0 items-center gap-3">
-                <FileIcon extension={d.extension} className="h-9 w-7" />
+              <div className="flex min-w-0 items-center gap-2.5">
+                <FileTypeTile extension={d.extension} className="size-8 rounded-[8px]" glyphClassName="h-5 w-4" />
                 <div className="min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => a.details(d)}
-                    title={d.name}
-                    className="block max-w-full truncate text-left text-[13.5px] font-medium text-foreground outline-none hover:underline focus-visible:underline"
-                  >
-                    {d.name}
-                  </button>
-                  <p className="flex min-w-0 items-center gap-1.5 truncate text-[11.5px] text-muted-foreground">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => a.details(d)}
+                      title={d.name}
+                      className="min-w-0 truncate text-left text-[13.5px] font-medium text-foreground outline-none hover:underline focus-visible:underline"
+                    >
+                      {d.name}
+                    </button>
                     {favorite && <Star className="size-3 shrink-0 fill-warning text-warning" aria-label="Favorito" />}
                     {fresh && <span className="shrink-0 rounded-[4px] bg-brand-soft px-1 text-[10px] font-semibold text-brand-strong">Novo</span>}
-                    <span className="uppercase">{d.extension}</span>
+                  </span>
+                  {/* Telas estreitas: o que as colunas escondidas diriam. */}
+                  <p className="flex min-w-0 items-center gap-1.5 truncate text-[11.5px] text-muted-foreground @min-[640px]/files:hidden">
+                    <span className="shrink-0 uppercase">{d.extension}</span>
                     <span aria-hidden>·</span>
-                    <span>{formatFileSize(d.sizeBytes)}</span>
-                    {!d.storagePath && <span className="text-warning">· sem arquivo</span>}
-                    {/* Telas estreitas: o que as colunas escondidas diriam. */}
-                    <span className="@3xl/files:hidden">· {fmtNumericDate(d.uploadedAt)}</span>
-                    <span className="truncate @4xl/files:hidden">{client ? `· ${client.name}` : ""}</span>
+                    <span className="shrink-0">{formatFileSize(d.sizeBytes)}</span>
+                    <span aria-hidden>·</span>
+                    <span className="shrink-0">{fmtNumericDate(changed)}</span>
+                    <span className="truncate @min-[520px]/files:hidden">· {by.firstName}</span>
+                    {!d.storagePath && <span className="shrink-0 text-warning">· sem arquivo</span>}
                   </p>
+                  {!d.storagePath && <p className="hidden text-[11.5px] text-warning @min-[640px]/files:block">Sem arquivo enviado</p>}
                 </div>
               </div>
             </td>
-            <td className={cn(cell, "hidden px-3 @4xl/files:table-cell")}>
-              <div className="flex min-w-0 flex-col">
-                {client ? (
-                  <Link href={`/clientes/${client.id}?tab=documentos`} className="truncate text-foreground/90 hover:underline" title={client.name}>
-                    {client.name}
-                  </Link>
-                ) : (
-                  <span className="text-subtle">—</span>
-                )}
-                {process && (
-                  <Link
-                    href={`/processos/${process.id}`}
-                    title={`${processSubject(process)} · ${process.code}`}
-                    className="truncate text-[11.5px] text-muted-foreground hover:text-foreground hover:underline"
-                  >
-                    {processSubject(process)}
-                  </Link>
-                )}
-              </div>
+            <td className={cn(cell, "hidden px-3 @min-[640px]/files:table-cell")}>
+              <TypeBadge extension={d.extension} />
             </td>
-            <td className={cn(cell, "hidden px-3 @5xl/files:table-cell")}>
-              <span className="inline-block max-w-full truncate rounded-full bg-surface-muted px-2 py-0.5 text-[11.5px] text-muted-foreground">
-                {d.kind}
+            <td className={cn(cell, "hidden px-3 @min-[520px]/files:table-cell")}>
+              <span className="flex min-w-0 items-center gap-2 text-foreground/85" title={`Enviado por ${by.name}`}>
+                <UserAvatar name={by.name} src={by.avatarUrl} size="sm" />
+                <span className="truncate">{by.name}</span>
               </span>
             </td>
             <td
-              className={cn(cell, "tabular hidden px-3 whitespace-nowrap text-muted-foreground @3xl/files:table-cell")}
-              title={`${fmtNumericDate(d.uploadedAt)} às ${fmtTime(d.uploadedAt)}`}
+              className={cn(cell, "tabular hidden px-3 text-[12.5px] whitespace-nowrap text-muted-foreground @min-[640px]/files:table-cell")}
+              title={changed === d.uploadedAt ? "Enviado nesta data" : `Enviado em ${fmtNumericDate(d.uploadedAt)}`}
             >
-              {fmtNumericDate(d.uploadedAt)}
+              <span className="block">{fmtNumericDate(changed)}</span>
+              <span className="block text-[11px] text-subtle">{fmtTime(changed)}</span>
             </td>
-            <td className={cn(cell, "hidden px-3 @6xl/files:table-cell")}>
-              <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
-                <UserAvatar name={by.name} src={by.avatarUrl} size="xs" />
-                <span className="truncate">{by.firstName}</span>
-              </span>
+            <td className={cn(cell, "hidden px-3 @min-[520px]/files:table-cell")}>
+              <StatusBadge tone={status.tone} size="sm">
+                {status.label}
+              </StatusBadge>
             </td>
-            <td className={cn(cell, "w-[84px] pr-3")}>
+            <td className={cn(cell, "w-9 pr-1.5")}>
               <div className="flex items-center justify-end gap-0.5">
-                {/* Ações rápidas: aparecem no hover/foco, sem mexer no layout (o espaço já é reservado). */}
-                {d.storagePath && (
-                  <button
-                    type="button"
-                    onClick={() => a.download([d])}
-                    aria-label={`Baixar ${d.name}`}
-                    title="Baixar"
-                    className="hidden size-8 items-center justify-center rounded-[8px] text-subtle opacity-0 outline-none transition-opacity duration-150 group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/40 @3xl/files:flex"
-                  >
-                    <Download className="size-4" />
-                  </button>
-                )}
                 <DocumentMenuButton doc={d} />
               </div>
             </td>

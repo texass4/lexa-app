@@ -9,7 +9,8 @@
 
 import type { DocumentQuery } from "@/lib/store/history-lists"
 import { matches } from "@/lib/core/format"
-import type { DocumentKind, LegalDocument } from "@/types"
+import type { DocumentKind, DocumentStatus, LegalDocument } from "@/types"
+import { DOCUMENT_STATUS_LABEL } from "./status"
 
 export type Section = "todos" | "recentes" | "favoritos" | "clientes"
 
@@ -33,13 +34,28 @@ export const CATEGORIES: { value: DocumentKind; label: string }[] = [
 
 export type Extension = LegalDocument["extension"]
 
-/** Formatos aceitos pelo armazenamento (bucket `documents`), agrupados como a pessoa pensa neles. */
-export const FORMATS: { value: string; label: string; extensions: Extension[] }[] = [
-  { value: "pdf", label: "PDF", extensions: ["pdf"] },
-  { value: "word", label: "Word (DOC, DOCX)", extensions: ["doc", "docx"] },
-  { value: "imagem", label: "Imagem (JPG, PNG)", extensions: ["jpg", "png"] },
-  { value: "texto", label: "Texto (TXT)", extensions: ["txt"] },
+/**
+ * Formatos aceitos pelo armazenamento (bucket `documents`), agrupados como a pessoa pensa
+ * neles — os mesmos botões da barra: PDF, Word, Excel e Outros (imagem e texto).
+ */
+export const FORMATS: { value: string; label: string; short: string; extensions: Extension[] }[] = [
+  { value: "pdf", label: "PDF", short: "PDF", extensions: ["pdf"] },
+  { value: "word", label: "Word (DOC, DOCX)", short: "Word", extensions: ["doc", "docx"] },
+  { value: "excel", label: "Excel (XLSX, XLS, CSV)", short: "Excel", extensions: ["xlsx", "xls", "csv"] },
+  { value: "outros", label: "Outros (JPG, PNG, TXT)", short: "Outros", extensions: ["jpg", "png", "txt"] },
 ]
+
+/** Nome curto do tipo do arquivo, para o selo da lista ("PDF", "DOCX", "XLSX"…). */
+export const typeLabel = (extension: string) => extension.toUpperCase()
+
+/** Situação do documento (o que a equipe marcou). Sem marcação: sem pendência. */
+export const DOCUMENT_STATUSES: { value: DocumentStatus; label: string; tone: "success" | "warning" | "info"; hint: string }[] = [
+  { value: "ok", label: DOCUMENT_STATUS_LABEL.ok, tone: "success", hint: "Sem pendência" },
+  { value: "revisao", label: DOCUMENT_STATUS_LABEL.revisao, tone: "warning", hint: "Alguém da equipe precisa revisar" },
+  { value: "assinado", label: DOCUMENT_STATUS_LABEL.assinado, tone: "success", hint: "Versão assinada" },
+]
+
+export const statusOf = (d: Pick<LegalDocument, "status">) => DOCUMENT_STATUSES.find((s) => s.value === (d.status ?? "ok"))!
 
 export const formatOf = (extension: string) => FORMATS.find((f) => f.extensions.includes(extension as Extension))
 
@@ -103,7 +119,15 @@ export function readState(params: URLSearchParams): LibraryState {
   const period = params.get("periodo") ?? ""
   const state: LibraryState = {
     section: SECTION_VALUES.has(pasta) ? (pasta as Section) : "todos",
-    formats: (params.get("formato") ?? "").split(",").filter((f) => FORMAT_VALUES.has(f)),
+    // Links antigos: "imagem" e "texto" agora estão em "Outros".
+    formats: [
+      ...new Set(
+        (params.get("formato") ?? "")
+          .split(",")
+          .map((f) => (f === "imagem" || f === "texto" ? "outros" : f))
+          .filter((f) => FORMAT_VALUES.has(f)),
+      ),
+    ],
   }
   if (KIND_VALUES.has(kind)) state.kind = kind as DocumentKind
   if (params.get("cliente")) state.clientId = params.get("cliente")!
@@ -232,8 +256,8 @@ export function breadcrumbs(s: LibraryState, names: { client?: string; process?:
 }
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
-export const ACCEPTED_EXTENSIONS: Extension[] = ["pdf", "docx", "doc", "txt", "jpg", "png"]
-export const ACCEPT_ATTRIBUTE = ".pdf,.docx,.doc,.txt,.jpg,.jpeg,.png"
+export const ACCEPTED_EXTENSIONS: Extension[] = ["pdf", "docx", "doc", "xlsx", "xls", "csv", "txt", "jpg", "png"]
+export const ACCEPT_ATTRIBUTE = ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.jpg,.jpeg,.png"
 
 /** Extensão aceita do nome do arquivo (`.jpeg` vale como `jpg`); null se o formato não é aceito. */
 export function extensionOf(name: string): Extension | null {
@@ -244,7 +268,7 @@ export function extensionOf(name: string): Extension | null {
 
 /** Por que o arquivo não pode ser enviado (null: pode). Mesmas regras do armazenamento. */
 export function uploadIssue(file: { name: string; size: number }): string | null {
-  if (!extensionOf(file.name)) return "Formato não aceito. Envie PDF, DOC, DOCX, TXT, JPG ou PNG."
+  if (!extensionOf(file.name)) return "Formato não aceito. Envie PDF, Word, Excel (XLSX, XLS, CSV), TXT, JPG ou PNG."
   if (file.size === 0) return "O arquivo está vazio."
   if (file.size > MAX_UPLOAD_BYTES) return "O arquivo passa de 25 MB."
   return null

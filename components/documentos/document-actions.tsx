@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { ContextMenu } from "@base-ui/react/context-menu"
-import { Download, Ellipsis, Eye, FolderInput, Info, Link2, Pencil, Star, StarOff, Trash2 } from "lucide-react"
+import { Check, Download, Ellipsis, Eye, FolderInput, Info, Link2, Pencil, Star, StarOff, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -18,7 +19,8 @@ import { useOfficeActions } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
 import { copyDocumentLink, documentUrl, downloadDocument, downloadDocuments } from "@/lib/documentos/documents"
 import { forgetFavorites, setFavorites, useDocumentFavorites } from "@/lib/documentos/favorites"
-import type { LegalDocument } from "@/types"
+import { DOCUMENT_STATUSES } from "@/lib/documentos/library"
+import type { DocumentStatus, LegalDocument } from "@/types"
 import { MoveDocumentsDialog, RenameDocumentDialog } from "./document-dialogs"
 
 /**
@@ -38,6 +40,8 @@ interface DocumentsActions {
   favorite(docs: LegalDocument[], on: boolean): Promise<boolean>
   download(docs: LegalDocument[]): void
   copyLinks(docs: LegalDocument[]): void
+  /** Situação marcada pela equipe (OK, Em revisão, Assinado). */
+  setStatus(docs: LegalDocument[], status: DocumentStatus): Promise<void>
 }
 
 const Ctx = React.createContext<DocumentsActions | null>(null)
@@ -60,7 +64,7 @@ export function DocumentsActionsProvider({
   children: React.ReactNode
 }) {
   const { can } = useSession()
-  const { deleteDocument } = useOfficeActions()
+  const { deleteDocument, updateDocument, versionOf } = useOfficeActions()
   const favorites = useDocumentFavorites()
   const [renaming, setRenaming] = React.useState<LegalDocument>()
   const [moving, setMoving] = React.useState<LegalDocument[]>()
@@ -100,6 +104,18 @@ export function DocumentsActionsProvider({
       else
         toast.success(`${started} download${started === 1 ? "" : "s"} iniciado${started === 1 ? "" : "s"}.`, {
           description: missing ? `${missing} sem arquivo salvo (só o registro).` : undefined,
+        })
+    },
+    async setStatus(docs, status) {
+      if (!canEdit) return
+      const targets = docs.filter((d) => (d.status ?? "ok") !== status)
+      if (!targets.length) return
+      const results = await Promise.all(targets.map((d) => updateDocument(d.id, { status }, { baseVersion: versionOf("documents", d.id) })))
+      const saved = results.filter((r) => r.status === "saved").length
+      const label = DOCUMENT_STATUSES.find((s) => s.value === status)!.label
+      if (saved)
+        toast.success(saved === 1 ? `Situação: ${label}.` : `${saved} documentos: ${label}.`, {
+          description: saved === 1 ? targets[0].name : undefined,
         })
     },
     async copyLinks(docs) {
@@ -182,6 +198,32 @@ function DocumentMenuItems({ doc }: { doc: LegalDocument }) {
       </DropdownMenuGroup>
       {a.canEdit && (
         <>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-[0.06em] text-subtle uppercase">Status</DropdownMenuLabel>
+            {DOCUMENT_STATUSES.map((st) => {
+              const current = (doc.status ?? "ok") === st.value
+              return (
+                <DropdownMenuItem
+                  key={st.value}
+                  className={item}
+                  onClick={() => void a.setStatus([doc], st.value)}
+                  aria-checked={current}
+                  role="menuitemradio"
+                >
+                  <span
+                    className={cn(
+                      "size-2 shrink-0 rounded-full",
+                      st.tone === "warning" ? "bg-warning" : st.tone === "info" ? "bg-info" : "bg-success",
+                    )}
+                    aria-hidden
+                  />
+                  {st.label}
+                  {current && <Check className="ml-auto" aria-hidden />}
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuItem className={item} onClick={() => a.rename(doc)}>

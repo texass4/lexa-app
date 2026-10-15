@@ -21,6 +21,7 @@ import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
 import { formatCurrency, uid } from "@/lib/core/format"
 import { relatedClientId } from "@/lib/store/selectors"
 import { columnForStatus } from "@/lib/tarefas/workspace"
+import { DOCUMENT_STATUS_LABEL } from "@/lib/documentos/status"
 import { resolveClientStatus } from "@/lib/clientes/clients"
 import type { NewClientDraft } from "@/lib/clientes/client-import"
 import { describeAppointmentChange } from "@/lib/agenda/agenda"
@@ -199,10 +200,10 @@ interface OfficeActions {
   addDocument(input: NewDocumentInput): LegalDocument
   /** Cria o documento e espera o banco confirmar; `null` se não foi gravado (aviso já mostrado). */
   saveNewDocument(input: NewDocumentInput): Promise<LegalDocument | null>
-  /** Nome, tipo e vínculos (cliente/processo) do documento. O arquivo não muda. */
+  /** Nome, tipo, vínculos (cliente/processo) e situação do documento. O arquivo não muda. */
   updateDocument(
     id: string,
-    patch: Partial<Pick<LegalDocument, "name" | "kind" | "clientId" | "processId">>,
+    patch: Partial<Pick<LegalDocument, "name" | "kind" | "clientId" | "processId" | "status">>,
     options?: SaveOptions,
   ): Promise<SaveResult<LegalDocument>>
   deleteDocument(id: string): void
@@ -1128,8 +1129,11 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
             ["kind", "tipo"],
             ["clientId", "cliente"],
             ["processId", "processo"],
+            ["status", "situação"],
           ]
-          const changed = labels.filter(([key]) => !sameValue(current[key], updated[key])).map(([, label]) => label)
+          const changed = labels
+            .filter(([key]) => !sameValue(key === "status" ? (current.status ?? "ok") : current[key], key === "status" ? (updated.status ?? "ok") : updated[key]))
+            .map(([key, label]) => (key === "status" ? `${label} (${DOCUMENT_STATUS_LABEL[updated.status ?? "ok"]})` : label))
           if (!changed.length) return false
           commit((s) => ({
             ...s,

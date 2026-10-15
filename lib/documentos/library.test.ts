@@ -14,7 +14,11 @@ import {
   toQuery,
   uploadIssue,
   type LibraryState,
+  FORMATS,
+  ACCEPTED_EXTENSIONS,
+  statusOf,
 } from "./library"
+import { pageNumbers } from "./pagination"
 import { documentSearchWhere, olderDocumentsWhere } from "@/lib/store/history-lists"
 import { searchFilter, windowBounds } from "@/lib/store/storage"
 import type { LegalDocument } from "@/types"
@@ -161,11 +165,42 @@ describe("Central de Documentos: ordem e trilha", () => {
 describe("Central de Documentos: envio", () => {
   it("aceita só os formatos do armazenamento, até 25 MB", () => {
     assert.equal(extensionOf("foto.JPEG"), "jpg")
-    assert.equal(extensionOf("planilha.xlsx"), null)
+    assert.equal(extensionOf("planilha.xlsx"), "xlsx")
+    assert.equal(extensionOf("dados.CSV"), "csv")
+    assert.equal(extensionOf("apresentacao.pptx"), null)
     assert.equal(extensionOf("semextensao"), null)
     assert.equal(uploadIssue({ name: "a.pdf", size: 10 }), null)
     assert.match(uploadIssue({ name: "a.exe", size: 10 })!, /Formato não aceito/)
     assert.match(uploadIssue({ name: "a.pdf", size: 26 * 1024 * 1024 })!, /25 MB/)
     assert.match(uploadIssue({ name: "a.pdf", size: 0 })!, /vazio/)
+  })
+})
+
+describe("Central de Documentos: formatos, situação e páginas", () => {
+  it("botões de formato: PDF, Word, Excel e Outros cobrem todos os formatos aceitos, sem repetir", () => {
+    const all = FORMATS.flatMap((f) => f.extensions)
+    assert.deepEqual(
+      FORMATS.map((f) => f.short),
+      ["PDF", "Word", "Excel", "Outros"],
+    )
+    assert.deepEqual([...all].sort(), [...ACCEPTED_EXTENSIONS].sort())
+    assert.equal(new Set(all).size, all.length)
+  })
+
+  it("links antigos de formato (imagem, texto) abrem em Outros", () => {
+    assert.deepEqual(readState(new URLSearchParams("formato=imagem,texto")).formats, ["outros"])
+    assert.deepEqual(readState(new URLSearchParams("formato=excel")).formats, ["excel"])
+  })
+
+  it("documento sem situação marcada aparece como OK", () => {
+    assert.equal(statusOf({}).label, "OK")
+    assert.equal(statusOf({ status: "revisao" }).label, "Em revisão")
+    assert.equal(statusOf({ status: "assinado" }).label, "Assinado")
+  })
+
+  it("paginação com reticências", () => {
+    assert.deepEqual(pageNumbers(1, 5), [1, 2, 3, 4, 5])
+    assert.deepEqual(pageNumbers(1, 9), [1, 2, "…", 9])
+    assert.deepEqual(pageNumbers(5, 12), [1, "…", 4, 5, 6, "…", 12])
   })
 })

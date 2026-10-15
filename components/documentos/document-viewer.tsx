@@ -259,7 +259,7 @@ export function DocumentViewer({ documentId, onClose, backLabel }: { documentId?
         <Message
           doc={doc}
           title="Sem pré-visualização para este formato."
-          description={`Arquivos .${doc.extension} (Word) não são exibidos no navegador com segurança. Baixe para abrir no seu editor.`}
+          description={`Arquivos .${doc.extension} (${["xlsx", "xls", "csv"].includes(doc.extension) ? "planilha" : "Word"}) não são exibidos no navegador com segurança. Baixe para abrir no seu ${["xlsx", "xls", "csv"].includes(doc.extension) ? "Excel" : "editor"}.`}
         />
       )
   }
