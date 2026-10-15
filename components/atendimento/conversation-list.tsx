@@ -2,10 +2,9 @@
 
 import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { DatabaseZap, MessageSquarePlus, MessagesSquare, SearchX, StickyNote } from "lucide-react"
+import { DatabaseZap, MessageSquarePlus, MessagesSquare, Search, SearchX, StickyNote, X } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
-import { SearchField } from "@/components/ui/search-field"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState, ErrorState } from "@/components/ui/empty-state"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -110,23 +109,37 @@ export function ConversationList({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 px-4 pt-4 pb-3">
-        <div className="flex items-center justify-between gap-2">
+      <div className="shrink-0 px-3 pt-3 pb-2">
+        <div className="flex items-center justify-between gap-2 px-1">
           <div className="min-w-0">
-            <h1 className="font-display text-[20px] leading-none font-semibold tracking-[-0.02em] text-foreground">Conversas</h1>
+            <h1 className="text-[22px] leading-none font-bold tracking-[-0.02em] text-foreground">Conversas</h1>
             <ConnectionBadge className="mt-1.5" />
           </div>
           <Can permission="whatsapp.edit">
             <Tooltip>
-              <TooltipTrigger render={<Button variant="secondary" size="icon-sm" aria-label="Nova conversa" onClick={onNew} />}>
+              <TooltipTrigger render={<Button variant="ghost" size="icon" aria-label="Nova conversa" onClick={onNew} className="rounded-full text-muted-foreground hover:text-foreground" />}>
                 <MessageSquarePlus />
               </TooltipTrigger>
               <TooltipContent>Nova conversa</TooltipContent>
             </Tooltip>
           </Can>
         </div>
-        <SearchField value={query} onChange={setQuery} placeholder="Buscar nome, telefone ou tag" className="mt-3.5" />
-        <div role="tablist" aria-label="Filtrar conversas" className="-mx-1 mt-3 flex flex-wrap gap-1">
+        <label className="mt-3 flex h-9 items-center gap-3 rounded-full bg-surface-muted px-3.5 text-muted-foreground focus-within:ring-2 focus-within:ring-brand/40">
+          <Search className="size-4 shrink-0" aria-hidden />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Pesquisar nome, telefone ou tag"
+            aria-label="Buscar nome, telefone ou tag"
+            className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-subtle"
+          />
+          {query && (
+            <button type="button" aria-label="Limpar busca" onClick={() => setQuery("")} className="rounded-full outline-none hover:text-foreground">
+              <X className="size-4" />
+            </button>
+          )}
+        </label>
+        <div role="tablist" aria-label="Filtrar conversas" className="-mx-3 mt-2.5 flex gap-1.5 overflow-x-auto px-3 pb-1 no-scrollbar">
           {FILTERS.map((f) => {
             const active = f.value === filter
             return (
@@ -137,15 +150,13 @@ export function ConversationList({
                 aria-selected={active}
                 onClick={() => onFilterChange(f.value)}
                 className={cn(
-                  "touch-target relative inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40 pointer-coarse:h-8",
-                  active
-                    ? "border-brand bg-brand text-brand-foreground"
-                    : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground",
+                  "touch-target relative inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                  active ? "bg-brand-soft text-brand-strong" : "bg-surface-muted text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
                 {f.label}
                 {counts[f.value] > 0 && (
-                  <span className={cn("tabular text-[11px]", active ? "text-background/70" : "text-subtle")}>{counts[f.value]}</span>
+                  <span className={cn("tabular text-[11.5px]", active ? "text-brand-strong/80" : "text-subtle")}>{counts[f.value]}</span>
                 )}
               </button>
             )
@@ -153,7 +164,7 @@ export function ConversationList({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto border-t border-border thin-scrollbar">
+      <div className="min-h-0 flex-1 overflow-y-auto thin-scrollbar">
         {status === "loading" ? (
           <ul aria-busy="true" aria-label="Carregando conversas">
             {Array.from({ length: 7 }).map((_, i) => (
@@ -187,10 +198,10 @@ export function ConversationList({
             <EmptyState compact icon={<SearchX />} title="Nada por aqui." description="Nenhuma conversa corresponde à busca ou ao filtro." />
           )
         ) : (
-          <ul className="py-1">
+          <ul>
             <AnimatePresence initial={false}>
               {visible.map((c) => (
-                <motion.li key={c.id} layout="position" transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
+                <motion.li key={c.id} layout="position" transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }} className="group/li">
                   <ConversationItem
                     conversation={c}
                     selected={c.id === selectedId}
@@ -232,32 +243,32 @@ function ConversationItem({
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "group relative flex w-full items-start gap-3 px-4 py-3 text-left outline-none transition-colors focus-visible:bg-accent",
-        selected ? "bg-surface-muted/80" : "hover:bg-accent/60",
+        "group relative flex w-full items-center gap-3 px-3 text-left outline-none transition-colors focus-visible:bg-accent",
+        selected ? "bg-surface-muted" : "hover:bg-surface-muted/60",
       )}
     >
-      {selected && <motion.span layoutId="conversation-active" className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-brand" />}
-      <span className="relative">
-        <ContactAvatar contact={c.contact} client={client} size="lg" />
+      <span className="relative shrink-0">
+        <ContactAvatar contact={c.contact} client={client} size="lg" className="size-12 text-[14px]" />
         {!c.contact.clientId && (
           <span className="absolute -right-0.5 -bottom-0.5 rounded-full bg-info px-1 text-[8.5px] leading-[14px] font-semibold text-white ring-2 ring-card">
             novo
           </span>
         )}
       </span>
-      <span className="min-w-0 flex-1">
+      {/* O fio entre as conversas começa depois da foto, como no WhatsApp Web. */}
+      <span className="min-w-0 flex-1 border-b border-border/70 py-3 group-last/li:border-b-0">
         <span className="flex items-baseline justify-between gap-2">
-          <span className={cn("truncate text-[13.5px]", unread ? "font-semibold text-foreground" : "font-medium text-foreground")}>{name}</span>
-          <span className={cn("tabular shrink-0 text-[11.5px]", unread ? "font-semibold text-brand-strong" : "text-subtle")}>{listTime(c.lastMessageAt ?? c.createdAt)}</span>
+          <span className={cn("truncate text-[16px] text-foreground", unread && "font-semibold")}>{name}</span>
+          <span className={cn("tabular shrink-0 text-[12px]", unread ? "font-medium text-brand-strong" : "text-subtle")}>{listTime(c.lastMessageAt ?? c.createdAt)}</span>
         </span>
-        <span className="mt-0.5 flex items-center gap-1.5">
-          {c.lastMessageDirection === "outbound" && <DeliveryStatus status={c.lastMessageStatus} className="text-subtle" />}
+        <span className="mt-0.5 flex items-center gap-1">
+          {c.lastMessageDirection === "outbound" && <DeliveryStatus status={c.lastMessageStatus} className="size-4 text-subtle" />}
           {c.lastMessageDirection === "internal" && <StickyNote className="size-3.5 shrink-0 text-brand" />}
-          <span className={cn("min-w-0 flex-1 truncate text-[12.5px]", unread ? "text-foreground" : "text-muted-foreground")}>
+          <span className={cn("min-w-0 flex-1 truncate text-[14px]", unread ? "text-foreground" : "text-muted-foreground")}>
             {c.lastMessagePreview ?? "Conversa iniciada"}
           </span>
           {unread && (
-            <span className="tabular flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-brand px-1 text-[10.5px] font-semibold text-brand-foreground">
+            <span className="tabular flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-[11.5px] font-semibold text-brand-foreground">
               {c.unreadCount > 99 ? "99+" : c.unreadCount}
             </span>
           )}

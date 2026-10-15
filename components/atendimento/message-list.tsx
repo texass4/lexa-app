@@ -45,16 +45,23 @@ function RichText({ text, query }: { text: string; query?: string }) {
   )
 }
 
-function Quote({ message, onJump }: { message?: WhatsAppMessage; onJump: (id: string) => void }) {
+/** Cores dos balões: o enviado leva um tom da cor da Íntegra; o recebido é o cartão branco. */
+const OUT_BG = "bg-[color-mix(in_srgb,var(--brand)_17%,var(--card))]"
+const OUT_TAIL = "bg-[color-mix(in_srgb,var(--brand)_17%,var(--card))]"
+const BUBBLE_SHADOW = "shadow-[0_1px_1px_rgb(0_0_0/0.13)]"
+
+function Quote({ message, onJump, outgoing }: { message?: WhatsAppMessage; onJump: (id: string) => void; outgoing: boolean }) {
   if (!message) return null
   return (
     <button
       type="button"
       onClick={() => onJump(message.id)}
-      className="mb-1.5 block w-full rounded-[8px] border-l-2 border-brand/70 bg-black/[0.04] px-2 py-1 text-left outline-none hover:bg-black/[0.07] focus-visible:ring-2 focus-visible:ring-brand/40 dark:bg-white/[0.06]"
+      className="mb-1 block w-full overflow-hidden rounded-[6px] border-l-[4px] border-brand bg-black/[0.06] px-2.5 py-1.5 text-left outline-none hover:bg-black/[0.09] focus-visible:ring-2 focus-visible:ring-brand/40 dark:bg-white/[0.07]"
     >
-      <span className="block text-[11px] font-semibold opacity-80">{message.direction === "inbound" ? "Cliente" : "Escritório"}</span>
-      <span className="line-clamp-2 text-[12px] opacity-75">{message.body || TYPE_PREVIEW[message.type]}</span>
+      <span className="block text-[12.5px] font-semibold text-brand-strong">
+        {message.direction === "inbound" ? "Cliente" : outgoing ? "Você" : "Escritório"}
+      </span>
+      <span className="line-clamp-2 text-[13px] text-muted-foreground">{message.body || TYPE_PREVIEW[message.type]}</span>
     </button>
   )
 }
@@ -83,7 +90,7 @@ function Bubble({
   if (message.type === "event") {
     return (
       <div className="flex justify-center py-1.5">
-        <span className="max-w-[80%] rounded-full bg-surface-muted/80 px-3 py-1 text-center text-[11.5px] text-muted-foreground">
+        <span className="max-w-[80%] rounded-[8px] bg-card/95 px-3 py-1 text-center text-[12.5px] text-muted-foreground shadow-[0_1px_1px_rgb(0_0_0/0.1)]">
           {message.body} · <span className="tabular">{fmtTime(message.sentAt)}</span>
         </span>
       </div>
@@ -93,39 +100,51 @@ function Bubble({
   const inbound = message.direction === "inbound"
   const note = message.type === "note"
   const author = message.sentByUserId ? getUser(message.sentByUserId) : undefined
-  const dark = !inbound && !note
   const canReply = !note && !!message.providerMessageId
   const hasMedia = message.attachments.length > 0
   const media = message.attachments.find((a) => a.kind === "image" || a.kind === "sticker" || a.kind === "video")
+  // Cauda do balão só no primeiro de uma sequência, como no WhatsApp.
+  const tail = showSender && !note
 
   return (
     <div className={cn("group/message flex flex-col", inbound ? "items-start" : "items-end")}>
-      {showSender && !inbound && (
-        <span className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
-          {note && <Lock className="size-3 text-brand" />}
-          {note ? `Nota interna · ${author?.firstName ?? "Equipe"}` : message.fromDevice ? "Enviada pelo celular" : (author?.firstName ?? "Escritório")}
-        </span>
-      )}
-      <div className={cn("flex max-w-[min(78%,560px)] items-end gap-1.5", inbound ? "flex-row" : "flex-row-reverse")}>
+      <div className={cn("flex max-w-[min(80%,540px)] items-end gap-1.5", inbound ? "flex-row" : "flex-row-reverse")}>
         <motion.div
           id={`msg-${message.id}`}
           initial={false}
           animate={highlighted ? { scale: [1, 1.015, 1] } : {}}
           className={cn(
-            "relative min-w-0 rounded-[16px] px-3 py-2 text-[13.5px] leading-[1.45] shadow-xs transition-shadow",
-            inbound && "rounded-bl-[5px] border border-border bg-surface text-foreground",
-            dark && "rounded-br-[5px] bg-primary text-primary-foreground",
-            note && "rounded-br-[5px] border border-dashed border-brand/45 bg-brand-soft text-foreground",
+            "relative min-w-0 rounded-[8px] px-2.5 pt-1.5 pb-1 text-[14.2px] leading-[1.4] text-foreground transition-shadow",
+            BUBBLE_SHADOW,
+            inbound && "bg-card",
+            !inbound && !note && OUT_BG,
+            note && "border border-dashed border-brand/45 bg-brand-soft shadow-none",
+            tail && (inbound ? "rounded-tl-none" : "rounded-tr-none"),
             message.status === "failed" && "ring-1 ring-danger/40",
             highlighted && "ring-2 ring-brand/60",
             media && !message.body && "p-1",
           )}
         >
-          {replied && <Quote message={replied} onJump={onJump} />}
+          {tail && (
+            <span
+              aria-hidden
+              className={cn(
+                "absolute top-0 h-[13px] w-[9px]",
+                inbound ? "-left-[8px] bg-card [clip-path:polygon(100%_0,0_0,100%_100%)]" : cn("-right-[8px]", OUT_TAIL, "[clip-path:polygon(0_0,100%_0,0_100%)]"),
+              )}
+            />
+          )}
+          {!inbound && showSender && (
+            <span className="mb-0.5 flex items-center gap-1 text-[12.5px] font-semibold text-brand-strong">
+              {note && <Lock className="size-3" />}
+              {note ? `Nota interna · ${author?.firstName ?? "Equipe"}` : message.fromDevice ? "Enviada pelo celular" : (author?.firstName ?? "Escritório")}
+            </span>
+          )}
+          {replied && <Quote message={replied} onJump={onJump} outgoing={!inbound} />}
           {hasMedia && (
             <div className={cn("space-y-1.5", message.body && "mb-1.5")}>
               {message.attachments.map((a) => (
-                <AttachmentView key={a.id} attachment={a} clientId={clientId} tone={dark ? "dark" : "light"} />
+                <AttachmentView key={a.id} attachment={a} clientId={clientId} tone="light" />
               ))}
             </div>
           )}
@@ -138,15 +157,14 @@ function Bubble({
           )}
           <span
             className={cn(
-              "float-right mt-1 ml-3 flex translate-y-0.5 items-center gap-1 text-[10.5px] leading-none",
-              dark ? "text-primary-foreground/60" : "text-subtle",
+              "float-right mt-1 ml-3 flex translate-y-[3px] items-center gap-1 text-[11px] leading-none text-subtle",
               media && !message.body && "absolute right-2.5 bottom-2 m-0 rounded-full bg-black/40 px-1.5 py-1 text-white/90",
             )}
           >
             {message.editedAt && <Pencil className="size-2.5" aria-label="Editada" />}
             {message.fromDevice && <Smartphone className="size-2.5" aria-label="Enviada pelo celular" />}
             <span className="tabular">{fmtTime(message.sentAt)}</span>
-            {!inbound && !note && <DeliveryStatus status={message.status} className={cn("size-3.5", dark && message.status !== "failed" && message.status !== "read" && message.status !== "played" && "text-primary-foreground/60")} />}
+            {!inbound && !note && <DeliveryStatus status={message.status} className="size-4" />}
           </span>
         </motion.div>
 
@@ -156,7 +174,7 @@ function Bubble({
               type="button"
               onClick={() => onReply(message)}
               aria-label="Responder esta mensagem"
-              className="touch-target relative flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="touch-target relative flex size-7 items-center justify-center rounded-full bg-card/90 text-subtle shadow-xs outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <Reply className="size-3.5" />
             </button>
@@ -169,7 +187,7 @@ function Bubble({
                 toast.success("Texto copiado.")
               }}
               aria-label="Copiar texto"
-              className="touch-target relative flex size-7 items-center justify-center rounded-[7px] text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 max-md:hidden"
+              className="touch-target relative flex size-7 items-center justify-center rounded-full bg-card/90 text-subtle shadow-xs outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 max-md:hidden"
             >
               <Copy className="size-3.5" />
             </button>
@@ -278,7 +296,7 @@ export function MessageList({
 
   return (
     <div className="relative min-h-0 flex-1">
-      <div ref={scroller} onScroll={onScroll} className="h-full overflow-y-auto px-3 py-4 thin-scrollbar sm:px-6" role="log" aria-live="polite" aria-label="Mensagens">
+      <div ref={scroller} onScroll={onScroll} className="h-full overflow-y-auto px-3 py-3 thin-scrollbar sm:px-[7%]" role="log" aria-live="polite" aria-label="Mensagens">
         {hasMore && <p className="pb-3 text-center text-[11.5px] text-subtle">{loadingOlder ? "Carregando mensagens anteriores…" : "Role para ver mensagens anteriores"}</p>}
         {!messages.length && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
@@ -287,7 +305,7 @@ export function MessageList({
             <p className="max-w-xs text-[12.5px] text-muted-foreground">Nenhuma mensagem ainda. Escreva abaixo para iniciar o atendimento.</p>
           </div>
         )}
-        <div className="mx-auto flex max-w-[860px] flex-col gap-1">
+        <div className="mx-auto flex max-w-[900px] flex-col gap-[3px]">
           {messages.map((m, i) => {
             const prev = messages[i - 1]
             const newDay = !prev || !isSameDay(parse(prev.sentAt), parse(m.sentAt))
@@ -303,13 +321,13 @@ export function MessageList({
             return (
               <React.Fragment key={m.id}>
                 {newDay && (
-                  <div className="sticky top-0 z-[1] flex justify-center py-2">
-                    <span className="rounded-full border border-border bg-card/90 px-3 py-0.5 text-[11.5px] font-medium text-muted-foreground shadow-xs backdrop-blur">
+                  <div className="sticky top-0 z-[1] flex justify-center py-2.5">
+                    <span className="rounded-[8px] bg-card px-3 py-1 text-[12.5px] font-medium uppercase text-muted-foreground shadow-[0_1px_1px_rgb(0_0_0/0.13)]">
                       {fmtDayLabel(m.sentAt)}
                     </span>
                   </div>
                 )}
-                <div className={cn(!sameSide && i > 0 && !newDay && "mt-2.5")}>
+                <div className={cn(!sameSide && i > 0 && !newDay && "mt-2")}>
                   <Bubble
                     message={m}
                     replied={replied}
@@ -333,7 +351,7 @@ export function MessageList({
           size="icon-sm"
           aria-label="Ir para a mensagem mais recente"
           onClick={() => scrollToBottom(true)}
-          className="absolute right-5 bottom-4 rounded-full shadow-float"
+          className="absolute right-5 bottom-4 size-10 rounded-full bg-card shadow-float"
         >
           <ArrowDown />
         </Button>

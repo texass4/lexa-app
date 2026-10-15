@@ -215,9 +215,9 @@ export function Composer({
   const kind = file ? attachmentKindFor(file.type) : undefined
 
   return (
-    <div className={cn("shrink-0 border-t px-3 pt-2.5 pb-3 transition-colors sm:px-4", note ? "border-brand/25 bg-brand-soft/45" : "border-border bg-card")}>
+    <div className={cn("shrink-0 border-t px-3 pt-2 pb-2.5 transition-colors sm:px-4", note ? "border-brand/25 bg-brand-soft" : "border-border bg-surface-muted")}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex shrink-0 rounded-control border border-border bg-surface-muted/60 p-[2px]">
+        <div role="tablist" aria-label="Tipo de mensagem" className="inline-flex shrink-0 rounded-full bg-black/[0.05] p-[2px] dark:bg-white/[0.07]">
           {(["reply", "note"] as const).map((mode) => (
             <button
               key={mode}
@@ -226,12 +226,12 @@ export function Composer({
               aria-selected={draft.mode === mode}
               onClick={() => setDraft({ mode })}
               className={cn(
-                "touch-target relative inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-2.5 text-[12px] font-medium outline-none pointer-coarse:h-8 transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
+                "touch-target relative inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12px] font-medium outline-none pointer-coarse:h-8 transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 draft.mode === mode ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {draft.mode === mode && (
-                <motion.span layoutId="composer-mode" transition={{ type: "spring", stiffness: 500, damping: 38 }} className="absolute inset-0 rounded-[7px] border border-border bg-surface shadow-xs" />
+                <motion.span layoutId="composer-mode" transition={{ type: "spring", stiffness: 500, damping: 38 }} className="absolute inset-0 rounded-full bg-card shadow-xs" />
               )}
               <span className="relative flex items-center gap-1.5">
                 {mode === "note" && <Lock className="size-3" />}
@@ -253,7 +253,7 @@ export function Composer({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="mb-2 flex items-center gap-2.5 rounded-[10px] border border-border bg-surface-muted/60 py-1.5 pr-1.5 pl-2.5">
+            <div className="mb-2 flex items-center gap-2.5 rounded-[10px] bg-card py-1.5 pr-1.5 pl-2.5 shadow-[0_1px_1px_rgb(0_0_0/0.08)]">
               <Reply className="size-3.5 shrink-0 text-brand" />
               <div className="min-w-0 flex-1 border-l-2 border-brand/60 pl-2">
                 <p className="text-[11.5px] font-medium text-foreground">{replyTo.direction === "inbound" ? "Respondendo ao cliente" : "Respondendo à sua mensagem"}</p>
@@ -267,7 +267,7 @@ export function Composer({
         )}
         {file && !note && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}>
-            <div className="mb-2 flex items-center gap-3 rounded-[12px] border border-border bg-surface p-2">
+            <div className="mb-2 flex items-center gap-3 rounded-[12px] bg-card p-2 shadow-[0_1px_1px_rgb(0_0_0/0.08)]">
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={preview} alt="" className="size-12 rounded-[8px] object-cover" />
@@ -294,7 +294,7 @@ export function Composer({
       </AnimatePresence>
 
       {recorder.recording ? (
-        <div className="flex items-center gap-2 rounded-[12px] border border-danger/20 bg-danger-soft/60 px-2 py-1.5">
+        <div className="flex items-center gap-2 rounded-full border border-danger/20 bg-danger-soft px-2 py-1.5">
           <Button variant="ghost" size="icon-sm" aria-label="Descartar gravação" onClick={() => stopRecording(false)}>
             <Trash2 />
           </Button>
@@ -307,8 +307,8 @@ export function Composer({
       ) : (
         <div
           className={cn(
-            "flex items-end gap-1 rounded-[14px] border bg-surface p-1 shadow-xs transition-[border-color,box-shadow] focus-within:ring-3",
-            note ? "border-brand/35 focus-within:border-brand/60 focus-within:ring-brand/15" : "border-border focus-within:border-brand/50 focus-within:ring-brand/12",
+            "flex items-end gap-1 rounded-[24px] bg-card px-1.5 py-1 shadow-[0_1px_1px_rgb(0_0_0/0.08)] ring-1 ring-transparent transition-shadow focus-within:ring-2",
+            note ? "ring-brand/30 focus-within:ring-brand/50" : "focus-within:ring-brand/35",
           )}
         >
           {!note && !textOnly && (
@@ -316,7 +316,7 @@ export function Composer({
               <DropdownMenuTrigger
                 aria-label="Anexar arquivo"
                 disabled={blocked}
-                className="flex size-9 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50 aria-expanded:bg-accent"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50 aria-expanded:bg-accent"
               >
                 <Plus className="size-[18px]" />
               </DropdownMenuTrigger>
@@ -355,23 +355,23 @@ export function Composer({
                 attach(pasted)
               }
             }}
-            placeholder={note ? "Escreva uma nota para a equipe…" : file ? "Adicione uma legenda…" : "Digite uma mensagem…"}
+            placeholder={note ? "Escreva uma nota para a equipe…" : file ? "Adicione uma legenda…" : "Digite uma mensagem"}
             aria-label={note ? "Nota interna" : "Mensagem"}
-            className="max-h-44 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-2 text-[14px] leading-[20px] text-foreground outline-none placeholder:text-subtle disabled:opacity-60 sm:text-[13.5px]"
+            className="max-h-44 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] leading-[20px] text-foreground outline-none placeholder:text-subtle disabled:opacity-60 sm:text-[13.5px]"
           />
           {!note && !textOnly && !draft.text.trim() && !file ? (
-            <Button variant="ghost" size="icon" aria-label="Gravar áudio" disabled={blocked || busy} onClick={recorder.start} className="rounded-[10px]">
-              <Mic className="size-[18px]" />
+            <Button variant="ghost" size="icon" aria-label="Gravar áudio" disabled={blocked || busy} onClick={recorder.start} className="rounded-full text-muted-foreground hover:text-foreground">
+              <Mic className="size-5" />
             </Button>
           ) : (
             <Button
-              variant={note ? "brand" : "default"}
+              variant="brand"
               onClick={() => submit()}
               disabled={blocked || busy || (!draft.text.trim() && !file)}
-              className="h-9 rounded-[10px] px-3.5"
+              aria-label={note ? "Salvar nota" : "Enviar"}
+              className={cn("rounded-full", note ? "h-9 px-4" : "size-9 p-0")}
             >
-              {note ? "Salvar nota" : "Enviar"}
-              {!note && <SendHorizontal className="size-3.5" />}
+              {note ? "Salvar nota" : <SendHorizontal className="size-[18px]" />}
             </Button>
           )}
         </div>

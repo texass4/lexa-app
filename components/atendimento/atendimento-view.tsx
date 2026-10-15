@@ -161,7 +161,7 @@ function Workspace() {
       <aside
         aria-label="Caixa de entrada"
         className={cn(
-          "flex min-h-0 w-full shrink-0 flex-col border-border md:w-[300px] md:border-r xl:w-[320px]",
+          "flex min-h-0 w-full shrink-0 flex-col border-border bg-card md:w-[330px] md:border-r xl:w-[380px]",
           (selected || focusClient) && "max-md:hidden",
         )}
       >

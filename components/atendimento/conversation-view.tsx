@@ -296,7 +296,7 @@ export function ConversationView({
         if (file) setDropped(file)
       }}
     >
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2.5 sm:px-4">
+      <header className="flex h-[60px] shrink-0 items-center gap-2 border-b border-border bg-surface-muted px-2 sm:px-4">
         <Button variant="ghost" size="icon-sm" aria-label="Voltar para as conversas" onClick={onBack} className="md:hidden">
           <ChevronLeft />
         </Button>
@@ -304,14 +304,14 @@ export function ConversationView({
           <ContactAvatar contact={conversation.contact} client={client} size="lg" />
           <span className="min-w-0">
             <span className="flex items-center gap-2">
-              <span className="truncate text-[14.5px] font-semibold tracking-[-0.01em]">{name}</span>
+              <span className="truncate text-[16px] font-medium">{name}</span>
               {client ? (
                 <span className="hidden shrink-0 rounded-[5px] bg-success-soft px-1.5 py-px text-[10.5px] font-medium text-success sm:inline">Cliente</span>
               ) : (
                 <span className="hidden shrink-0 rounded-[5px] bg-info-soft px-1.5 py-px text-[10.5px] font-medium text-info sm:inline">Contato novo</span>
               )}
             </span>
-            <span className="tabular block truncate text-[12px] text-muted-foreground">{formatPhone(conversation.contact.phone)}</span>
+            <span className="tabular block truncate text-[13px] text-muted-foreground">{formatPhone(conversation.contact.phone)}</span>
           </span>
         </button>
 
@@ -435,7 +435,7 @@ export function ConversationView({
       </header>
 
       {/* Status e responsável no mobile/tablet */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 lg:hidden">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-muted/60 px-4 py-2 lg:hidden">
         <StatusMenu conversation={conversation} onChanged={upsertConversation} disabled={!canEdit} />
         <button type="button" onClick={onAssign} className="touch-target relative inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-surface pr-2 pl-1 text-[12px] font-medium outline-none">
           {assignee ? <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="xs" /> : <UserRoundCheck className="ml-1 size-3.5 text-subtle" />}
@@ -476,7 +476,7 @@ export function ConversationView({
 
       <ConnectionNotice />
 
-      <div className="flex min-h-0 flex-1 flex-col bg-[radial-gradient(circle_at_1px_1px,color-mix(in_oklab,var(--border-strong)_45%,transparent)_1px,transparent_0)] [background-size:22px_22px]">
+      <div className="flex min-h-0 flex-1 flex-col bg-[color-mix(in_srgb,var(--brand)_5%,var(--surface-muted))] bg-[radial-gradient(circle_at_2px_2px,color-mix(in_oklab,var(--brand)_13%,transparent)_1.5px,transparent_0)] [background-size:26px_26px]">
         <MessageList
           messages={messages}
           loading={loading}
@@ -518,21 +518,22 @@ export function ConversationView({
 
 export function EmptyConversation() {
   return (
-    <div className="flex h-full flex-col items-center justify-center px-8 text-center">
-      <div className="relative mb-5">
-        <div className="absolute inset-0 -m-6 rounded-full bg-brand-soft/80 blur-2xl" aria-hidden />
-        <div className="relative flex size-16 items-center justify-center rounded-card border border-border/90 bg-surface shadow-card">
-          <svg viewBox="0 0 24 24" className="size-7 text-brand" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
-            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
-            <path d="M8.5 8.5h7M8.5 11.5h4.5" strokeLinecap="round" />
+    <div className="flex h-full flex-col items-center justify-center border-b-[6px] border-brand bg-surface-muted px-8 text-center">
+      <div className="relative mb-7">
+        <div className="absolute inset-0 -m-8 rounded-full bg-brand-soft blur-2xl" aria-hidden />
+        <div className="relative flex size-28 items-center justify-center rounded-full bg-card shadow-card ring-1 ring-border/70">
+          <svg viewBox="0 0 48 48" className="size-14 text-brand" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M8 11a5 5 0 0 1 5-5h22a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5H21l-8 7v-7a5 5 0 0 1-5-5z" strokeLinejoin="round" />
+            <path d="M16 15h16M16 21h10" strokeLinecap="round" />
+            <path d="M42 22v12a4 4 0 0 1-4 4h-1v6l-6-6h-9" strokeLinecap="round" strokeLinejoin="round" opacity="0.45" />
           </svg>
         </div>
       </div>
-      <h2 className="font-display text-[22px] leading-tight font-semibold tracking-[-0.02em]">Central de atendimento</h2>
-      <p className="mt-2 max-w-sm text-[13.5px] leading-relaxed text-muted-foreground">
+      <h2 className="text-[30px] leading-tight font-light tracking-[-0.02em] text-foreground">Atendimento Íntegra</h2>
+      <p className="mt-3 max-w-md text-[14.5px] leading-relaxed text-muted-foreground">
         Escolha uma conversa para responder, registrar notas internas e ver processos, tarefas e documentos do cliente — tudo no mesmo lugar.
       </p>
-      <Link href="/clientes" className="touch-target relative mt-5 text-[12.5px] font-medium text-brand-strong underline-offset-4 hover:underline">
+      <Link href="/clientes" className="touch-target relative mt-5 text-[13px] font-medium text-brand-strong underline-offset-4 hover:underline">
         Ver clientes do escritório
       </Link>
     </div>
