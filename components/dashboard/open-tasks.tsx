@@ -3,9 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ChevronRight, ListChecks, Plus } from "lucide-react"
+import { ListChecks, Plus } from "lucide-react"
 import { cn } from "cn"
-import { Panel, PanelHeader } from "@/components/ui/panel"
+import { Panel } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { AnimatedCheckbox } from "@/components/ui/animated-checkbox"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -15,7 +15,8 @@ import { useUI } from "@/lib/store/ui-store"
 import { Can, useSession } from "@/lib/auth/session"
 import { getUser } from "@/lib/auth/account"
 import { describeRelated, taskBucket, type TaskBucket } from "@/lib/store/selectors"
-import { fmtDayMonth, getNow } from "@/lib/core/dates"
+import { fmtNumericDate, getNow } from "@/lib/core/dates"
+import { PRIORITY_CONFIG } from "@/lib/core/config"
 import { inTaskTab, type TaskTab } from "@/lib/dashboard/dashboard"
 import { ChipTabs } from "./chip-tabs"
 import type { Task } from "@/types"
@@ -26,30 +27,40 @@ const TABS: { value: TaskTab; label: string }[] = [
   { value: "atrasadas", label: "Atrasadas" },
   { value: "hoje", label: "Hoje" },
   { value: "amanha", label: "Amanhã" },
-  { value: "semana", label: "Esta semana" },
+  { value: "semana", label: "Semana" },
 ]
 const VISIBLE = 5
 
-function dueBadge(bucket: TaskBucket, dueAt: string) {
-  if (bucket === "atrasadas") return { label: "Atrasada", cls: "bg-danger-soft text-danger" }
-  if (bucket === "hoje") return { label: "Hoje", cls: "bg-danger-soft text-danger" }
-  if (bucket === "amanha") return { label: "Amanhã", cls: "bg-warning-soft text-warning" }
-  return { label: fmtDayMonth(dueAt), cls: "bg-surface-muted text-muted-foreground" }
+/** Prazo à direita, como texto colorido (vencida e hoje em vermelho). */
+function dueLabel(bucket: TaskBucket, dueAt: string) {
+  if (bucket === "atrasadas") return { label: fmtNumericShort(dueAt), cls: "text-danger", title: "Atrasada" }
+  if (bucket === "hoje") return { label: "Hoje", cls: "text-danger" }
+  if (bucket === "amanha") return { label: "Amanhã", cls: "text-warning" }
+  return { label: fmtNumericShort(dueAt), cls: "text-muted-foreground" }
 }
 
-function OpenTaskRow({ task }: { task: Task }) {
+const fmtNumericShort = (iso: string) => fmtNumericDate(iso).slice(0, 5)
+
+const PRIORITY_STYLE: Record<Task["priority"], string> = {
+  alta: "bg-danger-soft text-danger",
+  media: "bg-warning-soft text-warning",
+  baixa: "bg-success-soft text-success",
+}
+
+/** `mineOnly`: só as da pessoa — o avatar do responsável fica de fora (é sempre ela). */
+function OpenTaskRow({ task, mineOnly }: { task: Task; mineOnly: boolean }) {
   const data = useOfficeData()
   const toggle = useToggleTask()
   const editable = useSession().can("tasks.edit")
   const related = describeRelated(data, task.related)
   const done = task.status === "concluida"
   const assignee = getUser(task.assigneeId)
-  const badge = dueBadge(taskBucket({ ...task, status: "pendente" }), task.dueAt)
+  const due = dueLabel(taskBucket({ ...task, status: "pendente" }), task.dueAt)
   return (
     <motion.li
       layout="position"
       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className="group flex items-center gap-3 rounded-[10px] px-3 py-2 transition-colors hover:bg-accent/70"
+      className="group flex items-start gap-3 border-b border-border/70 px-2 py-3 transition-colors last:border-0 hover:bg-accent/50"
     >
       <AnimatedCheckbox
         checked={done}
@@ -59,7 +70,10 @@ function OpenTaskRow({ task }: { task: Task }) {
       />
       <span className="min-w-0 flex-1">
         <span
-          className={cn("block text-[13.5px] font-medium max-sm:line-clamp-2 sm:truncate", done ? "text-subtle line-through" : "text-foreground")}
+          className={cn(
+            "block text-[13.5px] leading-snug font-medium max-sm:line-clamp-2 sm:truncate",
+            done ? "text-subtle line-through" : "text-foreground",
+          )}
         >
           {task.title}
         </span>
@@ -72,17 +86,22 @@ function OpenTaskRow({ task }: { task: Task }) {
           </Link>
         )}
       </span>
-      <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", badge.cls, done && "opacity-40")}>{badge.label}</span>
-      <span title={assignee.name} className="max-sm:hidden">
-        <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="sm" />
+      <span className="flex shrink-0 items-center gap-3 pt-0.5">
+        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", PRIORITY_STYLE[task.priority], done && "opacity-40")}>
+          {PRIORITY_CONFIG[task.priority].label}
+        </span>
+        <span
+          className={cn("tabular w-12 text-right text-[12px] font-medium", due.cls, done && "opacity-40")}
+          title={due.title ?? `Prazo: ${fmtNumericDate(task.dueAt)}`}
+        >
+          {due.label}
+        </span>
+        {!mineOnly && (
+          <span title={assignee.name} className="max-sm:hidden">
+            <UserAvatar name={assignee.name} src={assignee.avatarUrl} size="xs" />
+          </span>
+        )}
       </span>
-      <Link
-        href={related?.href ?? "/tarefas"}
-        aria-label={`Abrir ${task.title}`}
-        className="touch-target relative shrink-0 rounded-md text-subtle outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
-      >
-        <ChevronRight className="size-4" />
-      </Link>
     </motion.li>
   )
 }
@@ -109,45 +128,44 @@ export function OpenTasks() {
 
   return (
     <Panel className="flex flex-col">
-      <PanelHeader
-        title="Tarefas"
-        icon={<ListChecks />}
-        action={
-          <>
-            <button
-              type="button"
-              aria-pressed={mine}
-              onClick={() => setMine((v) => !v)}
-              className={cn(
-                "touch-target relative h-8 shrink-0 rounded-full border px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                mine ? "border-brand/30 bg-brand-soft text-brand-strong" : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Só minhas
-            </button>
-            <Can permission="tasks.edit">
-              <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" onClick={() => openDialog("task")}>
-                <Plus />
-              </Button>
-            </Can>
-            <PanelLink href="/tarefas">Ver todas</PanelLink>
-          </>
-        }
-      />
-      <div className="px-5 pb-2 sm:px-6">
+      <header className="flex items-start justify-between gap-3 px-5 pt-5 sm:px-6">
+        <h2 className="flex items-center gap-2 text-[16px] font-semibold tracking-[-0.015em] text-foreground">
+          <span className="flex size-8 items-center justify-center rounded-[8px] bg-brand text-brand-foreground">
+            <ListChecks className="size-[17px]" />
+          </span>
+          Tarefas
+        </h2>
+        <div className="flex items-center gap-1">
+          <Can permission="tasks.edit">
+            <Button variant="ghost" size="icon-sm" aria-label="Nova tarefa" title="Nova tarefa" onClick={() => openDialog("task")}>
+              <Plus />
+            </Button>
+          </Can>
+          <PanelLink href="/tarefas">Ver todas</PanelLink>
+        </div>
+      </header>
+      <div className="px-4 pt-4 pb-1">
         <ChipTabs
           ariaLabel="Filtrar tarefas"
-          wrap
-          className="min-w-0"
+          variant="segmented"
           value={tab}
           onChange={setTab}
-          tabs={TABS.map((t) => ({ ...t, count: pendingCount(byTab[t.value]) }))}
+          // Contagem só nas atrasadas (o que pede ação); as demais ficam no título da aba.
+          tabs={TABS.map((t) => {
+            const count = pendingCount(byTab[t.value])
+            return {
+              ...t,
+              title: `${t.value === "semana" ? "Esta semana" : t.label}: ${count} pendente${count === 1 ? "" : "s"}`,
+              count: t.value === "atrasadas" && count ? count : undefined,
+              alert: t.value === "atrasadas",
+            }
+          })}
         />
       </div>
       {shown.length ? (
-        <ul className="px-2 pb-3 sm:px-3">
+        <ul className="px-3 pb-2 sm:px-4">
           {shown.map((t) => (
-            <OpenTaskRow key={t.id} task={t} />
+            <OpenTaskRow key={t.id} task={t} mineOnly={mine} />
           ))}
         </ul>
       ) : (
@@ -155,14 +173,22 @@ export function OpenTasks() {
           {["Nenhuma tarefa em aberto", tab !== "todas" && "nesta aba", mine && "para você"].filter(Boolean).join(" ")}.
         </p>
       )}
-      {byTab[tab].length > VISIBLE && (
-        <p className="border-t border-border/80 px-5 py-2.5 text-[12px] text-muted-foreground sm:px-6">
-          Mais {byTab[tab].length - VISIBLE} em{" "}
-          <Link href="/tarefas" className="font-medium text-foreground hover:underline">
-            Tarefas
-          </Link>
-        </p>
-      )}
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/80 px-5 py-2.5 text-[12px] text-muted-foreground sm:px-6">
+        {byTab[tab].length > VISIBLE ? (
+          <p>
+            Mais {byTab[tab].length - VISIBLE} em{" "}
+            <Link href="/tarefas" className="font-medium text-foreground hover:underline">
+              Tarefas
+            </Link>
+          </p>
+        ) : (
+          <span />
+        )}
+        <label className="inline-flex cursor-pointer items-center gap-1.5 font-medium whitespace-nowrap">
+          <input type="checkbox" checked={mine} onChange={() => setMine((v) => !v)} className="size-3.5 cursor-pointer accent-[var(--brand)]" />
+          Só minhas
+        </label>
+      </div>
     </Panel>
   )
 }

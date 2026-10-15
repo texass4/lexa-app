@@ -1,13 +1,34 @@
 "use client"
 
 import * as React from "react"
-import { ArrowRight, ArrowUp, Check, Copy, ListChecks, Maximize2, MessagesSquare, Mic, Minimize2, RotateCcw, ShieldCheck, Square } from "lucide-react"
+import {
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Copy,
+  FileText,
+  Hourglass,
+  ListChecks,
+  Maximize2,
+  MessagesSquare,
+  Mic,
+  Minimize2,
+  RotateCcw,
+  Scale,
+  SendHorizontal,
+  ShieldCheck,
+  Sparkles,
+  Square,
+  UsersRound,
+} from "lucide-react"
+import Link from "next/link"
+import { currentUserId, getUser } from "@/lib/auth/account"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
 import { UnderlineTabs } from "@/components/ui/underline-tabs"
 import { ASSISTANT_WIDTH, useAssistantLayout } from "./assistant-layout"
-import { AIPrivacyNote } from "./ai-privacy"
+import { AI_PRIVACY_HREF, AIPrivacyNote } from "./ai-privacy"
 import { Button } from "@/components/ui/button"
 import { ChoiceChips } from "@/components/ui/choice-chips"
 import { CHAT_LIMITS, type AIStatus, type ChatMode } from "@/lib/ai/types"
@@ -25,6 +46,9 @@ const TOPIC = { office: "o escritório", process: "este processo", client: "este
 const CAPABILITIES = ["resumir", "explicar movimentações", "apontar o que merece atenção", "sugerir próximos passos"]
 
 /** Modos da conversa, na ordem do seletor. */
+/** Ícones das ações sugeridas (uma por pergunta, só para reconhecer à primeira vista). */
+const ACTION_ICONS = [ListChecks, Scale, FileText, Hourglass]
+
 const MODE_LABEL: Record<ChatMode, string> = { all: "All", office: "Escritório", jurisprudence: "Jurisprudência" }
 const MODE_HINT: Record<ChatMode, string> = {
   all: "Dados do escritório e, quando a pergunta pede, a base de jurisprudência.",
@@ -230,6 +254,8 @@ export function AIChatSheet({
     endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })
   }, [chat.messages.length, chat.pending])
 
+  const prompts = mode === "jurisprudence" ? jurisprudencePrompts(context.scope.type) : context.prompts
+
   const submit = (text = draft) => {
     if (!text.trim() || chat.pending || !ready || busyVoice) return
     chat.send(text)
@@ -301,7 +327,7 @@ export function AIChatSheet({
           className="space-y-2"
         >
           <VoiceStatus state={voice.state} onCancel={voice.cancel} onStop={voice.stop} onRetry={voice.start} />
-          <div className="flex items-end gap-2 rounded-[12px] border border-border bg-surface px-3 py-2.5 shadow-xs focus-within:border-brand/50 focus-within:ring-2 focus-within:ring-brand/20">
+          <div className="flex flex-col gap-2 rounded-[12px] border border-border bg-surface px-3 pt-2.5 pb-2 shadow-xs focus-within:border-brand/50 focus-within:ring-2 focus-within:ring-brand/20">
             <label htmlFor="lexa-ai-input" className="sr-only">
               Pergunte à Íntegra
             </label>
@@ -313,11 +339,7 @@ export function AIChatSheet({
               maxLength={CHAT_LIMITS.messageChars}
               disabled={!ready}
               placeholder={
-                !ready
-                  ? "Conversa indisponível"
-                  : mode === "jurisprudence"
-                    ? "Pesquise um tema na jurisprudência…"
-                    : `Pergunte sobre ${TOPIC[context.scope.type]}…`
+                !ready ? "Conversa indisponível" : mode === "jurisprudence" ? "Pesquise um tema na jurisprudência…" : "Digite sua pergunta…"
               }
               onChange={(e) => {
                 setDraft(e.target.value)
@@ -329,38 +351,56 @@ export function AIChatSheet({
                   submit()
                 }
               }}
-              className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] pointer-coarse:min-h-8 leading-snug outline-none field-sizing-content placeholder:text-subtle disabled:cursor-not-allowed"
+              className="max-h-32 min-h-[44px] w-full resize-none bg-transparent py-1 text-[13.5px] pointer-coarse:min-h-8 leading-snug outline-none field-sizing-content placeholder:text-subtle disabled:cursor-not-allowed"
             />
-            {ready && (
+            <div className="flex items-center justify-between gap-2">
+              {ready ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={listening ? "Parar a gravação e transcrever" : "Falar a pergunta (gravar áudio)"}
+                  aria-pressed={listening}
+                  title={listening ? "Parar e transcrever" : "Falar a pergunta"}
+                  disabled={voice.state.status === "processing" || voice.state.status === "requesting"}
+                  onClick={() => (voice.state.status === "recording" ? voice.stop() : voice.start())}
+                  className={cn(
+                    "text-muted-foreground",
+                    listening && "bg-danger-soft text-danger hover:bg-danger-soft hover:text-danger",
+                    voice.state.status === "processing" && "text-brand",
+                  )}
+                >
+                  {voice.state.status === "recording" ? (
+                    <Square className="fill-current" />
+                  ) : voice.state.status === "processing" ? (
+                    <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+                  ) : (
+                    <Mic />
+                  )}
+                </Button>
+              ) : (
+                <span />
+              )}
               <Button
-                type="button"
-                variant="ghost"
+                type="submit"
+                variant="brand"
                 size="icon-sm"
-                aria-label={listening ? "Parar a gravação e transcrever" : "Falar a pergunta (gravar áudio)"}
-                aria-pressed={listening}
-                title={listening ? "Parar e transcrever" : "Falar a pergunta"}
-                disabled={voice.state.status === "processing" || voice.state.status === "requesting"}
-                onClick={() => (voice.state.status === "recording" ? voice.stop() : voice.start())}
-                className={cn(
-                  "text-muted-foreground",
-                  listening && "bg-danger-soft text-danger hover:bg-danger-soft hover:text-danger",
-                  voice.state.status === "processing" && "text-brand",
-                )}
+                aria-label="Enviar pergunta"
+                disabled={!draft.trim() || chat.pending || !ready || busyVoice}
               >
-                {voice.state.status === "recording" ? (
-                  <Square className="fill-current" />
-                ) : voice.state.status === "processing" ? (
-                  <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-                ) : (
-                  <Mic />
-                )}
+                <SendHorizontal />
               </Button>
-            )}
-            <Button type="submit" size="icon-sm" aria-label="Enviar pergunta" disabled={!draft.trim() || chat.pending || !ready || busyVoice}>
-              <ArrowUp />
-            </Button>
+            </div>
           </div>
-          <p className="text-[11.5px] text-subtle">A IA usa apenas os dados aos quais você tem acesso e pode errar. Confira antes de usar.</p>
+          <p className="flex items-start gap-1.5 text-[11.5px] leading-snug text-subtle">
+            <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
+            <span>
+              A IA usa apenas os dados aos quais você tem acesso e pode errar — confira antes de usar.{" "}
+              <Link href={AI_PRIVACY_HREF} className="font-medium text-brand-strong underline underline-offset-2 hover:text-brand">
+                Saiba mais
+              </Link>
+            </span>
+          </p>
         </form>
       }
     >
@@ -415,41 +455,68 @@ export function AIChatSheet({
         <div className="space-y-5 px-5 py-5">
           {status && !ready && <AIUnavailable status={status} />}
 
-          {chat.messages.length === 0 && ready && (
+          {chat.messages.length === 0 && (
             <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
-              <p className="text-[17px] leading-snug font-semibold tracking-[-0.01em] text-foreground">
-                {mode === "jurisprudence" ? "Pesquise na jurisprudência" : context.headline}
-              </p>
-              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-                {mode === "jurisprudence" ? (
-                  <>
-                    Pergunte por um tema e a Íntegra pesquisa nas decisões da base de jurisprudência, citando cada decisão encontrada. Dados do
-                    escritório não entram neste modo.
-                  </>
-                ) : (
-                  <>
-                    A partir do que está registrado sobre {TOPIC[context.scope.type]}, dá para {CAPABILITIES.slice(0, -1).join(", ")} e{" "}
-                    {CAPABILITIES.at(-1)} — citando de onde veio cada informação. A resposta vira tarefa com um clique.
-                  </>
-                )}
-              </p>
-              <h3 className="mt-6 mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.08em] text-subtle uppercase">
-              Perguntas sugeridas para esta tela
-            </h3>
-              <div className="flex flex-col gap-2">
-                {(mode === "jurisprudence" ? jurisprudencePrompts(context.scope.type) : context.prompts).map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => submit(prompt)}
-                    disabled={chat.pending}
-                    className="group flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface px-3.5 py-3 text-left text-[13px] leading-snug text-foreground outline-none transition-[border-color,background-color,transform] hover:border-brand/40 hover:bg-brand-soft/50 focus-visible:ring-2 focus-visible:ring-brand/40 active:scale-[0.99] disabled:opacity-50"
-                  >
-                    {prompt}
-                    <ArrowRight className="size-3.5 shrink-0 text-subtle transition-colors group-hover:text-brand-strong" />
-                  </button>
-                ))}
+              {/* Saudação: quem é a assistente e o que ela usa para responder. */}
+              <div className="rounded-[12px] border border-border bg-surface p-4 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground">
+                    <UsersRound className="size-5" strokeWidth={1.8} />
+                  </span>
+                  <p className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">Olá, {getUser(currentUserId()).firstName}!</p>
+                </div>
+                <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+                  {mode === "jurisprudence" ? (
+                    <>Pergunte por um tema e eu pesquiso nas decisões da base de jurisprudência, citando cada decisão encontrada.</>
+                  ) : (
+                    <>
+                      Sou a assistente da Íntegra. Com o que está registrado sobre {TOPIC[context.scope.type]}, posso{" "}
+                      {CAPABILITIES.slice(0, -1).join(", ")} e {CAPABILITIES.at(-1)} — sempre citando de onde veio cada informação. Como posso ajudar?
+                    </>
+                  )}
+                </p>
+                {/* Ações: as primeiras perguntas desta tela, em grade. */}
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {prompts.slice(0, 4).map((prompt, i) => {
+                    const Icon = ACTION_ICONS[i % ACTION_ICONS.length]
+                    return (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => submit(prompt)}
+                        disabled={chat.pending || !ready}
+                        className="flex min-h-11 items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-2 text-left text-[12px] leading-snug font-medium text-foreground outline-none transition-[border-color,background-color] hover:border-brand/40 hover:bg-brand-soft/50 focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        <Icon className="size-4 shrink-0 text-brand" strokeWidth={1.8} />
+                        <span className="line-clamp-2">{prompt}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
+              {prompts.length > 4 && (
+                <>
+                  <h3 className="mt-5 mb-2 text-[13px] font-semibold text-foreground">Sugestões para você</h3>
+                  <div className="flex flex-col gap-2">
+                    {prompts.slice(4).map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => submit(prompt)}
+                        disabled={chat.pending || !ready}
+                        className="group flex items-center gap-3 rounded-[10px] border border-border bg-surface px-3.5 py-3 text-left outline-none transition-[border-color,background-color] hover:border-brand/40 hover:bg-brand-soft/40 focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        <Sparkles className="size-4 shrink-0 text-brand" strokeWidth={1.8} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] leading-snug text-foreground">{prompt}</span>
+                          <span className="mt-0.5 block truncate text-[11.5px] text-subtle">{context.subtitle}</span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

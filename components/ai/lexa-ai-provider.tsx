@@ -10,6 +10,7 @@ import { isAIReady, type SourceHandler } from "./ai-blocks"
 import { AIChatSheet } from "./ai-chat-sheet"
 import { clientContext, officeContext, processContext, scopeKey, type AIContext } from "./ai-context"
 import { useAIChat, useAIStatus, useChatMode } from "./use-ai"
+import { useAssistantLayout } from "./assistant-layout"
 
 /**
  * A Íntegra IA como camada do produto, não como página: um único painel lateral,
@@ -61,6 +62,26 @@ function useRouteContext(): AIContext {
 /** Conversas mantidas vivas na sessão (as mais recentes). Trocar de tela não aborta nem apaga nenhuma delas. */
 const KEEP_CONVERSATIONS = 6
 
+/** Quem fechou o assistente no Início não o vê abrir sozinho de novo (preferência do navegador). */
+const CLOSED_PREF = "lexa:assistant:closed"
+
+function rememberClosed(closed: boolean) {
+  try {
+    if (closed) localStorage.setItem(CLOSED_PREF, "1")
+    else localStorage.removeItem(CLOSED_PREF)
+  } catch {
+    // Sem armazenamento (janela privada): só não lembra a escolha.
+  }
+}
+
+function closedByUser() {
+  try {
+    return localStorage.getItem(CLOSED_PREF) === "1"
+  } catch {
+    return false
+  }
+}
+
 type PendingRequest = { id: number; key: string; prompt: string }
 
 export function LexaAIProvider({ children }: { children: React.ReactNode }) {
@@ -68,7 +89,8 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const routeContext = useRouteContext()
-  const [isOpen, setOpen] = React.useState(false)
+  // null: a pessoa ainda não abriu nem fechou o painel nesta sessão (vale a abertura automática do Início).
+  const [openState, setOpen] = React.useState<boolean | null>(null)
   const [expanded, setExpanded] = React.useState(false)
   // Contexto pedido por uma ação (ex.: tarefa → processo). Vale só na tela em que foi pedido.
   const [override, setOverride] = React.useState<{ context: AIContext; path: string } | null>(null)
@@ -81,6 +103,11 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
   const context = override && override.path === pathname ? override.context : routeContext
   const activeKey = scopeKey(context.scope)
 
+  // No Início, em telas onde o painel cabe ao lado do conteúdo, ele já começa aberto (abrir não
+  // consulta o modelo) — até a pessoa abrir ou fechar por conta própria, e nunca se já o fechou antes.
+  const { docked } = useAssistantLayout(false)
+  const isOpen = openState ?? (pathname === "/dashboard" && docked && !closedByUser())
+
   const remember = React.useCallback((ctx: AIContext) => {
     const key = scopeKey(ctx.scope)
     setVisited((list) => [ctx, ...list.filter((c) => scopeKey(c.scope) !== key)].slice(0, KEEP_CONVERSATIONS))
@@ -90,6 +117,7 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
     (next?: AIContext) => {
       setOverride(next ? { context: next, path: pathname } : null)
       remember(next ?? routeContext)
+      rememberClosed(false)
       setOpen(true)
     },
     [pathname, remember, routeContext],
@@ -107,7 +135,12 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
     [pathname, remember, routeContext],
   )
 
+  // Fechar por uma ação (ex.: abrir o formulário de tarefa) não conta como "a pessoa fechou".
   const close = React.useCallback(() => setOpen(false), [])
+  const changeOpen = React.useCallback((next: boolean) => {
+    rememberClosed(!next)
+    setOpen(next)
+  }, [])
 
   const registerSourceHandler = React.useCallback((handler: SourceHandler) => {
     sourceHandler.current = handler
@@ -147,7 +180,7 @@ export function LexaAIProvider({ children }: { children: React.ReactNode }) {
             key={key}
             context={ctx}
             open={active && isOpen}
-            onOpenChange={setOpen}
+            onOpenChange={changeOpen}
             status={status}
             request={request?.key === key ? request : null}
             onRequestHandled={handleRequest}

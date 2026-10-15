@@ -65,7 +65,7 @@ export function Sidebar() {
           <p className={cn("text-[11.5px] leading-snug text-subtle", labels)}>
             <span className="font-semibold text-muted-foreground">Digitaliza</span>
             <br />
-            Íntegra é um produto Digitaliza
+            Tecnologia que impulsiona a advocacia
           </p>
           <button
             type="button"

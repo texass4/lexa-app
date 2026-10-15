@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, CalendarDays, CalendarPlus, MapPin, Plus, UserRound } from "lucide-react"
+import { CalendarDays, CalendarPlus, ChevronRight, Plus } from "lucide-react"
 import { cn } from "cn"
 import { Panel } from "@/components/ui/panel"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -18,7 +18,7 @@ import { useCategoryLookup } from "@/components/agenda/use-category"
 import { AppointmentDetail } from "@/components/agenda/appointment-detail"
 import { addDays, fmtStartsIn, fmtTime, getNow, parse, startOfDay, toLocalISO, weekdayShort } from "@/lib/core/dates"
 import { getUser } from "@/lib/auth/account"
-import { processSubject, processTitle } from "@/lib/processos/label"
+import { processNumberLabel } from "@/lib/processos/label"
 import type { Appointment } from "@/types"
 
 /** Hoje e os próximos dias: a agenda do Início olha só para a frente. */
@@ -38,10 +38,10 @@ function timing(a: Appointment, now: Date, isToday: boolean) {
   if (!isToday) return undefined
   const start = parse(a.start)
   const end = parse(a.end)
-  if (end <= now) return { label: "Concluído", cls: "bg-surface-muted text-muted-foreground" }
-  if (start <= now) return { label: "Agora", cls: "bg-brand text-brand-foreground" }
+  if (end <= now) return { label: "concluído", tone: "text-subtle" }
+  if (start <= now) return { label: "agora", tone: "text-brand" }
   const minutes = (start.getTime() - now.getTime()) / 60_000
-  return { label: fmtStartsIn(a.start, now), cls: minutes <= 60 ? "bg-warning-soft text-warning" : "bg-surface-muted text-muted-foreground" }
+  return { label: fmtStartsIn(a.start, now), tone: minutes <= 60 ? "text-warning" : "text-subtle" }
 }
 
 /**
@@ -84,25 +84,31 @@ export function TodayAgenda() {
 
   return (
     <Panel className="flex flex-col">
-      <header className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5 sm:px-6">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-[16px] font-semibold tracking-[-0.015em] text-foreground">
-            <CalendarDays className="size-[18px] text-brand" /> Agenda do escritório
-          </h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">{summary ?? (isToday ? "Nenhum compromisso hoje" : "Nenhum compromisso neste dia")}</p>
-        </div>
-        <div className="flex items-center gap-1">
+      <header className="flex items-start justify-between gap-2 px-5 pt-5 sm:px-6">
+        <h2 className="flex min-w-0 items-center gap-2 text-[16px] font-semibold tracking-[-0.015em] text-foreground">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-brand-soft text-brand">
+            <CalendarDays className="size-[17px]" />
+          </span>
+          Agenda de hoje
+        </h2>
+        <div className="flex shrink-0 items-center gap-1">
           {editable && (
             <Button variant="ghost" size="icon-sm" aria-label="Novo compromisso" title="Novo compromisso" onClick={create}>
               <Plus />
             </Button>
           )}
-          <PanelLink href="/agenda">Abrir agenda</PanelLink>
+          <PanelLink href="/agenda">
+            Ver calendário<span className="max-sm:hidden"> completo</span>
+          </PanelLink>
         </div>
       </header>
+      <p className="pr-5 pl-[60px] text-[12.5px] text-muted-foreground sm:pl-[64px]">
+        {summary ?? (isToday ? "Nenhum compromisso hoje" : "Nenhum compromisso neste dia")}
+      </p>
       <ChipTabs
         ariaLabel="Dia da agenda"
-        className="px-5 pt-4 pb-3 sm:px-6"
+        variant="solid"
+        className="px-5 pt-4 pb-2 sm:px-6"
         value={day.value}
         onChange={setOffset}
         tabs={days.map((d) => ({ value: d.value, label: d.label, count: d.items.length }))}
@@ -113,7 +119,9 @@ export function TodayAgenda() {
           <span className="flex size-14 items-center justify-center rounded-full bg-brand-soft text-brand ring-8 ring-brand-soft/40">
             <CalendarPlus className="size-6" strokeWidth={1.7} />
           </span>
-          <p className="mt-5 text-[15px] font-semibold text-foreground">{isToday ? "Agenda livre hoje" : `Nada marcado para ${day.label.toLowerCase()}`}</p>
+          <p className="mt-5 text-[15px] font-semibold text-foreground">
+            {isToday ? "Agenda livre hoje" : `Nada marcado para ${day.label.toLowerCase()}`}
+          </p>
           <p className="mt-1.5 max-w-[340px] text-[13px] leading-relaxed text-muted-foreground">
             Audiências, reuniões e atendimentos aparecem aqui em ordem de horário, com o responsável e o processo ligado.
           </p>
@@ -129,7 +137,11 @@ export function TodayAgenda() {
           </div>
         </div>
       ) : (
-        <ol ref={listRef} aria-label={`Compromissos — ${day.label}`} className="relative flex-1 px-3 pb-4 thin-scrollbar sm:px-4 lg:max-h-[560px] lg:overflow-y-auto">
+        <ol
+          ref={listRef}
+          aria-label={`Compromissos — ${day.label}`}
+          className="relative flex-1 px-3 pb-3 thin-scrollbar sm:px-4 lg:max-h-[520px] lg:overflow-y-auto"
+        >
           {items.map((a, i) => {
             const { category, style } = lookup(a.categoryId)
             const status = timing(a, now, isToday)
@@ -137,86 +149,68 @@ export function TodayAgenda() {
             const owner = getUser(a.ownerId)
             const process = a.processId ? byId(data.processes, a.processId) : undefined
             const client = a.clientId ? byId(data.clients, a.clientId) : process ? byId(data.clients, process.clientId) : undefined
-            const record = process
-              ? { href: `/processos/${process.id}`, label: client ? `${client.name} — ${processSubject(process)}` : processTitle(process), kind: "processo" }
-              : client
-                ? { href: `/clientes/${client.id}`, label: client.name, kind: "cliente" }
-                : undefined
+            const record = process ? `Processo ${processNumberLabel(process)}` : client ? `Cliente: ${client.name}` : undefined
+            const secondary = [a.location, a.personName && !client ? `com ${a.personName}` : undefined, record].filter(Boolean).join(" • ")
+            const color = String(style.dot.backgroundColor)
+            const first = i === 0
             const last = i === items.length - 1
             return (
               <li key={a.id} data-now={i === nowIndex ? "" : undefined}>
                 {i === nowIndex && (
-                  <div className="grid grid-cols-[56px_24px_minmax(0,1fr)] items-center gap-x-3 px-2 py-1.5" aria-label={`Agora, ${fmtTime(toLocalISO(now))}`}>
-                    <span className="tabular text-right text-[11.5px] font-semibold text-brand">{fmtTime(toLocalISO(now))}</span>
+                  <div
+                    className="grid grid-cols-[48px_16px_minmax(0,1fr)] items-center gap-x-3 px-2 py-1"
+                    aria-label={`Agora, ${fmtTime(toLocalISO(now))}`}
+                  >
+                    <span className="tabular text-[11.5px] font-semibold text-brand">{fmtTime(toLocalISO(now))}</span>
                     <span className="flex justify-center">
-                      <span className="size-2.5 rounded-full bg-brand ring-4 ring-brand/15" />
+                      <span className="size-2 rounded-full bg-brand ring-4 ring-brand/15" />
                     </span>
-                    <span className="h-px bg-brand/60" />
+                    <span className="h-px bg-brand/50" />
                   </div>
                 )}
-                <div className={cn("group grid grid-cols-[56px_24px_minmax(0,1fr)] gap-x-3 px-2", past && "opacity-60 hover:opacity-100")}>
-                  {/* Horário */}
-                  <div className="pt-3.5 text-right">
-                    <p className="tabular text-[14px] leading-none font-semibold text-foreground">{fmtTime(a.start)}</p>
-                    <p className="tabular mt-1.5 text-[11.5px] text-subtle">{fmtTime(a.end)}</p>
-                  </div>
-                  {/* Trilho: marcador na cor da categoria e a linha até o próximo */}
-                  <div aria-hidden className="relative flex justify-center">
-                    <span className={cn("absolute top-0 w-px bg-border", i === 0 ? "top-4" : "", last ? "h-4" : "bottom-0")} />
-                    <span className="relative mt-3.5 size-3 rounded-full ring-4 ring-card" style={style.dot} />
-                  </div>
-                  {/* Evento */}
-                  <div className="min-w-0 pb-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelected(a)}
-                      className="mt-1.5 w-full rounded-[10px] border border-border/80 bg-surface px-3.5 py-3 text-left outline-none transition-[border-color,box-shadow,background-color] hover:border-border-strong hover:shadow-card focus-visible:ring-2 focus-visible:ring-brand/40"
-                      style={{ borderLeft: `3px solid ${String(style.dot.backgroundColor)}` }}
+                <button
+                  type="button"
+                  onClick={() => setSelected(a)}
+                  className={cn(
+                    "group grid w-full grid-cols-[48px_16px_36px_minmax(0,1fr)_auto] items-center gap-x-3 rounded-[10px] px-2 py-2.5 text-left outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-brand/40",
+                    past && "opacity-60 hover:opacity-100",
+                  )}
+                >
+                  {/* Horário (e a situação, no dia de hoje) */}
+                  <span className="self-start pt-1">
+                    <span className="tabular block text-[13px] leading-none font-semibold text-foreground">{fmtTime(a.start)}</span>
+                    {status && <span className={cn("mt-1 block text-[10.5px] font-semibold whitespace-nowrap", status.tone)}>{status.label}</span>}
+                  </span>
+                  {/* Trilho contínuo, na cor da categoria */}
+                  <span aria-hidden className="relative flex justify-center self-stretch">
+                    <span
+                      className={cn("absolute w-[2px] rounded-full", first ? "top-1/2" : "-top-2.5", last ? "bottom-1/2" : "-bottom-2.5")}
+                      style={{ backgroundColor: color, opacity: 0.45 }}
+                    />
+                    <span className="relative my-auto size-2.5 rounded-full ring-[3px] ring-card" style={{ backgroundColor: color }} />
+                  </span>
+                  {/* Responsável */}
+                  <span title={`Responsável: ${owner.name}`}>
+                    <UserAvatar name={owner.name} src={owner.avatarUrl} className="size-9 text-[11.5px]" />
+                  </span>
+                  {/* O que é */}
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13.5px] leading-snug font-semibold text-foreground">{a.title}</span>
+                    {secondary && <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">{secondary}</span>}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="hidden rounded-full px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap sm:inline-block"
+                      style={{ ...style.soft, ...style.text }}
                     >
-                      <span className="flex items-start justify-between gap-3">
-                        <span className="min-w-0">
-                          <span className="block text-[14px] leading-snug font-semibold text-foreground">{a.title}</span>
-                          <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted-foreground">
-                            <span className="inline-flex items-center gap-1.5 font-medium" style={style.text}>
-                              <span aria-hidden className="size-1.5 rounded-full" style={style.dot} />
-                              {category?.name ?? "Sem categoria"}
-                            </span>
-                            {a.location && (
-                              <span className="inline-flex min-w-0 items-center gap-1">
-                                <MapPin className="size-3.5 shrink-0 text-subtle" />
-                                <span className="truncate">{a.location}</span>
-                              </span>
-                            )}
-                          </span>
-                        </span>
-                        {status && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", status.cls)}>{status.label}</span>}
-                      </span>
-                      <span className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                        <span className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px]">
-                          <span className="inline-flex items-center gap-2 text-foreground" title={`Responsável: ${owner.name}`}>
-                            <UserAvatar name={owner.name} src={owner.avatarUrl} size="sm" />
-                            {owner.firstName}
-                          </span>
-                          {a.personName && (
-                            <span className="inline-flex min-w-0 items-center gap-1.5 text-muted-foreground" title={`Com ${a.personName}`}>
-                              <UserRound className="size-3.5 shrink-0 text-subtle" />
-                              <span className="truncate">com {a.personName}</span>
-                            </span>
-                          )}
-                        </span>
-                        {record && <span className="min-w-0 truncate text-[12px] text-muted-foreground">{record.label}</span>}
-                      </span>
-                    </button>
-                    {record && (
-                      <Link
-                        href={record.href}
-                        className="mt-1 ml-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-[12px] font-medium text-brand-strong opacity-80 outline-none hover:opacity-100 hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
-                      >
-                        Abrir {record.kind} <ArrowUpRight className="size-3.5" />
-                      </Link>
-                    )}
-                  </div>
-                </div>
+                      {category?.name ?? "Compromisso"}
+                    </span>
+                    <ChevronRight
+                      className="size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+                      aria-hidden
+                    />
+                  </span>
+                </button>
               </li>
             )
           })}

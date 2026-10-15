@@ -75,10 +75,23 @@ Legenda de dados: **store** = `office-store` (Supabase com RLS, por escritório)
 | Barra lateral | `layout/sidebar.tsx`, `sidebar-nav.tsx`, `nav-config.ts` | menu por permissão, contadores, recolher (preferência salva no `ui-store`) | clara, como a referência: marca, itens com ícone, estado ativo em azul, seção **Atalhos** (processos/documentos recentes, tarefas de hoje, prazos próximos — links reais com filtro), Configurações e assinatura Digitaliza no rodapé; recolhível | implementada e validada |
 | Barra superior | `layout/topbar.tsx`, `user-menu.tsx`, `notifications-menu.tsx`, `new-menu.tsx` | busca, perguntar à IA, notificações, perfil, "+ Novo" | busca ampla à esquerda; à direita notificações, ajuda, perfil (nome e papel); "+ Novo" preservado | implementada e validada |
 | Busca global | `layout/command-menu.tsx` | Ctrl K, resultados por tipo | mesmo comportamento, visual novo, categorias visíveis | herda os tokens; validada sem regressão — redesenho específico pendente |
-| Assistente (IA) | `ai/ai-chat-sheet.tsx`, `ai-dock.tsx`, `lexa-ai-provider.tsx`, `ai-context.ts` | conversa por escopo (processo, cliente, escritório, decisão), modos | painel lateral "Assistente Íntegra" com abas Conversa/Contexto, sugestões da página, recolhível; não fica aberto por padrão | implementada e validada (acoplado ≥ 1280 px) |
+| Assistente (IA) | `ai/ai-chat-sheet.tsx`, `ai-dock.tsx`, `lexa-ai-provider.tsx`, `ai-context.ts` | conversa por escopo (processo, cliente, escritório, decisão), modos | painel lateral "Assistente Íntegra" com abas Conversa/Contexto, saudação, ações 2 × 2, "Sugestões para você", rodapé de confiança; **abre sozinho só no Início** quando cabe acoplado e a pessoa não o fechou antes | implementada e validada (acoplado quando sobram ≥ 760 px de conteúdo) |
 | Navegação no celular | `layout/mobile-nav.tsx` | barra inferior + gaveta | mantida, com o visual novo | implementada (atalhos na gaveta) e validada em 390 px |
 | Diálogos globais | `layout/global-dialogs.tsx` | novo processo/cliente/tarefa/compromisso | tokens novos | herdam os tokens — não revisados um a um (pendente) |
 | Abertura | `layout/app-splash.tsx` | splash na primeira carga | tokens novos | herda os tokens — não revisada (pendente) |
+
+## Componentes alterados na fidelidade à referência e páginas afetadas
+
+Antes de cada mudança em componente compartilhado, os usos foram conferidos (busca pelos imports).
+
+| Componente | Usado em | Efeito |
+|---|---|---|
+| `layout/app-shell.tsx` (margem do conteúdo) | todas as rotas internas | margem lateral de 24 px; validado sem rolagem horizontal em 8 rotas × 7 larguras |
+| `layout/sidebar.tsx` (rodapé) | todas as rotas internas | texto "Tecnologia que impulsiona a advocacia" |
+| `ai/ai-chat-sheet.tsx`, `ai/lexa-ai-provider.tsx`, `ai/ai-privacy.tsx` | assistente em todas as rotas | novo estado inicial (saudação, ações, sugestões, rodapé); abertura automática só no Início |
+| `dashboard/chip-tabs.tsx` (variantes `solid` e `segmented`) | Início: agenda, tarefas, "O que mudou" | a variante padrão (`soft`) não mudou — "O que mudou" fica igual |
+| `dashboard/panel-link.tsx` (não quebra linha) | cartões do Início | só o Início |
+| `dashboard/dashboard-view`, `greeting`, `kpi-cards`, `today-agenda`, `open-tasks`, `recent-processes`, `quick-views` | só o Início (`/dashboard`) | composição e linguagem da referência |
 
 ## Painéis e diálogos que funcionam como etapas de navegação
 

@@ -70,7 +70,7 @@ function ShellLayout({ children }: { children: React.ReactNode }) {
             "@container/main mx-auto w-full flex-1",
             fullHeight
               ? "flex min-h-0 flex-col px-2 pt-2 pb-[calc(68px+env(safe-area-inset-bottom))] sm:px-3 sm:pt-3 md:pb-3 lg:px-4 lg:pb-4"
-              : "max-w-[1680px] px-4 pt-6 pb-28 sm:px-6 md:pb-16 lg:px-8 lg:pt-9 xl:px-10",
+              : "max-w-[1680px] px-4 pt-6 pb-28 sm:px-6 md:pb-16 lg:px-6 lg:pt-6",
           )}
         >
           {allowed ? (

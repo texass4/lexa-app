@@ -239,3 +239,70 @@ tocada); pré-visualização com arquivo real no armazenamento (os documentos de
 - Atendimento, Financeiro, Consulta processual e Jurisprudência: receberam os ajustes globais
   (contraste, aviso da IA, estados); ainda sem revisão específica de hierarquia página a página.
 - Diálogos (novo processo, cliente, tarefa, compromisso) e abertura: não revisados um a um.
+
+## Fidelidade à referência aprovada — discrepâncias (antes)
+
+Comparação na mesma medida da referência (1536 × 1024), com o assistente aberto.
+
+| Área | Referência | Implementação atual |
+|---|---|---|
+| Proporções | barra lateral ~240 · centro ~880 · IA ~390; o centro mantém 2 colunas | 248 · 888 · 400, mas o centro **empilha** (quebras em 896 px de container + 80 px de margem interna) |
+| Cabeçalho | bloco de boas-vindas com imagem ambiental clara à direita, saudação 26 px, subtítulo, seletor de data no canto | só texto: data em sobrelinha, saudação 32 px, sem imagem |
+| Indicadores | 4 cartões separados numa linha, ícone em quadro suave de 40 px, valor 26 px, situação com seta, "Ver todos →" | faixa única em 2 × 2 (por causa da largura), sem "Ver todos" |
+| Agenda × tarefas | lado a lado (~58% / 42%) | agenda em largura total, tarefas abaixo |
+| Timeline | linhas compactas: hora · trilho colorido · **avatar 36 px** · título/linha secundária · etiqueta de tipo · chevron | cartões grandes com borda por evento, avatar 24 px dentro do cartão |
+| Abas de dia | "Hoje" preenchida em azul, demais em contorno | pílulas iguais com contagem |
+| Tarefas | abas segmentadas; caixa, título, linha do processo, prioridade colorida, data à direita; sem avatar | pílulas com contagem, avatar e chevron por linha |
+| Processos recentes | tabela: ponto de alerta · ícone de documento · número · assunto · última movimentação (data) · situação | título humano + número, situação, prazo, "mudou há" |
+| Visualizações rápidas | ícone colorido em quadro, título + quantidade como subtítulo, chevron | quantidade à direita, ícones neutros/vermelhos |
+| Assistente | aberto ao entrar; cabeçalho compacto; contexto com ponto verde; cartão de saudação; 4 ações em grade 2 × 2; "Sugestões para você" em cartões; caixa de entrada delimitada com botões; rodapé de confiança com "Saiba mais" | fechado ao entrar; quando a IA não está configurada, só o aviso; sem saudação nem ações |
+| Densidade | blocos compactos, sem vazios | cartões altos e espaço vazio na agenda |
+| Rodapé da barra lateral | "Digitaliza — Tecnologia que impulsiona a advocacia" | "Digitaliza — Íntegra é um produto Digitaliza" |
+
+Mantido de propósito (diferente da referência): bloco "Escritório" sob o logo (o nome do escritório não pode
+voltar a parecer subtítulo da marca), botão "Perguntar" e "+ Novo" (ações reais), selo "BETA" **não** adicionado
+(não é estratégia confirmada do produto), dados e títulos dos registros sem alteração.
+
+## Fidelidade à referência — o que mudou
+
+Primeira passagem (componentes) e segunda passagem (comparando a tela real, em 1536 × 1024, com a referência).
+
+| Área | Ajuste |
+|---|---|
+| Composição | Abaixo do cabeçalho, duas colunas que empilham por conta própria (7 + 5): **Agenda → Processos** à esquerda, **Tarefas → Visualizações** à direita, como na referência. Uma agenda curta não deixa mais vão ao lado das tarefas. Numa coluna (celular, ou assistente acoplado em 1440), a ordem segue a prioridade: Agenda, Tarefas, Processos, Visualizações. "O que mudou", "Prazos da semana" e Financeiro continuam abaixo. |
+| Cabeçalho | Bloco de boas-vindas sobre superfície clara com a ilustração local `public/brand/ambiente-escritorio.svg` (planta, notebook, caneca; vetorial, sem imagem remota, some abaixo de 672 px de conteúdo); "Bom dia, {nome}!" + subtítulo da referência; data com ícone (abre a Agenda) e "+ Novo" no canto. A linha de pontos de atenção e "Ver o que merece atenção" continuam. |
+| Indicadores | 4 cartões separados (uma linha a partir de 672 px de conteúdo, dois no celular), ícone em quadro azul suave de 40 px, valor 26 px (22 px no celular, sem cortar "R$ 61.900"), situação com seta quando pede ação, "Ver todos →". Mesmas contas de antes. |
+| Agenda | Abas de dia com "Hoje" preenchida em azul; timeline em linhas: hora (e "em 7h", "agora", "concluído") · trilho na cor da categoria · avatar 36 px do responsável · título · local • com quem • processo/cliente · etiqueta da categoria · chevron. Resumo numa linha própria; "Ver calendário completo" alinhado ao título. A linha abre o detalhe do compromisso, como antes. |
+| Tarefas | Controle segmentado numa só faixa (Todas · Atrasadas · Hoje · Amanhã · Semana), com contagem só nas atrasadas, em vermelho (as demais ficam no título da aba); linhas com caixa, título, linha do processo/cliente, prioridade (Alta vermelho, Média âmbar, Baixa verde) e data à direita (vermelha quando vencida ou hoje). "Só minhas" desceu para o rodapé do cartão, ao lado de "Mais N em Tarefas". |
+| Processos recentes | Tabela: ponto vermelho quando o próximo prazo está vencido ou próximo (detalhe no título do ponto) · ícone · número · assunto · movimentação (data) · situação. Abaixo de 1024 px de conteúdo (assistente aberto, celular) o assunto vai para a segunda linha sob o número em vez de espremer a coluna. |
+| Visualizações rápidas | Quadro de ícone colorido, título, quantidade como subtítulo (vermelho quando pede ação) e chevron. |
+| Assistente Íntegra | **Abre sozinho no Início** quando cabe acoplado (≥ 760 px de conteúdo ao lado), até a pessoa abrir ou fechar por conta própria; quem fechar não o vê abrir de novo (preferência `lexa:assistant:closed` no navegador). Abrir não consulta o modelo. Em outras rotas continua fechado até ser chamado. Cartão "Olá, {nome}!", grade 2 × 2 de ações, "Sugestões para você", caixa "Digite sua pergunta…" com enviar azul, rodapé "A IA usa apenas os dados aos quais você tem acesso… Saiba mais" (leva a Configurações › Integrações). Com a IA indisponível, tudo aparece desabilitado, com o aviso — nada finge funcionar. |
+| Barra lateral | Rodapé "Digitaliza — Tecnologia que impulsiona a advocacia". |
+| Espaçamento | Margem interna do conteúdo de todas as páginas internas: 24 px (era maior), para caber o centro em duas colunas ao lado do assistente. |
+
+### Arquivos alterados
+
+`components/dashboard/dashboard-view.tsx`, `greeting.tsx`, `kpi-cards.tsx`, `today-agenda.tsx`, `open-tasks.tsx`,
+`recent-processes.tsx`, `quick-views.tsx`, `chip-tabs.tsx`, `panel-link.tsx`; `components/ai/ai-chat-sheet.tsx`,
+`lexa-ai-provider.tsx`, `ai-privacy.tsx`; `components/layout/app-shell.tsx`, `sidebar.tsx`; novo
+`public/brand/ambiente-escritorio.svg`. Nenhuma alteração de banco, seeds, APIs ou regras de cálculo.
+
+### Validação
+
+- `npm run lint`, `npx tsc --noEmit`, `npm test` (769 aprovados), `npm run build`: sem erros.
+- Rolagem horizontal medida em 390, 768, 1024, 1280, 1440, 1536 e 1680 px em Início, Processos, Clientes, Agenda,
+  Tarefas, Documentos, Financeiro e Configurações: 0 px em todas; nenhum erro de página.
+- Assistente: aberto ao entrar em 1440/1536/1680; fechado em 1280 ou menos (não cabe acoplado).
+
+### Diferenças que permanecem (intencionais ou por dados)
+
+- Dados reais em vez dos da referência: no escritório de teste há 1 compromisso hoje, então a agenda é curta; os
+  títulos de agenda e tarefas são os cadastrados (não foram alterados).
+- O responsável aparece com iniciais quando não há foto cadastrada; nenhuma foto genérica foi usada.
+- A IA local não está configurada: o painel mostra o aviso e as ações desabilitadas (na referência estão ativas).
+- Sem selo "BETA" e sem botões de anexo/ditado extras na caixa de entrada (só o microfone, quando a IA está pronta).
+- Mantidos: bloco "Escritório" sob o logo, "Perguntar" na barra superior, contadores na barra lateral, aba
+  "Atrasadas" nas tarefas, "O que mudou", "Prazos da semana" e Financeiro abaixo das quatro áreas da referência.
+- A ilustração do cabeçalho é vetorial e local, não a fotografia da referência.
+- Em 1440 px com o assistente aberto, o centro fica com 744 px: as áreas ficam em uma coluna (duas colunas
+  espremeriam as tarefas).

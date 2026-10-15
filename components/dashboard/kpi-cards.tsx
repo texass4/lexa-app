@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, CalendarDays, Hourglass, ListChecks, Wallet, type LucideIcon } from "lucide-react"
+import { ArrowRight, ArrowUp, CalendarDays, Hourglass, ListChecks, Wallet, type LucideIcon } from "lucide-react"
 import { cn } from "cn"
 import { useOfficeData } from "@/lib/store/office-store"
 import { useSession } from "@/lib/auth/session"
@@ -27,10 +27,10 @@ interface Kpi {
 }
 
 const TONES: Record<Tone, string> = {
-  brand: "bg-brand-soft text-brand-strong",
-  teal: "bg-success-soft text-success",
-  amber: "bg-warning-soft text-warning",
-  slate: "bg-surface-muted text-muted-foreground",
+  brand: "bg-brand-soft text-brand",
+  teal: "bg-brand-soft text-brand",
+  amber: "bg-brand-soft text-brand",
+  slate: "bg-brand-soft text-brand",
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -104,19 +104,11 @@ export function KpiCards() {
   const shown = all.filter((i) => can(i.permission))
   if (!shown.length) return null
 
-  // Uma faixa só, com divisórias: os números lado a lado, sem quatro cartões grandes.
+  // Quatro cartões compactos numa linha (dois no celular): ícone em quadro suave, valor, situação e "Ver".
   return (
     <section
       aria-label="Indicadores do que pede ação"
-      className={cn(
-        "grid overflow-hidden rounded-card border border-border bg-card shadow-card",
-        "grid-cols-2 [&>*:nth-child(2n)]:border-l [&>*:nth-child(n+3)]:border-t",
-        shown.length >= 4
-          ? "@4xl/main:grid-cols-4 @4xl/main:[&>*:not(:first-child)]:border-l @4xl/main:[&>*]:border-t-0"
-          : shown.length === 3
-            ? "@2xl/main:grid-cols-3 @2xl/main:[&>*:not(:first-child)]:border-l @2xl/main:[&>*]:border-t-0"
-            : "",
-      )}
+      className={cn("grid grid-cols-2 gap-3", shown.length >= 4 ? "@2xl/main:grid-cols-4" : shown.length === 3 ? "@2xl/main:grid-cols-3" : "")}
     >
       {shown.map((item) => {
         const Icon = item.icon
@@ -124,17 +116,29 @@ export function KpiCards() {
           <Link
             key={item.label}
             href={item.href}
-            className="group relative flex min-w-0 flex-col gap-1 border-border px-4 py-4 outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-inset sm:px-5"
+            className="group flex min-w-0 flex-col rounded-card border border-border bg-card px-4 pt-4 pb-3 shadow-card outline-none transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-raised focus-visible:ring-2 focus-visible:ring-brand/40"
           >
-            <span className="flex items-center gap-2">
-              <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-[8px]", TONES[item.tone])}>
-                <Icon className="size-[15px]" strokeWidth={1.9} />
+            <span className="flex items-center gap-3">
+              <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-[10px]", TONES[item.tone])}>
+                <Icon className="size-5" strokeWidth={1.8} />
               </span>
-              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-muted-foreground">{item.label}</span>
-              <ArrowRight className="size-3.5 shrink-0 text-subtle opacity-0 transition-[opacity,transform] group-hover:translate-x-0.5 group-hover:opacity-100 max-sm:hidden" />
+              <span className="min-w-0 text-[13px] leading-snug font-semibold text-foreground">{item.label}</span>
             </span>
-            <span className="tabular mt-1 truncate text-[26px] leading-none font-semibold tracking-[-0.025em] text-foreground">{item.value}</span>
-            <span className={cn("mt-1 truncate text-[12.5px]", item.alert ? "font-medium text-danger" : "text-muted-foreground")}>{item.foot}</span>
+            <span className="tabular mt-3 truncate text-[22px] leading-none sm:text-[26px] font-semibold tracking-[-0.02em] text-foreground">
+              {item.value}
+            </span>
+            <span
+              className={cn(
+                "mt-2 flex min-w-0 items-start gap-1 text-[12px] leading-snug",
+                item.alert ? "font-medium text-danger" : "text-muted-foreground",
+              )}
+            >
+              {item.alert && <ArrowUp className="mt-px size-3 shrink-0" aria-hidden />}
+              <span className="line-clamp-2">{item.foot}</span>
+            </span>
+            <span className="mt-auto self-end pt-2 text-[12px] font-medium text-brand-strong opacity-90 transition-opacity group-hover:opacity-100">
+              Ver todos <ArrowRight className="inline size-3 transition-transform group-hover:translate-x-0.5" />
+            </span>
           </Link>
         )
       })}

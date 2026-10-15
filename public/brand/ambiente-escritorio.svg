@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 220" fill="none">
+  <!-- Ilustração ambiental do cabeçalho do Início: mesa de trabalho com planta, notebook e caneca.
+       Tons claros e baixo contraste para não competir com o texto. -->
+  <defs>
+    <linearGradient id="luz" x1="520" y1="0" x2="160" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#EEF3FA" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="mesa" x1="0" y1="168" x2="0" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E6EBF2"/>
+      <stop offset="1" stop-color="#DCE3EC"/>
+    </linearGradient>
+    <linearGradient id="folha" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7FB79A"/>
+      <stop offset="1" stop-color="#4F8F72"/>
+    </linearGradient>
+    <linearGradient id="folha2" x1="1" y1="0" x2="0" y2="1">
+      <stop stop-color="#93C4AB"/>
+      <stop offset="1" stop-color="#5E9C80"/>
+    </linearGradient>
+    <linearGradient id="tela" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F7F9FC"/>
+      <stop offset="1" stop-color="#E3E9F1"/>
+    </linearGradient>
+  </defs>
+  <rect width="520" height="220" fill="url(#luz)"/>
+  <!-- feixe de luz da janela -->
+  <path d="M520 0 L360 0 L250 220 L520 220 Z" fill="#FFFFFF" opacity=".35"/>
+  <!-- mesa -->
+  <path d="M120 172 H520 V220 H80 Z" fill="url(#mesa)"/>
+  <path d="M120 172 H520" stroke="#D3DBE6" stroke-width="2"/>
+  <!-- notebook -->
+  <g opacity=".95">
+    <path d="M352 96 h150 a8 8 0 0 1 8 8 v66 h-166 v-66 a8 8 0 0 1 8 -8 z" fill="#CBD5E1"/>
+    <rect x="352" y="104" width="150" height="62" rx="3" fill="url(#tela)"/>
+    <rect x="364" y="116" width="62" height="6" rx="3" fill="#D6DEE9"/>
+    <rect x="364" y="128" width="96" height="5" rx="2.5" fill="#E1E7EF"/>
+    <rect x="364" y="138" width="80" height="5" rx="2.5" fill="#E1E7EF"/>
+    <rect x="364" y="148" width="54" height="5" rx="2.5" fill="#D9E4F7"/>
+    <path d="M330 170 h196 l-10 10 h-176 z" fill="#B9C4D3"/>
+  </g>
+  <!-- caneca -->
+  <g>
+    <rect x="296" y="146" width="30" height="30" rx="6" fill="#FFFFFF" stroke="#D6DEE8" stroke-width="2"/>
+    <path d="M326 154 h6 a7 7 0 0 1 0 14 h-6" stroke="#D6DEE8" stroke-width="3" fill="none"/>
+    <path d="M304 140 c-4 -6 4 -8 0 -14 M314 140 c-4 -6 4 -8 0 -14" stroke="#E2E8F0" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <!-- planta -->
+  <g>
+    <path d="M196 132 h52 l-6 44 h-40 z" fill="#FFFFFF" stroke="#D6DEE8" stroke-width="2"/>
+    <rect x="192" y="126" width="60" height="10" rx="4" fill="#F4F6FA" stroke="#D6DEE8" stroke-width="2"/>
+    <path d="M222 128 C 214 96 186 82 160 86 C 176 98 196 108 222 128 Z" fill="url(#folha)" opacity=".9"/>
+    <path d="M222 128 C 230 92 256 74 284 74 C 266 90 246 106 222 128 Z" fill="url(#folha2)" opacity=".9"/>
+    <path d="M222 128 C 214 84 222 50 240 30 C 244 62 236 98 222 128 Z" fill="url(#folha)" opacity=".85"/>
+    <path d="M222 128 C 208 102 190 70 196 44 C 214 64 220 98 222 128 Z" fill="url(#folha2)" opacity=".8"/>
+    <path d="M222 128 C 238 110 268 104 292 112 C 270 120 246 124 222 128 Z" fill="url(#folha)" opacity=".75"/>
+  </g>
+</svg>

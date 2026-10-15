@@ -1,6 +1,7 @@
 "use client"
 
-import { ChevronDown } from "lucide-react"
+import Link from "next/link"
+import { CalendarDays, ChevronDown } from "lucide-react"
 import { cn } from "cn"
 import { getNow, fmtFullDate, greeting } from "@/lib/core/dates"
 import { getUser, currentUserId } from "@/lib/auth/account"
@@ -24,7 +25,11 @@ function statusLine(signals: AttentionSignal[], empty: boolean) {
   return "Tudo em dia no escritório"
 }
 
-/** `onToggleAttention`: a frase de status abre a lista do que merece atenção (logo abaixo). */
+/**
+ * Boas-vindas do Início: saudação, a leitura do dia e, à direita, a data (abre a Agenda) e "Novo".
+ * Fica dentro do bloco com a ilustração ambiental (`dashboard-view.tsx`).
+ * `onToggleAttention`: a frase de status abre a lista do que merece atenção.
+ */
 export function Greeting({
   signals,
   empty = false,
@@ -38,16 +43,17 @@ export function Greeting({
 }) {
   const user = getUser(currentUserId())
   const hasSignals = !empty && signals.length > 0
+  const now = getNow()
 
   return (
-    <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         {/* O painel só renderiza depois da hidratação, então a data do navegador é segura aqui. */}
-        <p className="text-[11.5px] font-medium tracking-[0.12em] text-muted-foreground uppercase">{fmtFullDate(getNow())}</p>
-        <h1 className="mt-2.5 text-[28px] leading-[1.15] font-semibold tracking-[-0.025em] text-foreground sm:text-[32px]">
-          {greeting()}, {user.firstName}.
+        <h1 className="text-[26px] leading-[1.15] font-semibold tracking-[-0.022em] text-foreground sm:text-[28px]">
+          {greeting(now)}, {user.firstName}!
         </h1>
-        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-muted-foreground">
+        <p className="mt-1.5 text-[14.5px] text-muted-foreground">Aqui está um resumo do que precisa da sua atenção hoje.</p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-muted-foreground">
           <span>{statusLine(signals, empty)}</span>
           {hasSignals && onToggleAttention && (
             <button
@@ -55,7 +61,7 @@ export function Greeting({
               onClick={onToggleAttention}
               aria-expanded={attentionOpen}
               aria-controls="painel-atencao"
-              className="inline-flex items-center gap-1 rounded-md text-[13.5px] font-medium text-brand-strong outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="inline-flex items-center gap-1 rounded-md font-medium text-brand-strong outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {attentionOpen ? "Ocultar a lista" : "Ver o que merece atenção"}
               <ChevronDown className={cn("size-4 transition-transform", attentionOpen && "rotate-180")} />
@@ -63,8 +69,18 @@ export function Greeting({
           )}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-5">
-        <WeatherChip />
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="max-lg:hidden">
+          <WeatherChip />
+        </div>
+        <Link
+          href="/agenda"
+          title="Abrir a agenda"
+          className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface/95 px-3.5 text-[13px] font-medium text-foreground shadow-xs outline-none backdrop-blur-sm transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-brand/40"
+        >
+          <CalendarDays className="size-4 text-brand" />
+          {fmtFullDate(now).replace(/-feira/, "")}
+        </Link>
         <NewMenu />
       </div>
     </div>
