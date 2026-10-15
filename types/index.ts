@@ -398,6 +398,10 @@ export interface Task extends TenantEntity {
   related?: RelatedEntity
   /** Coluna do quadro Kanban. Ausente = primeira coluna não concluída. */
   columnId?: ID
+  /** Itens de verificação (subtarefas simples), gravados na própria tarefa. */
+  checklist?: { id: ID; text: string; done: boolean }[]
+  /** Quem criou (tarefas criadas a partir da área de Tarefas redesenhada). */
+  createdById?: ID
 }
 
 /** Coluna do quadro de tarefas, criada pelo próprio escritório (estilo Notion/Trello). */
@@ -555,6 +559,8 @@ export interface Activity extends TenantEntity {
   processId?: ID
   /** Documento da ação (atividades de documento registradas a partir da Central de Documentos). */
   documentId?: ID
+  /** Tarefa da ação (criação, conclusão, mudança de coluna ou de responsável). */
+  taskId?: ID
   href?: string
 }
 

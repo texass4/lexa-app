@@ -55,6 +55,7 @@ function initialState(task?: Task, defaults?: Defaults) {
     priority: task ? fromPriority[task.priority] : defaults?.priority ? fromPriority[defaults.priority] : ("Média" as (typeof PRIORITIES)[number]),
     assigneeId: task?.assigneeId ?? defaults?.assigneeId ?? currentUserId(),
     related: encodeRelated(task?.related ?? related),
+    columnId: defaults?.columnId ?? "",
   }
 }
 
@@ -62,9 +63,10 @@ type FormState = ReturnType<typeof initialState>
 
 function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Defaults; onClose: () => void }) {
   const data = useOfficeData()
-  const { addTask, updateTask, versionOf } = useOfficeActions()
+  const { saveNewTask, updateTask, versionOf } = useOfficeActions()
   const [form, setForm] = React.useState(() => initialState(task, defaults))
   const [error, setError] = React.useState("")
+  const [dateError, setDateError] = React.useState("")
   // Versão da tarefa quando o formulário abriu: se outra pessoa salvar antes, esta edição é recusada.
   const [baseVersion, setBaseVersion] = React.useState(() => (task ? versionOf("tasks", task.id) : null))
   useRemovedWhileEditing("tasks", task?.id)
@@ -79,6 +81,12 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
       setError("Descreva a tarefa em poucas palavras.")
       return
     }
+    setError("")
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.date) || !/^\d{2}:\d{2}$/.test(form.time)) {
+      setDateError("Escolha a data e o horário do prazo.")
+      return
+    }
+    setDateError("")
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
@@ -100,8 +108,12 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
       if (result.status === "error") return
       if (result.status === "saved") toast.success("Alterações salvas.")
     } else {
-      const columnId = defaults?.columnId ?? data.taskColumns.find((c) => !c.isDone)?.id
-      addTask({ ...payload, columnId }, { prazoId: defaults?.prazoId })
+      // Cria e espera o banco confirmar: um segundo clique não cria outra (o botão fica travado).
+      const columnId = form.columnId || openColumns[0]?.id
+      setSaving(true)
+      const created = await saveNewTask({ ...payload, columnId }, { prazoId: defaults?.prazoId })
+      setSaving(false)
+      if (!created) return
       toast.success("Tarefa criada.", {
         description: `${payload.title} — atribuída a ${getMembers().find((u) => u.id === payload.assigneeId)?.firstName}.`,
       })
@@ -110,6 +122,8 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
   }
 
   const activeClients = data.clients.filter((c) => c.status !== "inativo")
+  // Nova tarefa nasce numa coluna em aberto (a que conclui é para quem já terminou).
+  const openColumns = [...data.taskColumns].filter((c) => !c.isDone).sort((a, b) => a.order - b.order)
   // Aberta pelo perfil do cliente: o vínculo fica restrito ao cliente e aos processos dele.
   const scopedClient = !task && !defaults?.processId && defaults?.clientId ? byId(data.clients, defaults.clientId) : undefined
 
@@ -161,7 +175,18 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
               </NativeSelect>
             )}
           </Field>
-          <Field label="Prazo" htmlFor="task-date">
+          {!task && openColumns.length > 1 && (
+            <Field label="Status" htmlFor="task-column" className="sm:col-span-2">
+              <NativeSelect id="task-column" value={form.columnId || openColumns[0].id} onChange={(e) => set("columnId", e.target.value)}>
+                {openColumns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
+          <Field label="Prazo" htmlFor="task-date" error={dateError}>
             <TextInput id="task-date" type="date" value={form.date} onChange={(e) => set("date", e.target.value)} />
           </Field>
           <Field label="Horário" htmlFor="task-time">
@@ -190,7 +215,7 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
           Cancelar
         </Button>
         <Button type="submit" form="task-form" disabled={saving}>
-          {task ? "Salvar alterações" : "Criar tarefa"}
+          {saving ? "Salvando…" : task ? "Salvar alterações" : "Criar tarefa"}
         </Button>
       </ModalFooter>
     </>

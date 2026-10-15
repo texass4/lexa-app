@@ -20,6 +20,7 @@ import { CLIENT_STATUS } from "@/lib/core/config"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
 import { formatCurrency, uid } from "@/lib/core/format"
 import { relatedClientId } from "@/lib/store/selectors"
+import { columnForStatus } from "@/lib/tarefas/workspace"
 import { resolveClientStatus } from "@/lib/clientes/clients"
 import type { NewClientDraft } from "@/lib/clientes/client-import"
 import { describeAppointmentChange } from "@/lib/agenda/agenda"
@@ -156,7 +157,15 @@ interface OfficeActions {
   applyProcessSync(processId: string, sheet: ProcessSheet, checkedAt?: string, options?: { checks?: TribunalCheck[] }): SyncOutcome
   /** Exclui o processo (o banco exclui junto os prazos dele). */
   deleteProcess(id: string): void
+  /** Conclui ou reabre a tarefa; com quadro, ela vai para a primeira coluna correspondente. */
   toggleTask(id: string): Task | undefined
+  /** Cria a tarefa e espera o banco confirmar; `null` se não foi gravada (aviso já mostrado). */
+  saveNewTask(input: NewTaskInput, options?: { prazoId?: string }): Promise<Task | null>
+  /**
+   * Espera a gravação do que já está na tela e diz se este registro foi aceito pelo banco.
+   * Recusado, a tela volta ao que está no banco (o aviso já foi mostrado).
+   */
+  confirmSaved(collection: "tasks" | "taskColumns", id: string): Promise<boolean>
   /** Cria a tarefa. Com `prazoId`, a tarefa passa a ser a do prazo (vínculo por id). */
   addTask(input: NewTaskInput, options?: { prazoId?: string }): Task
   /**
@@ -175,8 +184,10 @@ interface OfficeActions {
   /** Colunas iniciais do quadro, com id fixo: duas pessoas abrindo o quadro vazio não duplicam. */
   ensureDefaultTaskColumns(columns: TaskColumnInput[]): Promise<void>
   updateTaskColumn(id: string, patch: Partial<TaskColumnInput>, options?: SaveOptions): Promise<SaveResult<TaskColumn>>
-  /** Exclui a coluna (nunca a última); as tarefas dela vão para a coluna restante mais à esquerda. */
-  deleteTaskColumn(id: string): void
+  /** Exclui a coluna; as tarefas dela vão para `targetId` (ou para a primeira coluna que sobrar). */
+  deleteTaskColumn(id: string, targetId?: string): void
+  /** Nova ordem das colunas do quadro (ids da esquerda para a direita). */
+  reorderTaskColumns(ids: string[]): void
   addAppointment(input: NewAppointmentInput): Appointment
   /** Edita ou remarca (arrastar na agenda) e registra na timeline quem fez e o que mudou. */
   updateAppointment(id: string, patch: Partial<NewAppointmentInput>, options?: SaveOptions): Promise<SaveResult<Appointment>>
@@ -375,6 +386,31 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
       if (refused) return refused
       if (!apply()) return { status: "saved" } as SaveResult<T>
       return sync.outcomeFor<T>(await sync.flush(), collection, id)
+    }
+
+    const createTask = (input: NewTaskInput, options?: { prazoId?: string }): Task => {
+      const task: Task = { ...base(), ...input, id: uid("t"), status: "pendente", createdById: account.currentUserId() }
+      const prazoId = options?.prazoId
+      commit((s) => ({
+        ...s,
+        tasks: [task, ...s.tasks],
+        deadlines: prazoId ? s.deadlines.map((d) => (d.id === prazoId ? { ...d, taskId: task.id, updatedAt: nowISO() } : d)) : s.deadlines,
+        activities: [
+          logActivity({
+            type: "task",
+            actor: account.getUser(account.currentUserId()).name,
+            message: "criou uma tarefa.",
+            detail: task.title,
+            taskId: task.id,
+            actorUserId: account.currentUserId(),
+            clientId: relatedClientId(s, input.related),
+            processId: input.related?.type === "process" ? input.related.id : undefined,
+            href: `/tarefas?tarefa=${task.id}`,
+          }),
+          ...s.activities,
+        ],
+      }))
+      return task
     }
 
     const createDocument = (input: NewDocumentInput): LegalDocument => {
@@ -673,10 +709,13 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
         const task = stateRef.current.tasks.find((t) => t.id === id)
         if (!task) return undefined
         const done = task.status !== "concluida"
+        // A coluna acompanha a situação: concluir leva à coluna que conclui; reabrir, à primeira aberta.
+        const target = columnForStatus(stateRef.current.taskColumns, done)
         const updated: Task = {
           ...task,
           status: done ? "concluida" : "pendente",
           completedAt: done ? nowISO() : undefined,
+          ...(target ? { columnId: target.id } : {}),
         }
         const related = task.related
         commit((s) => ({
@@ -692,38 +731,41 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
                   actorUserId: account.currentUserId(),
                   clientId: relatedClientId(s, related),
                   processId: related?.type === "process" ? related.id : undefined,
-                  href: "/tarefas",
+                  taskId: task.id,
+                  href: `/tarefas?tarefa=${task.id}`,
                 }),
                 ...s.activities,
               ]
-            : s.activities,
+            : [
+                logActivity({
+                  type: "task",
+                  actor: account.getUser(account.currentUserId()).name,
+                  message: "reabriu uma tarefa.",
+                  detail: task.title,
+                  actorUserId: account.currentUserId(),
+                  clientId: relatedClientId(s, related),
+                  processId: related?.type === "process" ? related.id : undefined,
+                  taskId: task.id,
+                  href: `/tarefas?tarefa=${task.id}`,
+                }),
+                ...s.activities,
+              ],
         }))
         return updated
       },
 
-      addTask(input, options) {
-        const task: Task = { ...base(), ...input, id: uid("t"), status: "pendente" }
-        const prazoId = options?.prazoId
-        commit((s) => ({
-          ...s,
-          tasks: [task, ...s.tasks],
-          deadlines: prazoId ? s.deadlines.map((d) => (d.id === prazoId ? { ...d, taskId: task.id, updatedAt: nowISO() } : d)) : s.deadlines,
-          activities: [
-            logActivity({
-              type: "task",
-              actor: account.getUser(account.currentUserId()).name,
-              message: "criou uma tarefa.",
-              detail: task.title,
-              actorUserId: account.currentUserId(),
-              clientId: relatedClientId(s, input.related),
-              processId: input.related?.type === "process" ? input.related.id : undefined,
-              href: `/tarefas?tarefa=${task.id}`,
-            }),
-            ...s.activities,
-          ],
-        }))
-        return task
+      async saveNewTask(input, options) {
+        const task = createTask(input, options)
+        const outcome = sync.outcomeFor<Task>(await sync.flush(), "tasks", task.id)
+        if (outcome.status !== "saved") return null
+        return stateRef.current.tasks.find((t) => t.id === task.id) ?? task
       },
+
+      async confirmSaved(collection, id) {
+        return sync.outcomeFor(await sync.flush(), collection, id).status === "saved"
+      },
+
+      addTask: createTask,
 
       async addPrazo(input, { createTask }) {
         const s0 = stateRef.current
@@ -810,8 +852,30 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
 
       updateTask(id, patch, options) {
         return save<Task>("tasks", id, options, () => {
-          if (!stateRef.current.tasks.some((t) => t.id === id)) return false
-          commit((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }))
+          const current = stateRef.current.tasks.find((t) => t.id === id)
+          if (!current) return false
+          const handedOver = patch.assigneeId && patch.assigneeId !== current.assigneeId
+          commit((s) => ({
+            ...s,
+            tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+            // Trocar o responsável fica no histórico da tarefa (quem passou para quem).
+            activities: handedOver
+              ? [
+                  logActivity({
+                    type: "task",
+                    actor: account.getUser(account.currentUserId()).name,
+                    message: `passou uma tarefa para ${account.getUser(patch.assigneeId!).name}.`,
+                    detail: current.title,
+                    actorUserId: account.currentUserId(),
+                    clientId: relatedClientId(s, current.related),
+                    processId: current.related?.type === "process" ? current.related.id : undefined,
+                    taskId: id,
+                    href: `/tarefas?tarefa=${id}`,
+                  }),
+                  ...s.activities,
+                ]
+              : s.activities,
+          }))
           return true
         })
       },
@@ -828,6 +892,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
               actor: account.getUser(account.currentUserId()).name,
               message: "excluiu uma tarefa.",
               detail: task.title,
+              taskId: task.id,
               actorUserId: account.currentUserId(),
               clientId: relatedClientId(s, task.related),
               processId: task.related?.type === "process" ? task.related.id : undefined,
@@ -853,22 +918,25 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
         commit((s) => ({
           ...s,
           tasks: s.tasks.map((t) => (t.id === taskId ? updated : t)),
-          activities:
-            !wasDone && done
-              ? [
-                  logActivity({
-                    type: "task",
-                    actor: account.getUser(account.currentUserId()).name,
-                    message: "concluiu uma tarefa.",
-                    detail: task.title,
-                    actorUserId: account.currentUserId(),
-                    clientId: relatedClientId(s, related),
-                    processId: related?.type === "process" ? related.id : undefined,
-                    href: "/tarefas",
-                  }),
-                  ...s.activities,
-                ]
-              : s.activities,
+          activities: [
+            logActivity({
+              type: "task",
+              actor: account.getUser(account.currentUserId()).name,
+              message:
+                !wasDone && done
+                  ? "concluiu uma tarefa."
+                  : wasDone && !done
+                    ? `reabriu uma tarefa em ${column.name}.`
+                    : `moveu uma tarefa para ${column.name}.`,
+              detail: task.title,
+              actorUserId: account.currentUserId(),
+              clientId: relatedClientId(s, related),
+              processId: related?.type === "process" ? related.id : undefined,
+              taskId,
+              href: `/tarefas?tarefa=${taskId}`,
+            }),
+            ...s.activities,
+          ],
         }))
         return updated
       },
@@ -915,10 +983,11 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
         })
       },
 
-      deleteTaskColumn(id) {
+      deleteTaskColumn(id, targetId) {
         const columns = stateRef.current.taskColumns
         if (columns.length <= 1) return
-        const fallback = columns.filter((c) => c.id !== id).sort((a, b) => a.order - b.order)[0]
+        const rest = columns.filter((c) => c.id !== id).sort((a, b) => a.order - b.order)
+        const fallback = rest.find((c) => c.id === targetId) ?? rest[0]
         commit((s) => ({
           ...s,
           taskColumns: s.taskColumns.filter((c) => c.id !== id),
@@ -932,6 +1001,16 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
                 }
               : t,
           ),
+        }))
+      },
+
+      reorderTaskColumns(ids) {
+        commit((s) => ({
+          ...s,
+          taskColumns: s.taskColumns.map((c) => {
+            const order = ids.indexOf(c.id)
+            return order >= 0 && order !== c.order ? { ...c, order } : c
+          }),
         }))
       },
 

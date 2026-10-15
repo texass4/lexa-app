@@ -345,3 +345,42 @@ cliente › processo, menu de contexto, exclusão com confirmação; 390–1680 
 registro, arquivo, URL assinada ou favorito. Não validado ponta a ponta: o build de produção (`next start`)
 — o login não concluiu nesse modo neste ambiente; o worker do pdf.js foi conferido no build (arquivo próprio,
 referenciado).
+
+## Tarefas (quadro, lista e calendário)
+
+Trello no quadro, Notion na lista e nas propriedades, Linear no painel e no teclado — sobre o modelo real
+(`tasks` e `task_columns` em jsonb, RLS por `tasks.view`/`tasks.edit` e escritório). Modelo puro e testado em
+`lib/tarefas/workspace.ts` (filtros, indicadores, URL, coluna da tarefa, ordenação, calendário).
+
+- **Cabeçalho e indicadores:** Atrasadas, Para hoje, Prioridade alta, Concluídas (inclui o histórico do
+  banco), no escopo atual; clicar aplica o filtro (chip removível, na URL) sem trocar a visão; concluídas
+  nunca contam como atrasadas; resumo recolhível.
+- **Barra de visões:** Quadro · Lista · Calendário (1/2/3) e Minhas tarefas · Escritório; busca (/) no
+  histórico; filtros combináveis (situação, status, prioridade, prazo, responsável, cliente, processo).
+  Links antigos (`?filtro=atrasadas|hoje|alta|concluidas`, `?escopo=escritorio`) continuam funcionando.
+- **Quadro:** colunas reais com contagem exata (inclui concluídas antigas), cor, renomear (duplo clique ou
+  menu), mover para esquerda/direita, recolher (por pessoa), excluir escolhendo a coluna de destino —
+  nenhuma tarefa é perdida; tarefas de coluna inexistente aparecem na coluna do status, em vez de sumirem.
+  Arrastar grava o status (coluna de concluídas conclui; sair dela reabre), com destaque da área e
+  "Desfazer"; alternativa por menu/teclado "Mover para…". Criação rápida na coluna (título, prazo).
+- **Lista:** colunas escolhidas pela pessoa, ordem por cabeçalho, edição na linha (status, prioridade,
+  responsável, prazo), seleção (Shift para intervalo, X no teclado), ações em lote (status, responsável,
+  prioridade, concluir, excluir com confirmação), J/K/↑/↓ e Enter.
+- **Calendário:** mês com hoje em destaque, atrasadas em vermelho, concluídas riscadas, "+N mais", "+" no
+  dia cria com a data; no celular vira agenda dos dias com prazo. Sem horário inventado.
+- **Painel de detalhes:** título editável, status, prioridade, responsável, prazo (data e hora), vínculo com
+  cliente/processo (e link), tipo (prazo processual, processo, cliente, interna), criada por/em, concluída
+  em, descrição, checklist com progresso, contexto do processo, atividade da tarefa (registrada a partir de
+  agora). Tarefa não vira prazo processual; o selo "Prazo" só aparece quando há prazo ligado.
+- **Persistência:** aviso de sucesso só depois que o banco confirma (`confirmSaved`/`saveNewTask`); falha
+  volta a tela ao estado do banco com aviso; criação não duplica (trava "Salvando…" e id único).
+
+Validado no navegador (Supabase local, dados reais): criação rápida e pelo formulário, arrastar (persiste
+após recarregar), mover pelo menu, concluir, painel (título, prioridade, vínculo, descrição, checklist —
+persistem), indicador → filtro na URL, lista (status na linha, seleção, prioridade em lote, exclusão em lote
+com confirmação), colunas (criar, renomear, cor, mover, recolher, excluir com destino — a tarefa foi para a
+coluna escolhida), calendário (+ com data), atalhos (C, /, 1/2/3, Esc, J, Enter; digitar no formulário não
+dispara atalho), Minhas × Escritório; 390, 768, 1024, 1280, 1440, 1680 px sem rolagem horizontal da página;
+leitor (`tasks.view`) sem nenhuma ação de edição na tela e barrado no banco (editar, concluir, excluir, criar
+tarefa ou coluna); outro escritório sem leitura nem escrita de tarefas, colunas ou atividades. Os dados de
+teste foram removidos.

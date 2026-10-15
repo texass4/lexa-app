@@ -19,6 +19,7 @@ export function ConfirmDialog({
   confirmLabel = "Excluir",
   cancelLabel = "Cancelar",
   onConfirm,
+  children,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -27,6 +28,8 @@ export function ConfirmDialog({
   confirmLabel?: string
   cancelLabel?: string
   onConfirm: () => void
+  /** Campos da confirmação (ex.: para onde vão os itens), abaixo da descrição. */
+  children?: React.ReactNode
 }) {
   // Mantém o último conteúdo enquanto a animação de fechar roda — o chamador costuma
   // zerar `title`/`description` (ex.: para undefined) no mesmo instante em que fecha.
@@ -60,6 +63,7 @@ export function ConfirmDialog({
                   {content.description}
                 </AlertDialogPrimitive.Description>
               )}
+              {open && children && <div className="mt-3">{children}</div>}
             </div>
           </div>
           <footer className="flex shrink-0 flex-col-reverse gap-2 px-5 pt-3 pb-[max(env(safe-area-inset-bottom),20px)] sm:flex-row sm:justify-end sm:px-6 sm:pb-5">

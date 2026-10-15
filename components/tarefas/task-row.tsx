@@ -20,11 +20,13 @@ const dueByToday = (tasks: Task[], userId: string) =>
   tasks.filter((t) => t.assigneeId === userId && t.status === "pendente" && diffInDays(parse(t.dueAt), getNow()) <= 0)
 
 export function useToggleTask() {
-  const { toggleTask } = useOfficeActions()
+  const { toggleTask, confirmSaved } = useOfficeActions()
   const { tasks } = useOfficeData()
-  return (task: Task) => {
+  return async (task: Task) => {
     const updated = toggleTask(task.id)
-    if (updated?.status === "concluida") {
+    // O aviso só depois que o banco confirma (recusado, a tela volta e o aviso de erro aparece).
+    if (!updated || !(await confirmSaved("tasks", task.id))) return
+    if (updated.status === "concluida") {
       // Feedback de ritmo: quanto falta do dia, com os dados de antes da conclusão.
       const today = dueByToday(tasks, currentUserId())
       const counted = today.some((t) => t.id === task.id)
@@ -35,9 +37,9 @@ export function useToggleTask() {
             ? `${task.title} — falta${left > 1 ? "m" : ""} ${left} para hoje.`
             : `${task.title} — nada mais pendente para hoje.`
           : task.title,
-        action: { label: "Desfazer", onClick: () => toggleTask(task.id) },
+        action: { label: "Desfazer", onClick: () => void toggleTask(task.id) },
       })
-    } else if (updated) {
+    } else {
       toast("Tarefa reaberta.", { description: task.title })
     }
   }

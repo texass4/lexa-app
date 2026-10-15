@@ -1,437 +1,363 @@
 "use client"
 
 import * as React from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { AnimatePresence } from "framer-motion"
+import { AlarmClock, CalendarCheck, ChevronDown, CircleCheck, Flag, Keyboard, ListChecks, Plus, SearchX } from "lucide-react"
 import { toast } from "sonner"
-import { AlarmClock, CalendarCheck, ChevronDown, CircleCheck, Flag, Kanban, ListChecks, ListTodo, Plus } from "lucide-react"
 import { cn } from "cn"
-import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
-import { FilterTabs } from "@/components/ui/filter-tabs"
-import { SearchField } from "@/components/ui/search-field"
-import { EmptyState } from "@/components/ui/empty-state"
+import { Kbd } from "@/components/ui/kbd"
+import { EmptyState, ErrorState } from "@/components/ui/empty-state"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Panel } from "@/components/ui/panel"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { MiniStat } from "@/components/shared/mini-stat"
-import { TaskItem } from "./task-item"
-import { TaskDetailSheet } from "./task-detail-sheet"
-import { TaskFormDialog } from "./task-form-dialog"
-import { BoardView } from "./board-view"
-import { useToggleTask } from "./task-row"
 import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
-import { useDebounced, useHistoryStats, usePagedHistory } from "@/lib/store/on-demand"
-import { completedKey, completedTasks, taskSearch } from "@/lib/store/history-lists"
-import { searchFilter } from "@/lib/store/storage"
-import { LimitedList } from "@/components/ui/show-more"
+import { describeRelated } from "@/lib/store/selectors"
 import { useUI } from "@/lib/store/ui-store"
 import { createLocalStore } from "@/lib/core/hooks"
-import { addDays, getNow, monthShort, startOfWeek, weekdayName } from "@/lib/core/dates"
-import { describeRelated, isOverdue, taskBucket, type TaskBucket } from "@/lib/store/selectors"
-import { PRIORITY_CONFIG } from "@/lib/core/config"
-import { matches } from "@/lib/core/format"
 import { currentUserId } from "@/lib/auth/account"
+import { activeChips, applyKpi, EMPTY_FILTERS, isKpiActive, type Kpi, type SortDir, type SortKey, type TaskView } from "@/lib/tarefas/workspace"
 import type { Task } from "@/types"
-import { Can } from "@/lib/auth/session"
+import { BoardView } from "./board-view"
+import { CalendarView } from "./calendar-view"
+import { BulkBar, ListView } from "./list-view"
+import { TaskActionsProvider, useTaskActions } from "./task-actions"
+import { TaskDetailSheet } from "./task-detail-sheet"
+import { TaskFormDialog } from "./task-form-dialog"
+import { FilterChips, FiltersPopover, SearchBox, ViewBar } from "./task-toolbar"
+import { useTaskWorkspace } from "./use-task-workspace"
 
-type Filter = "todas" | "hoje" | "atrasadas" | "alta" | "concluidas"
-type Scope = "minhas" | "escritorio"
-type ViewMode = "board" | "list"
+const kpiStore = createLocalStore("lexa:tarefas:indicadores", "abertos")
 
-const viewStore = createLocalStore("lexa:tasks-view", "board")
+const KPIS: { kpi: Kpi; label: string; icon: React.ReactNode; tone: "danger" | "warning" | "brand" | "success" }[] = [
+  { kpi: "atrasadas", label: "Atrasadas", icon: <AlarmClock />, tone: "danger" },
+  { kpi: "hoje", label: "Para hoje", icon: <CalendarCheck />, tone: "warning" },
+  { kpi: "alta", label: "Prioridade alta", icon: <Flag />, tone: "brand" },
+  { kpi: "concluidas", label: "Concluídas", icon: <CircleCheck />, tone: "success" },
+]
 
-const FILTER_TEST: Record<Filter, (t: Task) => boolean> = {
-  todas: () => true,
-  hoje: (t) => t.status === "pendente" && taskBucket(t) === "hoje",
-  atrasadas: (t) => isOverdue(t),
-  alta: (t) => t.status === "pendente" && t.priority === "alta",
-  concluidas: (t) => t.status === "concluida",
+const TONE: Record<(typeof KPIS)[number]["tone"], string> = {
+  danger: "bg-danger-soft text-danger",
+  warning: "bg-warning-soft text-warning",
+  brand: "bg-brand-soft text-brand",
+  success: "bg-success-soft text-success",
 }
 
-const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
-const dayHint = (d: Date) => `${cap(weekdayName(d.getDay()))}, ${d.getDate()} ${monthShort(d.getMonth())}`
-
-/** Grupos da lista, com a data real de hoje, amanhã e do fim da semana. */
-function buckets(now: Date): { id: TaskBucket; label: string; hint?: string }[] {
-  const sunday = addDays(startOfWeek(now), 6)
-  return [
-    { id: "atrasadas", label: "Atrasadas", hint: "Prazo vencido" },
-    { id: "hoje", label: "Hoje", hint: dayHint(now) },
-    { id: "amanha", label: "Amanhã", hint: dayHint(addDays(now, 1)) },
-    { id: "semana", label: "Esta semana", hint: `Até ${weekdayName(0)}, ${sunday.getDate()} ${monthShort(sunday.getMonth())}` },
-    { id: "proximas", label: "Próximas" },
-    { id: "concluidas", label: "Concluídas" },
-  ]
+/** Typing num campo, num menu ou com um diálogo aberto: atalhos de página não valem. */
+function typingOrDialog(e: KeyboardEvent) {
+  const el = e.target as HTMLElement | null
+  if (el?.closest("input,textarea,select,[contenteditable=true],[role=menu],[role=listbox]")) return true
+  return !!document.querySelector("[role=dialog],[role=alertdialog]")
 }
-
-const isFilter = (value: string | null): value is Filter => !!value && value in FILTER_TEST
 
 export function TasksView() {
-  const data = useOfficeData()
-  const { deleteTask, windowBounds } = useOfficeActions()
-  const { openDialog } = useUI()
-  const toggle = useToggleTask()
-  const router = useRouter()
-  const pathname = usePathname()
-  const params = useSearchParams()
-  const ready = data.hydrated
-  const storedView = (React.useSyncExternalStore(viewStore.subscribe, viewStore.get, viewStore.getServer) as ViewMode) || "board"
-  // `?filtro=atrasadas` (links de "o que merece atenção") abre a lista já filtrada.
-  const filterParam = params.get("filtro")
-  const view: ViewMode = isFilter(filterParam) ? "list" : storedView
-  const setView = (v: ViewMode) => {
-    viewStore.set(v)
-    if (filterParam) router.replace(pathname, { scroll: false })
-  }
-
-  const openId = params.get("tarefa")
-  const openTask = openId ? byId(data.tasks, openId) : undefined
-
-  const [filter, setFilter] = React.useState<Filter>(() => (isFilter(filterParam) ? filterParam : "todas"))
-  const [lastFilterParam, setLastFilterParam] = React.useState(filterParam)
-  if (filterParam !== lastFilterParam) {
-    setLastFilterParam(filterParam)
-    if (isFilter(filterParam)) setFilter(filterParam)
-  }
-  // `?escopo=escritorio` (listas do escritório no Início) abre já no escopo do escritório.
-  const [scope, setScope] = React.useState<Scope>(() =>
-    params.get("escopo") === "escritorio" || (openTask && openTask.assigneeId !== currentUserId()) ? "escritorio" : "minhas",
-  )
-  const [query, setQuery] = React.useState("")
-  const [editing, setEditingState] = React.useState<{ task?: Task; open: boolean }>({ open: false })
-  const setEditing = (t?: Task) => setEditingState((s) => (t ? { task: t, open: true } : { ...s, open: false }))
-  const [showDone, setShowDone] = React.useState(false)
-  const [toDelete, setToDelete] = React.useState<Task | null>(null)
-
-  const [lastOpenId, setLastOpenId] = React.useState(openId)
-  if (openId !== lastOpenId) {
-    setLastOpenId(openId)
-    if (openTask && openTask.assigneeId !== currentUserId()) setScope("escritorio")
-  }
-
-  // Pendentes e concluídas há até 30 dias estão na memória; as concluídas antes disso
-  // vêm do banco em páginas (e são contadas lá), e a busca procura também nelas.
-  const bounds = windowBounds()
-  const assignee = scope === "minhas" ? currentUserId() : undefined
-  const search = React.useDeferredValue(query)
-  const term = useDebounced(query.trim())
-  const serverSearch = React.useMemo(() => {
-    const related = [...data.clients.filter((c) => matches(term, c.name)), ...data.processes.filter((p) => matches(term, p.number, p.code))].map(
-      (r) => r.id,
-    )
-    return searchFilter(term, [{ column: "data->related->>id", ids: related }])
-  }, [term, data.clients, data.processes])
-  const historyList = React.useMemo(
-    () => (serverSearch ? taskSearch(term, serverSearch, assignee) : completedTasks(bounds, assignee)),
-    [serverSearch, term, bounds, assignee],
-  )
-  const history = usePagedHistory(historyList, bounds.month, { auto: !!serverSearch })
-  const stats = useHistoryStats<{ assignee_id: string | null; column_id: string | null; total: number }[]>("task_history_counts", {
-    p_before: bounds.month,
-  })
-  const historyCount = (columnId?: string) =>
-    stats?.reduce((n, r) => n + ((!assignee || r.assignee_id === assignee) && (!columnId || r.column_id === columnId) ? Number(r.total) : 0), 0)
-  // Concluídas mostradas só até onde a lista está completa (mais recentes primeiro, sem buracos).
-  const shown = (t: Task) => t.status === "pendente" || history.cursor === null || completedKey(t) >= history.cursor
-  const inWindow = (t: Task) => t.status === "pendente" || completedKey(t) >= bounds.month
-
-  const scoped = data.tasks.filter((t) => scope === "escritorio" || t.assigneeId === currentUserId())
-  const searched = scoped.filter((t) => {
-    if (!shown(t)) return false
-    const r = describeRelated(data, t.related)
-    return matches(search, t.title, t.description, r?.label, r?.kind)
-  })
-  const visible = searched.filter((t) => FILTER_TEST[filter](t))
-
-  // Contagens: a janela (na memória) mais o histórico (contado no banco).
-  const windowed = scoped.filter(inWindow)
-  const doneTotal = stats ? windowed.filter((t) => t.status === "concluida").length + (historyCount() ?? 0) : undefined
-  const counts = {
-    ...(Object.fromEntries((Object.keys(FILTER_TEST) as Filter[]).map((f) => [f, windowed.filter(FILTER_TEST[f]).length])) as Record<Filter, number>),
-    concluidas: doneTotal,
-    todas: doneTotal === undefined ? undefined : windowed.filter((t) => t.status === "pendente").length + doneTotal,
-  }
-  // Coluna do quadro: as da janela mais as concluídas antigas daquela coluna (sem coluna = a primeira).
-  const columnCount = (columnId: string, items: Task[], first: boolean) => {
-    if (!stats || search) return undefined
-    const extra = stats.reduce(
-      (n, r) => n + ((!assignee || r.assignee_id === assignee) && (r.column_id === columnId || (first && !r.column_id)) ? Number(r.total) : 0),
-      0,
-    )
-    return items.filter(inWindow).length + extra
-  }
-
-  const groups = buckets(getNow())
-    .map((b) => ({
-      ...b,
-      items: visible
-        .filter((t) => taskBucket(t) === b.id)
-        .sort((a, c) =>
-          b.id === "concluidas"
-            ? (c.completedAt ?? "").localeCompare(a.completedAt ?? "")
-            : a.dueAt.localeCompare(c.dueAt) || PRIORITY_CONFIG[a.priority].order - PRIORITY_CONFIG[c.priority].order,
-        ),
-    }))
-    // "Concluídas" aparece mesmo sem nenhuma recente: as antigas estão no banco.
-    .filter((g) => g.items.length > 0 || (g.id === "concluidas" && !search && (filter === "todas" || filter === "concluidas") && !!counts.concluidas))
-
-  const setOpen = (id?: string) => router.replace(id ? `${pathname}?tarefa=${id}` : pathname, { scroll: false })
-
-  const pendingMine = data.tasks.filter((t) => t.assigneeId === currentUserId() && t.status === "pendente").length
-  const overdueMine = data.tasks.filter((t) => t.assigneeId === currentUserId() && isOverdue(t)).length
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={scope === "minhas" ? "Minhas tarefas" : "Tarefas do escritório"}
-        description={
-          scope === "minhas"
-            ? pendingMine
-              ? `Você tem ${pendingMine} tarefa${pendingMine > 1 ? "s" : ""} pendente${pendingMine > 1 ? "s" : ""}${overdueMine ? ` — ${overdueMine} atrasada${overdueMine > 1 ? "s" : ""}. Comece por elas.` : ". Priorize os prazos que vencem hoje."}`
-              : "Nenhuma tarefa pendente com você. Crie uma ou veja as do escritório."
-            : "Acompanhe o que cada pessoa da equipe precisa entregar."
-        }
-        actions={
-          <Can permission="tasks.edit">
-            <Button onClick={() => openDialog("task")}>
-              <Plus /> Nova tarefa
-            </Button>
-          </Can>
-        }
-      />
+    <TaskActionsProvider>
+      <Workspace />
+    </TaskActionsProvider>
+  )
+}
 
-      {/* Resumo: cada número abre a lista já filtrada (contagens da janela + histórico). */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {(
-          [
-            { f: "atrasadas", label: "Atrasadas", hint: "Prazo já passou", icon: <AlarmClock />, danger: true },
-            { f: "hoje", label: "Para hoje", hint: "Vencem hoje", icon: <CalendarCheck /> },
-            { f: "alta", label: "Prioridade alta", hint: "Pendentes", icon: <Flag /> },
-            { f: "concluidas", label: "Concluídas", hint: "Inclui o histórico", icon: <CircleCheck /> },
-          ] as { f: Filter; label: string; hint: string; icon: React.ReactNode; danger?: boolean }[]
-        ).map((c) => {
-          const n = counts[c.f]
-          return (
-            <button
-              key={c.f}
-              type="button"
-              aria-label={`Ver tarefas: ${c.label.toLowerCase()}`}
-              aria-pressed={view === "list" && filter === c.f}
-              onClick={() => {
-                setFilter(c.f)
-                setView("list")
-              }}
-              className="rounded-card text-left outline-none transition-transform hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-brand/40"
-            >
-              <MiniStat
-                label={c.label}
-                value={n === undefined ? "—" : String(n)}
-                hint={c.hint}
-                icon={c.icon}
-                tone={c.danger && n ? "danger" : undefined}
-                className={cn(view === "list" && filter === c.f && "border-brand/40 ring-2 ring-brand/15")}
-              />
-            </button>
-          )
-        })}
+function Workspace() {
+  const data = useOfficeData()
+  const { retryLoad, deleteTask, confirmSaved } = useOfficeActions()
+  const { openDialog } = useUI()
+  const a = useTaskActions()
+  const w = useTaskWorkspace()
+  const { state, setState } = w
+  const searchRef = React.useRef<HTMLInputElement>(null)
+  const [selected, setSelected] = React.useState<ReadonlySet<string>>(() => new Set())
+  const [sort, setSort] = React.useState<{ key: SortKey; dir: SortDir }>({ key: "status", dir: "asc" })
+  const [editing, setEditing] = React.useState<{ task?: Task; open: boolean }>({ open: false })
+  const kpisOpen = React.useSyncExternalStore(kpiStore.subscribe, kpiStore.get, kpiStore.getServer) !== "recolhidos"
+  const me = currentUserId()
+
+  // Trocar de visão, escopo ou filtro limpa a seleção (o que estava marcado pode não estar mais à vista).
+  const selectionKey = `${state.view}|${state.scope}|${JSON.stringify(state.filters)}|${w.search}`
+  const [lastKey, setLastKey] = React.useState(selectionKey)
+  if (lastKey !== selectionKey) {
+    setLastKey(selectionKey)
+    if (selected.size) setSelected(new Set())
+  }
+
+  const newTask = React.useCallback(
+    (extra?: { date?: string }) =>
+      openDialog("task", {
+        processId: state.filters.processId,
+        clientId: state.filters.clientId,
+        assigneeId: state.filters.assignees.length === 1 ? state.filters.assignees[0] : undefined,
+        ...extra,
+      }),
+    [openDialog, state.filters],
+  )
+  const setView = React.useCallback((view: TaskView) => setState({ ...state, view }), [setState, state])
+
+  // Atalhos (padrão Linear): C nova tarefa · / buscar · 1/2/3 visões · Esc limpa a seleção.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || typingOrDialog(e)) return
+      if (e.key === "/") {
+        e.preventDefault()
+        searchRef.current?.focus()
+      } else if ((e.key === "c" || e.key === "C") && a.editable) {
+        e.preventDefault()
+        newTask()
+      } else if (e.key === "1" || e.key === "2" || e.key === "3") {
+        setView((["quadro", "lista", "calendario"] as TaskView[])[Number(e.key) - 1])
+      } else if (e.key === "Escape" && selected.size) setSelected(new Set())
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [a.editable, newTask, setView, selected.size])
+
+  const openTask = w.openId ? byId(data.tasks, w.openId) : undefined
+  const selectedTasks = data.tasks.filter((t) => selected.has(t.id))
+  const filtered = activeChips(state.filters).length > 0 || !!w.search.trim()
+  const pendingMine = data.tasks.filter((t) => t.assigneeId === me && t.status === "pendente").length
+
+  let content: React.ReactNode
+  if (w.loadError) {
+    content = (
+      <div className="rounded-card border border-border bg-card">
+        <ErrorState title="Não foi possível carregar as tarefas." onRetry={retryLoad} />
       </div>
-
-      {/* Barra da lista: exibição, de quem, filtros (na lista) e busca. */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div role="radiogroup" aria-label="Visualização" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
-            {(
-              [
-                { value: "board", label: "Quadro", icon: <Kanban className="size-3.5" /> },
-                { value: "list", label: "Lista", icon: <ListTodo className="size-3.5" /> },
-              ] as { value: ViewMode; label: string; icon: React.ReactNode }[]
-            ).map((v) => (
-              <button
-                key={v.value}
-                type="button"
-                role="radio"
-                aria-checked={view === v.value}
-                onClick={() => setView(v.value)}
-                className={cn(
-                  "flex h-8 items-center gap-1.5 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                  view === v.value ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {v.icon} {v.label}
-              </button>
-            ))}
-          </div>
-          <div role="radiogroup" aria-label="Escopo" className="flex rounded-control border border-border bg-surface p-0.5 shadow-xs">
-            {(["minhas", "escritorio"] as Scope[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                role="radio"
-                aria-checked={scope === s}
-                onClick={() => setScope(s)}
-                className={cn(
-                  "h-8 rounded-[7px] px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                  scope === s ? "bg-brand-soft text-brand-strong" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {s === "minhas" ? "Minhas" : "Escritório"}
-              </button>
-            ))}
-          </div>
-          <SearchField
-            value={query}
-            onChange={setQuery}
-            placeholder="Buscar tarefa, cliente ou processo…"
-            className="w-full sm:ml-auto sm:w-[280px]"
-          />
-        </div>
-        {view === "list" && (
-          <div className="min-w-0">
-            <FilterTabs
-              ariaLabel="Filtrar tarefas"
-              layoutId="tasks-filter"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: "todas", label: "Todas", count: counts.todas },
-                { value: "hoje", label: "Hoje", count: counts.hoje },
-                { value: "atrasadas", label: "Atrasadas", count: counts.atrasadas },
-                { value: "alta", label: "Alta prioridade", count: counts.alta },
-                { value: "concluidas", label: "Concluídas", count: counts.concluidas },
-              ]}
-            />
-          </div>
-        )}
-      </div>
-
-      {view === "board" ? (
-        <BoardView tasks={searched} onOpen={setOpen} history={history} columnCount={columnCount} listKey={`${scope}|${search}`} />
-      ) : !ready ? (
-        <div className="space-y-5">
-          {[3, 2].map((n, i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-3 w-24" />
-              <div className="rounded-card border border-border/90 bg-card">
-                {Array.from({ length: n }).map((_, j) => (
-                  <div key={j} className="flex items-center gap-3.5 border-b border-border px-5 py-4 last:border-0">
-                    <Skeleton className="size-[18px] rounded-[5px]" />
-                    <div className="flex-1 space-y-1.5">
-                      <Skeleton className="h-3.5 w-1/2" />
-                      <Skeleton className="h-2.5 w-1/4" />
-                    </div>
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                ))}
-              </div>
-            </div>
+    )
+  } else if (!w.ready) {
+    content =
+      state.view === "quadro" ? (
+        <div className="flex gap-3 overflow-hidden" aria-busy>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-80 w-[288px] shrink-0 rounded-[14px]" />
           ))}
         </div>
-      ) : groups.length === 0 ? (
-        <Panel>
+      ) : (
+        <Skeleton className="h-96 w-full rounded-card" />
+      )
+  } else if (!w.visible.length && (state.view !== "quadro" || filtered)) {
+    content = (
+      <div className="rounded-card border border-border bg-card">
+        {filtered ? (
           <EmptyState
-            icon={<ListChecks />}
-            title={filter === "atrasadas" ? "Nenhuma tarefa atrasada." : "Nenhuma tarefa por aqui."}
-            description={filter === "atrasadas" ? "Excelente — todos os prazos estão em dia." : "Crie uma tarefa ou ajuste os filtros."}
+            icon={<SearchX />}
+            title={w.search.trim() ? `Nenhuma tarefa encontrada para “${w.search.trim()}”.` : "Nenhuma tarefa com estes filtros."}
+            description="A busca procura no título, na descrição, no cliente e no processo — inclusive nas concluídas antigas."
             action={
-              <Can permission="tasks.edit">
-                <Button size="sm" onClick={() => openDialog("task")}>
-                  <Plus /> Nova tarefa
-                </Button>
-              </Can>
+              <div className="flex flex-wrap justify-center gap-2">
+                {w.search.trim() && (
+                  <Button size="sm" variant="secondary" onClick={() => w.setQuery("")}>
+                    Limpar busca
+                  </Button>
+                )}
+                {activeChips(state.filters).length > 0 && (
+                  <Button size="sm" variant="secondary" onClick={() => setState({ ...state, filters: EMPTY_FILTERS })}>
+                    Limpar filtros
+                  </Button>
+                )}
+              </div>
             }
           />
-        </Panel>
-      ) : (
-        <div className="space-y-6">
-          {groups.map((g) => {
-            const collapsible = g.id === "concluidas" && filter !== "concluidas"
-            const collapsed = collapsible && !showDone
-            return (
-              <section key={g.id} aria-label={g.label}>
-                <header className="mb-2 flex items-baseline justify-between gap-3 px-1">
-                  <button
-                    type="button"
-                    disabled={!collapsible}
-                    onClick={() => setShowDone((v) => !v)}
-                    className="touch-target relative flex items-center gap-2 text-left outline-none disabled:cursor-default"
-                  >
-                    <h2 className={cn("text-[13px] font-semibold", g.id === "atrasadas" ? "text-danger" : "text-foreground")}>{g.label}</h2>
-                    <span className="tabular rounded-[5px] bg-surface-muted px-1.5 text-[11px] font-medium text-muted-foreground">
-                      {g.id === "concluidas" && !search ? (counts.concluidas ?? g.items.length) : g.items.length}
-                    </span>
-                    {collapsible && <ChevronDown className={cn("size-3.5 text-subtle transition-transform", !collapsed && "rotate-180")} />}
-                  </button>
-                  {g.hint && <span className="text-[12px] text-subtle">{g.hint}</span>}
-                </header>
-                {!collapsed && (
-                  // Muitas tarefas num grupo: desenha 50 por vez; as concluídas antigas vêm do banco.
-                  <LimitedList
-                    items={g.items}
-                    listKey={`${g.id}|${filter}|${scope}|${search}`}
-                    server={g.id === "concluidas" ? history : undefined}
-                    total={g.id === "concluidas" && !search ? counts.concluidas : undefined}
-                  >
-                    {(items) => (
-                      <ul
-                        className={cn(
-                          "overflow-hidden rounded-[14px] border bg-card shadow-card",
-                          g.id === "atrasadas" ? "border-danger/20" : "border-border",
-                        )}
-                      >
-                        <AnimatePresence initial={false}>
-                          {items.map((t) => (
-                            <TaskItem
-                              key={t.id}
-                              task={t}
-                              related={describeRelated(data, t.related)}
-                              onToggle={() => toggle(t)}
-                              onEdit={() => setEditing(t)}
-                              onOpen={() => setOpen(t.id)}
-                              onDelete={() => setToDelete(t)}
-                            />
-                          ))}
-                        </AnimatePresence>
-                      </ul>
-                    )}
-                  </LimitedList>
-                )}
-              </section>
-            )
-          })}
+        ) : (
+          <EmptyState
+            icon={<ListChecks />}
+            title={state.scope === "minhas" ? "Nenhuma tarefa com você." : "Nenhuma tarefa no escritório ainda."}
+            description={
+              state.scope === "minhas"
+                ? "Crie uma tarefa ou veja as do escritório."
+                : "Crie a primeira tarefa — com prazo, responsável e o processo ou cliente ligado."
+            }
+            action={
+              a.editable ? (
+                <Button size="sm" onClick={() => newTask()}>
+                  <Plus /> Nova tarefa
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+      </div>
+    )
+  } else if (state.view === "quadro") {
+    content = (
+      <BoardView
+        tasks={w.visible}
+        columns={w.columns}
+        columnOf={w.columnOf}
+        columnTotal={w.columnTotal}
+        history={w.history}
+        listKey={w.listKey}
+        activeId={openTask?.id}
+        showAssignee={(t) => state.scope === "escritorio" || t.assigneeId !== me}
+        filters={state.filters}
+        onOpen={(id) => w.openTask(id)}
+      />
+    )
+  } else if (state.view === "lista") {
+    content = (
+      <>
+        <ListView
+          tasks={w.visible}
+          columns={w.columns}
+          columnOf={w.columnOf}
+          history={state.filters.situation === "pendentes" ? undefined : w.history}
+          listKey={w.listKey}
+          activeId={openTask?.id}
+          selected={selected}
+          onSelected={setSelected}
+          onOpen={(id) => w.openTask(id)}
+          sort={sort}
+          onSort={setSort}
+        />
+        <BulkBar tasks={selectedTasks} columns={w.columns} onClear={() => setSelected(new Set())} />
+      </>
+    )
+  } else {
+    content = <CalendarView tasks={w.visible} filters={state.filters} onOpen={(id) => w.openTask(id)} />
+  }
+
+  return (
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] text-foreground">Tarefas</h1>
+          <p className="mt-1 text-[13.5px] text-muted-foreground">
+            {state.scope === "minhas"
+              ? pendingMine
+                ? `${pendingMine} pendente${pendingMine === 1 ? "" : "s"} com você. Arraste entre as colunas, filtre e abra para editar.`
+                : "Nenhuma pendente com você. Veja as do escritório ou crie uma."
+              : "Tudo o que a equipe precisa entregar, por coluna, prazo e responsável."}
+          </p>
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <ShortcutsHelp />
+          {a.editable && (
+            <Button onClick={() => newTask()}>
+              <Plus /> Nova tarefa <Kbd className="ml-1 border-white/30 bg-white/15 text-brand-foreground shadow-none max-sm:hidden">C</Kbd>
+            </Button>
+          )}
+        </div>
+      </header>
+
+      {/* Indicadores do escopo atual: cada um aplica o filtro correspondente (visível nos chips). */}
+      <section aria-label="Indicadores">
+        <button
+          type="button"
+          onClick={() => kpiStore.set(kpisOpen ? "recolhidos" : "abertos")}
+          aria-expanded={kpisOpen}
+          className="mb-2 flex items-center gap-1 text-[12px] font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:underline"
+        >
+          <ChevronDown className={cn("size-3.5 transition-transform duration-150", !kpisOpen && "-rotate-90")} /> Resumo{" "}
+          {state.scope === "minhas" ? "das suas tarefas" : "do escritório"}
+        </button>
+        {kpisOpen && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {KPIS.map(({ kpi, label, icon, tone }) => {
+              const value = w.kpis[kpi]
+              const active = isKpiActive(state.filters, kpi)
+              return (
+                <button
+                  key={kpi}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setState({ ...state, filters: active ? EMPTY_FILTERS : applyKpi(state.filters, kpi) })}
+                  className={cn(
+                    "flex items-center gap-3 rounded-[12px] border bg-card px-3 py-2.5 text-left outline-none transition-[border-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-brand/40",
+                    active ? "border-brand/50 ring-2 ring-brand/15" : "border-border hover:border-border-strong hover:shadow-card",
+                  )}
+                >
+                  <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-[9px] [&_svg]:size-4", TONE[tone])}>{icon}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12px] text-muted-foreground">{label}</span>
+                    <span
+                      className={cn(
+                        "tabular block text-[19px] leading-tight font-semibold",
+                        kpi === "atrasadas" && value ? "text-danger" : "text-foreground",
+                      )}
+                    >
+                      {value === undefined ? "—" : value}
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <div className="space-y-3">
+        <ViewBar
+          view={state.view}
+          scope={state.scope}
+          onView={setView}
+          onScope={(scope) =>
+            setState({ ...state, scope, filters: { ...state.filters, assignees: scope === "minhas" ? [] : state.filters.assignees } })
+          }
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchBox ref={searchRef} value={w.query} onChange={w.setQuery} searching={w.searching} />
+          <FiltersPopover filters={state.filters} onChange={(filters) => setState({ ...state, filters })} columns={w.columns} scope={state.scope} />
+          {w.ready && (
+            <p className="ml-auto text-[12.5px] text-muted-foreground" aria-live="polite">
+              {w.visible.length} tarefa{w.visible.length === 1 ? "" : "s"}
+              {filtered ? " com estes filtros" : ""}
+            </p>
+          )}
+        </div>
+        <FilterChips filters={state.filters} onChange={(filters) => setState({ ...state, filters })} columns={w.columns} />
+      </div>
+
+      <div className="min-w-0">{content}</div>
 
       <TaskDetailSheet
         task={openTask}
         related={openTask ? describeRelated(data, openTask.related) : undefined}
         open={!!openTask}
-        onOpenChange={(o) => !o && setOpen()}
-        onToggle={(t) => toggle(t)}
+        onOpenChange={(o) => !o && w.openTask()}
+        onToggle={(t) => void a.setDone(t, t.status !== "concluida")}
         onEdit={(t) => {
-          setOpen()
-          window.setTimeout(() => setEditing(t), 180)
+          w.openTask()
+          window.setTimeout(() => setEditing({ task: t, open: true }), 180)
         }}
-        onDelete={(t) => {
-          setOpen()
+        onDelete={async (t) => {
+          w.openTask()
           deleteTask(t.id)
-          toast.success("Tarefa excluída.", { description: t.title })
+          if (await confirmSaved("tasks", t.id)) toast.success("Tarefa excluída.", { description: t.title })
         }}
       />
-      <TaskFormDialog open={editing.open} onOpenChange={(o) => !o && setEditing()} task={editing.task} />
-
-      <ConfirmDialog
-        open={!!toDelete}
-        onOpenChange={(o) => !o && setToDelete(null)}
-        title={`Excluir "${toDelete?.title}"?`}
-        description="Esta ação não pode ser desfeita."
-        onConfirm={() => {
-          if (!toDelete) return
-          deleteTask(toDelete.id)
-          toast.success("Tarefa excluída.", { description: toDelete.title })
-        }}
-      />
+      <TaskFormDialog open={editing.open} onOpenChange={(o) => !o && setEditing((s) => ({ ...s, open: false }))} task={editing.task} />
     </div>
+  )
+}
+
+function ShortcutsHelp() {
+  const rows: [string, string][] = [
+    ["C", "Nova tarefa"],
+    ["/", "Buscar"],
+    ["1 · 2 · 3", "Quadro · Lista · Calendário"],
+    ["↑ ↓ ou J K", "Percorrer a lista"],
+    ["Enter", "Abrir a tarefa"],
+    ["X", "Selecionar na lista"],
+    ["Esc", "Limpar seleção · fechar"],
+    ["Ctrl K", "Busca global do Íntegra"],
+  ]
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={<Button variant="ghost" size="icon" aria-label="Atalhos de teclado" title="Atalhos de teclado" className="max-sm:hidden" />}
+      >
+        <Keyboard />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 gap-2 p-3">
+        <p className="text-[12.5px] font-semibold text-foreground">Atalhos</p>
+        <dl className="space-y-1.5">
+          {rows.map(([k, label]) => (
+            <div key={k} className="flex items-center justify-between gap-3 text-[12.5px]">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd>
+                <Kbd>{k}</Kbd>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </PopoverContent>
+    </Popover>
   )
 }
