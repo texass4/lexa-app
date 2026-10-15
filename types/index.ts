@@ -402,6 +402,8 @@ export interface Task extends TenantEntity {
   checklist?: { id: ID; text: string; done: boolean }[]
   /** Quem criou (tarefas criadas a partir da área de Tarefas redesenhada). */
   createdById?: ID
+  /** Página (Tarefas › Páginas) onde a tarefa foi criada. A página guarda só a referência. */
+  pageId?: ID
 }
 
 /** Coluna do quadro de tarefas, criada pelo próprio escritório (estilo Notion/Trello). */

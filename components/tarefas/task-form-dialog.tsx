@@ -30,6 +30,8 @@ type Defaults = {
   assigneeId?: string
   /** A tarefa criada fica vinculada a este prazo. */
   prazoId?: string
+  /** Página onde a tarefa está sendo criada (Tarefas › Páginas). */
+  pageId?: string
 }
 
 function encodeRelated(r?: RelatedEntity) {
@@ -61,7 +63,17 @@ function initialState(task?: Task, defaults?: Defaults) {
 
 type FormState = ReturnType<typeof initialState>
 
-function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Defaults; onClose: () => void }) {
+function TaskForm({
+  task,
+  defaults,
+  onClose,
+  onCreated,
+}: {
+  task?: Task
+  defaults?: Defaults
+  onClose: () => void
+  onCreated?: (task: Task) => void
+}) {
   const data = useOfficeData()
   const { saveNewTask, updateTask, versionOf } = useOfficeActions()
   const [form, setForm] = React.useState(() => initialState(task, defaults))
@@ -111,9 +123,10 @@ function TaskForm({ task, defaults, onClose }: { task?: Task; defaults?: Default
       // Cria e espera o banco confirmar: um segundo clique não cria outra (o botão fica travado).
       const columnId = form.columnId || openColumns[0]?.id
       setSaving(true)
-      const created = await saveNewTask({ ...payload, columnId }, { prazoId: defaults?.prazoId })
+      const created = await saveNewTask({ ...payload, columnId, pageId: defaults?.pageId }, { prazoId: defaults?.prazoId })
       setSaving(false)
       if (!created) return
+      onCreated?.(created)
       toast.success("Tarefa criada.", {
         description: `${payload.title} — atribuída a ${getMembers().find((u) => u.id === payload.assigneeId)?.firstName}.`,
       })
@@ -227,11 +240,14 @@ export function TaskFormDialog({
   onOpenChange,
   task,
   defaults,
+  onCreated,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   task?: Task
   defaults?: Defaults
+  /** Chamado depois que o banco confirma a tarefa nova. */
+  onCreated?: (task: Task) => void
 }) {
   return (
     <Modal
@@ -242,7 +258,7 @@ export function TaskFormDialog({
       icon={task ? <Pencil /> : <ListChecks />}
       bare
     >
-      <TaskForm task={task} defaults={defaults} onClose={() => onOpenChange(false)} />
+      <TaskForm task={task} defaults={defaults} onClose={() => onOpenChange(false)} onCreated={onCreated} />
     </Modal>
   )
 }

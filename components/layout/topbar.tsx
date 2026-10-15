@@ -27,6 +27,7 @@ function useBreadcrumb() {
     return { title: c?.name ?? "Cliente", parent: { label: ROUTE_META["/clientes"].title, href: "/clientes" } }
   }
   if (id === "prazos" && root === "tarefas") return { title: "Prazos", parent: { label: "Tarefas", href: "/tarefas" } }
+  if (id === "paginas" && root === "tarefas") return { title: "Páginas", parent: { label: "Tarefas", href: "/tarefas" } }
   if (id === "consulta" && root === "processos") return { title: "Consulta processual", parent: { label: ROUTE_META["/processos"].title, href: "/processos" } }
   if (id && root === "processos") {
     const p = byId(data.processes, id)

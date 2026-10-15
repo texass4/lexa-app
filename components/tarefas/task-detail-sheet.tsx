@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, Check, Ellipsis, Link2, ListChecks, Pencil, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react"
+import { ArrowUpRight, Check, Ellipsis, FileText, Link2, ListChecks, Pencil, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
@@ -31,6 +31,8 @@ import { clientContext, processContext, taskPrompts } from "@/components/ai/ai-c
 import { useLexaAI } from "@/components/ai/lexa-ai-provider"
 import { processNumberLabel, processTitle } from "@/lib/processos/label"
 import { checklistProgress, columnOfTask, dueGroup, PRIORITIES } from "@/lib/tarefas/workspace"
+import { usePages } from "@/lib/paginas/pages"
+import { pageHref, pageTitle, type PageMeta } from "@/lib/paginas/model"
 import type { Priority, RelatedEntity, Task } from "@/types"
 import { PRIORITY_STYLE } from "./task-card"
 
@@ -38,6 +40,40 @@ import { PRIORITY_STYLE } from "./task-card"
  * O que está em volta da tarefa: o processo (prazo, última movimentação) ou o
  * cliente — e perguntas da Íntegra sobre ela, com os dados desse contexto.
  */
+/**
+ * Páginas ligadas à tarefa: a de origem (onde foi criada) e as que a mostram. A tarefa não
+ * é copiada para a página — é a mesma, e a lista vem da referência guardada no banco.
+ */
+function TaskPages({ task }: { task: Task }) {
+  const { status, list, pages } = usePages()
+  if (status !== "ready") return null
+  const origin = task.pageId ? pages.get(task.pageId) : undefined
+  const shownIn = list.filter((p) => p.id !== task.pageId && p.taskIds.includes(task.id))
+  if (!task.pageId && !shownIn.length) return null
+  const item = (p: PageMeta, hint?: string) => (
+    <li key={p.id}>
+      <Link
+        href={pageHref(p.id)}
+        className="flex min-w-0 items-center gap-2 rounded-[8px] px-2 py-1.5 text-[13px] text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/40"
+      >
+        <FileText className="size-4 shrink-0 text-subtle" aria-hidden />
+        <span className="truncate">{pageTitle(p)}</span>
+        {hint && <span className="ml-auto shrink-0 text-[11.5px] text-muted-foreground">{hint}</span>}
+      </Link>
+    </li>
+  )
+  return (
+    <section aria-label="Páginas">
+      <Eyebrow className="mb-1.5">Páginas</Eyebrow>
+      <ul className="-mx-2 space-y-0.5">
+        {origin && item(origin, "criada aqui")}
+        {task.pageId && !origin && <li className="px-2 py-1 text-[12.5px] text-muted-foreground">Criada numa página excluída ou sem acesso.</li>}
+        {shownIn.map((p) => item(p))}
+      </ul>
+    </section>
+  )
+}
+
 function TaskContext({ task, onBeforeAsk }: { task: Task; onBeforeAsk: () => void }) {
   const data = useOfficeData()
   const lexa = useLexaAI()
@@ -399,6 +435,7 @@ export function TaskDetailSheet({
           onSave={(description) => save({ description }, "Descrição salva.")}
         />
         <Checklist task={t} editable={editable} onSave={(checklist) => save({ checklist })} />
+        <TaskPages task={t} />
         <TaskContext task={t} onBeforeAsk={() => onOpenChange(false)} />
 
         <section aria-label="Atividade">

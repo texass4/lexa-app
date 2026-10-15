@@ -384,3 +384,45 @@ dispara atalho), Minhas × Escritório; 390, 768, 1024, 1280, 1440, 1680 px sem 
 leitor (`tasks.view`) sem nenhuma ação de edição na tela e barrado no banco (editar, concluir, excluir, criar
 tarefa ou coluna); outro escritório sem leitura nem escrita de tarefas, colunas ou atividades. Os dados de
 teste foram removidos.
+
+## Páginas (Tarefas › Páginas)
+
+Espaço de anotações no estilo Notion dentro de Tarefas, com as tarefas reais dentro das páginas.
+Rotas `/tarefas/paginas` (início) e `/tarefas/paginas/[id]`; item "Páginas" no menu, sob Tarefas, e
+botão no cabeçalho de Tarefas.
+
+- **Banco (`0027_paginas.sql`, aditiva):** `pages` (título, conteúdo em JSON do editor, pessoal ou do
+  escritório, subpáginas, vínculo com cliente/processo, modelo de origem, autor, quem editou, versão) e
+  `page_favorites`. O gatilho define autor, versão (sobe só quando título/conteúdo mudam), texto de busca
+  e as tarefas referenciadas (`task_ids`); impede ciclo, subpágina herda o acesso e uma árvore com páginas
+  de outras pessoas não vira pessoal. RLS: pessoal só o autor; do escritório lê com `tasks.view`, altera
+  com `tasks.edit`; vinculada a cliente/processo só para quem também o vê; outro escritório nunca.
+  Teste em `supabase/tests/paginas.sql`.
+- **Editor:** Tiptap 3.31.4 (ProseMirror, MIT), carregado só nas páginas. Texto, títulos, negrito,
+  itálico, tachado, código, links (só http/https/e-mail/telefone), listas, checklist (passos — não são
+  tarefas), citação, divisor, bloco de código; menu "/" e "@" (cliente, processo, tarefa, página); barra
+  ao selecionar texto; alça do bloco (inserir, mover, duplicar, transformar, excluir) e Alt+Shift+↑/↓.
+- **Tarefas na página:** "Nova tarefa" (formulário completo, nasce com `pageId`), "Tarefa existente",
+  "Criar tarefa" com o texto selecionado e "Converter em tarefa" no passo do checklist. O bloco guarda só
+  o id e mostra status, prazo, prioridade e responsável do registro real; concluir no bloco conclui a
+  tarefa; o detalhe da tarefa mostra a página de origem e as páginas que a mostram.
+- **Salvamento:** automático com espera de 0,9 s (máximo 5 s digitando), uma gravação por vez, condicionada
+  à versão (conflito vira aviso com "Ver a versão salva" / "Manter a minha"); "Salvo" só após o banco;
+  falha de rede mantém o conteúdo e tenta de novo (2 s → 30 s) com "Tentar agora"; aviso ao fechar a aba
+  com algo pendente; sair da página grava o pendente; Ctrl/⌘+S grava na hora; ao voltar para a aba, a
+  versão nova de outra pessoa é carregada se não houver nada pendente.
+- **Navegação:** início (modelos, favoritas, editadas recentemente), coluna recolhível com busca no banco
+  (título e texto, sem acento), favoritas, árvore Pessoais/Escritório e "+" para subpágina; gaveta no
+  celular; trilha na página; mover página; excluir com confirmação (leva as subpáginas; tarefas ficam).
+- **Modelos:** página em branco, reunião, planejamento semanal, projeto, análise interna de caso,
+  procedimento, ideias — só estrutura, sem conteúdo jurídico pronto; ficam no código (a página guarda só
+  de qual modelo veio).
+
+Validado no navegador (Supabase local): criar pelo modelo, digitar, salvar e recuperar após recarregar;
+"/" e "@"; nova tarefa, concluir pelo bloco, mudar prioridade no detalhe (o bloco acompanha), converter
+passo em tarefa, tarefa existente; negrito; subpágina e trilha; favoritar; busca por texto do conteúdo
+e sem resultado; falha de rede (indicador, conteúdo mantido, salvou ao voltar); conflito entre duas
+sessões; aviso ao recarregar com conteúdo não salvo; mover bloco pelo teclado; 200 parágrafos (≈1,6 s para
+salvar); excluir com subpágina; leitor sem edição e criando página pessoal; página pessoal e de outro
+escritório inacessíveis pela URL e pela API; 390–1680 px sem rolagem horizontal.
+

@@ -92,7 +92,7 @@ export type NewInvoiceInput = Pick<
   Invoice,
   "clientId" | "processId" | "description" | "category" | "amount" | "dueDate" | "status" | "paidAt" | "method" | "notes"
 >
-export type NewTaskInput = Pick<Task, "title" | "dueAt" | "priority" | "assigneeId" | "description" | "related" | "columnId">
+export type NewTaskInput = Pick<Task, "title" | "dueAt" | "priority" | "assigneeId" | "description" | "related" | "columnId" | "pageId">
 export type NewPrazoInput = Pick<
   Prazo,
   "processId" | "description" | "fatalDate" | "internalDate" | "internalDateReason" | "responsibleId" | "origin" | "intimacaoId" | "triageItemId"

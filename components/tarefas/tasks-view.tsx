@@ -1,10 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { AlarmClock, CalendarCheck, ChevronDown, CircleCheck, Flag, Keyboard, ListChecks, Plus, SearchX } from "lucide-react"
+import Link from "next/link"
+import { AlarmClock, CalendarCheck, ChevronDown, CircleCheck, FileText, Flag, Keyboard, ListChecks, Plus, SearchX } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "cn"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { EmptyState, ErrorState } from "@/components/ui/empty-state"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -228,6 +229,9 @@ function Workspace() {
         </div>
         <div className="flex items-center gap-2">
           <ShortcutsHelp />
+          <Link href="/tarefas/paginas" className={buttonVariants({ variant: "secondary" })}>
+            <FileText /> Páginas
+          </Link>
           {a.editable && (
             <Button onClick={() => newTask()}>
               <Plus /> Nova tarefa <Kbd className="ml-1 border-white/30 bg-white/15 text-brand-foreground shadow-none max-sm:hidden">C</Kbd>

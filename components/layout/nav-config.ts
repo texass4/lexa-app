@@ -1,6 +1,7 @@
 import {
   BookOpenText,
   CalendarDays,
+  FileText,
   FolderOpen,
   Hourglass,
   LayoutGrid,
@@ -46,7 +47,10 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         icon: ListChecks,
         badgeKey: "tasks",
         permission: "tasks.view",
-        children: [{ href: "/tarefas/prazos", label: "Prazos", icon: Hourglass, badgeKey: "prazos", permission: "processes.view" }],
+        children: [
+          { href: "/tarefas/paginas", label: "Páginas", icon: FileText, permission: "tasks.view" },
+          { href: "/tarefas/prazos", label: "Prazos", icon: Hourglass, badgeKey: "prazos", permission: "processes.view" },
+        ],
       },
       { href: "/documentos", label: "Documentos", icon: FolderOpen, permission: "documents.view" },
       { href: "/atendimento", label: "Atendimento", icon: MessagesSquare, permission: "whatsapp.view" },
@@ -85,6 +89,7 @@ export const ROUTE_META: Record<string, { title: string; section: string }> = {
   "/atendimento": { title: "Central de atendimento", section: "WhatsApp" },
   "/processos": { title: "Processos", section: "Escritório" },
   "/tarefas": { title: "Tarefas", section: "Escritório" },
+  "/tarefas/paginas": { title: "Páginas", section: "Tarefas" },
   "/tarefas/prazos": { title: "Prazos", section: "Tarefas" },
   "/agenda": { title: "Agenda", section: "Escritório" },
   "/jurisprudencia": { title: "Jurisprudência", section: "Escritório" },
