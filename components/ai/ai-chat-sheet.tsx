@@ -4,25 +4,28 @@ import * as React from "react"
 import {
   ArrowRight,
   Check,
-  ChevronRight,
   Copy,
+  FileSearch,
   FileText,
-  Hourglass,
+  HelpCircle,
   ListChecks,
   Maximize2,
   MessagesSquare,
   Mic,
   Minimize2,
+  Paperclip,
   RotateCcw,
   Scale,
   SendHorizontal,
   ShieldCheck,
-  Sparkles,
+  SlidersHorizontal,
   Square,
-  UsersRound,
+  UserRound,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 import { currentUserId, getUser } from "@/lib/auth/account"
+import { formatFileSize } from "@/lib/core/format"
 import { toast } from "sonner"
 import { cn } from "cn"
 import { SideSheet } from "@/components/ui/side-sheet"
@@ -30,11 +33,13 @@ import { UnderlineTabs } from "@/components/ui/underline-tabs"
 import { ASSISTANT_WIDTH, useAssistantLayout } from "./assistant-layout"
 import { AI_PRIVACY_HREF, AIPrivacyNote } from "./ai-privacy"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ATTACHMENT_ACCEPT, AttachmentError, readAttachment, type ReadAttachment } from "@/lib/ai/attachments"
 import { ChoiceChips } from "@/components/ui/choice-chips"
-import { CHAT_LIMITS, type AIStatus, type ChatMode } from "@/lib/ai/types"
+import { ATTACHMENT_LIMITS, CHAT_LIMITS, type AIStatus, type ChatMode } from "@/lib/ai/types"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
-import { AIErrorNotice, AIMark, AIThinking, AIUnavailable, AIWarnings, isAIReady, type SourceHandler } from "./ai-blocks"
+import { AIErrorNotice, AIThinking, AIUnavailable, AIWarnings, isAIReady, type SourceHandler } from "./ai-blocks"
 import { AIMarkdown } from "./ai-markdown"
 import type { AIContext } from "./ai-context"
 import type { AIChat, ChatEntry } from "./use-ai"
@@ -43,12 +48,6 @@ import { useVoiceInput, type VoiceState } from "./use-voice-input"
 
 const TOPIC = { office: "o escritório", process: "este processo", client: "este cliente", jurisprudence: "esta decisão" } as const
 
-const CAPABILITIES = ["resumir", "explicar movimentações", "apontar o que merece atenção", "sugerir próximos passos"]
-
-/** Modos da conversa, na ordem do seletor. */
-/** Ícones das ações sugeridas (uma por pergunta, só para reconhecer à primeira vista). */
-const ACTION_ICONS = [ListChecks, Scale, FileText, Hourglass]
-
 const MODE_LABEL: Record<ChatMode, string> = { all: "All", office: "Escritório", jurisprudence: "Jurisprudência" }
 const MODE_HINT: Record<ChatMode, string> = {
   all: "Dados do escritório e, quando a pergunta pede, a base de jurisprudência.",
@@ -56,30 +55,69 @@ const MODE_HINT: Record<ChatMode, string> = {
   jurisprudence: "Só a base de jurisprudência: cada pergunta é pesquisada nas decisões.",
 }
 
-/** Sugestões do modo Jurisprudência (as do escopo falam de tarefas e prazos). */
-function jurisprudencePrompts(scope: AIContext["scope"]["type"]) {
-  return scope === "process"
-    ? ["Há jurisprudência para este processo?", "Mostre a jurisprudência vinculada a este processo", "Quais decisões o escritório salvou?"]
-    : [
-        "Há jurisprudência sobre negativação indevida?",
-        "Há jurisprudência sobre dano moral por atraso de voo?",
-        "Quais decisões o escritório salvou?",
-      ]
+/** Atalho da tela inicial da conversa (formato de pílula, como no modelo). */
+function StartChip({
+  icon: Icon,
+  disabled,
+  onClick,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
+  disabled?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-10 items-center gap-2.5 rounded-full border border-border bg-surface px-4 text-[13px] font-medium text-foreground shadow-xs outline-none transition-[border-color,background-color] duration-150 hover:border-brand/40 hover:bg-brand-soft/50 focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-55"
+    >
+      <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
+      {children}
+    </button>
+  )
 }
 
-/** Seletor do modo da conversa (All, Escritório, Jurisprudência). */
-function ModePicker({ modes, value, onChange }: { modes: ChatMode[]; value: ChatMode; onChange: (mode: ChatMode) => void }) {
+/** Marca do assistente: estrela de quatro pontas (a mesma do topo e da saudação). */
+function Spark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="currentColor">
+      <path
+        d="M12 2c.6 4.9 1.8 7.9 3.6 9.4C17.1 12.7 19.6 13.7 22 14c-2.4.3-4.9 1.3-6.4 2.6C13.8 18.1 12.6 21.1 12 26c-.6-4.9-1.8-7.9-3.6-9.4C6.9 15.3 4.4 14.3 2 14c2.4-.3 4.9-1.3 6.4-2.6C10.2 9.9 11.4 6.9 12 2z"
+        transform="translate(0 -2)"
+      />
+    </svg>
+  )
+}
+
+/** Escolha do modo da conversa (All, Escritório, Jurisprudência), no ícone de ajustes do campo. */
+function ModeMenu({ modes, value, onChange }: { modes: ChatMode[]; value: ChatMode; onChange: (mode: ChatMode) => void }) {
   const labels = modes.map((mode) => MODE_LABEL[mode])
   return (
-    <div className="space-y-1.5 px-5 py-2.5">
-      <ChoiceChips
-        ariaLabel="Responder com base em"
-        options={labels}
-        value={MODE_LABEL[value]}
-        onChange={(label) => onChange(modes.find((mode) => MODE_LABEL[mode] === label) ?? "all")}
-      />
-      <p className="text-[11.5px] leading-snug text-subtle">{MODE_HINT[value]}</p>
-    </div>
+    <Popover>
+      <PopoverTrigger
+        aria-label={`Responder com base em: ${MODE_LABEL[value]}`}
+        title={`Base da resposta: ${MODE_LABEL[value]}`}
+        className={cn(
+          "flex size-8 items-center justify-center rounded-[8px] text-muted-foreground outline-none transition-colors duration-150 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-expanded:bg-accent",
+          value !== "all" && "text-brand",
+        )}
+      >
+        <SlidersHorizontal className="size-[18px]" />
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" className="w-[min(320px,calc(100vw-2rem))] gap-2 p-3">
+        <p className="text-[12px] font-semibold text-foreground">Responder com base em</p>
+        <ChoiceChips
+          ariaLabel="Responder com base em"
+          options={labels}
+          value={MODE_LABEL[value]}
+          onChange={(label) => onChange(modes.find((mode) => MODE_LABEL[mode] === label) ?? "all")}
+        />
+        <p className="text-[11.5px] leading-snug text-muted-foreground">{MODE_HINT[value]}</p>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -136,7 +174,7 @@ function AnswerActions({ entry, context }: { entry: ChatEntry; context: AIContex
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
 
 /** Linha de estado da gravação, logo acima do campo (anunciada aos leitores de tela). */
-function VoiceStatus({ state, onCancel, onStop, onRetry }: { state: VoiceState; onCancel: () => void; onStop: () => void; onRetry: () => void }) {
+function VoiceStatus({ state, onCancel, onRetry }: { state: VoiceState; onCancel: () => void; onRetry: () => void }) {
   if (state.status === "idle") return null
   return (
     <div role="status" aria-live="polite" className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
@@ -152,9 +190,7 @@ function VoiceStatus({ state, onCancel, onStop, onRetry }: { state: VoiceState; 
             <Button type="button" variant="ghost" size="xs" onClick={onCancel}>
               Cancelar
             </Button>
-            <Button type="button" variant="secondary" size="xs" onClick={onStop}>
-              Concluir
-            </Button>
+            <span className="self-center text-subtle">Toque em enviar para transcrever</span>
           </span>
         </>
       )}
@@ -218,49 +254,115 @@ export function AIChatSheet({
 }) {
   const [draft, setDraft] = React.useState("")
   const [tab, setTab] = React.useState<"conversa" | "contexto">("conversa")
+  const [files, setFiles] = React.useState<ReadAttachment[]>([])
+  const [reading, setReading] = React.useState(false)
   // Acoplado ao lado do conteúdo só quando sobra espaço para a página (`useAssistantLayout`).
   const { expanded, setExpanded, recent, open: openConversation } = useLexaAI()
   const layout = useAssistantLayout(expanded)
   const docked = layout.docked
   const endRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
+  const fileRef = React.useRef<HTMLInputElement>(null)
   const ready = isAIReady(status)
 
-  // Voz: a transcrição entra no campo (junto do que já foi digitado) para revisão — nunca é enviada sozinha.
+  const focusInput = React.useCallback(() => {
+    requestAnimationFrame(() => {
+      const input = inputRef.current
+      if (!input) return
+      input.focus()
+      input.setSelectionRange(input.value.length, input.value.length)
+    })
+  }, [])
+
+  // Voz: "enviar" encerra a gravação, transcreve e manda a pergunta; o ícone do microfone
+  // (durante a gravação) só transcreve para o campo, para revisar antes.
+  const sendAfterVoice = React.useRef(false)
+  const submitRef = React.useRef<(text?: string) => void>(() => {})
   const voice = useVoiceInput({
     onTranscript: (text) => {
-      setDraft((current) => {
-        const next = current.trim() ? `${current.trimEnd()} ${text}` : text
-        return next.slice(0, CHAT_LIMITS.messageChars)
-      })
-      requestAnimationFrame(() => {
-        const input = inputRef.current
-        if (!input) return
-        input.focus()
-        input.setSelectionRange(input.value.length, input.value.length)
-      })
+      const combined = (draftRef.current.trim() ? `${draftRef.current.trimEnd()} ${text}` : text).slice(0, CHAT_LIMITS.messageChars)
+      if (sendAfterVoice.current) {
+        sendAfterVoice.current = false
+        submitRef.current(combined)
+        return
+      }
+      setDraft(combined)
+      focusInput()
     },
   })
-  const listening = voice.state.status === "requesting" || voice.state.status === "recording"
+  const draftRef = React.useRef(draft)
+  React.useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
+  const recording = voice.state.status === "recording"
+  const listening = voice.state.status === "requesting" || recording
   const busyVoice = listening || voice.state.status === "processing"
   const { cancel: cancelVoice } = voice
 
   // Fechar a conversa nunca deixa o microfone ligado.
   React.useEffect(() => {
-    if (!open) cancelVoice()
+    if (!open) {
+      sendAfterVoice.current = false
+      cancelVoice()
+    }
   }, [open, cancelVoice])
 
   React.useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })
   }, [chat.messages.length, chat.pending])
 
-  const prompts = mode === "jurisprudence" ? jurisprudencePrompts(context.scope.type) : context.prompts
+  const scopeName = TOPIC[context.scope.type]
+  const hasJurisprudenceMode = !!modes?.includes("jurisprudence") && !!onModeChange
+
+  const addFiles = async (list: FileList | File[]) => {
+    const incoming = Array.from(list)
+    if (!incoming.length) return
+    const room = ATTACHMENT_LIMITS.files - files.length
+    if (room <= 0) return void toast.error(`Até ${ATTACHMENT_LIMITS.files} anexos por pergunta.`)
+    setReading(true)
+    const added: ReadAttachment[] = []
+    for (const file of incoming.slice(0, room)) {
+      try {
+        const read = await readAttachment(file)
+        if (files.some((f) => f.id === read.id) || added.some((f) => f.id === read.id)) continue
+        added.push(read)
+        if (read.truncated) toast(`“${read.name}” é longo: a Íntegra lê só o começo (${ATTACHMENT_LIMITS.chars.toLocaleString("pt-BR")} caracteres).`)
+      } catch (error) {
+        toast.error(error instanceof AttachmentError ? error.message : "Não foi possível ler o arquivo.")
+      }
+    }
+    if (incoming.length > room) toast(`Só ${ATTACHMENT_LIMITS.files} anexos por pergunta: os demais foram ignorados.`)
+    setFiles((current) => [...current, ...added])
+    setReading(false)
+    if (added.length) focusInput()
+  }
+
+  const canSend = ready && !chat.pending && !reading && (recording || (!busyVoice && (draft.trim().length > 0 || files.length > 0)))
 
   const submit = (text = draft) => {
-    if (!text.trim() || chat.pending || !ready || busyVoice) return
-    chat.send(text)
+    if (chat.pending || !ready || reading) return
+    // Só anexos, sem pergunta: pede a leitura dos arquivos.
+    const question = text.trim() || (files.length ? "Analise o documento anexado e resuma os pontos de atenção." : "")
+    if (!question) return
+    chat.send(
+      question,
+      files.map(({ name, text: body }) => ({ name, text: body })),
+    )
     setDraft("")
+    setFiles([])
     voice.reset()
+  }
+  React.useEffect(() => {
+    submitRef.current = submit
+  })
+
+  const onSubmit = () => {
+    if (recording) {
+      sendAfterVoice.current = true
+      voice.stop()
+      return
+    }
+    submit()
   }
 
   return (
@@ -273,21 +375,32 @@ export function AIChatSheet({
       dockedWidth={layout.width}
       header={
         <div className="border-b border-border">
-          <div className="flex items-center gap-3 px-5 pt-4 pb-2 pr-14">
-            <AIMark />
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-[16px] leading-tight font-semibold tracking-[-0.01em]">Assistente Íntegra</h2>
-              <p className="truncate text-[12px] text-muted-foreground">{context.subtitle}</p>
-            </div>
+          <div className="flex items-center gap-2.5 px-5 pt-4 pr-14 pb-3">
+            <span
+              aria-hidden
+              className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-brand-soft text-brand ring-1 ring-brand/15"
+            >
+              <Spark className="size-[18px]" />
+            </span>
+            <h2 className="min-w-0 truncate text-[17px] leading-tight font-semibold tracking-[-0.015em] text-foreground">Assistente Íntegra</h2>
+            <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10.5px] font-semibold tracking-wide text-brand-strong">BETA</span>
+            <span className="flex-1" />
             {chat.messages.length > 0 && tab === "conversa" && (
-              <Button variant="ghost" size="xs" onClick={chat.reset} aria-label="Começar nova conversa" title="Começar nova conversa">
-                <RotateCcw /> Nova
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+                onClick={chat.reset}
+                aria-label="Começar nova conversa"
+                title="Nova conversa"
+              >
+                <RotateCcw />
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon-sm"
-              className="max-sm:hidden"
+              className="text-muted-foreground max-sm:hidden"
               onClick={() => setExpanded(!expanded)}
               aria-pressed={expanded}
               aria-label={expanded ? "Reduzir o painel" : "Expandir o painel"}
@@ -307,27 +420,62 @@ export function AIChatSheet({
               { value: "contexto", label: "Contexto" },
             ]}
           />
-          {tab === "conversa" && (
-            <p className="flex items-center gap-1.5 truncate px-5 py-2 text-[12px] text-muted-foreground">
-              <span className={cn("size-1.5 shrink-0 rounded-full", ready ? "bg-success" : "bg-subtle")} aria-hidden />
-              <span className="truncate">{ready ? `Responde com os dados de ${context.subtitle}` : "Íntegra IA indisponível no momento"}</span>
-            </p>
-          )}
-          {tab === "conversa" && ready && onModeChange && modes && modes.length > 1 && (
-            <ModePicker modes={modes} value={mode} onChange={onModeChange} />
-          )}
         </div>
       }
       footer={
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            submit()
+            onSubmit()
           }}
-          className="space-y-2"
+          className="space-y-2.5"
         >
-          <VoiceStatus state={voice.state} onCancel={voice.cancel} onStop={voice.stop} onRetry={voice.start} />
-          <div className="flex flex-col gap-2 rounded-[12px] border border-border bg-surface px-3 pt-2.5 pb-2 shadow-xs focus-within:border-brand/50 focus-within:ring-2 focus-within:ring-brand/20">
+          <VoiceStatus state={voice.state} onCancel={voice.cancel} onRetry={voice.start} />
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            hidden
+            accept={ATTACHMENT_ACCEPT}
+            onChange={(e) => {
+              void addFiles(e.target.files ?? [])
+              e.target.value = ""
+            }}
+          />
+          <div className="flex flex-col gap-2 rounded-[14px] border border-border bg-surface px-3.5 pt-3 pb-2.5 shadow-xs focus-within:border-brand/50 focus-within:ring-2 focus-within:ring-brand/20">
+            {(files.length > 0 || reading) && (
+              <ul className="flex flex-wrap gap-1.5" aria-label="Arquivos anexados">
+                {files.map((f) => (
+                  <li
+                    key={f.id}
+                    className="flex max-w-full items-center gap-1.5 rounded-[8px] border border-border bg-surface-muted/70 py-1 pr-1 pl-2 text-[12px]"
+                  >
+                    <FileText className="size-3.5 shrink-0 text-brand" aria-hidden />
+                    <span className="min-w-0 truncate" title={f.name}>
+                      {f.name}
+                    </span>
+                    <span className="shrink-0 text-subtle">{formatFileSize(f.size)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFiles((current) => current.filter((x) => x.id !== f.id))}
+                      aria-label={`Remover o anexo ${f.name}`}
+                      className="flex size-5 shrink-0 items-center justify-center rounded-md text-subtle outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </li>
+                ))}
+                {reading && (
+                  <li className="flex items-center gap-1.5 px-1 text-[12px] text-muted-foreground" role="status">
+                    <span
+                      aria-hidden
+                      className="size-3 animate-spin rounded-full border-2 border-border-strong border-t-brand motion-reduce:animate-none"
+                    />
+                    Lendo o arquivo…
+                  </li>
+                )}
+              </ul>
+            )}
             <label htmlFor="lexa-ai-input" className="sr-only">
               Pergunte à Íntegra
             </label>
@@ -339,7 +487,7 @@ export function AIChatSheet({
               maxLength={CHAT_LIMITS.messageChars}
               disabled={!ready}
               placeholder={
-                !ready ? "Conversa indisponível" : mode === "jurisprudence" ? "Pesquise um tema na jurisprudência…" : "Digite sua pergunta…"
+                !ready ? "Conversa indisponível" : mode === "jurisprudence" ? "Pesquise um tema na jurisprudência..." : "Digite sua pergunta..."
               }
               onChange={(e) => {
                 setDraft(e.target.value)
@@ -348,54 +496,71 @@ export function AIChatSheet({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault()
-                  submit()
+                  onSubmit()
                 }
               }}
               className="max-h-32 min-h-[44px] w-full resize-none bg-transparent py-1 text-[13.5px] pointer-coarse:min-h-8 leading-snug outline-none field-sizing-content placeholder:text-subtle disabled:cursor-not-allowed"
             />
             <div className="flex items-center justify-between gap-2">
-              {ready ? (
+              <div className="flex items-center gap-0.5">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={listening ? "Parar a gravação e transcrever" : "Falar a pergunta (gravar áudio)"}
-                  aria-pressed={listening}
-                  title={listening ? "Parar e transcrever" : "Falar a pergunta"}
-                  disabled={voice.state.status === "processing" || voice.state.status === "requesting"}
-                  onClick={() => (voice.state.status === "recording" ? voice.stop() : voice.start())}
-                  className={cn(
-                    "text-muted-foreground",
-                    listening && "bg-danger-soft text-danger hover:bg-danger-soft hover:text-danger",
-                    voice.state.status === "processing" && "text-brand",
-                  )}
+                  aria-label="Anexar arquivo (PDF, TXT, CSV ou MD)"
+                  title="Anexar arquivo"
+                  disabled={!ready || reading || files.length >= ATTACHMENT_LIMITS.files || busyVoice}
+                  onClick={() => fileRef.current?.click()}
+                  className="text-muted-foreground"
                 >
-                  {voice.state.status === "recording" ? (
-                    <Square className="fill-current" />
-                  ) : voice.state.status === "processing" ? (
-                    <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-                  ) : (
-                    <Mic />
-                  )}
+                  <Paperclip className="size-[18px]" />
                 </Button>
-              ) : (
-                <span />
-              )}
-              <Button
+                {ready && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={recording ? "Parar a gravação e colocar o texto no campo" : "Falar a pergunta (gravar áudio)"}
+                    aria-pressed={listening}
+                    title={recording ? "Parar e colocar o texto no campo" : "Falar a pergunta"}
+                    disabled={voice.state.status === "processing" || voice.state.status === "requesting"}
+                    onClick={() => (recording ? voice.stop() : voice.start())}
+                    className={cn(
+                      "text-muted-foreground",
+                      listening && "bg-danger-soft text-danger hover:bg-danger-soft hover:text-danger",
+                      voice.state.status === "processing" && "text-brand",
+                    )}
+                  >
+                    {recording ? (
+                      <Square className="fill-current" />
+                    ) : voice.state.status === "processing" ? (
+                      <span
+                        aria-hidden
+                        className="size-3.5 animate-spin rounded-full border-2 border-border-strong border-t-brand motion-reduce:animate-none"
+                      />
+                    ) : (
+                      <Mic className="size-[18px]" />
+                    )}
+                  </Button>
+                )}
+                {ready && modes && modes.length > 1 && onModeChange && <ModeMenu modes={modes} value={mode} onChange={onModeChange} />}
+              </div>
+              <button
                 type="submit"
-                variant="brand"
-                size="icon-sm"
-                aria-label="Enviar pergunta"
-                disabled={!draft.trim() || chat.pending || !ready || busyVoice}
+                aria-label={recording ? "Enviar: parar a gravação, transcrever e perguntar" : "Enviar pergunta"}
+                title={recording ? "Enviar (transcreve o áudio)" : "Enviar"}
+                disabled={!canSend}
+                className="flex size-9 items-center justify-center rounded-[10px] bg-brand text-brand-foreground shadow-xs outline-none transition-colors duration-150 hover:bg-brand-strong focus-visible:ring-2 focus-visible:ring-brand/40 disabled:bg-brand-soft disabled:text-brand/50 disabled:shadow-none"
               >
-                <SendHorizontal />
-              </Button>
+                <SendHorizontal className="size-[18px]" />
+              </button>
             </div>
           </div>
-          <p className="flex items-start gap-1.5 text-[11.5px] leading-snug text-subtle">
-            <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
+          <p className="flex items-start gap-2 text-[11.5px] leading-snug text-muted-foreground">
+            <UserRound className="mt-px size-3.5 shrink-0" aria-hidden />
             <span>
-              A IA usa apenas os dados aos quais você tem acesso e pode errar — confira antes de usar.{" "}
+              A IA utiliza apenas os dados aos quais você tem acesso.
+              <br />
               <Link href={AI_PRIVACY_HREF} className="font-medium text-brand-strong underline underline-offset-2 hover:text-brand">
                 Saiba mais
               </Link>
@@ -456,80 +621,89 @@ export function AIChatSheet({
           {status && !ready && <AIUnavailable status={status} />}
 
           {chat.messages.length === 0 && (
-            <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
-              {/* Saudação: quem é a assistente e o que ela usa para responder. */}
-              <div className="rounded-[12px] border border-border bg-surface p-4 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground">
-                    <UsersRound className="size-5" strokeWidth={1.8} />
-                  </span>
-                  <p className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">Olá, {getUser(currentUserId()).firstName}!</p>
-                </div>
-                <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
-                  {mode === "jurisprudence" ? (
-                    <>Pergunte por um tema e eu pesquiso nas decisões da base de jurisprudência, citando cada decisão encontrada.</>
-                  ) : (
-                    <>
-                      Sou a assistente da Íntegra. Com o que está registrado sobre {TOPIC[context.scope.type]}, posso{" "}
-                      {CAPABILITIES.slice(0, -1).join(", ")} e {CAPABILITIES.at(-1)} — sempre citando de onde veio cada informação. Como posso ajudar?
-                    </>
-                  )}
-                </p>
-                {/* Ações: as primeiras perguntas desta tela, em grade. */}
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  {prompts.slice(0, 4).map((prompt, i) => {
-                    const Icon = ACTION_ICONS[i % ACTION_ICONS.length]
-                    return (
-                      <button
-                        key={prompt}
-                        type="button"
-                        onClick={() => submit(prompt)}
-                        disabled={chat.pending || !ready}
-                        className="flex min-h-11 items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-2 text-left text-[12px] leading-snug font-medium text-foreground outline-none transition-[border-color,background-color] hover:border-brand/40 hover:bg-brand-soft/50 focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-55"
-                      >
-                        <Icon className="size-4 shrink-0 text-brand" strokeWidth={1.8} />
-                        <span className="line-clamp-2">{prompt}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+            <div className="flex flex-col items-center pt-6 pb-2 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+              {/* Saudação: quem é a assistente. */}
+              <span
+                aria-hidden
+                className="flex size-[88px] items-center justify-center rounded-full bg-gradient-to-b from-brand-soft to-brand-soft/60 text-brand ring-1 ring-brand/10"
+              >
+                <span className="flex size-[58px] items-center justify-center rounded-full bg-surface shadow-[0_6px_18px_-6px_rgb(43_87_196/0.35)]">
+                  <Spark className="size-8" />
+                </span>
+              </span>
+              <p className="mt-6 text-[17px] font-semibold tracking-[-0.01em] text-foreground">Olá, {getUser(currentUserId()).firstName}!</p>
+              <p className="mt-2.5 max-w-[34ch] text-center text-[13.5px] leading-relaxed text-muted-foreground">
+                {mode === "jurisprudence"
+                  ? "Pergunte por um tema e eu pesquiso nas decisões da base de jurisprudência, citando cada decisão encontrada."
+                  : "Sou a IA da Íntegra. Posso te ajudar a analisar processos, comparar jurisprudências, revisar documentos e muito mais. É só me dizer como posso ajudar hoje."}
+              </p>
+              <div className="mt-6 flex flex-col items-start gap-2.5 self-center">
+                <StartChip
+                  icon={FileText}
+                  disabled={chat.pending || !ready}
+                  onClick={() => submit(`Faça um resumo de ${scopeName}: o que está registrado e o que merece atenção.`)}
+                >
+                  Resumo {context.scope.type === "process" ? "do processo" : context.scope.type === "client" ? "do cliente" : "do escritório"}
+                </StartChip>
+                <StartChip
+                  icon={Scale}
+                  disabled={chat.pending || !ready}
+                  onClick={() => {
+                    if (hasJurisprudenceMode) {
+                      onModeChange?.("jurisprudence")
+                      focusInput()
+                    } else submit(`Há jurisprudência relacionada a ${scopeName}?`)
+                  }}
+                >
+                  Buscar jurisprudência
+                </StartChip>
+                <StartChip icon={FileSearch} disabled={chat.pending || !ready} onClick={() => fileRef.current?.click()}>
+                  Analisar documento
+                </StartChip>
+                <StartChip
+                  icon={ListChecks}
+                  disabled={chat.pending || !ready}
+                  onClick={() => submit(`Compare as decisões de jurisprudência salvas com ${scopeName}.`)}
+                >
+                  Comparar precedentes
+                </StartChip>
+                <StartChip icon={HelpCircle} disabled={chat.pending || !ready} onClick={focusInput}>
+                  Tirar dúvidas jurídicas
+                </StartChip>
               </div>
-              {prompts.length > 4 && (
-                <>
-                  <h3 className="mt-5 mb-2 text-[13px] font-semibold text-foreground">Sugestões para você</h3>
-                  <div className="flex flex-col gap-2">
-                    {prompts.slice(4).map((prompt) => (
-                      <button
-                        key={prompt}
-                        type="button"
-                        onClick={() => submit(prompt)}
-                        disabled={chat.pending || !ready}
-                        className="group flex items-center gap-3 rounded-[10px] border border-border bg-surface px-3.5 py-3 text-left outline-none transition-[border-color,background-color] hover:border-brand/40 hover:bg-brand-soft/40 focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-55"
-                      >
-                        <Sparkles className="size-4 shrink-0 text-brand" strokeWidth={1.8} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] leading-snug text-foreground">{prompt}</span>
-                          <span className="mt-0.5 block truncate text-[11.5px] text-subtle">{context.subtitle}</span>
-                        </span>
-                        <ChevronRight className="size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" />
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           )}
 
           {chat.messages.map((message) =>
             message.role === "user" ? (
               <div key={message.id} className="flex justify-end animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-                <p className="max-w-[85%] rounded-[14px] rounded-br-[4px] bg-surface-muted px-3.5 py-2.5 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
-                  {message.content}
-                </p>
+                <div className="flex max-w-[85%] flex-col items-end gap-1.5">
+                  {message.attachments && message.attachments.length > 0 && (
+                    <ul className="flex flex-wrap justify-end gap-1.5" aria-label="Arquivos anexados">
+                      {message.attachments.map((name, i) => (
+                        <li
+                          key={`${name}-${i}`}
+                          className="flex max-w-full items-center gap-1.5 rounded-[8px] border border-border bg-surface px-2 py-1 text-[12px] text-muted-foreground"
+                        >
+                          <FileText className="size-3.5 shrink-0 text-brand" aria-hidden />
+                          <span className="truncate">{name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="rounded-[14px] rounded-br-[4px] bg-surface-muted px-3.5 py-2.5 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-foreground">
+                    {message.content}
+                  </p>
+                </div>
               </div>
             ) : (
               <div key={message.id} className="flex gap-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
-                <AIMark className="size-7 rounded-[8px] [&_svg]:size-3.5" />
+                <span
+                  aria-hidden
+                  className="flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-brand-soft text-brand ring-1 ring-brand/15"
+                >
+                  <Spark className="size-3.5" />
+                </span>
                 <div className="min-w-0 flex-1 space-y-2.5">
                   <AIMarkdown text={message.content} sources={message.sources ?? {}} onOpen={onOpenSource} />
                   <AIWarnings warnings={message.warnings ?? []} />

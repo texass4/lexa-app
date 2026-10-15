@@ -428,3 +428,26 @@ describe("entrada das rotas", () => {
     assert.throws(() => readChatInput({ scope: { type: "office" }, messages: [] }))
   })
 })
+
+describe("conversa: anexos da pergunta", () => {
+  const base = { scope: { type: "office" }, messages: [{ role: "user", content: "Resuma o anexo" }] }
+
+  it("sem anexos, nada muda", () => {
+    assert.deepEqual(readChatInput(base).attachments, [])
+  })
+
+  it("aceita até 3 anexos, limpa o nome e corta o texto no limite", () => {
+    const long = "a".repeat(40_000)
+    const { attachments } = readChatInput({ ...base, attachments: [{ name: "contrato\n.pdf", text: long }, { name: "b.txt", text: "ok" }] })
+    assert.equal(attachments.length, 2)
+    assert.equal(attachments[0].name, "contrato .pdf")
+    assert.equal(attachments[0].text.length, 30_000)
+  })
+
+  it("recusa mais de 3 anexos e anexo malformado", () => {
+    const file = { name: "a.txt", text: "x" }
+    assert.throws(() => readChatInput({ ...base, attachments: [file, file, file, file] }))
+    assert.throws(() => readChatInput({ ...base, attachments: [{ name: 1, text: "x" }] }))
+    assert.throws(() => readChatInput({ ...base, attachments: "texto" }))
+  })
+})

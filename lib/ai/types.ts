@@ -89,7 +89,17 @@ export interface ChatReply {
 /* --------------------------------- fontes --------------------------------- */
 
 /** `consulta`: uma fonte da Consulta processual (DataJud, DJEN, cadastro do escritório). */
-export type SourceKind = "movement" | "process" | "task" | "deadline" | "appointment" | "document" | "client" | "invoice" | "jurisprudence" | "consulta"
+export type SourceKind =
+  | "movement"
+  | "process"
+  | "task"
+  | "deadline"
+  | "appointment"
+  | "document"
+  | "client"
+  | "invoice"
+  | "jurisprudence"
+  | "consulta"
 
 /**
  * Registro real da Íntegra que o modelo recebeu com uma referência curta ("M3").
@@ -183,6 +193,22 @@ export interface FinanceAnalysisResult extends AIResult<FinanceAnalysis> {
 /* ---------------------------------- chat ---------------------------------- */
 
 export type ChatRole = "user" | "assistant"
+
+/** Arquivo anexado a uma pergunta: o texto é lido no navegador; o arquivo em si não é enviado nem guardado. */
+export interface ChatAttachment {
+  name: string
+  text: string
+}
+
+export const ATTACHMENT_LIMITS = {
+  /** Anexos por pergunta. */
+  files: 3,
+  /** Caracteres de texto lidos por anexo (o resto é cortado, com aviso). */
+  chars: 30_000,
+  /** Tamanho máximo do arquivo escolhido. */
+  bytes: 10 * 1024 * 1024,
+  name: 120,
+} as const
 
 export interface AIMessage {
   role: ChatRole
@@ -349,7 +375,17 @@ export interface StrategyRetrievalView {
     pontuacao: number
   }[]
   consultas: { questao: string; tipo: string; conceitos: string[]; resultados: number; situacao: string }[]
-  metricas: { candidatas: number; unicas: number; duplicatas: number; pertinentes: number; selecionadas: number; aplicaveis: number; contrarias: number; cobertura: number; ms: number }
+  metricas: {
+    candidatas: number
+    unicas: number
+    duplicatas: number
+    pertinentes: number
+    selecionadas: number
+    aplicaveis: number
+    contrarias: number
+    cobertura: number
+    ms: number
+  }
 }
 
 export interface RelatedJurisprudenceAnalysis {

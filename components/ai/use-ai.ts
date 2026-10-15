@@ -2,7 +2,17 @@
 
 import * as React from "react"
 import { AIRequestError, aiApi, fetchAIStatus } from "@/lib/ai/client"
-import { CHAT_LIMITS, CHAT_MODES, type ActionSuggestion, type AIMessage, type AISources, type AIStatus, type ChatMode, type ChatScope } from "@/lib/ai/types"
+import {
+  CHAT_LIMITS,
+  CHAT_MODES,
+  type ActionSuggestion,
+  type AIMessage,
+  type ChatAttachment,
+  type AISources,
+  type AIStatus,
+  type ChatMode,
+  type ChatScope,
+} from "@/lib/ai/types"
 import { uid } from "@/lib/core/format"
 import { useSession } from "@/lib/auth/session"
 import { useUI } from "@/lib/store/ui-store"
@@ -59,6 +69,8 @@ export interface ChatEntry {
   id: string
   role: AIMessage["role"]
   content: string
+  /** Nomes dos arquivos anexados à pergunta (só para mostrar na conversa). */
+  attachments?: string[]
   sources?: AISources
   warnings?: string[]
 }
@@ -103,7 +115,7 @@ export function useChatMode() {
 export function useAIChat(scope: ChatScope, mode: ChatMode = "all") {
   const [messages, setMessages] = React.useState<ChatEntry[]>([])
   const [pending, setPending] = React.useState(false)
-  const [failure, setFailure] = React.useState<{ error: AIRequestError; question: string } | null>(null)
+  const [failure, setFailure] = React.useState<{ error: AIRequestError; question: string; attachments: ChatAttachment[] } | null>(null)
   const controller = React.useRef<AbortController | null>(null)
   const scopeRef = React.useRef(scope)
   const modeRef = React.useRef(mode)
@@ -114,12 +126,17 @@ export function useAIChat(scope: ChatScope, mode: ChatMode = "all") {
   React.useEffect(() => () => controller.current?.abort(), [])
 
   const send = React.useCallback(
-    async (text: string) => {
+    async (text: string, attachments: ChatAttachment[] = []) => {
       const question = text.trim().slice(0, CHAT_LIMITS.messageChars)
       if (!question || controller.current) return
       const current = new AbortController()
       controller.current = current
-      const userEntry: ChatEntry = { id: uid("msg"), role: "user", content: question }
+      const userEntry: ChatEntry = {
+        id: uid("msg"),
+        role: "user",
+        content: question,
+        ...(attachments.length ? { attachments: attachments.map((a) => a.name) } : {}),
+      }
       const history = [...messages, userEntry]
       setMessages(history)
       setPending(true)
@@ -130,6 +147,7 @@ export function useAIChat(scope: ChatScope, mode: ChatMode = "all") {
           history.slice(-CHAT_LIMITS.history).map(({ role, content }) => ({ role, content })),
           current.signal,
           modeRef.current,
+          attachments,
         )
         setMessages((list) => [
           ...list,
@@ -139,7 +157,7 @@ export function useAIChat(scope: ChatScope, mode: ChatMode = "all") {
         const known = toError(failure)
         // Pergunta sem resposta sai do histórico: pode ser reenviada.
         setMessages((list) => list.filter((m) => m.id !== userEntry.id))
-        if (known.code !== "CANCELLED") setFailure({ error: known, question })
+        if (known.code !== "CANCELLED") setFailure({ error: known, question, attachments })
       } finally {
         if (controller.current === current) controller.current = null
         setPending(false)
@@ -155,7 +173,7 @@ export function useAIChat(scope: ChatScope, mode: ChatMode = "all") {
     setFailure(null)
   }, [])
   const retry = React.useCallback(() => {
-    if (failure) send(failure.question)
+    if (failure) send(failure.question, failure.attachments)
   }, [failure, send])
 
   return { messages, pending, error: failure?.error ?? null, send, cancel, reset, retry }

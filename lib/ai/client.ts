@@ -5,6 +5,7 @@
 
 import type {
   AIMessage,
+  ChatAttachment,
   AIResult,
   AIStatus,
   ChatReply,
@@ -84,8 +85,8 @@ export const aiApi = {
     post<RelatedJurisprudenceResult>("/api/ai/jurisprudence/related", input, signal),
   jurisprudenceStrategy: (input: { question: string; processId?: string }, signal?: AbortSignal) =>
     post<JurisprudenceStrategyResult>("/api/ai/jurisprudence/strategy", input, signal),
-  chat: (scope: ChatScope, messages: AIMessage[], signal?: AbortSignal, mode: ChatMode = "all") =>
-    post<AIResult<ChatReply>>("/api/ai/chat", { scope, messages, mode }, signal),
+  chat: (scope: ChatScope, messages: AIMessage[], signal?: AbortSignal, mode: ChatMode = "all", attachments: ChatAttachment[] = []) =>
+    post<AIResult<ChatReply>>("/api/ai/chat", { scope, messages, mode, ...(attachments.length ? { attachments } : {}) }, signal),
 }
 
 /** Análise comparativa + o que a pesquisa encontrou (calculado pela Íntegra, não pelo modelo). */
