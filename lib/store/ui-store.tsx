@@ -3,7 +3,7 @@
 import * as React from "react"
 import { createLocalStore } from "@/lib/core/hooks"
 import type { Permission } from "@/lib/auth/permissions"
-import type { Priority, TribunalCheck } from "@/types"
+import type { DocumentKind, Priority, TribunalCheck } from "@/types"
 
 export type DialogKind = "client" | "task" | "prazo" | "appointment" | "document" | "process" | "invoice" | "document-preview"
 
@@ -44,6 +44,9 @@ export interface DialogDefaults {
    * entram como evidência do tribunal, para uma divergência não virar confirmação.
    */
   tribunalEvidence?: { cnj: string; checks: TribunalCheck[] }
+  /** Envio de documentos: arquivos já escolhidos (arrastados para a tela) e a categoria do lugar atual. */
+  files?: File[]
+  documentKind?: DocumentKind
 }
 
 interface UIState {

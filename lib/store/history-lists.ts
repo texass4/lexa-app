@@ -142,6 +142,63 @@ export function documentSearch(
   }
 }
 
+/**
+ * Recorte da Central de Documentos aplicado no banco: o mesmo que a tela filtra na
+ * memória, para que as páginas do histórico tragam só o que a lista vai mostrar.
+ */
+export interface DocumentQuery {
+  kind?: string
+  clientId?: string
+  processId?: string
+  /** Extensões aceitas (formato do arquivo). */
+  extensions?: string[]
+  uploadedById?: string
+  /** Enviados a partir desta data (`YYYY-MM-DD`, inclusive). */
+  from?: string
+  /** Enviados antes desta data (`YYYY-MM-DD`, exclusive). */
+  to?: string
+}
+
+function documentQueryFilter(q: DocumentQuery): ScopeFilter {
+  const eq: [string, string][] = []
+  if (q.kind) eq.push(["data->>kind", q.kind])
+  if (q.clientId) eq.push(["data->>clientId", q.clientId])
+  if (q.processId) eq.push(["data->>processId", q.processId])
+  if (q.uploadedById) eq.push(["data->>uploadedById", q.uploadedById])
+  const filter: ScopeFilter = {}
+  if (eq.length) filter.eq = eq
+  if (q.extensions?.length) filter.in = [["data->>extension", [...q.extensions].sort()]]
+  if (q.from) filter.gte = [["data->>uploadedAt", q.from]]
+  if (q.to) filter.lt = [["data->>uploadedAt", q.to]]
+  return filter
+}
+
+const documentQueryId = (q: DocumentQuery) =>
+  [q.kind, q.clientId, q.processId, q.extensions?.slice().sort().join("+"), q.uploadedById, q.from, q.to].map((v) => v ?? "").join(":")
+
+/** Documentos anteriores à janela da abertura, já com os filtros da tela. */
+export function olderDocumentsWhere(bounds: WindowBounds, q: DocumentQuery): PagedList<LegalDocument> {
+  const own = documentQueryFilter(q)
+  // A fronteira da janela e o fim do período são dois limites na mesma coluna: valem os dois.
+  const filter: ScopeFilter = { ...own, lt: [["data->>uploadedAt", bounds.documents], ...(own.lt ?? [])] }
+  return {
+    id: `documentos:central:${documentQueryId(q)}`,
+    scope: { key: "documents", order: "data->>uploadedAt", filter },
+    size: HISTORY_PAGE,
+    cursor: uploadedKey,
+  }
+}
+
+/** Busca em todos os documentos (janela e histórico), com os filtros da tela. */
+export function documentSearchWhere(query: string, search: ScopeFilter, q: DocumentQuery): PagedList<LegalDocument> {
+  return {
+    id: `documentos:central:busca:${documentQueryId(q)}:${query}`,
+    scope: { key: "documents", order: "data->>uploadedAt", filter: merge(documentQueryFilter(q), search) },
+    size: HISTORY_PAGE,
+    cursor: uploadedKey,
+  }
+}
+
 /* -------------------------------- Financeiro ------------------------------ */
 
 /** Abas do Financeiro com histórico (as em aberto estão todas na memória). */

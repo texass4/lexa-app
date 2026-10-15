@@ -52,3 +52,28 @@ export async function downloadDocument(doc: LegalDocument) {
   }
   window.location.assign(url)
 }
+
+/**
+ * Baixa vários arquivos (seleção). Cada um vem por uma URL assinada de 5 minutos com
+ * "salvar como" do próprio Storage; o navegador pode pedir permissão para vários downloads.
+ * Devolve quantos foram iniciados.
+ */
+export async function downloadDocuments(docs: LegalDocument[]) {
+  const withFile = docs.filter((d) => d.storagePath)
+  let started = 0
+  for (const doc of withFile) {
+    const url = await documentUrl(doc, { download: true })
+    if (!url) continue
+    const a = document.createElement("a")
+    a.href = url
+    a.rel = "noopener"
+    a.style.display = "none"
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    started++
+    // Um intervalo curto entre os arquivos: o navegador trata cada um como download próprio.
+    await new Promise((r) => setTimeout(r, 450))
+  }
+  return { started, missing: docs.length - withFile.length }
+}

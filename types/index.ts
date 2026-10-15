@@ -553,6 +553,8 @@ export interface Activity extends TenantEntity {
   actorUserId?: ID
   clientId?: ID
   processId?: ID
+  /** Documento da ação (atividades de documento registradas a partir da Central de Documentos). */
+  documentId?: ID
   href?: string
 }
 

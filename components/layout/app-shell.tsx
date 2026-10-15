@@ -6,6 +6,7 @@ import { Topbar } from "./topbar"
 import { MobileBottomNav, MobileDrawer } from "./mobile-nav"
 import { CommandMenu } from "./command-menu"
 import { GlobalDialogs } from "./global-dialogs"
+import { UploadTray } from "@/components/documentos/upload-tray"
 import { usePathname } from "next/navigation"
 import { ShieldOff } from "lucide-react"
 import { Panel } from "@/components/ui/panel"
@@ -90,6 +91,7 @@ function ShellLayout({ children }: { children: React.ReactNode }) {
       <MobileDrawer />
       <CommandMenu />
       <GlobalDialogs />
+      <UploadTray />
     </div>
   )
 }

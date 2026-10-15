@@ -1,173 +1,198 @@
 "use client"
 
 import * as React from "react"
-import { CloudUpload, FilePlus, FileText, X } from "lucide-react"
-import { motion } from "framer-motion"
-import { toast } from "sonner"
+import { CloudUpload, FilePlus, TriangleAlert, X } from "lucide-react"
 import { cn } from "cn"
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Field, NativeSelect } from "@/components/ui/field"
-import { useOfficeActions, useOfficeData } from "@/lib/store/office-store"
+import { FileIcon } from "@/components/shared/file-icon"
+import { useOfficeData } from "@/lib/store/office-store"
 import { byId } from "@/lib/store/indexes"
-import { formatFileSize, uid } from "@/lib/core/format"
-import { currentOrgId } from "@/lib/auth/account"
+import { formatFileSize } from "@/lib/core/format"
 import { documentRequiredIssue } from "@/lib/clientes/clients"
-import { getSupabase } from "@/lib/supabase/client"
-import { DOCUMENT_MIME } from "@/lib/documentos/documents"
+import { ACCEPT_ATTRIBUTE, extensionOf, uploadIssue } from "@/lib/documentos/library"
+import { enqueueUploads } from "@/lib/documentos/upload-queue"
+import { processTitle } from "@/lib/processos/label"
 import type { DocumentKind } from "@/types"
 
 export const DOCUMENT_KINDS: DocumentKind[] = ["Contrato", "Procuração", "Documento pessoal", "Petição", "Comprovante", "Laudo", "Decisão"]
-const EXTENSIONS = ["pdf", "docx", "doc", "txt", "jpg", "png"] as const
-const MAX_BYTES = 25 * 1024 * 1024
-/** O tipo vem da extensão aceita, nunca do navegador: um .pdf é servido sempre como PDF. */
-type Defaults = { clientId?: string; processId?: string }
 
+type Defaults = { clientId?: string; processId?: string; files?: File[]; documentKind?: DocumentKind }
+
+/**
+ * Envio de documentos: um ou vários arquivos, com o destino (categoria, cliente e
+ * processo). Os arquivos entram na fila de envios, que mostra o progresso real de cada um
+ * e só dá o documento como salvo depois que o armazenamento e o banco confirmam.
+ */
 export function NewDocumentDialog({ open, onOpenChange, defaults }: { open: boolean; onOpenChange: (o: boolean) => void; defaults?: Defaults }) {
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Adicionar documento"
-      description="Anexe arquivos ao cliente ou processo."
+      title="Enviar documentos"
+      description="Escolha os arquivos e onde eles ficam: categoria, cliente e processo."
       icon={<FilePlus />}
+      size="lg"
       bare
     >
-      <DocumentForm defaults={defaults} onClose={() => onOpenChange(false)} />
+      <UploadForm defaults={defaults} onClose={() => onOpenChange(false)} />
     </Modal>
   )
 }
 
-function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => void }) {
+interface Picked {
+  key: string
+  file: File
+  issue: string | null
+}
+
+const keyOf = (f: File) => `${f.name}:${f.size}:${f.lastModified}`
+const toPicked = (files: File[]): Picked[] => files.map((file) => ({ key: keyOf(file), file, issue: uploadIssue(file) }))
+
+function UploadForm({ defaults, onClose }: { defaults?: Defaults; onClose: () => void }) {
   const data = useOfficeData()
-  const { addDocument } = useOfficeActions()
   const inputRef = React.useRef<HTMLInputElement>(null)
-  const [file, setFile] = React.useState<{ name: string; size: number; source: File } | null>(null)
+  const [picked, setPicked] = React.useState<Picked[]>(() => toPicked(defaults?.files ?? []))
   const [dragging, setDragging] = React.useState(false)
-  const [kind, setKind] = React.useState<DocumentKind>("Comprovante")
+  const [kind, setKind] = React.useState<DocumentKind | "">(defaults?.documentKind ?? "")
   const [clientId, setClientId] = React.useState(defaults?.clientId ?? "")
   const [processId, setProcessId] = React.useState(defaults?.processId ?? "")
-  const [error, setError] = React.useState("")
-  const [uploading, setUploading] = React.useState(false)
+  const [errors, setErrors] = React.useState<{ files?: string; kind?: string }>({})
 
-  const pick = (f?: File | null) => {
-    if (!f) return
-    if (f.size > MAX_BYTES) {
-      setError("O arquivo passa de 25 MB.")
-      return
-    }
-    setFile({ name: f.name, size: f.size, source: f })
-    setError("")
-  }
-
-  const submit = async () => {
-    if (!file) {
-      setError("Selecione ou arraste um arquivo.")
-      return
-    }
-    // Contrato exige CPF/CNPJ do cliente (o banco também confere, `0010_contacts.sql`).
-    if (contractIssue) return
-    setUploading(true)
-    const ext = (file.name.split(".").pop()?.toLowerCase() ?? "pdf") as (typeof EXTENSIONS)[number]
-    const extension = EXTENSIONS.includes(ext) ? ext : "pdf"
-
-    // Pasta do escritório: a política do Storage só aceita a de quem está logado.
-    const storagePath = `${currentOrgId()}/${uid("file")}.${extension}`
-    const { error: uploadError } = await getSupabase().storage.from("documents").upload(storagePath, file.source, { contentType: DOCUMENT_MIME[extension] })
-    if (uploadError) {
-      setUploading(false)
-      setError("Não foi possível enviar o arquivo. Verifique se você pode adicionar documentos e tente de novo.")
-      return
-    }
-
-    addDocument({
-      name: file.name,
-      kind,
-      clientId: clientId || undefined,
-      processId: processId || undefined,
-      extension,
-      sizeBytes: file.size,
-      storagePath,
+  const add = (files: FileList | File[] | null | undefined) => {
+    if (!files?.length) return
+    setPicked((list) => {
+      const known = new Set(list.map((p) => p.key))
+      return [...list, ...toPicked(Array.from(files)).filter((p) => !known.has(p.key))]
     })
-    onClose()
-    toast.success("Documento adicionado.", { description: file.name })
+    setErrors((e) => ({ ...e, files: undefined }))
   }
-
+  const valid = picked.filter((p) => !p.issue)
+  const invalid = picked.length - valid.length
   const processes = data.processes.filter((p) => !clientId || p.clientId === clientId)
   const contractIssue = kind === "Contrato" ? documentRequiredIssue(byId(data.clients, clientId), "contrato") : undefined
+  const total = valid.reduce((n, p) => n + p.file.size, 0)
+
+  const submit = () => {
+    const next: typeof errors = {}
+    if (!valid.length) next.files = picked.length ? "Nenhum dos arquivos pode ser enviado." : "Escolha ou arraste ao menos um arquivo."
+    if (!kind) next.kind = "Escolha a categoria."
+    setErrors(next)
+    // Contrato exige CPF/CNPJ do cliente (o banco também confere, `0010_contacts.sql`).
+    if (Object.keys(next).length || contractIssue || !kind) return
+    // A bandeja de envios (canto da tela) mostra o progresso de cada arquivo.
+    enqueueUploads(
+      valid.map((p) => p.file),
+      { kind, clientId: clientId || undefined, processId: processId || undefined },
+    )
+    onClose()
+  }
 
   return (
     <>
       <ModalBody>
-        <div className="space-y-4">
-          {file ? (
-            <div className="relative overflow-hidden rounded-[12px] border border-border bg-surface p-3.5">
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-[10px] bg-danger-soft text-danger">
-                  <FileText className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium">{file.name}</p>
-                  <p className="text-[12px] text-muted-foreground">{formatFileSize(file.size)} · pronto para envio</p>
-                </div>
-                {!uploading && (
-                  <Button variant="ghost" size="icon-sm" aria-label="Remover arquivo" onClick={() => setFile(null)}>
-                    <X />
-                  </Button>
+        <div className="space-y-5">
+          <div
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes("Files")) return
+              e.preventDefault()
+              setDragging(true)
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              if (!e.dataTransfer.types.includes("Files")) return
+              e.preventDefault()
+              setDragging(false)
+              add(e.dataTransfer.files)
+            }}
+            className={cn(
+              "flex flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-6 text-center transition-colors duration-150",
+              dragging
+                ? "border-brand bg-brand-soft/60"
+                : errors.files
+                  ? "border-danger/50 bg-danger-soft/30"
+                  : "border-border-strong bg-surface-muted/40",
+            )}
+          >
+            <span className="flex size-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground">
+              <CloudUpload className="size-5" />
+            </span>
+            <p className="mt-3 text-[13.5px] font-medium">Arraste os arquivos aqui</p>
+            <p className="mt-0.5 text-[12.5px] text-muted-foreground">PDF, DOC, DOCX, TXT, JPG ou PNG — até 25 MB cada</p>
+            <Button variant="secondary" size="sm" className="mt-3" onClick={() => inputRef.current?.click()}>
+              Escolher arquivos
+            </Button>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept={ACCEPT_ATTRIBUTE}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(e) => {
+                add(e.target.files)
+                e.target.value = ""
+              }}
+            />
+            {errors.files && (
+              <p role="alert" className="mt-3 text-[12px] text-danger">
+                {errors.files}
+              </p>
+            )}
+          </div>
+
+          {picked.length > 0 && (
+            <div>
+              <p className="mb-2 text-[12.5px] text-muted-foreground">
+                {valid.length} arquivo{valid.length === 1 ? "" : "s"} para enviar · {formatFileSize(total)}
+                {invalid > 0 && (
+                  <span className="text-danger">
+                    {" "}
+                    · {invalid} não pode{invalid === 1 ? "" : "m"} ser enviado{invalid === 1 ? "" : "s"}
+                  </span>
                 )}
-              </div>
-              {uploading && (
-                <motion.div
-                  className="absolute bottom-0 left-0 h-[2px] bg-brand"
-                  initial={{ width: "0%" }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 0.7, ease: "easeInOut" }}
-                />
-              )}
-            </div>
-          ) : (
-            <div
-              onDragOver={(e) => {
-                e.preventDefault()
-                setDragging(true)
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault()
-                setDragging(false)
-                pick(e.dataTransfer.files?.[0])
-              }}
-              className={cn(
-                "flex flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-8 text-center transition-colors",
-                dragging
-                  ? "border-brand bg-brand-soft/60"
-                  : error
-                    ? "border-danger/50 bg-danger-soft/40"
-                    : "border-border-strong bg-surface-muted/40",
-              )}
-            >
-              <span className="flex size-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground">
-                <CloudUpload className="size-5" />
-              </span>
-              <p className="mt-3 text-[13.5px] font-medium">Arraste o arquivo aqui</p>
-              <p className="mt-0.5 text-[12.5px] text-muted-foreground">PDF, DOCX, TXT ou imagem — até 25 MB</p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <Button variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>
-                  Escolher arquivo
-                </Button>
-              </div>
-              <input ref={inputRef} type="file" className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => pick(e.target.files?.[0])} />
-              {error && (
-                <p role="alert" className="mt-3 text-[12px] text-danger">
-                  {error}
-                </p>
-              )}
+              </p>
+              <ul
+                className="max-h-[220px] divide-y divide-border/70 overflow-y-auto rounded-[10px] border border-border thin-scrollbar"
+                aria-label="Arquivos escolhidos"
+              >
+                {picked.map((p) => (
+                  <li key={p.key} className={cn("flex items-center gap-3 px-3 py-2", p.issue && "bg-danger-soft/25")}>
+                    <FileIcon extension={extensionOf(p.file.name) ?? "?"} className="h-8 w-6 text-[7px]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-foreground">{p.file.name}</p>
+                      <p className={cn("text-[11.5px]", p.issue ? "flex items-center gap-1 text-danger" : "text-muted-foreground")}>
+                        {p.issue ? (
+                          <>
+                            <TriangleAlert className="size-3" aria-hidden /> {p.issue}
+                          </>
+                        ) : (
+                          formatFileSize(p.file.size)
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Tirar ${p.file.name} da lista`}
+                      onClick={() => setPicked((list) => list.filter((x) => x.key !== p.key))}
+                    >
+                      <X />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Tipo" htmlFor="doc-kind">
+            <Field label="Categoria" htmlFor="doc-kind" error={errors.kind}>
               <NativeSelect id="doc-kind" value={kind} onChange={(e) => setKind(e.target.value as DocumentKind)}>
+                <option value="" disabled>
+                  Escolha a categoria
+                </option>
                 {DOCUMENT_KINDS.map((k) => (
                   <option key={k}>{k}</option>
                 ))}
@@ -191,11 +216,21 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
               </NativeSelect>
             </Field>
             <Field label="Processo" htmlFor="doc-process" optional className="sm:col-span-2">
-              <NativeSelect id="doc-process" value={processId} onChange={(e) => setProcessId(e.target.value)}>
+              <NativeSelect
+                id="doc-process"
+                value={processId}
+                onChange={(e) => {
+                  const id = e.target.value
+                  setProcessId(id)
+                  // Escolher o processo traz o cliente dele.
+                  const process = byId(data.processes, id)
+                  if (process?.clientId) setClientId(process.clientId)
+                }}
+              >
                 <option value="">Nenhum</option>
                 {processes.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.code} — {p.type}
+                    {processTitle(p)} — {p.code}
                   </option>
                 ))}
               </NativeSelect>
@@ -207,8 +242,8 @@ function DocumentForm({ defaults, onClose }: { defaults?: Defaults; onClose: () 
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
-        <Button onClick={submit} disabled={uploading}>
-          {uploading ? "Enviando…" : "Adicionar documento"}
+        <Button onClick={submit} disabled={!picked.length}>
+          <CloudUpload /> {valid.length > 1 ? `Enviar ${valid.length} arquivos` : "Enviar"}
         </Button>
       </ModalFooter>
     </>

@@ -2,7 +2,19 @@
 
 import * as React from "react"
 import { toast } from "sonner"
-import type { Activity, Appointment, AppointmentCategory, Client, Invoice, LegalDocument, Prazo, Process, Task, TaskColumn, TribunalCheck } from "@/types"
+import type {
+  Activity,
+  Appointment,
+  AppointmentCategory,
+  Client,
+  Invoice,
+  LegalDocument,
+  Prazo,
+  Process,
+  Task,
+  TaskColumn,
+  TribunalCheck,
+} from "@/types"
 import * as account from "@/lib/auth/account"
 import { CLIENT_STATUS } from "@/lib/core/config"
 import { fmtNumericDate, getNow, toLocalISO } from "@/lib/core/dates"
@@ -174,6 +186,8 @@ interface OfficeActions {
   /** Exclui a categoria; os compromissos dela ficam sem categoria. */
   deleteAppointmentCategory(id: string): void
   addDocument(input: NewDocumentInput): LegalDocument
+  /** Cria o documento e espera o banco confirmar; `null` se não foi gravado (aviso já mostrado). */
+  saveNewDocument(input: NewDocumentInput): Promise<LegalDocument | null>
   /** Nome, tipo e vínculos (cliente/processo) do documento. O arquivo não muda. */
   updateDocument(
     id: string,
@@ -361,6 +375,35 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
       if (refused) return refused
       if (!apply()) return { status: "saved" } as SaveResult<T>
       return sync.outcomeFor<T>(await sync.flush(), collection, id)
+    }
+
+    const createDocument = (input: NewDocumentInput): LegalDocument => {
+      const doc: LegalDocument = {
+        ...base(),
+        ...input,
+        id: uid("d"),
+        uploadedById: account.currentUserId(),
+        uploadedAt: nowISO(),
+      }
+      commit((s) => ({
+        ...s,
+        documents: [doc, ...s.documents],
+        activities: [
+          logActivity({
+            type: "document",
+            actor: account.getUser(account.currentUserId()).name,
+            message: "adicionou um documento.",
+            detail: doc.name,
+            documentId: doc.id,
+            clientId: clientOfItem(s, doc),
+            processId: doc.processId,
+            actorUserId: account.currentUserId(),
+            href: clientOfItem(s, doc) ? `/clientes/${clientOfItem(s, doc)}?tab=documentos` : "/documentos",
+          }),
+          ...s.activities,
+        ],
+      }))
+      return doc
     }
 
     return {
@@ -987,32 +1030,13 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
         }))
       },
 
-      addDocument(input) {
-        const doc: LegalDocument = {
-          ...base(),
-          ...input,
-          id: uid("d"),
-          uploadedById: account.currentUserId(),
-          uploadedAt: nowISO(),
-        }
-        commit((s) => ({
-          ...s,
-          documents: [doc, ...s.documents],
-          activities: [
-            logActivity({
-              type: "document",
-              actor: account.getUser(account.currentUserId()).name,
-              message: "adicionou um documento.",
-              detail: doc.name,
-              clientId: clientOfItem(s, doc),
-              processId: doc.processId,
-              actorUserId: account.currentUserId(),
-              href: clientOfItem(s, doc) ? `/clientes/${clientOfItem(s, doc)}?tab=documentos` : "/documentos",
-            }),
-            ...s.activities,
-          ],
-        }))
-        return doc
+      addDocument: createDocument,
+
+      async saveNewDocument(input) {
+        const doc = createDocument(input)
+        const outcome = sync.outcomeFor<LegalDocument>(await sync.flush(), "documents", doc.id)
+        if (outcome.status !== "saved") return null
+        return stateRef.current.documents.find((d) => d.id === doc.id) ?? doc
       },
 
       updateDocument(id, patch, options) {
@@ -1036,6 +1060,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
                 type: "document",
                 actor: account.getUser(account.currentUserId()).name,
                 message: "atualizou um documento.",
+                documentId: id,
                 detail: `${updated.name} · Alterado: ${changed.join(", ")}${updated.name !== current.name ? ` · Antes: ${current.name}` : ""}`,
                 clientId: clientOfItem(s, updated),
                 processId: updated.processId,
@@ -1061,6 +1086,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
               actor: account.getUser(account.currentUserId()).name,
               message: "excluiu um documento.",
               detail: doc.name,
+              documentId: doc.id,
               clientId: clientOfItem(s, doc),
               processId: doc.processId,
               actorUserId: account.currentUserId(),

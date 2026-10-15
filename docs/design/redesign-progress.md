@@ -306,3 +306,42 @@ Primeira passagem (componentes) e segunda passagem (comparando a tela real, em 1
 - A ilustração do cabeçalho é vetorial e local, não a fotografia da referência.
 - Em 1440 px com o assistente aberto, o centro fica com 744 px: as áreas ficam em uma coluna (duas colunas
   espremeriam as tarefas).
+
+## Central de Documentos (gerenciador de arquivos)
+
+Padrão Dropbox/Google Drive sobre o modelo real: cada documento já guarda categoria, cliente, processo e
+arquivo. A navegação usa isso — **Clientes › processo** são vínculos reais (navegáveis como pastas, com
+ícone próprio, distinto dos arquivos), **categorias são filtros** (etiquetas, não pastas). Não há pastas
+criadas pela pessoa nem lixeira: proposta em `redesign-inventory.md`, sem implementação.
+
+- **Navegação:** Todos, Recentes, Favoritos, Clientes (expansível até os processos), Categorias; contagens
+  só quando exatas (janela na memória + contagem no banco); uso do armazenamento. No celular e no tablet,
+  em gaveta.
+- **Barra:** trilha clicável, busca (no banco, em todo o histórico; indicador e "limpar"), filtros
+  combináveis com chips removíveis (categoria, formato, cliente, processo, enviado por, período — todos
+  aplicados também no banco), ordem com direção, lista/grade. Lugar e filtros ficam na URL.
+- **Lista e grade:** colunas que se adaptam à largura real da área (container `files`), nome como
+  elemento principal, miniaturas reais (imagem e 1ª página do PDF, só quando o item aparece, até 12 MB),
+  ícones por formato. Clique: detalhes; duplo clique ou "Abrir": visualizador; Shift+clique: intervalo;
+  clique direito: o mesmo menu do ⋯. Ações rápidas no hover sem mudar o layout.
+- **Seleção múltipla:** barra flutuante com Baixar, Favoritar, Copiar links, Mover, Excluir (conforme
+  permissão); Esc limpa.
+- **Detalhes:** coluna ao lado (≥ 1180 px de área) ou painel; metadados reais, "Alterado em" do banco,
+  local na Central e atividade ligada ao documento (registrada a partir de agora com `documentId`).
+- **Visualizador:** tela inteira, URL assinada temporária; PDF pelo pdf.js (páginas, zoom, teclado),
+  imagem com zoom, texto até 2 MB; Word e arquivos ausentes com mensagem e download.
+- **Envio:** vários arquivos, validação de formato e tamanho por arquivo, destino (categoria obrigatória,
+  cliente, processo — padrão do lugar atual), arrastar para a área; bandeja global com progresso real
+  (XHR), registrando → concluído só após o banco, cancelar, tentar de novo; arquivo de registro falho é
+  removido do Storage. Substitui a barra de progresso animada (falsa) do diálogo anterior.
+- **Favoritos:** por pessoa, `0026_documentos_favoritos.sql` (RLS por pessoa e escritório). Sem a migração,
+  aparecem como indisponíveis.
+
+Validado no navegador (Supabase local, dados reais): envio de PDF/PNG/TXT com recusa de .xlsx, falha de rede
+com nova tentativa, cancelamento a 18% de 19,6 MB, miniaturas, visualizador (3 páginas, zoom), detalhes,
+seleção, favoritos, busca no histórico, filtros + URL + recarregar, ordem, renomear, mover, Clientes ›
+cliente › processo, menu de contexto, exclusão com confirmação; 390–1680 px sem rolagem horizontal; leitor
+(`documents.view`) sem ações de edição na tela e barrado no banco/Storage; outro escritório sem acesso a
+registro, arquivo, URL assinada ou favorito. Não validado ponta a ponta: o build de produção (`next start`)
+— o login não concluiu nesse modo neste ambiente; o worker do pdf.js foi conferido no build (arquivo próprio,
+referenciado).
