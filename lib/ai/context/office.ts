@@ -8,6 +8,7 @@
  * aberto e as do mês atual e do anterior; processos sem o histórico de movimentações.
  */
 
+import { isPlanned } from "@/lib/agenda/agenda"
 import { PROCESS_STATUS } from "@/lib/core/config"
 import { STALE_DAYS } from "@/lib/dashboard/attention"
 import { addDays, parse, startOfDay, startOfWeek, toLocalISO } from "@/lib/core/dates"
@@ -145,8 +146,8 @@ export function computeOfficeMetrics(data: OfficeData, now: Date): OfficeMetrics
   if (data.can.agenda) {
     const horizon = addDays(today, 8)
     metrics.agenda = {
-      today: data.appointments.filter((a) => daysUntil(a.start, now) === 0).length,
-      next7Days: data.appointments.filter((a) => parse(a.start) >= today && parse(a.start) < horizon).length,
+      today: data.appointments.filter((a) => isPlanned(a) && daysUntil(a.start, now) === 0).length,
+      next7Days: data.appointments.filter((a) => isPlanned(a) && parse(a.start) >= today && parse(a.start) < horizon).length,
     }
   }
 
@@ -256,7 +257,7 @@ export function buildOfficeContext(data: OfficeData, now: Date, { forChat = fals
       ? overdueTasks.slice(0, OFFICE_LIMITS.list).map((t) => describeTask(t, registerTask(registry, t), data.members, now))
       : undefined,
     compromissos_dos_proximos_7_dias: data.can.agenda
-      ? upcoming(data.appointments, now)
+      ? upcoming(data.appointments.filter(isPlanned), now)
           .filter((a) => (daysUntil(a.start, now) ?? Infinity) <= 7)
           .slice(0, OFFICE_LIMITS.list)
           .map((a) => describeAppointment(a, registerAppointment(registry, a)))

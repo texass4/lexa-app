@@ -6,6 +6,7 @@
  * funções puras que escolhem os campos e limitam o volume.
  */
 
+import { isPlanned } from "@/lib/agenda/agenda"
 import { AIError } from "@/lib/ai/errors"
 import { PROCESS_STATUS } from "@/lib/core/config"
 import { formatCurrency } from "@/lib/core/format"
@@ -142,7 +143,7 @@ export function buildProcessContext(data: ProcessData, now: Date): BuiltContext 
   const movements = newestFirst(process.movements).slice(0, PROCESS_LIMITS.movements)
   const tasks = sortTasks(data.tasks).slice(0, PROCESS_LIMITS.tasks)
   const prazos = prazosOfProcess(data.prazos, process.id).slice(0, PROCESS_LIMITS.prazos)
-  const appointments = upcoming(data.appointments, now).slice(0, PROCESS_LIMITS.appointments)
+  const appointments = upcoming(data.appointments.filter(isPlanned), now).slice(0, PROCESS_LIMITS.appointments)
   const documents = [...data.documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, PROCESS_LIMITS.documents)
 
   const context = {

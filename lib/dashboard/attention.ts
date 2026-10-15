@@ -25,6 +25,7 @@ import { prazosByProcess, processesByClient, tasksByRelated } from "@/lib/store/
 import { isAutoTracked } from "@/lib/services/processos/labels"
 import { MONITORING_STALE_AFTER_DAYS } from "@/lib/services/processos/monitoring-policy"
 import { processTitle } from "@/lib/processos/label"
+import { isPlanned } from "@/lib/agenda/agenda"
 import type { Activity, Appointment, Client, Invoice, LegalDocument, Prazo, Process, Task } from "@/types"
 
 /** Sem movimentação há mais que isso = processo parado. Também usado pela Íntegra IA. */
@@ -398,7 +399,7 @@ export function officeSignals(data: AttentionData, options: AttentionOptions = {
 
   if (allowed("agenda.view")) {
     const upcomingToday = data.appointments
-      .filter((a) => diffInDays(parse(a.start), now) === 0 && parse(a.end) > now)
+      .filter((a) => isPlanned(a) && diffInDays(parse(a.start), now) === 0 && parse(a.end) > now)
       .sort((a, b) => a.start.localeCompare(b.start))
     if (upcomingToday.length) {
       const next = upcomingToday[0]

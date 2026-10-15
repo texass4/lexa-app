@@ -1,5 +1,8 @@
 "use client"
 
+import { isPlanned, participantsOf } from "@/lib/agenda/agenda"
+import { AvatarStack } from "@/components/agenda/avatar-stack"
+import { EventMarks } from "@/components/agenda/event-block"
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -182,7 +185,7 @@ export function ProcessProfile({ id }: { id: string }) {
     .sort((a, b) => (a.status === b.status ? a.dueAt.localeCompare(b.dueAt) : a.status === "pendente" ? -1 : 1))
   const documents = data.documents.filter((d) => d.processId === process.id).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))
   const appointments = data.appointments
-    .filter((a) => a.processId === process.id && parse(a.end) > getNow())
+    .filter((a) => a.processId === process.id && isPlanned(a) && parse(a.end) > getNow())
     .sort((a, b) => a.start.localeCompare(b.start))
   // Próximo prazo = o aberto de menor data fatal (a coleção de prazos é a fonte de verdade).
   const next = process.status === "concluido" ? undefined : nextPrazo(data.deadlines, process.id)
@@ -535,12 +538,16 @@ export function ProcessProfile({ id }: { id: string }) {
             <li key={a.id} className="flex items-center gap-3 rounded-[10px] px-2 py-2.5">
               <span className="h-9 w-[3px] shrink-0 rounded-full" style={style.dot} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-medium">{a.title}</p>
+                <p className="flex items-center gap-1.5 text-[13.5px] font-medium">
+                  <span className="truncate">{a.title}</span>
+                  <EventMarks a={a} />
+                </p>
                 <p className="text-[12px] text-muted-foreground">
                   {category ? `${category.name} · ` : ""}
                   {fmtDayLabel(a.start)}, {fmtTime(a.start)}
                 </p>
               </div>
+              <AvatarStack ids={participantsOf(a)} size="xs" max={3} className="shrink-0" />
             </li>
           )
         })}

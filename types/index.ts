@@ -492,7 +492,20 @@ export interface Appointment extends TenantEntity {
   processId?: ID
   location?: string
   notes?: string
+  /** Outras pessoas da equipe no compromisso (além do responsável). */
+  attendeeIds?: ID[]
+  /** Ausente = planejado. */
+  status?: AppointmentStatus
+  /** Ausente = normal. */
+  priority?: Priority
+  /** Link da videochamada (Meet, Zoom, Teams…). */
+  videoUrl?: string
+  /** Compromissos criados juntos por "Repetir" — cada um é um compromisso próprio. */
+  seriesId?: ID
 }
+
+/** Situação do compromisso: planejado, realizado ou cancelado. */
+export type AppointmentStatus = "planejado" | "realizado" | "cancelado"
 
 /* ------------------------------- Documentos ------------------------------- */
 

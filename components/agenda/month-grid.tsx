@@ -2,7 +2,11 @@
 
 import * as React from "react"
 import { cn } from "cn"
-import { useCategoryLookup } from "./use-category"
+import { AvatarStack } from "./avatar-stack"
+import { DayChip } from "./day-chip"
+import { EventMarks } from "./event-block"
+import { eventTone } from "./event-style"
+import { appointmentStatus, participantsOf, type DayItem } from "@/lib/agenda/agenda"
 import { addDays, getNow, fmtTime, isSameDay, parse, startOfWeek, toLocalISO } from "@/lib/core/dates"
 import type { Appointment } from "@/types"
 
@@ -11,18 +15,23 @@ const WEEK_LABELS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 export function MonthGrid({
   anchor,
   events,
+  items,
   onSelect,
   onDayClick,
   onMove,
+  colorOf,
+  canOpenItem,
 }: {
   anchor: Date
   events: Appointment[]
+  items: DayItem[]
+  colorOf: (a: Appointment) => string | undefined
+  canOpenItem: (item: DayItem) => boolean
   onSelect: (a: Appointment) => void
   onDayClick: (d: Date) => void
   /** Arrastar para outro dia (mesmo horário). Ausente = sem permissão para editar. */
   onMove?: (a: Appointment, date: string) => void
 }) {
-  const lookup = useCategoryLookup()
   const dragged = React.useRef<Appointment | null>(null)
   const [target, setTarget] = React.useState<string | null>(null)
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
@@ -49,11 +58,16 @@ export function MonthGrid({
           const dayEvents = events.filter((e) => isSameDay(parse(e.start), d)).sort((a, b) => a.start.localeCompare(b.start))
           const weekend = d.getDay() === 0 || d.getDay() === 6
           const dayKey = toLocalISO(d).slice(0, 10)
+          const dayItems = items.filter((i) => i.date === dayKey)
+          // Compromissos primeiro; prazos e tarefas ocupam o que sobrar das 3 linhas.
+          const shownEvents = dayEvents.slice(0, 3)
+          const shownItems = dayItems.slice(0, 3 - shownEvents.length)
+          const hiddenCount = dayEvents.length - shownEvents.length + dayItems.length - shownItems.length
           return (
             <div
               key={d.toISOString()}
               className={cn(
-                "group relative min-h-[64px] border-border p-1 sm:min-h-[112px] sm:p-1.5",
+                "group/day @container/day relative min-h-[64px] border-border p-1 sm:min-h-[118px] sm:p-1.5",
                 i % 7 !== 0 && "border-l",
                 i >= 7 && "border-t",
                 !inMonth && "bg-surface-muted/40",
@@ -81,15 +95,16 @@ export function MonthGrid({
                 aria-label={`Ver dia ${d.getDate()}`}
                 className={cn(
                   "touch-target relative tabular mb-1 flex size-7 items-center justify-center rounded-full text-[12.5px] font-medium outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/40 max-sm:mx-auto",
-                  today ? "bg-brand text-brand-foreground hover:bg-brand-strong" : inMonth ? "text-foreground" : "text-subtle",
+                  today ? "bg-danger text-white hover:bg-danger/90" : inMonth ? "text-foreground" : "text-subtle",
                 )}
               >
                 {d.getDate()}
               </button>
-              {/* Desktop: chips */}
+              {/* Desktop: chips coloridos, com a foto de quem participa */}
               <div className="hidden space-y-0.5 sm:block">
-                {dayEvents.slice(0, 3).map((a) => {
-                  const { style } = lookup(a.categoryId)
+                {shownEvents.map((a) => {
+                  const status = appointmentStatus(a)
+                  const tone = eventTone(colorOf(a), status)
                   return (
                     <button
                       key={a.id}
@@ -105,24 +120,34 @@ export function MonthGrid({
                         setTarget(null)
                       }}
                       onClick={() => onSelect(a)}
+                      style={{ ...tone.card, ...tone.bar }}
                       className={cn(
-                        "flex w-full items-center gap-1.5 truncate rounded-[5px] px-1.5 py-0.5 text-left text-[11px] outline-none pointer-coarse:-my-1.5 pointer-coarse:py-2 transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-brand/40",
-                        parse(a.end) < getNow() && "opacity-60",
+                        "flex w-full items-center gap-1.5 truncate rounded-[6px] border-l-[3px] px-1.5 py-[3px] text-left text-[11px] outline-none pointer-coarse:-my-1.5 pointer-coarse:py-2 transition-[filter] hover:brightness-[0.96] focus-visible:ring-2 focus-visible:ring-brand/40",
+                        parse(a.end) < getNow() && status === "planejado" && "opacity-70",
                       )}
                     >
-                      <span className="size-1.5 shrink-0 rounded-full" style={style.dot} />
-                      <span className="tabular shrink-0 text-muted-foreground">{fmtTime(a.start)}</span>
-                      <span className="truncate text-foreground">{a.personName ?? a.title}</span>
+                      <span className="tabular shrink-0 font-medium" style={tone.text}>
+                        {fmtTime(a.start)}
+                      </span>
+                      <span className={cn("min-w-0 flex-1 truncate font-medium", status === "cancelado" && "line-through")} style={tone.text}>
+                        {a.title}
+                      </span>
+                      <EventMarks a={a} />
+                      {/* Foto só quando a célula é larga: senão o título some. */}
+                      <AvatarStack ids={participantsOf(a)} size="xs" max={1} className="hidden shrink-0 @[9.5rem]/day:inline-flex" />
                     </button>
                   )
                 })}
-                {dayEvents.length > 3 && (
+                {shownItems.map((item) => (
+                  <DayChip key={`${item.kind}-${item.id}`} item={item} link={canOpenItem(item)} />
+                ))}
+                {hiddenCount > 0 && (
                   <button
                     type="button"
                     onClick={() => onDayClick(d)}
                     className="touch-target relative px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
                   >
-                    +{dayEvents.length - 3} mais
+                    +{hiddenCount} mais
                   </button>
                 )}
               </div>
@@ -130,7 +155,7 @@ export function MonthGrid({
               {dayEvents.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-0.5 sm:hidden" aria-hidden>
                   {dayEvents.slice(0, 4).map((a) => (
-                    <span key={a.id} className="size-1 rounded-full" style={lookup(a.categoryId).style.dot} />
+                    <span key={a.id} className="size-1.5 rounded-full" style={eventTone(colorOf(a)).dot} />
                   ))}
                 </div>
               )}

@@ -1,5 +1,8 @@
 "use client"
 
+import { appointmentStatus, isPlanned, participantsOf, STATUS_LABEL } from "@/lib/agenda/agenda"
+import { AvatarStack } from "@/components/agenda/avatar-stack"
+import { EventMarks } from "@/components/agenda/event-block"
 import * as React from "react"
 import Link from "next/link"
 import { AnimatePresence } from "framer-motion"
@@ -10,7 +13,6 @@ import { Panel, PanelHeader } from "@/components/ui/panel"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { FilterTabs } from "@/components/ui/filter-tabs"
-import { UserAvatar } from "@/components/ui/user-avatar"
 import { ProcessListItem } from "@/components/shared/process-list-item"
 import { DocumentList } from "@/components/shared/document-list"
 import { GroupedTimeline } from "@/components/shared/grouped-timeline"
@@ -225,8 +227,9 @@ export function AppointmentsTab({ client, hub }: { client: Client; hub: ClientHu
   const lookup = useCategoryLookup()
   const [selectedId, setSelectedId] = React.useState<string>()
   const now = getNow()
-  const upcoming = hub.appointments.filter((a) => parse(a.end) > now)
-  const past = hub.appointments.filter((a) => parse(a.end) <= now).reverse()
+  const upcoming = hub.appointments.filter((a) => isPlanned(a) && parse(a.end) > now)
+  // Cancelados e realizados vão para o histórico, mesmo que a data seja futura.
+  const past = hub.appointments.filter((a) => !isPlanned(a) || parse(a.end) <= now).reverse()
   const selected = selectedId ? hub.appointments.find((a) => a.id === selectedId) : undefined
 
   const row = (a: Appointment) => {
@@ -248,7 +251,10 @@ export function AppointmentsTab({ client, hub }: { client: Client; hub: ClientHu
             <span className="tabular text-[15px] font-semibold leading-tight">{day}</span>
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13.5px] font-medium">{a.title}</p>
+            <p className="flex items-center gap-1.5 text-[13.5px] font-medium">
+              <span className={cn("truncate", appointmentStatus(a) === "cancelado" && "text-muted-foreground line-through")}>{a.title}</span>
+              <EventMarks a={a} />
+            </p>
             <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12px] text-muted-foreground">
               <span className="tabular">
                 {fmtDayLabel(a.start)}, {fmtTime(a.start)}–{fmtTime(a.end)}
@@ -258,6 +264,12 @@ export function AppointmentsTab({ client, hub }: { client: Client; hub: ClientHu
                 <span className="size-1.5 rounded-full" style={style.dot} />
                 {category?.name ?? "Sem categoria"}
               </span>
+              {appointmentStatus(a) !== "planejado" && (
+                <>
+                  <span className="text-subtle">·</span>
+                  <span className="font-medium">{STATUS_LABEL[appointmentStatus(a)]}</span>
+                </>
+              )}
               {process && (
                 <>
                   <span className="text-subtle">·</span>
@@ -268,9 +280,9 @@ export function AppointmentsTab({ client, hub }: { client: Client; hub: ClientHu
               )}
             </p>
           </div>
-          <span className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:flex">
-            <UserAvatar name={owner.name} size="xs" />
-            {owner.firstName}
+          <span className="hidden items-center gap-2 text-[12px] text-muted-foreground sm:flex">
+            <AvatarStack ids={participantsOf(a)} size="xs" max={3} />
+            {participantsOf(a).length > 1 ? `${participantsOf(a).length} pessoas` : owner.firstName}
           </span>
         </div>
       </li>

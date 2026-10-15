@@ -4,6 +4,7 @@
  * só se a pessoa tiver permissão para vê-la.
  */
 
+import { isPlanned } from "@/lib/agenda/agenda"
 import { AIError } from "@/lib/ai/errors"
 import { CLIENT_STATUS, INVOICE_STATUS, PROCESS_STATUS } from "@/lib/core/config"
 import { formatCurrency } from "@/lib/core/format"
@@ -180,7 +181,7 @@ export function buildClientContext(data: ClientData, now: Date): BuiltContext {
     tarefas: sortTasks(data.tasks)
       .slice(0, CLIENT_LIMITS.tasks)
       .map((t) => describeTask(t, registerTask(registry, t), members, now)),
-    compromissos_futuros: upcoming(data.appointments, now)
+    compromissos_futuros: upcoming(data.appointments.filter(isPlanned), now)
       .slice(0, CLIENT_LIMITS.appointments)
       .map((a) => describeAppointment(a, registerAppointment(registry, a))),
     documentos: [...data.documents]

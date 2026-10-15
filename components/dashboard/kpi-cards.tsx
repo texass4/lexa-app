@@ -8,6 +8,7 @@ import { useSession } from "@/lib/auth/session"
 import type { Permission } from "@/lib/auth/permissions"
 import { overdueInvoices } from "@/lib/dashboard/dashboard"
 import { daysToPrazo, weekPrazos } from "@/lib/prazos/prazos"
+import { appointmentStatus, isPlanned } from "@/lib/agenda/agenda"
 import { taskBucket, todaysAppointments } from "@/lib/store/selectors"
 import { formatCurrency, formatNumber } from "@/lib/core/format"
 import { fmtTime, getNow, parse } from "@/lib/core/dates"
@@ -47,8 +48,8 @@ export function KpiCards() {
   const overduePrazos = week.filter((p) => daysToPrazo(p, now) < 0).length
   const late = overdueInvoices(data.invoices, now)
   const lateTotal = late.reduce((acc, { invoice }) => acc + invoice.amount, 0)
-  const today = todaysAppointments(data, now)
-  const next = today.find((a) => parse(a.start) > now)
+  const today = todaysAppointments(data, now).filter((a) => appointmentStatus(a) !== "cancelado")
+  const next = today.find((a) => isPlanned(a) && parse(a.start) > now)
   // As tarefas são as da pessoa: o mesmo número do selo da barra lateral e da tela "Minhas tarefas".
   const mine = data.tasks.filter((t) => t.assigneeId === user.id && t.status === "pendente")
   const mineOverdue = mine.filter((t) => taskBucket(t, now) === "atrasadas").length

@@ -180,6 +180,10 @@ Remarcar: arrastar o compromisso na semana/dia (encaixa em 15 min, mantém a dur
 
 Não há tipos fixos: cada escritório cria as suas categorias (nome + cor da paleta `CATEGORY_COLORS` em `lib/core/config.ts`) direto no formulário do compromisso — `components/agenda/category-picker.tsx`. Excluir uma categoria deixa os compromissos dela "Sem categoria". Para colorir um compromisso em qualquer tela, use `useCategoryLookup()` (`components/agenda/use-category.ts`) + `categoryStyle(color)`.
 
+**Agenda (tela `/agenda`)** — três colunas em telas largas: filtros à esquerda (minicalendário, equipe com foto, categorias, camadas "Prazos dos processos" e "Tarefas", "Colorir por" categoria ou advogado), calendário no centro (Dia, Semana, Mês e Lista) e um painel à direita (próximo compromisso, horários livres, reunião rápida, atalhos). Atalhos: `N` novo, `T` hoje, `D`/`S`/`M`/`L` visões, setas para navegar. Arrastar remarca; puxar a borda de baixo do cartão muda o término (ambos com "Desfazer"). A faixa "Dia inteiro" mostra os prazos abertos (data fatal e interna) e as tarefas pendentes do período (`dayItems` em `lib/agenda/agenda.ts`); clicar leva ao processo ou à tarefa.
+
+O compromisso ganhou campos opcionais (guardados no mesmo JSON — **sem migração**): `attendeeIds` (participantes além do responsável), `status` (`planejado` — ausente —, `realizado`, `cancelado`), `priority` (`alta` aparece com bandeira), `videoUrl` (Meet/Zoom/Teams: botão "Conectar") e `seriesId` (compromissos criados juntos por "Repetir": semanal, a cada 15 dias ou mensal, até 26; cada um é um compromisso próprio, então todas as telas os veem). Regras puras e testadas em `lib/agenda/agenda.ts`: repetição, conflito de horário (aviso no formulário, não bloqueia), horários livres, situação. **Só `planejado` conta como "restante" ou "próximo"** (`isPlanned`): Início, sinais de atenção, perfil do cliente, processo e a Íntegra IA ignoram cancelados e realizados. As fotos vêm de `avatarUrl` do perfil (`components/agenda/avatar-stack.tsx`; iniciais quando não há foto).
+
 ---
 
 ## 4b. Central de Atendimento (WhatsApp)

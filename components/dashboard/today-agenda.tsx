@@ -19,6 +19,8 @@ import { AppointmentDetail } from "@/components/agenda/appointment-detail"
 import { addDays, fmtStartsIn, fmtTime, getNow, parse, startOfDay, toLocalISO, weekdayShort } from "@/lib/core/dates"
 import { getUser } from "@/lib/auth/account"
 import { processNumberLabel } from "@/lib/processos/label"
+import { appointmentStatus, isPlanned } from "@/lib/agenda/agenda"
+import { EventMarks } from "@/components/agenda/event-block"
 import type { Appointment } from "@/types"
 
 /** Hoje e os próximos dias: a agenda do Início olha só para a frente. */
@@ -35,6 +37,8 @@ function dayLabel(offset: number, date: Date) {
 
 /** Situação do compromisso em relação a agora: só no dia de hoje. */
 function timing(a: Appointment, now: Date, isToday: boolean) {
+  if (appointmentStatus(a) === "cancelado") return { label: "cancelado", tone: "text-danger" }
+  if (appointmentStatus(a) === "realizado") return { label: "realizado", tone: "text-success" }
   if (!isToday) return undefined
   const start = parse(a.start)
   const end = parse(a.end)
@@ -145,12 +149,20 @@ export function TodayAgenda() {
           {items.map((a, i) => {
             const { category, style } = lookup(a.categoryId)
             const status = timing(a, now, isToday)
-            const past = isToday && parse(a.end) <= now
+            const past = (isToday && parse(a.end) <= now) || !isPlanned(a)
             const owner = getUser(a.ownerId)
             const process = a.processId ? byId(data.processes, a.processId) : undefined
             const client = a.clientId ? byId(data.clients, a.clientId) : process ? byId(data.clients, process.clientId) : undefined
             const record = process ? `Processo ${processNumberLabel(process)}` : client ? `Cliente: ${client.name}` : undefined
-            const secondary = [a.location, a.personName && !client ? `com ${a.personName}` : undefined, record].filter(Boolean).join(" • ")
+            const team = (a.attendeeIds ?? []).map((id) => getUser(id).firstName)
+            const secondary = [
+              a.location,
+              a.personName && !client ? `com ${a.personName}` : undefined,
+              record,
+              team.length ? `+ ${team.join(", ")}` : undefined,
+            ]
+              .filter(Boolean)
+              .join(" • ")
             const color = String(style.dot.backgroundColor)
             const first = i === 0
             const last = i === items.length - 1
@@ -195,7 +207,10 @@ export function TodayAgenda() {
                   </span>
                   {/* O que é */}
                   <span className="min-w-0">
-                    <span className="block truncate text-[13.5px] leading-snug font-semibold text-foreground">{a.title}</span>
+                    <span className="flex items-center gap-1.5 text-[13.5px] leading-snug font-semibold text-foreground">
+                      <span className={cn("truncate", appointmentStatus(a) === "cancelado" && "line-through")}>{a.title}</span>
+                      <EventMarks a={a} />
+                    </span>
                     {secondary && <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">{secondary}</span>}
                   </span>
                   <span className="flex items-center gap-1.5">

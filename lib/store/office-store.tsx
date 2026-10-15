@@ -101,7 +101,8 @@ export type NewPrazoInput = Pick<
 export type NewAppointmentInput = Pick<
   Appointment,
   "title" | "categoryId" | "start" | "end" | "ownerId" | "clientId" | "processId" | "notes" | "personName" | "area" | "location"
->
+> &
+  Partial<Pick<Appointment, "attendeeIds" | "status" | "priority" | "videoUrl" | "seriesId">>
 export type AppointmentCategoryInput = Pick<AppointmentCategory, "name" | "color">
 export type NewProcessInput = Pick<
   Process,
@@ -190,9 +191,13 @@ interface OfficeActions {
   /** Nova ordem das colunas do quadro (ids da esquerda para a direita). */
   reorderTaskColumns(ids: string[]): void
   addAppointment(input: NewAppointmentInput): Appointment
+  /** Vários compromissos de uma vez (repetição): um só registro na timeline. */
+  addAppointments(inputs: NewAppointmentInput[]): Appointment[]
   /** Edita ou remarca (arrastar na agenda) e registra na timeline quem fez e o que mudou. */
   updateAppointment(id: string, patch: Partial<NewAppointmentInput>, options?: SaveOptions): Promise<SaveResult<Appointment>>
   deleteAppointment(id: string): void
+  /** Exclui vários compromissos (série): um só registro na timeline. */
+  deleteAppointments(ids: string[]): void
   addAppointmentCategory(input: AppointmentCategoryInput): AppointmentCategory
   updateAppointmentCategory(id: string, patch: Partial<AppointmentCategoryInput>, options?: SaveOptions): Promise<SaveResult<AppointmentCategory>>
   /** Exclui a categoria; os compromissos dela ficam sem categoria. */
@@ -1036,13 +1041,36 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
         return appt
       },
 
+      addAppointments(inputs) {
+        const created: Appointment[] = inputs.map((input) => ({ ...base(), ...input, id: uid("a") }))
+        const first = inputs[0]
+        if (!first) return created
+        commit((s) => ({
+          ...s,
+          appointments: [...s.appointments, ...created],
+          activities: [
+            logActivity({
+              type: "appointment",
+              message: `${first.title} agendado ${created.length} vezes${first.personName ? ` com ${first.personName}` : ""}.`,
+              detail: `De ${first.start.slice(8, 10)}/${first.start.slice(5, 7)} a ${inputs[inputs.length - 1].start.slice(8, 10)}/${inputs[inputs.length - 1].start.slice(5, 7)}, às ${first.start.slice(11, 16)}`,
+              clientId: clientOfItem(s, first),
+              processId: first.processId,
+              actorUserId: account.currentUserId(),
+              href: "/agenda",
+            }),
+            ...s.activities,
+          ],
+        }))
+        return created
+      },
+
       updateAppointment(id, patch, options) {
         return save<Appointment>("appointments", id, options, () => {
           const current = stateRef.current.appointments.find((a) => a.id === id)
           if (!current) return false
           const updated: Appointment = { ...current, ...patch }
           const change = describeAppointmentChange(current, updated)
-          if (!change.rescheduled && !change.fields.length) return false
+          if (!change.rescheduled && !change.fields.length && !change.statusText) return false
           const actor = account.getUser(account.currentUserId()).name
           const entry = (message: string, detail: string) =>
             logActivity({
@@ -1057,6 +1085,7 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
             })
           const log: Activity[] = []
           if (change.rescheduled) log.push(entry(change.rescheduleText, updated.title))
+          if (change.statusText) log.push(entry(change.statusText, updated.title))
           if (change.fields.length) log.push(entry("atualizou o compromisso.", `${updated.title} · Alterado: ${change.fields.join(", ")}`))
           commit((s) => ({ ...s, appointments: s.appointments.map((a) => (a.id === id ? updated : a)), activities: [...log, ...s.activities] }))
           return true
@@ -1075,6 +1104,29 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
               message: `${appt.title} foi removido da agenda.`,
               clientId: clientOfItem(s, appt),
               processId: appt.processId,
+              actorUserId: account.currentUserId(),
+            }),
+            ...s.activities,
+          ],
+        }))
+      },
+
+      deleteAppointments(ids) {
+        const gone = stateRef.current.appointments.filter((a) => ids.includes(a.id))
+        const first = gone[0]
+        if (!first) return
+        commit((s) => ({
+          ...s,
+          appointments: s.appointments.filter((a) => !ids.includes(a.id)),
+          activities: [
+            logActivity({
+              type: "appointment",
+              message:
+                gone.length === 1
+                  ? `${first.title} foi removido da agenda.`
+                  : `${gone.length} compromissos de "${first.title}" foram removidos da agenda.`,
+              clientId: clientOfItem(s, first),
+              processId: first.processId,
               actorUserId: account.currentUserId(),
             }),
             ...s.activities,
@@ -1132,7 +1184,10 @@ export function OfficeStoreProvider({ children }: { children: React.ReactNode })
             ["status", "situação"],
           ]
           const changed = labels
-            .filter(([key]) => !sameValue(key === "status" ? (current.status ?? "ok") : current[key], key === "status" ? (updated.status ?? "ok") : updated[key]))
+            .filter(
+              ([key]) =>
+                !sameValue(key === "status" ? (current.status ?? "ok") : current[key], key === "status" ? (updated.status ?? "ok") : updated[key]),
+            )
             .map(([key, label]) => (key === "status" ? `${label} (${DOCUMENT_STATUS_LABEL[updated.status ?? "ok"]})` : label))
           if (!changed.length) return false
           commit((s) => ({

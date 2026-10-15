@@ -6,6 +6,7 @@ import { cn } from "cn"
 import { useOfficeData } from "@/lib/store/office-store"
 import { useAppointmentsRange } from "@/lib/store/on-demand"
 import { addDays, addMonths, getNow, isSameDay, monthName, parse, startOfWeek } from "@/lib/core/dates"
+import type { Appointment } from "@/types"
 
 const WEEK = ["S", "T", "Q", "Q", "S", "S", "D"]
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
@@ -28,7 +29,7 @@ export function MiniCalendar({
   rangeEnd: Date
   onPick: (day: Date) => void
   /** Filtro da grade (categorias e "minha agenda") — os pontos seguem o mesmo filtro. */
-  visible: (a: { start: string; ownerId: string; categoryId?: string }) => boolean
+  visible: (a: Appointment) => boolean
 }) {
   const data = useOfficeData()
   const [month, setMonth] = React.useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1))
@@ -98,12 +99,18 @@ export function MiniCalendar({
               onClick={() => onPick(d)}
               className={cn(
                 "relative mx-auto flex size-8 flex-col items-center justify-center rounded-full text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
-                isToday ? "bg-brand font-semibold text-brand-foreground" : isSelected ? "bg-brand-soft font-semibold text-brand-strong" : inRange ? "bg-accent text-foreground" : "hover:bg-accent",
+                isToday
+                  ? "bg-danger font-semibold text-white"
+                  : isSelected
+                    ? "bg-brand-soft font-semibold text-brand-strong"
+                    : inRange
+                      ? "bg-accent text-foreground"
+                      : "hover:bg-accent",
                 !isToday && !isSelected && (out ? "text-subtle/70" : "text-foreground"),
               )}
             >
               {d.getDate()}
-              {dot && <span aria-hidden className={cn("absolute bottom-1 size-1 rounded-full", isToday ? "bg-brand-foreground" : "bg-brand")} />}
+              {dot && <span aria-hidden className={cn("absolute bottom-1 size-1 rounded-full", isToday ? "bg-white" : "bg-brand")} />}
             </button>
           )
         })}

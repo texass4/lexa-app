@@ -1,5 +1,6 @@
 "use client"
 
+import { isPlanned } from "@/lib/agenda/agenda"
 import Link from "next/link"
 import {
   CalendarDays,
@@ -137,7 +138,7 @@ export function OverviewTab({
   const deadlineDays = nextDeadline ? diffInDays(parse(nextDeadline.prazo.fatalDate), getNow()) : undefined
   const tasks = hub.tasks.slice(0, 5)
   const pendingTasks = hub.tasks.filter((t) => t.status === "pendente").length
-  const upcoming = hub.appointments.filter((a) => parse(a.end) > getNow()).slice(0, 4)
+  const upcoming = hub.appointments.filter((a) => isPlanned(a) && parse(a.end) > getNow()).slice(0, 4)
   const lastActivity = activities[0]
   const lastLabel = lastActivity ? fmtDayLabel(lastActivity.at) : "—"
   const owner = getUser(client.ownerId)
