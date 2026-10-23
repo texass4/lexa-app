@@ -6,7 +6,7 @@ import { createServerClient } from "@supabase/ssr"
  * se autentica pela assinatura `X-Hub-Signature-256`. As rotas de `/api/cron/` são
  * chamadas pelo agendador da hospedagem e exigem o `CRON_SECRET`.
  */
-const PUBLIC = ["/login", "/cadastro", "/recuperar-senha", "/auth/confirm", "/api/auth/", "/api/whatsapp/meta/webhook", "/api/cron/"]
+const PUBLIC = ["/login", "/cadastro", "/recuperar-senha", "/auth/confirm", "/api/auth/", "/api/whatsapp/meta/webhook", "/api/cron/", "/loja-demo"]
 /** Telas de entrada: quem já está logado é mandado para o app. */
 const GUEST_ONLY = ["/login", "/cadastro", "/recuperar-senha"]
 /** Área do Super Admin. */
