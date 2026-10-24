@@ -1,11 +1,13 @@
 import { AreaRow, NewAreaForm } from "@/components/areas/area-list"
 import { Page, PageHeader, SectionTitle } from "@/components/layout/page"
 import { EmptyState } from "@/components/ui/empty"
+import { requireOwner } from "@/lib/auth/server"
 import { listAreas } from "@/lib/services/areas"
 
 export const metadata = { title: "Áreas" }
 
 export default async function AreasPage() {
+  await requireOwner()
   const all = await listAreas({ includeArchived: true })
   const active = all.filter((a) => !a.archivedAt)
   const archived = all.filter((a) => a.archivedAt)

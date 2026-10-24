@@ -1,5 +1,6 @@
 import "server-only"
 import { cookies } from "next/headers"
+import { requireOwner } from "@/lib/auth/server"
 import { hourIn, isValidTimeZone, todayIn, type LocalDate } from "@/lib/domain/dates"
 import { getSettings } from "@/lib/services/settings"
 
@@ -13,6 +14,8 @@ export type RequestContext = { timezone: string; today: LocalDate; hour: number;
  * navegador informou no cookie `mesa_tz`. "Hoje" e "atrasada" sempre partem daqui.
  */
 export async function getRequestContext(): Promise<RequestContext> {
+  // Toda tela passa por aqui: a sessão é conferida antes de qualquer leitura de dados.
+  await requireOwner()
   const [settings, store] = await Promise.all([getSettings(), cookies()])
   const browserTz = store.get(TZ_COOKIE)?.value
   let timezone = FALLBACK_TZ
