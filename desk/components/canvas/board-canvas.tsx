@@ -20,7 +20,7 @@ import {
 } from "@xyflow/react"
 import { AlertTriangle, History } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { RefsProvider, useRefs } from "@/components/editor/refs-context"
 import { Button } from "@/components/ui/button"
@@ -85,30 +85,31 @@ function Canvas({ board }: { board: BoardDetail }) {
   // ——— Desfazer / refazer ————————————————————————————————————————————————
   const past = useRef<Snap[]>([])
   const future = useRef<Snap[]>([])
-  const [, rerender] = useReducer((x: number) => x + 1, 0)
+  const [history, setHistory] = useState({ past: 0, future: 0 })
+  const syncHistory = useCallback(() => setHistory({ past: past.current.length, future: future.current.length }), [])
   const snap = useCallback((): Snap => ({ nodes: nodesRef.current.map(strip), edges: edgesRef.current.map(strip) }), [])
   const checkpoint = useCallback(() => {
     past.current.push(snap())
     if (past.current.length > 100) past.current.shift()
     future.current = []
-    rerender()
-  }, [snap])
+    syncHistory()
+  }, [snap, syncHistory])
   const undo = useCallback(() => {
     const prev = past.current.pop()
     if (!prev) return
     future.current.push(snap())
     setNodes(prev.nodes)
     setEdges(prev.edges)
-    rerender()
-  }, [snap, setNodes, setEdges])
+    syncHistory()
+  }, [snap, setNodes, setEdges, syncHistory])
   const redo = useCallback(() => {
     const next = future.current.pop()
     if (!next) return
     past.current.push(snap())
     setNodes(next.nodes)
     setEdges(next.edges)
-    rerender()
-  }, [snap, setNodes, setEdges])
+    syncHistory()
+  }, [snap, setNodes, setEdges, syncHistory])
 
   // ——— Salvamento automático ————————————————————————————————————————————————
   const save = useCallback(
@@ -506,8 +507,8 @@ function Canvas({ board }: { board: BoardDetail }) {
                 onTool={(t) => (t === "record" ? setPicker({ mode: "insert" }) : setTool(t))}
                 shape={shapeKind}
                 onShape={setShapeKind}
-                canUndo={past.current.length > 0}
-                canRedo={future.current.length > 0}
+                canUndo={history.past > 0}
+                canRedo={history.future > 0}
                 onUndo={undo}
                 onRedo={redo}
                 onZoomIn={() => void rf.zoomIn({ duration: 150 })}

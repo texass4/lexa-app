@@ -55,7 +55,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-14">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-14">
         <div className="flex flex-col gap-12">
           <section aria-labelledby="hoje">
             <SectionTitle index="01" title={<span id="hoje">Hoje</span>} count={d.todayTasks.length || undefined} action={<NewTaskButton defaults={{ dueDate: ctx.today }} label="Tarefa" />} />
@@ -136,8 +136,8 @@ export default async function DashboardPage() {
                       <Link href={a.href} className="group flex items-center gap-3 rounded-sm py-1.5 text-sm">
                         <Icon className="size-3.5 text-ink-4" />
                         <span className="min-w-0 flex-1 truncate text-ink-2 group-hover:text-ink group-hover:underline">{a.title}</span>
-                        <span className="text-xs text-ink-4">{a.verb}</span>
-                        <span className="meta w-24 text-right">{formatInstant(a.updatedAt, ctx.timezone)}</span>
+                        <span className="hidden text-xs text-ink-4 sm:inline">{a.verb}</span>
+                        <span className="meta shrink-0 text-right whitespace-nowrap sm:w-28">{formatInstant(a.updatedAt, ctx.timezone)}</span>
                       </Link>
                     </li>
                   )

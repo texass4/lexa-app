@@ -36,22 +36,12 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const [query, setQuery] = useState("")
   const [search, setSearch] = useState<SearchState>({ status: "idle", results: [], query: "" })
   const requestId = useRef(0)
+  const q = query.trim()
 
+  // A consulta roda com uma pequena espera; o estado só muda quando a resposta chega.
   useEffect(() => {
-    if (!open) {
-      setQuery("")
-      setSearch({ status: "idle", results: [], query: "" })
-    }
-  }, [open])
-
-  useEffect(() => {
-    const q = query.trim()
-    if (!q) {
-      setSearch({ status: "idle", results: [], query: "" })
-      return
-    }
+    if (!q) return
     const id = ++requestId.current
-    setSearch((s) => ({ ...s, status: "loading" }))
     const handle = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=5`)
@@ -63,20 +53,30 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       }
     }, 160)
     return () => clearTimeout(handle)
-  }, [query])
+  }, [q])
+
+  // Resultado de uma busca anterior não vale para o texto atual: mostra "buscando".
+  const current: SearchState = !q ? { status: "idle", results: [], query: "" } : search.query === q ? search : { status: "loading", results: [], query: q }
+
+  const changeOpen = (next: boolean) => {
+    if (!next) {
+      setQuery("")
+      setSearch({ status: "idle", results: [], query: "" })
+    }
+    onOpenChange(next)
+  }
 
   const grouped = useMemo(() => {
     const map = new Map<RefType, SearchResult[]>()
-    for (const r of search.results) map.set(r.type, [...(map.get(r.type) ?? []), r])
+    for (const r of current.results) map.set(r.type, [...(map.get(r.type) ?? []), r])
     return [...map.entries()]
-  }, [search.results])
+  }, [current.results])
 
-  const close = () => onOpenChange(false)
+  const close = () => changeOpen(false)
   const go = (href: string) => {
     close()
     router.push(href)
   }
-  const q = query.trim()
   const matches = (label: string) => !q || label.toLowerCase().includes(q.toLowerCase())
 
   const createPage = async () => {
@@ -103,14 +103,14 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const groupClass = "[&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1"
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-ink/35 transition-opacity duration-100 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
         <Dialog.Popup className="fixed top-[10vh] left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-md border border-line bg-white shadow-float outline-none transition-[opacity,transform] duration-100 data-[ending-style]:opacity-0 data-[starting-style]:-translate-y-1 data-[starting-style]:opacity-0">
           <Dialog.Title className="sr-only">Buscar e comandos</Dialog.Title>
           <Command shouldFilter={false} label="Buscar e comandos" loop>
             <div className="flex items-center gap-3 border-b border-line-soft px-4">
-              {search.status === "loading" ? <Loader2 className="size-4 animate-spin text-ink-4" /> : <span className="font-mono text-xs text-cobalt">⌘</span>}
+              {current.status === "loading" ? <Loader2 className="size-4 animate-spin text-ink-4" /> : <span className="font-mono text-xs text-cobalt">⌘</span>}
               <Command.Input
                 value={query}
                 onValueChange={setQuery}
@@ -119,10 +119,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               />
             </div>
             <Command.List className="max-h-[min(60vh,28rem)] overflow-y-auto p-1.5">
-              {search.status === "error" ? <div className="px-3 py-6 text-center text-sm text-clay">Não foi possível buscar agora. Verifique a conexão e tente de novo.</div> : null}
-              {search.status === "done" && search.results.length === 0 ? (
+              {current.status === "error" ? <div className="px-3 py-6 text-center text-sm text-clay">Não foi possível buscar agora. Verifique a conexão e tente de novo.</div> : null}
+              {current.status === "done" && current.results.length === 0 ? (
                 <div className="px-3 py-5 text-center text-sm text-ink-3">
-                  Nada encontrado para <span className="font-medium text-ink">“{search.query}”</span>.
+                  Nada encontrado para <span className="font-medium text-ink">“{current.query}”</span>.
                 </div>
               ) : null}
 

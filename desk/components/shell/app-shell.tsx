@@ -2,7 +2,6 @@
 
 import { Dialog } from "@base-ui/react/dialog"
 import { Menu as MenuIcon, Plus, Search, X } from "lucide-react"
-import { usePathname } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Toaster } from "sonner"
 import { reportTimezoneAction } from "@/app/actions/settings"
@@ -98,9 +97,7 @@ export function AppShell({ data, initialCollapsed, children }: { data: ShellData
 /** Celular: barra superior em carvão com menu, busca e criação. */
 function MobileBar() {
   const [open, setOpen] = useState(false)
-  const pathname = usePathname()
   const createItems = useCreateMenu()
-  useEffect(() => setOpen(false), [pathname])
   return (
     <>
       <header className="sticky top-0 z-30 flex h-12 items-center gap-1 border-b border-black/20 bg-nav px-2 text-paper md:hidden">

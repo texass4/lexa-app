@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm"
 import { getDb } from "@/lib/db/client"
-import { areas, boards, contentLinks, pages, projects, tasks } from "@/lib/db/schema"
+import { areas, boards, contentLinks, pages, projects } from "@/lib/db/schema"
 import { normalizeForSearch } from "@/lib/domain/search"
 import { areaSchema, updateAreaSchema } from "@/lib/validation"
 import type { z } from "zod"

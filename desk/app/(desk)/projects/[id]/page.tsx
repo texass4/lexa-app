@@ -30,7 +30,7 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[id]"
   return (
     <Page wide>
       <ProjectHeader project={project} />
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex flex-col gap-10">
           <section>
             <SectionTitle title="Tarefas abertas" count={open.length} action={<NewTaskButton defaults={{ projectId: id, areaId: project.areaId }} label="Tarefa" />} />

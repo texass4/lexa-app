@@ -90,9 +90,16 @@ export function RecordPicker({ open, onOpenChange, onPick, title = "Vincular reg
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "ArrowDown") (e.preventDefault(), setActive((a) => Math.min(options.length - 1, a + 1)))
-              if (e.key === "ArrowUp") (e.preventDefault(), setActive((a) => Math.max(0, a - 1)))
-              if (e.key === "Enter") (e.preventDefault(), options[active]?.run())
+              if (e.key === "ArrowDown") {
+                e.preventDefault()
+                setActive((a) => Math.min(options.length - 1, a + 1))
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault()
+                setActive((a) => Math.max(0, a - 1))
+              } else if (e.key === "Enter") {
+                e.preventDefault()
+                options[active]?.run()
+              }
             }}
             placeholder="Buscar tarefa, projeto, página ou entrada do diário…"
             aria-label="Buscar registro"

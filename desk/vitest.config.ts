@@ -13,6 +13,8 @@ export default defineConfig({
     environment: "node",
     // Cada arquivo de serviço sobe um PGlite em memória com as migrações aplicadas.
     testTimeout: 30_000,
+    // Com um PostgreSQL compartilhado (TEST_DATABASE_URL), os arquivos não podem esvaziar o banco um do outro.
+    fileParallelism: !process.env.TEST_DATABASE_URL,
     hookTimeout: 60_000,
   },
 })

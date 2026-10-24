@@ -12,7 +12,7 @@ type Holder = { db?: Promise<Db>; override?: Db; close?: () => Promise<void> }
 // Sobrevive ao recarregamento de módulos do `next dev` (uma conexão por processo).
 const holder: Holder = ((globalThis as { __mesaDb?: Holder }).__mesaDb ??= {})
 
-export const MIGRATIONS_FOLDER = path.join(process.cwd(), "drizzle")
+export const MIGRATIONS_FOLDER = path.join(/*turbopackIgnore: true*/ process.cwd(), "drizzle")
 
 /**
  * Banco da Mesa. Com `DATABASE_URL`, um PostgreSQL de verdade (local, Supabase, Neon…).
@@ -51,7 +51,7 @@ async function connect(): Promise<Db> {
 
   const { PGlite } = await import("@electric-sql/pglite")
   const { drizzle } = await import("drizzle-orm/pglite")
-  const dataDir = path.resolve(process.env.DESK_DATA_DIR ?? path.join(process.cwd(), ".data", "pglite"))
+  const dataDir = path.resolve(/*turbopackIgnore: true*/ process.env.DESK_DATA_DIR ?? path.join(process.cwd(), ".data", "pglite"))
   const client = new PGlite(dataDir)
   const db = drizzle(client, { schema })
   // O banco embutido sempre recebe as migrações: não há outro processo para aplicá-las.

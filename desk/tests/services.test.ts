@@ -10,9 +10,9 @@ import { backlinks, resolveRefs } from "@/lib/services/refs"
 import { globalSearch } from "@/lib/services/search"
 import { addSubtask, createTask, deleteTask, getTask, listTasks, moveTask, updateSubtask, updateTask } from "@/lib/services/tasks"
 import type { BoardSnapshotInput } from "@/lib/validation"
-import { useTestDb } from "./helpers/db"
+import { setupTestDb } from "./helpers/db"
 
-useTestDb()
+setupTestDb()
 const today = "2026-10-24"
 const ctx = { today }
 

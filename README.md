@@ -115,3 +115,7 @@ Hoje o cadastro de escritório e os convites criam a conta com o e-mail já conf
 - **Falhas:** com `SMTP_PASSWORD` errada, o convite avisa que o e-mail não foi enviado, o reenvio mostra erro e o log do servidor traz `[LEXA · e-mail] O SMTP recusou o login…` (sem a senha).
 
 Os testes automáticos (`npm test`) cobrem configuração, validação de destinatários, deduplicação, nova tentativa, classificação de erros, teste de conexão e templates, sem precisar de SMTP.
+
+## Mesa (service desk pessoal) — `desk/`
+
+A pasta [`desk/`](./desk) contém outro produto, independente da Íntegra: a **Mesa**, um centro de comando pessoal (tarefas, diário, páginas, projetos, áreas e quadros visuais). Tem `package.json`, banco e configuração próprios; o `tsconfig` e o ESLint da raiz ignoram essa pasta. Instruções em [`desk/README.md`](./desk/README.md).

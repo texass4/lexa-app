@@ -33,7 +33,7 @@ export default async function JournalDayPage({ params, searchParams }: PageProps
 
   const navBtn = "flex size-8 items-center justify-center rounded-sm text-ink-3 hover:bg-white hover:text-ink"
   return (
-    <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-4 pt-4 pb-32 sm:px-8 md:px-12 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-16">
+    <div className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1200px] gap-10 px-4 pt-4 pb-32 sm:px-8 md:px-12 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-16">
       <article className="mx-auto w-full max-w-[42rem] lg:pl-6">
         <nav aria-label="Navegar entre dias" className="mb-2 flex items-center gap-0.5">
           {adjacent.previous ? (

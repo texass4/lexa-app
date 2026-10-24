@@ -24,7 +24,7 @@ export default async function PageEditorPage({ params }: PageProps<"/pages/[id]"
   if (!page) notFound()
   const refs = await resolveRefs(extractRefs(page.content), ctx.today)
   return (
-    <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-4 pt-4 pb-32 sm:px-8 md:px-12 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-16">
+    <div className="mx-auto grid w-full grid-cols-[minmax(0,1fr)] max-w-[1200px] gap-10 px-4 pt-4 pb-32 sm:px-8 md:px-12 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-16">
       <article className="mx-auto w-full max-w-[44rem] lg:pl-6">
         <div className="mb-2 flex items-center gap-2">
           <Link href={page.projectId ? `/projects/${page.projectId}` : "/pages"} className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink">

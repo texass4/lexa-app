@@ -22,8 +22,12 @@ export const SuggestionList = forwardRef<
 >(function SuggestionList({ items, command, loading, empty, query }, ref) {
   const [index, setIndex] = useState(0)
   const list = useRef<HTMLDivElement>(null)
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- volta ao primeiro item quando a lista muda
-  useEffect(() => setIndex(0), [items])
+  // Volta ao primeiro item quando a lista muda.
+  const [seen, setSeen] = useState(items)
+  if (seen !== items) {
+    setSeen(items)
+    setIndex(0)
+  }
   useEffect(() => {
     list.current?.querySelector(`[data-index="${index}"]`)?.scrollIntoView({ block: "nearest" })
   }, [index])

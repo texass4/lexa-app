@@ -30,7 +30,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
         </Link>
         <span className="meta">{taskCode(task.number)}</span>
       </div>
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_16rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-[minmax(0,1fr)_16rem]">
         <TaskEditor task={task} />
         <aside className="flex flex-col gap-8 lg:pt-16">
           <Backlinks target={{ type: "task", id: task.id }} />

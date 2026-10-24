@@ -10,7 +10,7 @@ import * as schema from "@/lib/db/schema"
  * Banco PostgreSQL de verdade com as mesmas migrações da aplicação. Por padrão, um PGlite em
  * memória; com `TEST_DATABASE_URL`, o servidor indicado (o banco é esvaziado a cada teste!).
  */
-export function useTestDb() {
+export function setupTestDb() {
   const state: { db?: Db; close?: () => Promise<void> } = {}
   beforeAll(async () => {
     const url = process.env.TEST_DATABASE_URL

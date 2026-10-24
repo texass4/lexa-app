@@ -27,7 +27,12 @@ export async function exportJson() {
     db.select().from(s.settings),
   ])
   // O texto de busca é derivado; não precisa ir para o arquivo.
-  const strip = <T extends { searchText?: string }>(rows: T[]) => rows.map(({ searchText: _searchText, ...rest }) => rest)
+  const strip = <T extends { searchText?: string }>(rows: T[]) =>
+    rows.map((row) => {
+      const copy: Partial<T> = { ...row }
+      delete copy.searchText
+      return copy
+    })
   return {
     format: "mesa-export",
     version: EXPORT_FORMAT_VERSION,

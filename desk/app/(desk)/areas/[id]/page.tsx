@@ -45,7 +45,7 @@ export default async function AreaPage({ params }: PageProps<"/areas/[id]">) {
           </Link>
         }
       />
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex flex-col gap-10">
           <section>
             <SectionTitle title="Projetos" count={projects.length || undefined} action={<NewProjectButton variant="ghost" label="+ Projeto" defaultAreaId={id} />} />

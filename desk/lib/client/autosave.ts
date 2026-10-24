@@ -78,6 +78,7 @@ export function useAutosave<T>({
   const attempt = useRef(0)
   const blocked = useRef(false)
   const saveRef = useRef(save)
+  const flushRef = useRef<(opts?: { force?: boolean }) => Promise<void>>(async () => {})
   useEffect(() => {
     saveRef.current = save
   }, [save])
@@ -133,13 +134,16 @@ export function useAutosave<T>({
       const wait = RETRY_DELAYS[Math.min(attempt.current, RETRY_DELAYS.length - 1)]!
       attempt.current++
       if (retryTimer.current) clearTimeout(retryTimer.current)
-      retryTimer.current = setTimeout(() => void flush(), wait)
+      retryTimer.current = setTimeout(() => void flushRef.current(), wait)
       return
     } finally {
       inflight.current = false
     }
-    if (pending.current !== undefined && !blocked.current) void flush()
+    if (pending.current !== undefined && !blocked.current) void flushRef.current()
   }, [key])
+  useEffect(() => {
+    flushRef.current = flush
+  }, [flush])
 
   const schedule = useCallback(
     (value: T) => {
