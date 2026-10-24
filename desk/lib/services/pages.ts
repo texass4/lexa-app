@@ -2,7 +2,7 @@ import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm"
 import { getDb } from "@/lib/db/client"
 import { areas, contentLinks, pages, projects } from "@/lib/db/schema"
 import { EMPTY_DOC, excerpt, type DocNode } from "@/lib/domain/doc"
-import { likePattern, normalizeForSearch } from "@/lib/domain/search"
+import { likePattern, normalizeForSearch, snippetAround } from "@/lib/domain/search"
 import { pageMetaSchema, saveDocSchema } from "@/lib/validation"
 import type { z } from "zod"
 import { prepareDoc, type SaveResult } from "./documents"
@@ -53,7 +53,8 @@ export async function listPages(filter: { query?: string; projectId?: string; ar
     .where(and(...where))
     .orderBy(desc(pages.updatedAt))
     .limit(filter.limit ?? 500)
-  return rows.map(toItem)
+  // Com busca, o trecho mostra onde o termo aparece no conteúdo (não só o começo).
+  return rows.map((row) => ({ ...toItem(row), snippet: filter.query?.trim() ? snippetAround(row.contentText, filter.query) : null }))
 }
 
 export async function getPage(id: string): Promise<PageDetail | null> {
