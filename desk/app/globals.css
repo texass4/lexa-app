@@ -436,3 +436,18 @@
 .mesa-drag-handle {
   transition: opacity 120ms;
 }
+
+/* Frame: só a barra de título e as bordas capturam o ponteiro; o interior deixa clicar no quadro. */
+.mesa-flow .react-flow__node-frame {
+  pointer-events: none !important;
+}
+.mesa-flow .react-flow__node-frame .frame-handle,
+.mesa-flow .react-flow__node-frame .react-flow__resize-control {
+  pointer-events: all;
+}
+.mesa-flow .react-flow__node-frame.selected > div {
+  pointer-events: none;
+}
+.mesa-flow .react-flow__panel {
+  z-index: 6;
+}
