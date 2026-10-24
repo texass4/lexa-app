@@ -1,0 +1,453 @@
+@import "tailwindcss";
+
+/*
+ * Mesa — tokens de design.
+ *
+ * Carvão estrutura (navegação, comandos). Papel é a superfície de leitura e escrita.
+ * Cobalto marca ação primária, seleção e foco. Sálvia aparece pouco: estados positivos.
+ * Bordas finas, quase nenhuma sombra, cantos pequenos.
+ */
+
+@theme {
+  /* Cor */
+  --color-ink: #171a21;
+  --color-ink-2: #2a2e38;
+  --color-ink-3: #545862;
+  --color-ink-4: #868891;
+  --color-ink-5: #b2b2b0;
+  --color-paper: #f2f0e9;
+  --color-paper-2: #e9e6dc;
+  --color-paper-3: #dfdbcf;
+  --color-white: #ffffff;
+  --color-line: #dcd8cc;
+  --color-line-soft: #e7e4da;
+  --color-line-strong: #c4bfb1;
+  --color-cobalt: #5269ff;
+  --color-cobalt-ink: #3a4fe0;
+  --color-cobalt-soft: #e5e9ff;
+  --color-cobalt-wash: #f1f3ff;
+  --color-sage: #b9c4b0;
+  --color-sage-ink: #4f5c47;
+  --color-sage-soft: #e3e9dd;
+  --color-clay: #c2532f;
+  --color-clay-soft: #f6e2d9;
+  --color-amber: #a8701c;
+  --color-amber-soft: #f4e8cf;
+  --color-plum: #7a4f86;
+  --color-plum-soft: #eee3f1;
+  --color-sand: #d9c9a3;
+
+  /* Navegação (sobre carvão) */
+  --color-nav: #171a21;
+  --color-nav-2: #20242d;
+  --color-nav-3: #2b303b;
+  --color-nav-text: #c9c7bf;
+  --color-nav-muted: #7e818a;
+
+  /* Tipografia */
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-display: 2.75rem;
+  --text-display--line-height: 1.05;
+  --text-title: 2rem;
+  --text-title--line-height: 1.15;
+
+  /* Raios: pequenos por padrão */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Elevação: só para camadas que flutuam (menus, diálogos) */
+  --shadow-float: 0 1px 2px rgb(23 26 33 / 0.06), 0 12px 32px -8px rgb(23 26 33 / 0.18);
+  --shadow-lift: 0 1px 0 rgb(23 26 33 / 0.04), 0 2px 6px -2px rgb(23 26 33 / 0.1);
+
+  /* Movimento */
+  --ease-out-quick: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-fade-in: fade-in 120ms var(--ease-out-quick);
+  --animate-rise: rise 160ms var(--ease-out-quick);
+  --animate-pulse-dot: pulse-dot 1.2s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @keyframes pulse-dot {
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--color-cobalt-soft);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  button,
+  [role="button"],
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Rótulo de seção editorial: "01 — Hoje" em mono. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-4);
+  }
+  .meta {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+    color: var(--color-ink-4);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Papel quadriculado discreto, usado em estados vazios e no canvas. */
+  .grid-paper {
+    background-image: radial-gradient(circle at 1px 1px, rgb(23 26 33 / 0.13) 1px, transparent 0);
+    background-size: 18px 18px;
+  }
+  .field {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    background: var(--color-white);
+    border-radius: var(--radius-sm);
+    padding: 0.4375rem 0.625rem;
+    transition:
+      border-color 120ms,
+      box-shadow 120ms;
+  }
+  .field:hover {
+    border-color: var(--color-line-strong);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-cobalt);
+    box-shadow: 0 0 0 3px var(--color-cobalt-soft);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--color-clay);
+  }
+  .field::placeholder {
+    color: var(--color-ink-5);
+  }
+  select.field {
+    appearance: none;
+    padding-right: 1.75rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath stroke='%23545862' stroke-width='1.3' d='m1 1 4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+  }
+  /* Campo "invisível" que vira campo ao focar (títulos editáveis). */
+  .field-ghost {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    transition:
+      border-color 120ms,
+      background 120ms;
+  }
+  .field-ghost:hover {
+    background: rgb(23 26 33 / 0.03);
+  }
+  .field-ghost:focus {
+    outline: none;
+    background: var(--color-white);
+    border-color: var(--color-line);
+  }
+}
+
+/* ——— Editor em blocos ———————————————————————————————————————————————————— */
+
+.prose-mesa {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--color-ink-2);
+  outline: none;
+  min-height: 12rem;
+}
+.prose-mesa > * + * {
+  margin-top: 0.6em;
+}
+.prose-mesa h1,
+.prose-mesa h2,
+.prose-mesa h3 {
+  font-family: var(--font-serif);
+  color: var(--color-ink);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.prose-mesa h1 {
+  font-size: 1.875rem;
+  line-height: 1.2;
+  margin-top: 1.4em;
+}
+.prose-mesa h2 {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  margin-top: 1.3em;
+}
+.prose-mesa h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin-top: 1.2em;
+}
+.prose-mesa > :first-child {
+  margin-top: 0;
+}
+.prose-mesa ul,
+.prose-mesa ol {
+  padding-left: 1.4em;
+}
+.prose-mesa ul {
+  list-style: disc;
+}
+.prose-mesa ol {
+  list-style: decimal;
+}
+.prose-mesa li::marker {
+  color: var(--color-ink-4);
+}
+.prose-mesa li > p {
+  margin: 0;
+}
+.prose-mesa ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.1em;
+}
+.prose-mesa ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.6em;
+  align-items: flex-start;
+}
+.prose-mesa ul[data-type="taskList"] li > label {
+  margin-top: 0.38em;
+  flex: none;
+  user-select: none;
+}
+.prose-mesa ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.prose-mesa ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--color-ink-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-ink-5);
+}
+.prose-mesa input[type="checkbox"] {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 1.5px solid var(--color-ink-4);
+  border-radius: 3px;
+  background: var(--color-white);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+.prose-mesa input[type="checkbox"]:checked {
+  background: var(--color-cobalt);
+  border-color: var(--color-cobalt);
+}
+.prose-mesa input[type="checkbox"]:checked::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.28rem;
+  border: 1.6px solid white;
+  border-top: 0;
+  border-right: 0;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.prose-mesa blockquote {
+  border-left: 2px solid var(--color-ink);
+  padding-left: 1em;
+  font-family: var(--font-serif);
+  font-size: 1.15em;
+  font-style: italic;
+  color: var(--color-ink-3);
+}
+.prose-mesa hr {
+  border: 0;
+  height: 1px;
+  background: var(--color-line-strong);
+  margin: 1.6em 0;
+}
+.prose-mesa hr.ProseMirror-selectednode {
+  background: var(--color-cobalt);
+}
+.prose-mesa a {
+  color: var(--color-cobalt-ink);
+  text-decoration: underline;
+  text-decoration-color: rgb(82 105 255 / 0.4);
+  text-underline-offset: 2px;
+}
+.prose-mesa code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-paper-2);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+.prose-mesa pre {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  padding: 0.9em 1em;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.prose-mesa pre code {
+  background: none;
+  padding: 0;
+}
+.prose-mesa p.is-editor-empty:first-child::before,
+.prose-mesa .is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-ink-5);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.prose-mesa .ProseMirror-gapcursor:after {
+  border-top-color: var(--color-ink);
+}
+
+/* ——— Canvas (React Flow) ——————————————————————————————————————————————————— */
+
+.mesa-flow .react-flow__node {
+  font-family: var(--font-sans);
+}
+.mesa-flow .react-flow__handle {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--color-cobalt);
+  background: var(--color-white);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.mesa-flow .react-flow__node:hover .react-flow__handle,
+.mesa-flow .react-flow__node.selected .react-flow__handle,
+.mesa-flow.is-connecting .react-flow__handle {
+  opacity: 1;
+}
+.mesa-flow .react-flow__edge-path {
+  stroke: var(--color-ink-3);
+  stroke-width: 1.5;
+}
+.mesa-flow .react-flow__edge.selected .react-flow__edge-path,
+.mesa-flow .react-flow__edge:focus .react-flow__edge-path {
+  stroke: var(--color-cobalt);
+}
+.mesa-flow .react-flow__selection,
+.mesa-flow .react-flow__nodesselection-rect {
+  background: rgb(82 105 255 / 0.06);
+  border: 1px solid var(--color-cobalt);
+}
+.mesa-flow .react-flow__minimap {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.mesa-flow .react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--color-cobalt);
+  background: var(--color-white);
+  border-radius: 1px;
+}
+.mesa-flow .react-flow__resize-control.line {
+  border-color: var(--color-cobalt);
+}
+.mesa-flow .react-flow__attribution {
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  opacity: 0.5;
+}
+
+/* Referência interna: chip próprio, sem o estilo de link do texto. */
+.prose-mesa [data-ref-type] a {
+  color: inherit;
+  text-decoration: none;
+}
+.prose-mesa [data-ref-type].ProseMirror-selectednode a {
+  border-color: var(--color-cobalt);
+  box-shadow: 0 0 0 2px var(--color-cobalt-soft);
+}
+.mesa-drag-handle {
+  transition: opacity 120ms;
+}
+
+/* Frame: só a barra de título e as bordas capturam o ponteiro; o interior deixa clicar no quadro. */
+.mesa-flow .react-flow__node-frame {
+  pointer-events: none !important;
+}
+.mesa-flow .react-flow__node-frame .frame-handle,
+.mesa-flow .react-flow__node-frame .react-flow__resize-control {
+  pointer-events: all;
+}
+.mesa-flow .react-flow__node-frame.selected > div {
+  pointer-events: none;
+}
+.mesa-flow .react-flow__panel {
+  z-index: 6;
+}
